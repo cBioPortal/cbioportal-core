@@ -17,20 +17,20 @@
 	<properties>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
-		
+
 		<!-- THIS SHOULD BE KEPT IN SYNC TO VERSION IN CGDS.SQL -->
 		<db.version>2.13.1</db.version>
 		<cbioportal.version>demo-rfc72-squash-9966fd5d1c-1</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
-		
-		
+
+
 		<mysql_driver.version>5.1.48</mysql_driver.version>
 		<mysql_commons_lang3.version>3.13.0</mysql_commons_lang3.version>
-		
+
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
 		<commons_io.version>2.14.0</commons_io.version>
 		<jung.version>2.1.1</jung.version>
-		
+
 		<jackson.version>2.15.2</jackson.version>
 		<antlr.version>3.5.2</antlr.version>
 		<httpclient.version>4.5.13</httpclient.version>
@@ -43,11 +43,12 @@
 		<fop.version>2.6</fop.version>
 		<opencsv.version>2.4</opencsv.version>
 		<dom4j.version>1.6.1</dom4j.version>
-		<spring_starter_test.version>3.1.5</spring_starter_test.version>
+		<spring_starter_test.version>3.1.4</spring_starter_test.version>
 		<junit.version>4.13.2</junit.version>
 		<jakarta_ws_rs.version>3.1.0</jakarta_ws_rs.version>
 		<easymock.version>4.3</easymock.version>
 		<junitparams.version>1.1.0</junitparams.version>
+		<byte_buddy.version>1.14.9</byte_buddy.version>
 	</properties>
 
 
@@ -202,6 +203,12 @@
 			<artifactId>JUnitParams</artifactId>
 			<version>${junitparams.version}</version>
 			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>net.bytebuddy</groupId>
+			<artifactId>byte-buddy</artifactId>
+			<version>${byte_buddy.version}</version>
 		</dependency>
 
 
