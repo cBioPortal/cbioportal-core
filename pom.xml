@@ -59,7 +59,7 @@
 			<version>${cbioportal.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.mskcc.cbio</groupId>
+			<groupId>org.cbioportal</groupId>
 			<artifactId>maf</artifactId>
 			<version>${maf.version}</version>
 		</dependency>
