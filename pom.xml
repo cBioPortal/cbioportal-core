@@ -17,15 +17,20 @@
 	<properties>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
+		
 		<!-- THIS SHOULD BE KEPT IN SYNC TO VERSION IN CGDS.SQL -->
 		<db.version>2.13.1</db.version>
+		<cbioportal.version>demo-rfc72-squash-9966fd5d1c-1</cbioportal.version>
+		<maf.version>1.0.0</maf.version>
+		
+		
 		<mysql_driver.version>5.1.48</mysql_driver.version>
 		<mysql_commons_lang3.version>3.13.0</mysql_commons_lang3.version>
-		<cbioportal.version>0.0.1-SNAPSHOT</cbioportal.version>
+		
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
 		<commons_io.version>2.14.0</commons_io.version>
 		<jung.version>2.1.1</jung.version>
-		<maf.version>0.0.1-SNAPSHOT</maf.version>
+		
 		<jackson.version>2.15.2</jackson.version>
 		<antlr.version>3.5.2</antlr.version>
 		<httpclient.version>4.5.13</httpclient.version>
@@ -50,7 +55,7 @@
 		<!-- cBioPortal Projects -->
 		<dependency>
 			<groupId>org.cbioportal</groupId>
-			<artifactId>master</artifactId>
+			<artifactId>cbioportal</artifactId>
 			<version>${cbioportal.version}</version>
 		</dependency>
 		<dependency>
@@ -192,12 +197,12 @@
 			<version>${easymock.version}</version>
 			<scope>test</scope>
 		</dependency>
-		 <dependency>
-            <groupId>pl.pragmatists</groupId>
-            <artifactId>JUnitParams</artifactId>
-            <version>${junitparams.version}</version>
-            <scope>test</scope>
-        </dependency>
+		<dependency>
+			<groupId>pl.pragmatists</groupId>
+			<artifactId>JUnitParams</artifactId>
+			<version>${junitparams.version}</version>
+			<scope>test</scope>
+		</dependency>
 
 
 		<dependency>
@@ -205,16 +210,13 @@
 			<artifactId>mysql-connector-java</artifactId>
 			<version>${mysql_driver.version}</version>
 		</dependency>
-
-
 	</dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
+
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
 </project>
