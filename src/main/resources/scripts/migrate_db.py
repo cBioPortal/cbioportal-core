@@ -398,7 +398,7 @@ def main():
         script_dir = Path(__file__).resolve().parent
         # go up from cbioportal/core/src/main/scripts/ to cbioportal/
         src_root = script_dir.parent.parent.parent.parent
-        sql_filename = src_root / 'db-scripts/src/main/resources/migration.sql'
+        sql_filename = src_root / 'src/main/resources/db-scripts/migration.sql'
 
     if not os.path.exists(sql_filename):
         print('sql file %s cannot be found' % (sql_filename), file=ERROR_FILE)

@@ -38,12 +38,12 @@ sub locate_src_root {
     # isolate the directory this code file is in
     my ($volume, $script_dir, undef) = File::Spec->splitpath(__FILE__);
     # go up from cbioportal/core/src/main/scripts/ to cbioportal/
-    my $src_root_dir = File::Spec->catdir($script_dir, (File::Spec->updir()) x 4);
+    my $src_root_dir = File::Spec->catdir($script_dir, (File::Spec->updir()) x 1);
     # reassamble the path and resolve updirs (/../)
     return abs_path(File::Spec->catpath($volume, $src_root_dir));
 }
 $src_root = locate_src_root();
-@jar_files = glob("$src_root/scripts/target/scripts-*.jar");
+@jar_files = glob("$src_root/scripts/target/core-*.jar");
 if (scalar @jar_files != 1) {
     die "Expected to find 1 scripts-*.jar, but found: " . scalar @jar_files;
 }
