@@ -43,7 +43,7 @@ sub locate_src_root {
     return abs_path(File::Spec->catpath($volume, $src_root_dir));
 }
 $src_root = locate_src_root();
-@jar_files = glob("$src_root/scripts/target/core-*.jar");
+@jar_files = glob("$src_root/core-*.jar");
 if (scalar @jar_files != 1) {
     die "Expected to find 1 scripts-*.jar, but found: " . scalar @jar_files;
 }
