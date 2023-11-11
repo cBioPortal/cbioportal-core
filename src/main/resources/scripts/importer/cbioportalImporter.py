@@ -499,9 +499,9 @@ def locate_jar():
     # get the directory name of the currently running script,
     # resolving any symlinks
     script_dir = Path(__file__).resolve().parent
-    # go up from cbioportal/core/src/main/scripts/importer/ to cbioportal/
-    src_root = script_dir.parent.parent.parent.parent.parent
-    jars = list((src_root / 'scripts' / 'target').glob('scripts-*.jar'))
+    # go up from core/scripts/importer/ to core/
+    src_root = script_dir.parent.parent
+    jars = list((src_root ).glob('core-*.jar'))
     if len(jars) != 1:
         raise FileNotFoundError(
             'Expected to find 1 scripts-*.jar, but found ' + str(len(jars)))
