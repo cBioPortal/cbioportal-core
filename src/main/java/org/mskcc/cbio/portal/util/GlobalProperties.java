@@ -68,7 +68,7 @@ import org.springframework.util.ResourceUtils;
 public class GlobalProperties {
 
     public static final String HOME_DIR = "PORTAL_HOME";
-    private static final String PORTAL_PROPERTIES_FILE_NAME = "portal.properties";
+    private static final String PORTAL_PROPERTIES_FILE_NAME = "application.properties";
     private static final String MAVEN_PROPERTIES_FILE_NAME = "maven.properties";
 
     public static final String PATHWAY_COMMONS_URL = "pathway_commons.url";
