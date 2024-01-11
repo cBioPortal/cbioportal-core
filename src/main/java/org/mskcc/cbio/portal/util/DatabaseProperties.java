@@ -35,7 +35,7 @@ package org.mskcc.cbio.portal.util;
 import org.mskcc.cbio.portal.util.GlobalProperties;
 
 /**
- * Stores db props (name, id, pw, host) from portal.properties
+ * Stores db props (name, id, pw, host) from application.properties
  * and makes them accessible.
  */
 public class DatabaseProperties {
@@ -48,6 +48,8 @@ public class DatabaseProperties {
     private String dbUseSSL;
     private String dbEnablePooling;
     private String connectionURL;
+    private String springConnectionURL;
+    private String springDbDriverClassName;
 
     // No production keys stored in filesystem or code: digest the key; put it in properties; load it into dbms on startup
     private static DatabaseProperties dbProperties;
@@ -55,7 +57,7 @@ public class DatabaseProperties {
     public static DatabaseProperties getInstance() {
         if (dbProperties == null) {
             dbProperties = new DatabaseProperties();
-            //  Get DB Properties from portal.properties.
+            //  Get DB Properties from application.properties.
             dbProperties.setDbHost(GlobalProperties.getProperty("db.host"));
             dbProperties.setDbName(GlobalProperties.getProperty("db.portal_db_name"));
             dbProperties.setDbUser(GlobalProperties.getProperty("db.user"));
@@ -65,6 +67,9 @@ public class DatabaseProperties {
             dbProperties.setDbUseSSL(GlobalProperties.getProperty("db.use_ssl"));
             dbProperties.setDbEnablePooling(GlobalProperties.getProperty("db.enable_pooling"));
             dbProperties.setConnectionURL(GlobalProperties.getProperty("db.connection_string"));
+            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.url"));
+            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.driver-class-name"));
+
         }
         return dbProperties;
     }
@@ -142,6 +147,22 @@ public class DatabaseProperties {
 
     public void setConnectionURL(String connectionURL) {
         this.connectionURL = connectionURL;
+    }
+
+    public String getSpringConnectionURL() {
+        return springConnectionURL;
+    }
+
+    public void setSpringConnectionURL(String springConnectionURL) {
+        this.springConnectionURL = springConnectionURL;
+    }
+
+    public String getSpringDbDriverClassName() {
+        return springDbDriverClassName;
+    }
+
+    public void setSpringDbDriverClassName(String springDbDriverClassName) {
+        this.springDbDriverClassName = springDbDriverClassName;
     }
     
 }

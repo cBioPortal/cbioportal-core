@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # Script which hot deploys cbio portal fixes.  Script assumes
 # properties file argument lives within $PORTAL_HOME/portal.  This
-# script will clobber any existing portal.properties file within $PORTAL_HOME/portal.
+# script will clobber any existing application.properties file within $PORTAL_HOME/portal.
 
 # ------------------------------------------------------------------------------
 # imports
@@ -29,7 +29,7 @@ PORTAL_PROJECT = PORTAL_HOME + os.sep + "portal"
 
 WAR_FILE_DEST = "/srv/www/sander-tomcat/tomcat6/webapps/"
 
-# fields in credentials - should match portal portal.properties
+# fields in credentials - should match portal application.properties
 CGDS_DATABASE_USER = 'db.user'
 CGDS_DATABASE_PW = 'db.password'
 BITLY_USER = 'bitly.user'
@@ -104,12 +104,12 @@ def deploy_war(host, user):
 
 def build_war(portal_credentials, portal_properties):
 
-	# setup portal.properties
-	portal_properties = PORTAL_PROJECT + os.sep + "portal.properties"
+	# setup application.properties
+	portal_properties = PORTAL_PROJECT + os.sep + "application.properties"
 	if os.path.exists(portal_properties):
 		print >> OUTPUT_FILE, "Clobbering %s" % portal_properties
 
-	# we are going to create a new portal.properties file using
+	# we are going to create a new application.properties file using
 	# portal_properties as the template and get credentials from portal_credentials
 	portal_properties_file = open(portal_properties, 'w')
 	portal_properties_file = open(portal_properties, 'r')

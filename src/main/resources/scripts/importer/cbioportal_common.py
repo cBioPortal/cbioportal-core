@@ -45,7 +45,8 @@ PORTAL_PROPERTY_DATABASE_HOST = 'db.host'
 PORTAL_PROPERTY_DATABASE_NAME = 'db.portal_db_name'
 PORTAL_PROPERTY_DATABASE_URL = 'db.connection_string'
 PORTAL_PROPERTY_DATABASE_USESSL = 'db.use_ssl'
-REQUIRED_DATABASE_PROPERTIES = [PORTAL_PROPERTY_DATABASE_USER, PORTAL_PROPERTY_DATABASE_PW, PORTAL_PROPERTY_DATABASE_URL]
+PORTAL_PROPERTY_SPRING_DATABASE_URL = 'spring.datasource.url'
+REQUIRED_DATABASE_PROPERTIES = [PORTAL_PROPERTY_DATABASE_USER, PORTAL_PROPERTY_DATABASE_PW, PORTAL_PROPERTY_SPRING_DATABASE_URL]
 
 # provides a key for data types to metafile specification dict.
 class MetaFileTypes(object):
@@ -1013,7 +1014,7 @@ def run_java(*args):
 
 
 def properties_error_message(display_name: str, property_name: str) -> str:
-    return f"No {display_name} provided for database connection. Please set '{property_name}' in portal.properties."
+    return f"No {display_name} provided for database connection. Please set '{property_name}' in application.properties."
 
 
 class PortalProperties(object):
@@ -1041,12 +1042,13 @@ def get_database_properties(properties_filename: str) -> Optional[PortalProperti
 
     if properties.get(PORTAL_PROPERTY_DATABASE_HOST) is not None \
         or properties.get(PORTAL_PROPERTY_DATABASE_NAME) is not None \
-        or properties.get(PORTAL_PROPERTY_DATABASE_USESSL) is not None:
+        or properties.get(PORTAL_PROPERTY_DATABASE_USESSL) is not None \ 
+        or properties.get(PORTAL_PROPERTY_DATABASE_URL) is not None:
         print("""
             ----------------------------------------------------------------------------------------------------------------
             -- Connection error:
-            -- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' properties.
-            -- Please remove these properties and use the 'db.connection_string' property instead. See https://docs.cbioportal.org/deployment/customization/portal.properties-reference/
+            -- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' or 'db.connection_string' properties.
+            -- Please remove these properties and use the 'db.spring.datasource.url' property instead. See https://docs.cbioportal.org/deployment/customization/application.properties-reference/
             -- for assistance on building a valid connection string.
             ------------------------------------------------------------f---------------------------------------------------
         """, file=ERROR_FILE)
@@ -1054,7 +1056,7 @@ def get_database_properties(properties_filename: str) -> Optional[PortalProperti
 
     return PortalProperties(properties[PORTAL_PROPERTY_DATABASE_USER],
                             properties[PORTAL_PROPERTY_DATABASE_PW],
-                            properties[PORTAL_PROPERTY_DATABASE_URL])
+                            properties[PORTAL_PROPERTY_SPRING_DATABASE_URL])
 
 
 def parse_properties_file(properties_filename: str) -> Dict[str, str]:

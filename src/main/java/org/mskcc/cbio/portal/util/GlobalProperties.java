@@ -392,7 +392,7 @@ public class GlobalProperties {
      * Minimal portal property resolver that takes system property overrides.
      *
      * Provides properties from runtime or the baked-in
-     * portal.properties config file, but takes overrides from <code>-D</code>
+     * application.properties config file, but takes overrides from <code>-D</code>
      * system properties.
      */
     private static class ConfigPropertyResolver {
@@ -400,7 +400,7 @@ public class GlobalProperties {
         /**
          * Finds the config file for properties not overridden by system props.
          *
-         * Either the runtime or buildtime portal.properties file.
+         * Either the runtime or buildtime application.properties file.
          */
         public ConfigPropertyResolver() {
             configFileProperties = initializeProperties(PORTAL_PROPERTIES_FILE_NAME);

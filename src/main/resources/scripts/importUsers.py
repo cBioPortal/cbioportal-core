@@ -2,7 +2,7 @@
 
 # ------------------------------------------------------------------------------
 # Script which adds new users fram google spreadsheet into the the cgds
-# user table.  The following properties must be specified in portal.properties:
+# user table.  The following properties must be specified in application.properties:
 #
 # db.name
 # db.user
@@ -51,7 +51,7 @@ from email import Encoders
 ERROR_FILE = sys.stderr
 OUTPUT_FILE = sys.stdout
 
-# fields in portal.properties
+# fields in application.properties
 CGDS_DATABASE_HOST = 'db.host'
 CGDS_DATABASE_NAME = 'db.portal_db_name'
 CGDS_DATABASE_USER = 'db.user'
@@ -345,7 +345,7 @@ def get_db_connection(portal_properties):
 
 
 # ------------------------------------------------------------------------------
-# parse portal.properties
+# parse application.properties
 
 def get_portal_properties(portal_properties_filename):
 

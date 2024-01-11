@@ -371,7 +371,7 @@ def main():
     parser = argparse.ArgumentParser(description='cBioPortal DB migration script')
     parser.add_argument('-y', '--suppress_confirmation', default=False, action='store_true')
     parser.add_argument('-p', '--properties-file', type=str, required=False,
-                        help='Path to portal.properties file (default: locate it '
+                        help='Path to application.properties file (default: locate it '
                              'relative to the script)')
     parser.add_argument('-s', '--sql', type=str, required=False,
                         help='Path to official migration.sql script. (default: locate it '
@@ -389,7 +389,7 @@ def main():
         script_dir = Path(__file__).resolve().parent
         # go up from cbioportal/core/src/main/scripts/ to cbioportal/
         src_root = script_dir.parent.parent.parent.parent
-        properties_filename = src_root / 'portal.properties'
+        properties_filename = src_root / 'application.properties'
                 
     sql_filename = parser.sql
     if sql_filename is None:
