@@ -1042,7 +1042,7 @@ def get_database_properties(properties_filename: str) -> Optional[PortalProperti
 
     if properties.get(PORTAL_PROPERTY_DATABASE_HOST) is not None \
         or properties.get(PORTAL_PROPERTY_DATABASE_NAME) is not None \
-        or properties.get(PORTAL_PROPERTY_DATABASE_USESSL) is not None \ 
+        or properties.get(PORTAL_PROPERTY_DATABASE_USESSL) is not None \
         or properties.get(PORTAL_PROPERTY_DATABASE_URL) is not None:
         print("""
             ----------------------------------------------------------------------------------------------------------------
