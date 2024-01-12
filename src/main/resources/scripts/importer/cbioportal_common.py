@@ -45,8 +45,10 @@ PORTAL_PROPERTY_DATABASE_HOST = 'db.host'
 PORTAL_PROPERTY_DATABASE_NAME = 'db.portal_db_name'
 PORTAL_PROPERTY_DATABASE_URL = 'db.connection_string'
 PORTAL_PROPERTY_DATABASE_USESSL = 'db.use_ssl'
+PORTAL_PROPERTY_SPRING_DATABASE_USER = 'spring.datasource.username'
+PORTAL_PROPERTY_SPRING_DATABASE_PW = 'spring.datasource.password'
 PORTAL_PROPERTY_SPRING_DATABASE_URL = 'spring.datasource.url'
-REQUIRED_DATABASE_PROPERTIES = [PORTAL_PROPERTY_DATABASE_USER, PORTAL_PROPERTY_DATABASE_PW, PORTAL_PROPERTY_SPRING_DATABASE_URL]
+REQUIRED_DATABASE_PROPERTIES = [PORTAL_PROPERTY_SPRING_DATABASE_USER, PORTAL_PROPERTY_SPRING_DATABASE_PW, PORTAL_PROPERTY_SPRING_DATABASE_URL]
 
 # provides a key for data types to metafile specification dict.
 class MetaFileTypes(object):
@@ -1054,8 +1056,8 @@ def get_database_properties(properties_filename: str) -> Optional[PortalProperti
         """, file=ERROR_FILE)
         return None
 
-    return PortalProperties(properties[PORTAL_PROPERTY_DATABASE_USER],
-                            properties[PORTAL_PROPERTY_DATABASE_PW],
+    return PortalProperties(properties[PORTAL_PROPERTY_SPRING_DATABASE_USER],
+                            properties[PORTAL_PROPERTY_SPRING_DATABASE_PW],
                             properties[PORTAL_PROPERTY_SPRING_DATABASE_URL])
 
 

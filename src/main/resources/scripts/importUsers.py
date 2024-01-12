@@ -52,9 +52,9 @@ ERROR_FILE = sys.stderr
 OUTPUT_FILE = sys.stdout
 
 # fields in application.properties
-CGDS_DATABASE_HOST = 'db.host'
+CGDS_DATABASE_HOST = 'spring.datasource.password'
 CGDS_DATABASE_NAME = 'db.portal_db_name'
-CGDS_DATABASE_USER = 'db.user'
+CGDS_DATABASE_USER = 'spring.datasource.user'
 CGDS_DATABASE_PW = 'db.password'
 GOOGLE_ID = 'google.id'
 GOOGLE_PW = 'google.pw'

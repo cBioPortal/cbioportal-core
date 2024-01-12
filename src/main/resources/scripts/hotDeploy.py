@@ -30,8 +30,8 @@ PORTAL_PROJECT = PORTAL_HOME + os.sep + "portal"
 WAR_FILE_DEST = "/srv/www/sander-tomcat/tomcat6/webapps/"
 
 # fields in credentials - should match portal application.properties
-CGDS_DATABASE_USER = 'db.user'
-CGDS_DATABASE_PW = 'db.password'
+CGDS_DATABASE_USER = 'spring.datasource.username'
+CGDS_DATABASE_PW = 'spring.datasource.password'
 BITLY_USER = 'bitly.user'
 BITLY_KEY = 'bitly.api_key'
 CGDS_USERS_SPREADSHEET = 'users.spreadsheet'

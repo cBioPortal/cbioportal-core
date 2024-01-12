@@ -31,8 +31,8 @@ public class JdbcDataSource extends BasicDataSource {
                 "----------------------------------------------------------------------------------------------------------------\n"
         );
         
-        Assert.hasText(userName, errorMessage("username", "db.user"));
-        Assert.hasText(password, errorMessage("password", "db.password"));
+        Assert.hasText(userName, errorMessage("username", "spring.datasource.username"));
+        Assert.hasText(password, errorMessage("password", "spring.datasource.password"));
         Assert.hasText(mysqlDriverClassName, errorMessage("driver class name", "spring.datasource.driver-class-name"));
 
         this.setUrl(connectionURL);

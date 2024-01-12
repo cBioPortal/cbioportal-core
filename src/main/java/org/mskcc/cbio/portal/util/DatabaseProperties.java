@@ -48,6 +48,8 @@ public class DatabaseProperties {
     private String dbUseSSL;
     private String dbEnablePooling;
     private String connectionURL;
+    private String springDbUser;
+    private String springDbPassword;
     private String springConnectionURL;
     private String springDbDriverClassName;
 
@@ -67,6 +69,8 @@ public class DatabaseProperties {
             dbProperties.setDbUseSSL(GlobalProperties.getProperty("db.use_ssl"));
             dbProperties.setDbEnablePooling(GlobalProperties.getProperty("db.enable_pooling"));
             dbProperties.setConnectionURL(GlobalProperties.getProperty("db.connection_string"));
+            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.username"));
+            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.password"));
             dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.url"));
             dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.driver-class-name"));
 
@@ -155,6 +159,22 @@ public class DatabaseProperties {
 
     public void setSpringConnectionURL(String springConnectionURL) {
         this.springConnectionURL = springConnectionURL;
+    }
+
+    public String getSpringDbUser() {
+        return springDbUser;
+    }
+
+    public void setSpringDbUser(String springDbUser) {
+        this.springDbUser = springDbUser;
+    }
+
+    public String getSpringDbPassword() {
+        return springDbPassword;
+    }
+
+    public void setSpringDbPassword(String springDbPassword) {
+        this.springDbPassword = springDbPassword;
     }
 
     public String getSpringDbDriverClassName() {
