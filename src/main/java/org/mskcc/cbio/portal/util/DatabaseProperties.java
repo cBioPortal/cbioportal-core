@@ -69,10 +69,10 @@ public class DatabaseProperties {
             dbProperties.setDbUseSSL(GlobalProperties.getProperty("db.use_ssl"));
             dbProperties.setDbEnablePooling(GlobalProperties.getProperty("db.enable_pooling"));
             dbProperties.setConnectionURL(GlobalProperties.getProperty("db.connection_string"));
-            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.username"));
-            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.password"));
-            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.url"));
-            dbProperties.setConnectionURL(GlobalProperties.getProperty("spring.datasource.driver-class-name"));
+            dbProperties.setSpringDbUser(GlobalProperties.getProperty("spring.datasource.username"));
+            dbProperties.setSpringDbPassword(GlobalProperties.getProperty("spring.datasource.password"));
+            dbProperties.setSpringConnectionURL(GlobalProperties.getProperty("spring.datasource.url"));
+            dbProperties.setSpringDbDriverClassName(GlobalProperties.getProperty("spring.datasource.driver-class-name"));
 
         }
         return dbProperties;

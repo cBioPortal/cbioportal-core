@@ -13,16 +13,14 @@ public class JdbcDataSource extends BasicDataSource {
     public JdbcDataSource () {
         DatabaseProperties dbProperties = DatabaseProperties.getInstance();
 
-        String host = dbProperties.getDbHost();
-        String userName = dbProperties.getDbUser();
-        String password = dbProperties.getDbPassword();
-        String mysqlDriverClassName = dbProperties.getDbDriverClassName();
-        String database = dbProperties.getDbName();
+        String userName = dbProperties.getSpringDbUser();
+        String password = dbProperties.getSpringDbPassword();
+        String mysqlDriverClassName = dbProperties.getSpringDbDriverClassName();
         String enablePooling = (!StringUtils.isBlank(dbProperties.getDbEnablePooling())) ? dbProperties.getDbEnablePooling(): "false";
-        String connectionURL = dbProperties.getConnectionURL();
+        String connectionURL = dbProperties.getSpringConnectionURL();
         
         Assert.isTrue(
-            !defined(host) && !defined(database) && !defined(dbProperties.getConnectionURL()) &&!defined(dbProperties.getDbDriverClassName()) && !defined(dbProperties.getDbUseSSL()),
+            !defined(dbProperties.getDbHost()) && !defined(dbProperties.getDbUser()) && !defined(dbProperties.getDbPassword()) && !defined(dbProperties.getDbName()) && !defined(dbProperties.getConnectionURL()) && !defined(dbProperties.getDbDriverClassName()) && !defined(dbProperties.getDbUseSSL()),
             "\n----------------------------------------------------------------------------------------------------------------" +
                 "-- Connection error:\n" +
                 "-- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' or 'db.connection_string' and. 'db.driver' properties.\n" +
@@ -51,7 +49,6 @@ public class JdbcDataSource extends BasicDataSource {
         this.setMinEvictableIdleTimeMillis(30000);
         this.setTestOnBorrow(true);
         this.setValidationQuery("SELECT 1");
-        this.setJmxName("org.cbioportal:DataSource=" + database);
     }
     
     private String errorMessage(String displayName, String propertyName) {
