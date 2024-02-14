@@ -54,7 +54,7 @@ public class CnaUtil {
                 continue;
             }
             
-            CnaEvent.Event event = cnaEvent.getEvent()
+            CnaEvent.Event event = cnaEvent.getEvent();
             if (existingCnaEvents.contains(event)) {
                 cnaEvent.setEventId(event.getEventId());
                 DaoCnaEvent.addCaseCnaEvent(cnaEvent, false);
