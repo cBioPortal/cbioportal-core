@@ -219,7 +219,7 @@ public class QueryBuilder extends HttpServlet {
 //                String extraMessage = "";
 //                //extra message for the cases where property is missing (will happen often in transition period to this new versioning model):
 //                if (dbPortalExpectedSchemaVersion.equals("0")) {
-//                    extraMessage = "The db.version property also not found in your portal.properties file. This new property needs to be added by the administrator.";
+//                    extraMessage = "The db.version property also not found in your application.properties file. This new property needs to be added by the administrator.";
 //                }
 //                String finalMessage = "Current DB schema version: " + dbActualSchemaVersion + "<br/>" +
 //                    "DB schema version expected by Portal: " + dbPortalExpectedSchemaVersion + "<br/>" + extraMessage;

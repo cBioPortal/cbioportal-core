@@ -269,7 +269,7 @@ def interface():
                         required=True,
                         help='Study Identifier')
     parser.add_argument('-p', '--portal_properties', type=str, required=True,
-                        help='portal.properties of cBioPortal')
+                        help='application.properties of cBioPortal')
     parser = parser.parse_args()
     return parser
 

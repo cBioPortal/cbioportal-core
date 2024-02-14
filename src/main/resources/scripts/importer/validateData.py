@@ -2136,7 +2136,7 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
 
     def checkNCBIbuild(self, value):
         """
-        Checks whether the value found in MAF NCBI_Build column matches the genome specified in portal.properties at 
+        Checks whether the value found in MAF NCBI_Build column matches the genome specified in application.properties at 
         field ncbi.build. Expecting GRCh37, GRCh38, GRCm38 or without the GRCx prefix
         """    
     

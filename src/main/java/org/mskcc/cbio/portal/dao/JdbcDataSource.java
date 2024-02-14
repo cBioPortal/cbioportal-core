@@ -13,27 +13,25 @@ public class JdbcDataSource extends BasicDataSource {
     public JdbcDataSource () {
         DatabaseProperties dbProperties = DatabaseProperties.getInstance();
 
-        String host = dbProperties.getDbHost();
-        String userName = dbProperties.getDbUser();
-        String password = dbProperties.getDbPassword();
-        String mysqlDriverClassName = dbProperties.getDbDriverClassName();
-        String database = dbProperties.getDbName();
+        String userName = dbProperties.getSpringDbUser();
+        String password = dbProperties.getSpringDbPassword();
+        String mysqlDriverClassName = dbProperties.getSpringDbDriverClassName();
         String enablePooling = (!StringUtils.isBlank(dbProperties.getDbEnablePooling())) ? dbProperties.getDbEnablePooling(): "false";
-        String connectionURL = dbProperties.getConnectionURL();
+        String connectionURL = dbProperties.getSpringConnectionURL();
         
         Assert.isTrue(
-            !defined(host) && !defined(database) && !defined(dbProperties.getDbUseSSL()),
+            !defined(dbProperties.getDbHost()) && !defined(dbProperties.getDbUser()) && !defined(dbProperties.getDbPassword()) && !defined(dbProperties.getDbName()) && !defined(dbProperties.getConnectionURL()) && !defined(dbProperties.getDbDriverClassName()) && !defined(dbProperties.getDbUseSSL()),
             "\n----------------------------------------------------------------------------------------------------------------" +
                 "-- Connection error:\n" +
-                "-- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' properties.\n" +
-                "-- Please remove these properties and use the 'db.connection_string' property instead. See https://docs.cbioportal.org/deployment/customization/portal.properties-reference/\n" +
+                "-- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' or 'db.connection_string' and. 'db.driver' properties.\n" +
+                "-- Please remove these properties and use the 'spring.datasource.url' property instead. See https://docs.cbioportal.org/deployment/customization/application.properties-reference/\n" +
                 "-- for assistance on building a valid connection string.\n" +
                 "----------------------------------------------------------------------------------------------------------------\n"
         );
         
-        Assert.hasText(userName, errorMessage("username", "db.user"));
-        Assert.hasText(password, errorMessage("password", "db.password"));
-        Assert.hasText(mysqlDriverClassName, errorMessage("driver class name", "db.driver"));
+        Assert.hasText(userName, errorMessage("username", "spring.datasource.username"));
+        Assert.hasText(password, errorMessage("password", "spring.datasource.password"));
+        Assert.hasText(mysqlDriverClassName, errorMessage("driver class name", "spring.datasource.driver-class-name"));
 
         this.setUrl(connectionURL);
 
@@ -51,11 +49,10 @@ public class JdbcDataSource extends BasicDataSource {
         this.setMinEvictableIdleTimeMillis(30000);
         this.setTestOnBorrow(true);
         this.setValidationQuery("SELECT 1");
-        this.setJmxName("org.cbioportal:DataSource=" + database);
     }
     
     private String errorMessage(String displayName, String propertyName) {
-        return String.format("No %s provided for database connection. Please set '%s' in portal.properties.", displayName, propertyName);
+        return String.format("No %s provided for database connection. Please set '%s' in application.properties.", displayName, propertyName);
     }
     
     private boolean defined(String property) {
