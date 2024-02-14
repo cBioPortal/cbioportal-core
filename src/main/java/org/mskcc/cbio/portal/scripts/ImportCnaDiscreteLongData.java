@@ -260,6 +260,11 @@ public class ImportCnaDiscreteLongData {
             if (genes.size() > 1) {
                 throw new IllegalStateException("Found multiple genes for Hugo symbol " + hugoSymbol + " while importing cna");
             }
+            // Ignore gene if it cannot be found in the database
+            if (genes.size() < 1) {
+                ProgressMonitor.logWarning("Ignoring Hugo symbol " + hugoSymbol + "not found in the database");
+                return null;
+            }
             return genes.get(0);
         }
         ProgressMonitor.logWarning("Entrez_Id " + entrez + " not found. Record will be skipped for this gene.");
