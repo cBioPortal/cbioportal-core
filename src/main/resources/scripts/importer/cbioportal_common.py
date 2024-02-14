@@ -1096,7 +1096,6 @@ def get_db_cursor(portal_properties: PortalProperties):
             connection_kwargs['ssl_mode'] = 'REQUIRED'
             connection_kwargs['ssl'] = {"ssl_mode": True}
         else:
-            connection_kwargs['ssl_mode'] = 'DISABLED'  
             if url_elements.query.get("get-server-public-key") == "true":
                 connection_kwargs['ssl'] = {
                     'MYSQL_OPT_GET_SERVER_PUBLIC_KEY': True
