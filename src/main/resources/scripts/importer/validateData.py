@@ -92,6 +92,9 @@ COLOR_REGEX = re.compile("^#[a-fA-F0-9]{6}$")
 # global character limit on sample stable ids
 MAX_SAMPLE_STABLE_ID_LENGTH = 63
 
+# global variable that defines the invalid ID characters
+INVALID_ID_CHARACTERS = r"[^A-Za-z0-9._\(\)'-]"
+
 # ----------------------------------------------------------------------------
 
 VALIDATOR_IDS = {
@@ -2517,7 +2520,6 @@ class ClinicalValidator(Validator):
             'datatype': 'STRING'
         },
     }
-    INVALID_ID_CHARACTERS = r'[^A-Za-z0-9._-]'
     BANNED_ATTRIBUTES = ['MUTATION_COUNT', 'FRACTION_GENOME_ALTERED']
 
     def __init__(self, *args, **kwargs):
@@ -2754,7 +2756,7 @@ class ClinicalValidator(Validator):
                                'cause': value})
 
             if col_name == 'PATIENT_ID' or col_name == 'SAMPLE_ID':
-                if re.findall(self.INVALID_ID_CHARACTERS, value):
+                if re.findall(INVALID_ID_CHARACTERS, value):
                     self.logger.error(
                         'PATIENT_ID and SAMPLE_ID can only contain letters, '
                         'numbers, points, underscores and/or hyphens',
@@ -3758,8 +3760,6 @@ class ResourceValidator(Validator):
     NULL_VALUES = ["[not applicable]", "[not available]", "[pending]", "[discrepancy]", "[completed]", "[null]", "", "na"]
     ALLOW_BLANKS = True
 
-    INVALID_ID_CHARACTERS = r'[^A-Za-z0-9._-]'
-
     def __init__(self, *args, **kwargs):
         """Initialize the instance attributes of the data file validator."""
         super(ResourceValidator, self).__init__(*args, **kwargs)
@@ -3822,7 +3822,7 @@ class ResourceValidator(Validator):
                                'cause': value})
 
             if col_name == 'PATIENT_ID' or col_name == 'SAMPLE_ID':
-                if re.findall(self.INVALID_ID_CHARACTERS, value):
+                if re.findall(INVALID_ID_CHARACTERS, value):
                     self.logger.error(
                         'PATIENT_ID and SAMPLE_ID can only contain letters, '
                         'numbers, points, underscores and/or hyphens',
@@ -4314,15 +4314,13 @@ class MultipleDataFileValidator(FeaturewiseFileValidator, metaclass=ABCMeta):
 
         """Check the feature id column."""
 
-        ALLOWED_CHARACTERS = r'[^A-Za-z0-9_.-]'
-
         feature_id = nonsample_col_vals[0].strip()
 
         # Check if genetic entity is present
         if feature_id == '':
             # Validator already gives warning for this in checkLine method
             pass
-        elif re.search(ALLOWED_CHARACTERS, feature_id) is not None:
+        elif re.search(INVALID_ID_CHARACTERS, feature_id) is not None:
             self.logger.error('Feature id contains one or more illegal characters',
                                 extra={'line_number': self.line_number,
                                         'cause': 'id was`'+feature_id+'` and only alpha-numeric, _, . and - are allowed.'})
@@ -4457,12 +4455,10 @@ class GenericAssayWiseFileValidator(FeaturewiseFileValidator):
     def parseFeatureColumns(self, nonsample_col_vals):
         """Check the IDs in the first column."""
 
-        allowed_characters = r'[^A-Za-z0-9_.-]'
-
         value = nonsample_col_vals[0].strip()
 
-        # Check if genetic entity is present and contains allowed characters
-        if re.search(allowed_characters, value) is not None:
+        # Check if genetic entity is present and contains invalid characters
+        if re.search(INVALID_ID_CHARACTERS, value) is not None:
             self.logger.error('Feature id contains one or more illegal characters',
                               extra={'line_number': self.line_number,
                                      'cause': 'id was`' + value + '` and only alpha-numeric, _, . and - are allowed.'})
@@ -4688,7 +4684,6 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         'mm10': ('mouse', 'GRCm38', 'mm10')
     }
 
-    DISALLOWED_CHARACTERS = r'[^A-Za-z0-9_-]'
     for filename in filenames:
 
         meta_dictionary = cbioportal_common.parse_metadata_file(
@@ -4710,10 +4705,10 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         if 'stable_id' in meta_dictionary:
             stable_id = meta_dictionary['stable_id'].strip()
 
-            # Check for non-supported characters in the stable_id
+            # Check for invalid characters in the stable_id
             # Note: this check is needed because when using a wildcard for STABLE_ID
             # in the allowed_file_types.txt the user can specify a custom stable_id in the meta file.
-            if stable_id == '' or re.search(DISALLOWED_CHARACTERS, stable_id) != None:
+            if stable_id == '' or re.search(INVALID_ID_CHARACTERS, stable_id) != None:
                 logger.error(
                     '`stable_id` is not valid (empty string or contains one or more illegal characters)',
                     extra={'filename_': filename,
