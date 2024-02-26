@@ -444,8 +444,13 @@ def check_dir(study_directory):
 def add_parser_args(parser):
     parser.add_argument('-s', '--study_directory', type=str, required=False,
                         help='Path to Study Directory')
+    parser.add_argument('-jvo', '--java_opts', type=str, required=False,
+                        help='Path to specify JAVA_OPTS for the importer. \
+                        (default: locates the jar path relative to the import script \
+                        and passes it as the JAVA_OPTS)')
     parser.add_argument('-jar', '--jar_path', type=str, required=False,
-                        help='Path to scripts JAR file')
+                        help='DEPRECATED ARGUMENT. Please, use -jvo/--java_opts instead. If you \
+                             want to pass a jar path, use "-cp <jar_path>" as parameter for --java_opts.')
     parser.add_argument('-meta', '--meta_filename', type=str, required=False,
                         help='Path to meta file')
     parser.add_argument('-data', '--data_filename', type=str, required=False,
@@ -520,18 +525,25 @@ def main(args):
     module_logger.addHandler(error_handler)
     LOGGER = module_logger
 
-    # jar_path is optional. If not set, try to find it relative to this script
-    if args.jar_path is None:
+    # java_opts is optional. If class (jar) path is not set (-cp), try to find the jar path relative to this script
+    locate_jar_path = True
+    if args.java_opts is not None and '-cp' in args.java_opts:
+        locate_jar_path = False
+    if locate_jar_path:
         try:
-            args.jar_path = locate_jar()
+            jar_path = locate_jar()
         except FileNotFoundError as e:
             print(e)
             sys.exit(2)
-        print('Data loading step using', args.jar_path)
+        print('Data loading step using', jar_path)
         print()
+        if args.java_opts is None:
+            args.java_opts = f"-cp {jar_path}"
+        else:
+            args.java_opts = f"-cp {jar_path} {args.java_opts}"
 
     # process the options
-    jvm_args = "-Dspring.profiles.active=dbcp -cp " + args.jar_path
+    jvm_args = "-Dspring.profiles.active=dbcp " + args.java_opts
     study_directory = args.study_directory
 
     # check if DB version and application version are in sync

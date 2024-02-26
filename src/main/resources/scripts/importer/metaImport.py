@@ -74,11 +74,14 @@ def interface():
     portal_mode_group.add_argument('-n', '--no_portal_checks', default=False,
                                        action='store_true',
                                        help='Skip tests requiring information '
-                                            'from the cBioPortal installation')                                                               
+                                            'from the cBioPortal installation')
+    parser.add_argument('-jvo', '--java_opts', type=str, required=False,
+                        help='Path to specify JAVA_OPTS for the importer. \
+                        (default: locates the jar path relative to the import script \
+                        and passes it as the JAVA_OPTS)')
     parser.add_argument('-jar', '--jar_path', type=str, required=False,
-                        help=(
-                            'Path to scripts JAR file (default: locate it '
-                            'relative to the import script)'))
+                        help='DEPRECATED ARGUMENT. Please, use -jvo/--java_opts instead. If you \
+                             want to pass a jar path, use "-cp <jar_path>" as parameter for --java_opts.')
     parser.add_argument('-html', '--html_table', type=str,
                         help='path to html report')
     parser.add_argument('-v', '--verbose', action='store_true',
