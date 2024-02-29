@@ -1,48 +1,71 @@
 package org.mskcc.cbio.portal.dao;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.mskcc.cbio.portal.util.DatabaseProperties;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Data source that self-initializes based on cBioPortal configuration.
  */
 public class JdbcDataSource extends BasicDataSource {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcDataSource.class);
+
+    class RequiredPropertyInfo {
+        private String key; // the key string in the .properties file
+        private String value; // the value for the key set in the properties file
+        private String label; // the common descriptive label for the property for the error message
+
+        public RequiredPropertyInfo(String key, String value, String label) {
+            this.key = key;
+            this.value = value;
+            this.label = label;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
+
     public JdbcDataSource () {
         DatabaseProperties dbProperties = DatabaseProperties.getInstance();
-
-        String userName = dbProperties.getSpringDbUser();
+        logUsedDeprecatedProperties(dbProperties);
+        // extract required property values
+        String username = dbProperties.getSpringDbUser();
         String password = dbProperties.getSpringDbPassword();
-        String mysqlDriverClassName = dbProperties.getSpringDbDriverClassName();
-        String enablePooling = (!StringUtils.isBlank(dbProperties.getDbEnablePooling())) ? dbProperties.getDbEnablePooling(): "false";
         String connectionURL = dbProperties.getSpringConnectionURL();
-        
-        Assert.isTrue(
-            !defined(dbProperties.getDbHost()) && !defined(dbProperties.getDbUser()) && !defined(dbProperties.getDbPassword()) && !defined(dbProperties.getDbName()) && !defined(dbProperties.getConnectionURL()) && !defined(dbProperties.getDbDriverClassName()) && !defined(dbProperties.getDbUseSSL()),
-            "\n----------------------------------------------------------------------------------------------------------------" +
-                "-- Connection error:\n" +
-                "-- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' or 'db.connection_string' and. 'db.driver' properties.\n" +
-                "-- Please remove these properties and use the 'spring.datasource.url' property instead. See https://docs.cbioportal.org/deployment/customization/application.properties-reference/\n" +
-                "-- for assistance on building a valid connection string.\n" +
-                "----------------------------------------------------------------------------------------------------------------\n"
-        );
-        
-        Assert.hasText(userName, errorMessage("username", "spring.datasource.username"));
-        Assert.hasText(password, errorMessage("password", "spring.datasource.password"));
-        Assert.hasText(mysqlDriverClassName, errorMessage("driver class name", "spring.datasource.driver-class-name"));
-
-        this.setUrl(connectionURL);
-
+        String mysqlDriverClassName = dbProperties.getSpringDbDriverClassName();
+        // extract optional property values
+        String enablePooling = dbProperties.getDbEnablePooling();
+        if (stringIsNullOrBlank(enablePooling)) {
+            enablePooling = "false"; // default
+        }
+        // validate required property values are provided
+        ArrayList<RequiredPropertyInfo> requiredPropertyInfoList = new ArrayList<>();
+        requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.username", username, "username"));
+        requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.password", password, "password"));
+        requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.url", connectionURL, "connectionURL"));
+        requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.driver-class-name", mysqlDriverClassName, "driver class name"));
+        validateRequiredProperties(requiredPropertyInfoList);
         //  Set up poolable data source
-        this.setDriverClassName(mysqlDriverClassName);
-        this.setUsername(userName);
+        this.setUsername(username);
         this.setPassword(password);
+        this.setUrl(connectionURL);
+        this.setDriverClassName(mysqlDriverClassName);
         // Disable this to avoid caching statements
         this.setPoolPreparedStatements(Boolean.valueOf(enablePooling));
-        // these are the values cbioportal has been using in their production
-        // context.xml files when using jndi
+        // these values are from the production cbioportal application context for a jndi data source
         this.setMaxTotal(500);
         this.setMaxIdle(30);
         this.setMaxWaitMillis(10000);
@@ -50,12 +73,63 @@ public class JdbcDataSource extends BasicDataSource {
         this.setTestOnBorrow(true);
         this.setValidationQuery("SELECT 1");
     }
-    
-    private String errorMessage(String displayName, String propertyName) {
-        return String.format("No %s provided for database connection. Please set '%s' in application.properties.", displayName, propertyName);
+
+    private void logUsedDeprecatedProperties(DatabaseProperties dbProperties) {
+        if (defined(dbProperties.getDbHost()) ||
+                defined(dbProperties.getDbUser()) ||
+                defined(dbProperties.getDbPassword()) ||
+                defined(dbProperties.getDbName()) ||
+                defined(dbProperties.getConnectionURL()) ||
+                defined(dbProperties.getDbDriverClassName()) ||
+                defined(dbProperties.getDbUseSSL())) {
+            LOG.warn("\n" +
+                    "----------------------------------------------------------------------------------------------------------------\n" +
+                    "-- Connection warning:\n" +
+                    "-- You seem to be attempting to connect to the database by setting some of these deprecated properties:\n" +
+                    "---    db.host\n" +
+                    "---    db.user\n" +
+                    "---    db.password\n" +
+                    "---    db.portal_db_name\n" +
+                    "---    db.connection_string\n" +
+                    "---    db.driver\n" +
+                    "-- Please remove those properties and set these properties instead:\n" +
+                    "---    spring.datasource.username\n" +
+                    "---    spring.datasource.password\n" +
+                    "---    spring.datasource.url\n" +
+                    "---    spring.datasource.driver-class-name\n" +
+                    "-- For examples and assistance on setting these properties see:\n" +
+                    "--     https://github.com/cBioPortal/cbioportal/blob/master/src/main/resources/application.properties.EXAMPLE\n" +
+                    "--     https://docs.cbioportal.org/deployment/customization/application.properties-reference/\n" +
+                    "----------------------------------------------------------------------------------------------------------------\n");
+        }
     }
-    
+
+    private void validateRequiredProperties(List<RequiredPropertyInfo> requiredPropertyInfoList) {
+        boolean requiredPropertyIsMissing = false;
+        for (RequiredPropertyInfo requiredPropertyInfo : requiredPropertyInfoList) {
+            if (stringIsNullOrBlank(requiredPropertyInfo.getValue())) {
+                LOG.error(errorMessage(requiredPropertyInfo));
+                requiredPropertyIsMissing = true;
+            }
+        }
+        if (requiredPropertyIsMissing) {
+            // Throw exception. Because this occurs during the bean wiring step, this will cause the context creation to fail and the application to exit.
+            throw new RuntimeException("Datasource cannot be configured because required properties are missing values. See log for details.");
+        }
+    }
+
+    private String errorMessage(RequiredPropertyInfo requiredPropertyInfo) {
+        return String.format(
+                "No %s provided for database connection. Please provide a value for '%s' in application.properties or as a jvm command line system property.",
+                requiredPropertyInfo.getLabel(),
+                requiredPropertyInfo.getKey());
+    }
+
     private boolean defined(String property) {
-        return property != null && !property.isEmpty();
+        return !stringIsNullOrBlank(property);
+    }
+
+    private boolean stringIsNullOrBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }
