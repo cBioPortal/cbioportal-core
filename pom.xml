@@ -236,7 +236,11 @@
 								<resource>
 									<directory>${project.basedir}</directory>
 									<includes>
+										<!-- FIXME Remove these includes when running loader from the cbioportal docker image is deprecated. Loading should be done from cbioportal-core docker image directly instead. -->
+										<!-- Includes python/perl/shell scripts with the jar to transfer to cbioportal project -->
+										<!-- See here https://github.com/cBioPortal/cbioportal/blob/14e00a6c5580700b96152c45f34baf150e652c89/docker/web-and-data/Dockerfile#L48 -->
 										<include>requirements.txt</include>
+										<include>scripts/</include>
 									</includes>
 								</resource>
 							</resources>
@@ -322,6 +326,13 @@
 						</configuration>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<outputDirectory>${project.basedir}</outputDirectory>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
