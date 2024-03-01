@@ -23,6 +23,8 @@
 hs_err_pid*
 replay_pid*
 /target/
+# the final jar artifact is placed in the root of the project
+/core-*.jar
 .DS_Store
 .project
 /.settings/
@@ -31,3 +33,14 @@ replay_pid*
 
 .idea
 /dependency-reduced-pom.xml
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# test html reports
+*.html~
+
+# app properties that contains credentials
+/application.properties

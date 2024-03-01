@@ -957,7 +957,7 @@ class Validator(object):
                                     'downloadChromosomeSizes.py.')
 
         logger.debug("Retrieving chromosome lengths from '%s'",
-                     chrom_size_file)
+                     os.path.basename(chrom_size_file))
 
         try:
             chrom_size_dict = chrom_sizes[reference_genome]

@@ -20,6 +20,7 @@ if ($#ARGV >= 0) {
 }
 
 $portalHome = $ENV{PORTAL_HOME};
+$portalDataHome = $ENV{PORTAL_DATA_HOME};
 my $osCheck = $ENV{OS};
 my $pathDelim;
 
@@ -33,19 +34,23 @@ if ($portalHome eq "") {
 	die "PORTAL_HOME Environment Variable is not set.  Please set, and try again.\n";
 }
 
+if ($portalDataHome eq "") {
+	die "PORTAL_DATA_HOME Environment Variable is not set.  Please set, and try again.\n";
+}
+
 # Set up Classpath to use the scripts jar
-sub locate_src_root {
+sub locate_root {
     # isolate the directory this code file is in
     my ($volume, $script_dir, undef) = File::Spec->splitpath(__FILE__);
-    # go up from cbioportal/core/src/main/scripts/ to cbioportal/
-    my $src_root_dir = File::Spec->catdir($script_dir, (File::Spec->updir()) x 1);
+    # go up one level
+    my $root_dir = File::Spec->catdir($script_dir, File::Spec->updir());
     # reassamble the path and resolve updirs (/../)
-    return abs_path(File::Spec->catpath($volume, $src_root_dir));
+    return abs_path(File::Spec->catpath($volume, $root_dir));
 }
-$src_root = locate_src_root();
-@jar_files = glob("$src_root/core-*.jar");
+$root_dir = locate_root();
+@jar_files = glob("$root_dir/core-*.jar");
 if (scalar @jar_files != 1) {
-    die "Expected to find 1 scripts-*.jar, but found: " . scalar @jar_files;
+    die "Expected to find 1 core-*.jar, but found: " . scalar @jar_files;
 }
 $cp = pop @jar_files;
 
