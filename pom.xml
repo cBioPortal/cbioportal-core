@@ -254,6 +254,13 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<outputDirectory>${project.basedir}</outputDirectory>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
