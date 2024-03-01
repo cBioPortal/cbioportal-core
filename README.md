@@ -82,3 +82,16 @@ The script will search for `core-*.jar` in the root of the project:
 ```bash
 python scripts/importer/metaImport.py -s tests/test_data/study_es_0 -p tests/test_data/api_json_unit_tests -o
 ```
+
+## Running in docker
+
+Build docker image with:
+```bash
+docker build -t cbioportal-core .
+```
+
+Example of how to start the loading:
+```bash
+docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -s /data/study_es_0 -p /data/api_json -o
+```
+
