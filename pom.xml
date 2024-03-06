@@ -20,7 +20,7 @@
 
 		<!-- THIS SHOULD BE KEPT IN SYNC TO VERSION IN CGDS.SQL -->
 		<db.version>2.13.1</db.version>
-		<cbioportal.version>v6.0.0</cbioportal.version>
+		<cbioportal.version>v6.0.3</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
 
 
