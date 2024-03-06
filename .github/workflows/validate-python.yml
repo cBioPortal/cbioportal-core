@@ -16,8 +16,6 @@ jobs:
         run: |
           docker run -v ${PWD}:/cbioportal-core python:3.6 /bin/sh -c '
             cd cbioportal-core &&
-          	pwd &&
-          	ls -lart &&
             pip install -r requirements.txt &&
             export PYTHONPATH=/cbioportal-core/src/main/resources/scripts &&
             cd src/test/scripts/ &&
