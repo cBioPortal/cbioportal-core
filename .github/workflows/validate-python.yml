@@ -11,7 +11,9 @@ jobs:
         uses: actions/checkout@v4
       - name: 'Validate tests'
         run: |
-          docker run -v ${PWD} python:3.6 /bin/sh -c '
+          docker run -v ${PWD}:cbioportal-core python:3.6 /bin/sh -c '
+          	pwd &&
+          	ls -lart &&
             pip install -r requirements.txt &&
             export PYTHONPATH=/src/main/resources/scripts &&
             cd /src/test/scripts/ &&
