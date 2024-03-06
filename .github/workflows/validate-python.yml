@@ -10,7 +10,6 @@ jobs:
       - name: 'Checkout Code'
         uses: actions/checkout@v4
       - name: 'Validate tests'
-        working-directory: ./cbioportal
         run: |
           docker run -v ${PWD}:/cbioportal python:3.6 /bin/sh -c '
             pip install -r requirements.txt &&
