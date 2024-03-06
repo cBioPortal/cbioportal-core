@@ -9,7 +9,10 @@ jobs:
     steps:
       - name: 'Checkout Code'
         uses: actions/checkout@v4
+        with:
+        	path: ./cbioportal-core
       - name: 'Validate tests'
+      	working-directory: path: ./cbioportal-core
         run: |
           docker run -v ${PWD} python:3.6 /bin/sh -c '
           	pwd &&
