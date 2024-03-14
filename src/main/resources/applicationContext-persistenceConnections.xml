@@ -27,6 +27,9 @@
             <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.persistence.mybatis" />
         </bean>
 
+
+        <bean id="cacheMapUtil" class="org.cbioportal.persistence.cachemaputil.InactiveCacheMapUtil" />
+
         <!-- enable component scanning (beware that this does not enable mapper scanning!) -->
         <context:component-scan base-package="org.mskcc.cbio.portal.util"/> <!-- - mainly to inject into global properties -->
         <context:component-scan base-package="org.cbioportal.persistence" />
@@ -34,6 +37,7 @@
 
         <!-- enable autowire -->
         <context:annotation-config />
+
 
         <!-- enable transaction demarcation with annotations -->
         <tx:annotation-driven />

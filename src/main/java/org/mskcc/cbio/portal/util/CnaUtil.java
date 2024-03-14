@@ -53,14 +53,18 @@ public class CnaUtil {
             if (!CNA.AMP.equals(cnaEvent.getAlteration()) && !CNA.HOMDEL.equals(cnaEvent.getAlteration())) {
                 continue;
             }
-            
-            CnaEvent.Event event = cnaEvent.getEvent();
-            if (existingCnaEvents.contains(event)) {
-                cnaEvent.setEventId(event.getEventId());
+
+            // Revert PR https://github.com/cBioPortal/cbioportal-core/pull/1 breaks importer
+            Optional<CnaEvent.Event> existingCnaEvent = existingCnaEvents
+                    .stream()
+                    .filter(e -> e.equals(cnaEvent.getEvent()))
+                    .findFirst();
+            if (existingCnaEvent.isPresent()) {
+                cnaEvent.setEventId(existingCnaEvent.get().getEventId());
                 DaoCnaEvent.addCaseCnaEvent(cnaEvent, false);
             } else {
                 DaoCnaEvent.addCaseCnaEvent(cnaEvent, true);
-                existingCnaEvents.add(event);
+                existingCnaEvents.add(cnaEvent.getEvent());
             }
         }
     }
