@@ -68,7 +68,10 @@ public class ProgressMonitor {
     }
     
     private static boolean isRunningOnServer() {
-        return ServerDetector.getServerId() != null;
+        // FXIME because we bring core as dependency into cbioportal-core, we have web server classes in classpath
+        // But we run loader as standalone java process atm, not from the web server.
+        // return ServerDetector.getServerId() != null;
+        return false;
     } 
     /**
      * Sets Console Flag.
