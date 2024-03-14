@@ -52,8 +52,6 @@ import org.springframework.transaction.annotation.Transactional;
  * JUnit tests for MutationFilter class.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
-
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional

@@ -62,8 +62,6 @@ import java.util.Set;
  * JUnit tests for ImportTabDelimData class.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
-
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional

@@ -63,8 +63,6 @@ import java.util.Set;
  * JUnit tests for ImportGenericAssayPatientLevelData class.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
-
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
