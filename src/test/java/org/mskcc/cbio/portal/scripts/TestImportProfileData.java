@@ -71,8 +71,6 @@ import org.springframework.transaction.annotation.Transactional;
  * @author Pieter Lukasse pieter@thehyve.nl
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
-
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
