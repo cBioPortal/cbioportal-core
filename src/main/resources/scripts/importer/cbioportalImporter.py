@@ -449,8 +449,7 @@ def add_parser_args(parser):
                         (default: locates the jar path relative to the import script \
                         and passes it as the JAVA_OPTS)')
     parser.add_argument('-jar', '--jar_path', type=str, required=False,
-                        help='DEPRECATED ARGUMENT. Please, use -jvo/--java_opts instead. If you \
-                             want to pass a jar path, use "-cp <jar_path>" as parameter for --java_opts.')
+                        help='Path to scripts JAR file')
     parser.add_argument('-meta', '--meta_filename', type=str, required=False,
                         help='Path to meta file')
     parser.add_argument('-data', '--data_filename', type=str, required=False,
@@ -524,6 +523,10 @@ def main(args):
     error_handler.setLevel(logging.ERROR)
     module_logger.addHandler(error_handler)
     LOGGER = module_logger
+
+    # move jar_path to java_opts if it exists
+    if args.jar_path:
+        args.java_opts = f"-cp {args.jar_path} {args.java_opts}"
 
     # java_opts is optional. If class (jar) path is not set (-cp), try to find the jar path relative to this script
     locate_jar_path = True

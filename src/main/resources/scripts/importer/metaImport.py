@@ -80,8 +80,8 @@ def interface():
                         (default: locates the jar path relative to the import script \
                         and passes it as the JAVA_OPTS)')
     parser.add_argument('-jar', '--jar_path', type=str, required=False,
-                        help='DEPRECATED ARGUMENT. Please, use -jvo/--java_opts instead. If you \
-                             want to pass a jar path, use "-cp <jar_path>" as parameter for --java_opts.')
+                        help='Path to scripts JAR file (default: locate it '
+                             'relative to the import script)')
     parser.add_argument('-html', '--html_table', type=str,
                         help='path to html report')
     parser.add_argument('-v', '--verbose', action='store_true',
