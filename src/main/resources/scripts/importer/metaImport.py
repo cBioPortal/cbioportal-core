@@ -75,10 +75,9 @@ def interface():
                                        action='store_true',
                                        help='Skip tests requiring information '
                                             'from the cBioPortal installation')
-    parser.add_argument('-jvo', '--java_opts', type=str, required=False,
+    parser.add_argument('-jvo', '--java_opts', type=str, default=os.environ.get('JAVA_OPTS'),
                         help='Path to specify JAVA_OPTS for the importer. \
-                        (default: locates the jar path relative to the import script \
-                        and passes it as the JAVA_OPTS)')
+                        (default: gets the JAVA_OPTS from the environment)')
     parser.add_argument('-jar', '--jar_path', type=str, required=False,
                         help='Path to scripts JAR file (default: locate it '
                              'relative to the import script)')
