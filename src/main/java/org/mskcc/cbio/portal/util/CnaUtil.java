@@ -46,25 +46,28 @@ public class CnaUtil {
     }
 
     public static void storeCnaEvents(
-        Set<CnaEvent.Event> existingCnaEvents,
+        Map<CnaEvent.Event,CnaEvent.Event> existingCnaEvents,
         List<CnaEvent> cnaEventsToAdd
     ) throws DaoException {
         for (CnaEvent cnaEvent : cnaEventsToAdd) {
             if (!CNA.AMP.equals(cnaEvent.getAlteration()) && !CNA.HOMDEL.equals(cnaEvent.getAlteration())) {
                 continue;
             }
-
-            // Revert PR https://github.com/cBioPortal/cbioportal-core/pull/1 breaks importer
-            Optional<CnaEvent.Event> existingCnaEvent = existingCnaEvents
-                    .stream()
-                    .filter(e -> e.equals(cnaEvent.getEvent()))
-                    .findFirst();
-            if (existingCnaEvent.isPresent()) {
-                cnaEvent.setEventId(existingCnaEvent.get().getEventId());
+            CnaEvent.Event event = cnaEvent.getEvent();
+            CnaEvent.Event existingEvent = existingCnaEvents.get(event);
+            // Caution :
+            // existingEvent (if found) was retrieved from the database and has a populated event_id field.
+            // event is constructed while parsing the CNA file and does not have a populated event_id field.
+            // The type CnaEvent.Event, and contained types, have overridden hashCode() and equals() functions
+            // which allow successful comparison so that an Event with a non-populated event_id field will
+            // match an Event with a populated / discrepant event_id field. That is to allow this hashmap lookup
+            // of the previously existing event from the database in order to obtain the event_id (see below).
+            if (existingEvent != null) {
+                cnaEvent.setEventId(existingEvent.getEventId());
                 DaoCnaEvent.addCaseCnaEvent(cnaEvent, false);
             } else {
                 DaoCnaEvent.addCaseCnaEvent(cnaEvent, true);
-                existingCnaEvents.add(cnaEvent.getEvent());
+                existingCnaEvents.put(event, event);
             }
         }
     }
@@ -72,7 +75,7 @@ public class CnaUtil {
     public CnaEvent createEvent(
         GeneticProfile geneticProfile,
         int sampleId,
-        long entrezId, 
+        long entrezId,
         String[] parts
     ) throws IOException {
         int cnaProfileId = geneticProfile.getGeneticProfileId();
@@ -88,11 +91,11 @@ public class CnaUtil {
         );
         return cna;
     }
-    
+
     private String convertMapToJsonString(Map<String, Map<String, Object>> map) throws JsonProcessingException {
         return this.objectMapper.writeValueAsString(map);
     }
-    
+
     public long getEntrezSymbol(String[] parts) {
         String entrezAsString = TabDelimitedFileUtil.getPartString(getColumnIndex(CnaUtil.ENTREZ_GENE_ID), parts);
         if (entrezAsString.isEmpty()) {
@@ -123,7 +126,7 @@ public class CnaUtil {
      */
     public int getColumnIndex(String colName) {
         return this.columnIndexMap.getOrDefault(
-            colName.toLowerCase(), 
+            colName.toLowerCase(),
             -1
         );
     }

@@ -45,7 +45,7 @@ public class ImportCnaDiscreteLongData {
     private String genePanel;
     private final DaoGeneOptimized daoGene;
     private CnaUtil cnaUtil;
-    private Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
+    private Map<CnaEvent.Event, CnaEvent.Event> existingCnaEvents = new HashMap<>();
     private int samplesSkipped = 0;
     private Set<String> namespaces;
 
@@ -84,7 +84,9 @@ public class ImportCnaDiscreteLongData {
             && geneticProfile.showProfileInAnalysisTab();
 
         if (isDiscretizedCnaProfile) {
-            existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
+            for (CnaEvent.Event event : DaoCnaEvent.getAllCnaEvents()) {
+                existingCnaEvents.put(event, event);
+            }
             MySQLbulkLoader.bulkLoadOn();
         }
 
