@@ -38,7 +38,7 @@ public class JdbcDataSource extends BasicDataSource {
         }
     }
 
-    public JdbcDataSource () {
+    public JdbcDataSource() {
         DatabaseProperties dbProperties = DatabaseProperties.getInstance();
         logUsedDeprecatedProperties(dbProperties);
         // extract required property values
@@ -65,6 +65,9 @@ public class JdbcDataSource extends BasicDataSource {
         this.setDriverClassName(mysqlDriverClassName);
         // Disable this to avoid caching statements
         this.setPoolPreparedStatements(Boolean.valueOf(enablePooling));
+        // this property setting is needed to enable MySQLbulkLoader to load data from a local file
+        // this is set here in case this class is initialized via JdbcUtil (not expected), but is also set in applicationContext resource files.
+        this.addConnectionProperty("allowLoadLocalInfile", "true");
         // these values are from the production cbioportal application context for a jndi data source
         this.setMaxTotal(500);
         this.setMaxIdle(30);

@@ -84,10 +84,8 @@ public class MySQLbulkLoader {
             con = JdbcUtil.getDbConnection(MySQLbulkLoader.class);
             stmt = con.prepareStatement("SELECT @@foreign_key_checks;");
             ResultSet result = stmt.executeQuery();
-            
-            result.first();
+            result.next();
             checks = result.getInt(1);
-
             stmt = con.prepareStatement("SET foreign_key_checks = ?;");
             stmt.setLong(1, 0);
             stmt.execute();
