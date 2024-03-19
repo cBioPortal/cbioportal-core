@@ -50,7 +50,6 @@ import java.util.ArrayList;
  * @author Ethan Cerami.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 public class ITDaoGeneticProfileSamples {
 	

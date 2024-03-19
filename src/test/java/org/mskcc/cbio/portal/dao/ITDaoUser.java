@@ -52,7 +52,6 @@ import static org.hamcrest.CoreMatchers.*;
  */
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional

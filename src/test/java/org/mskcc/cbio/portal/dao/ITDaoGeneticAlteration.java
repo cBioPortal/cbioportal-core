@@ -50,7 +50,6 @@ import java.util.*;
  * JUnit tests for DaoGeneticAlteration class.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional

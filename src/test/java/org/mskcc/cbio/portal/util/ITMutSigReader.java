@@ -48,8 +48,6 @@ import static org.junit.Assert.*;
 import java.io.File;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
-
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional

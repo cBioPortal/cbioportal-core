@@ -50,7 +50,6 @@ import static org.junit.Assert.assertEquals;
  * JUnit Tests for DaoGene and DaoGeneOptimized.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional

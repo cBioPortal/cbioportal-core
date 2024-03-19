@@ -50,7 +50,6 @@ import java.util.*;
  * JUnit Tests for DaoGenePanel.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
