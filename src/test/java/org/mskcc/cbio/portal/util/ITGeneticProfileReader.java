@@ -56,8 +56,6 @@ import java.util.ArrayList;
  * JUnit test for GeneticProfileReader class.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
-
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
