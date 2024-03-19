@@ -24,7 +24,7 @@
 		<maf.version>1.0.0</maf.version>
 
 
-		<mysql_driver.version>5.1.48</mysql_driver.version>
+		<mysql_driver.version>8.0.28</mysql_driver.version>
 		<mysql_commons_lang3.version>3.13.0</mysql_commons_lang3.version>
 
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
