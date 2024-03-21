@@ -56,7 +56,7 @@ public class TestOddsRatio extends TestCase {
                                    GeneticAlterationType.COPY_NUMBER_ALTERATION, "DISCRETE",
                                    "CNA", "CNA", true);
         // TBD: change this to use getResourceAsStream()
-        String matrix0[][] = WebFileConnect.retrieveMatrix(new File("target/test-classes/cna_sample2.txt"));
+        String matrix0[][] = WebFileConnect.retrieveMatrix(new File("src/test/resources/cna_sample2.txt"));
         ProfileData data0 = new ProfileData(profile0, matrix0);
         profileList.add(data0);
         

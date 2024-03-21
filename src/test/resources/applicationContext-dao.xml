@@ -9,17 +9,6 @@
      http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
      http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
 
-    <!-- Mock beans for Ehcache manager and statistics -->
-    <bean id="cacheManager" class="org.mockito.Mockito" factory-method="mock">
-        <constructor-arg value="javax.cache.CacheManager" />
-    </bean>
-    <bean id="ehcacheStatistics" class="org.mockito.Mockito" factory-method="mock">
-        <constructor-arg value="org.cbioportal.persistence.util.EhcacheStatistics" />
-    </bean>
-    <bean id="customEhcachingProvider" class="org.mockito.Mockito" factory-method="mock">
-        <constructor-arg value="org.cbioportal.persistence.util.CustomEhcachingProvider" />
-    </bean>
-
     <bean id="propertyPlaceholderConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
 	    <property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE" />
 	    <property name="searchSystemEnvironment" value="true" />
@@ -93,10 +82,6 @@
         <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.persistence.mybatis" />
     </bean>
 
-    <!-- enable component scanning (beware that this does not enable mapper scanning!) -->
-    <context:component-scan base-package="org.cbioportal.persistence" />
-    <context:component-scan base-package="org.cbioportal.service" />
-   
     <!-- enable autowire -->
     <context:annotation-config />
 	
