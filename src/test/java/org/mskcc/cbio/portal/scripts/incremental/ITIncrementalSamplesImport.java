@@ -36,10 +36,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.ClinicalData;
-import org.mskcc.cbio.portal.model.Patient;
-import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.*;
 import org.mskcc.cbio.portal.scripts.ImportClinicalData;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
@@ -47,6 +44,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -67,7 +65,7 @@ public class ITIncrementalSamplesImport {
 
     public static final String STUDY_ID = "study_tcga_pub";
     private CancerStudy cancerStudy;
-    private final String UPDATE_TCGA_SAMPLE_ID  = "TCGA-A1-A0SD-01";
+    private final String UPDATE_TCGA_SAMPLE_ID  = "TCGA-A1-A0SH-01";
 
     @Before
     public void setUp() throws DaoException {
@@ -181,5 +179,13 @@ public class ITIncrementalSamplesImport {
                 "OS_MONTHS", "45.67",
                 "DFS_STATUS", "1:Recurred/Progressed",
                 "DFS_MONTHS", "123"), sampleAttrs);
+
+        /**
+         * Sub-entries stayed as they were, not removed.
+         */
+        GeneticProfile mutationsProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mutations");
+        assertNotNull(mutationsProfile);
+        ArrayList<ExtendedMutation> mutations = DaoMutation.getMutations(mutationsProfile.getGeneticProfileId(), tcgaSample.getInternalId());
+        assertEquals(2, mutations.size());
     }
 }
