@@ -50,9 +50,10 @@ public final class DaoClinicalData {
     public static final String SAMPLE_TABLE = "clinical_sample";
     public static final String PATIENT_TABLE = "clinical_patient";
 
-    private static final String SAMPLE_INSERT = "INSERT INTO " + SAMPLE_TABLE + "(`INTERAL_ID`,`ATTR_ID`,`ATTR_VALUE` VALUES(?,?,?)";
-    private static final String PATIENT_INSERT = "INSERT INTO " + PATIENT_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE` VALUES(?,?,?)";
+    private static final String SAMPLE_INSERT = "INSERT INTO " + SAMPLE_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
+    private static final String PATIENT_INSERT = "INSERT INTO " + PATIENT_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
 
+    private static final String SAMPLE_DELETE = "DELETE FROM " + SAMPLE_TABLE + " WHERE `INTERNAL_ID` = ?";
     private static final Map<String, String> sampleAttributes = new HashMap<String, String>();
     private static final Map<String, String> patientAttributes = new HashMap<String, String>();
 
@@ -362,6 +363,24 @@ public final class DaoClinicalData {
             }
         }
         return getDataByInternalIds(cancerStudyId, SAMPLE_TABLE, sampleIdsInt, Collections.singletonList(attr.getAttrId()));
+    }
+
+    public static void removeSampleData(int sampleInternalId) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+            pstmt = con.prepareStatement(SAMPLE_DELETE);
+            pstmt.setInt(1, sampleInternalId);
+            pstmt.executeUpdate();
+        }
+        catch (SQLException e) {
+            throw new DaoException(e);
+        }
+        finally {
+            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
+        }
     }
 
     public static List<ClinicalData> getSampleData(int cancerStudyId, Collection<String> sampleIds) throws DaoException
