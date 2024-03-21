@@ -90,6 +90,15 @@ INSERT INTO `reference_genome` VALUES (2,'human','hg38','GRCh38',3049315783,'htt
 INSERT INTO "cancer_study" ("CANCER_STUDY_ID","CANCER_STUDY_IDENTIFIER","TYPE_OF_CANCER_ID","NAME","DESCRIPTION","PUBLIC","PMID","CITATION","GROUPS","REFERENCE_GENOME_ID") 
 VALUES (1,'study_tcga_pub','brca','Breast Invasive Carcinoma (TCGA,Nature 2012)','<a href=\"http://cancergenome.nih.gov/\">The Cancer Genome Atlas (TCGA)</a> Breast Invasive Carcinoma project. 825 cases.<br><i>Nature 2012.</i> <a href=\"http://tcga-data.nci.nih.gov/tcga/\">Raw data via the TCGA Data Portal</a>.',1,'23000897,26451490','TCGA,Nature 2012,...','SU2C-PI3K;PUBLIC;GDAC',1);
 
+-- clinical_attribute_meta
+INSERT INTO "clinical_attribute_meta"
+VALUES ('DFS_MONTHS','Disease Free (Months)','Disease free in months since treatment','NUMBER',0,'1',1),
+('DFS_STATUS','Disease Free Status','Disease free status','STRING',0,'1',1),
+('OS_MONTHS','Overall Survival (Months)','Overall survival in months since diagnosis','NUMBER',0,'1',1),
+('OS_STATUS','Overall Survival Status','Overall survival status','STRING',0,'1',1),
+('SAMPLE_COUNT','Number of Samples Per Patient','Number of Samples Per Patient','STRING',1,'1',1),
+('SUBTYPE','Subtype','Subtype description','STRING',0,'1',1);
+
 -- gene as genetic_entity
 INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
 SET @max_entity_id = (Select MAX(ID) from genetic_entity);
