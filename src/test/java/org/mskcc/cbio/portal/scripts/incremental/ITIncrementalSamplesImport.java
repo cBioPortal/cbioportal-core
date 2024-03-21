@@ -92,6 +92,7 @@ public class ITIncrementalSamplesImport {
         ImportClinicalData importClinicalData = new ImportClinicalData(new String[] {
                 "--meta", metaFile.getAbsolutePath(),
                 "--data", dataFile.getAbsolutePath(),
+                "--overwrite-existing",
         });
         importClinicalData.run();
 
@@ -126,6 +127,7 @@ public class ITIncrementalSamplesImport {
         ImportClinicalData importClinicalData = new ImportClinicalData(new String[] {
                 "--meta", metaFile.getAbsolutePath(),
                 "--data", dataFile.getAbsolutePath(),
+                "--overwrite-existing",
         });
         importClinicalData.run();
 
