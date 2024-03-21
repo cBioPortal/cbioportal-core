@@ -75,11 +75,17 @@ public class ImportExtendedMutationData{
     private Pattern SEQUENCE_SAMPLES_REGEX = Pattern.compile("^.*sequenced_samples:(.*)$");
     private final String ASCN_NAMESPACE = "ASCN";
 
+    private final boolean overwriteExisting;
+
     /**
      * construct an ImportExtendedMutationData.
      * Filter mutations according to the no argument MutationFilter().
      */
     public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces) {
+        this(mutationFile, geneticProfileId, genePanel, filteredMutations, namespaces, false);
+    }
+
+    public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces, boolean overwriteExisting) {
         this.mutationFile = mutationFile;
         this.geneticProfileId = geneticProfileId;
         this.swissprotIsAccession = false;
@@ -89,6 +95,7 @@ public class ImportExtendedMutationData{
         // create default MutationFilter
         myMutationFilter = new MutationFilter( );
         this.namespaces = namespaces;
+        this.overwriteExisting = overwriteExisting;
     }
 
     public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel) {
@@ -150,7 +157,7 @@ public class ImportExtendedMutationData{
             referenceGenome = GlobalProperties.getReferenceGenomeName();
         }
         String genomeBuildName = DaoReferenceGenome.getReferenceGenomeByGenomeName(referenceGenome).getBuildName();
-
+        Set<Integer> processedSamples = new HashSet<>();
         while((line=buf.readLine()) != null)
         {
             ProgressMonitor.incrementCurValue();
@@ -180,6 +187,9 @@ public class ImportExtendedMutationData{
                     else {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(barCode) + "' found in MAF file: " + this.mutationFile.getCanonicalPath());
                     }
+                } else if (overwriteExisting && !processedSamples.contains(sample.getInternalId())) {
+                    DaoMutation.deleteAllRecordsInGeneticProfileForSample(geneticProfileId, sample.getInternalId());
+                    processedSamples.add(sample.getInternalId());
                 }
 
                 String validationStatus = record.getValidationStatus();
