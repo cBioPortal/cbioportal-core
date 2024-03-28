@@ -38,15 +38,13 @@ import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
+import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.SampleList;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
@@ -56,6 +54,7 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     private String cancerStudyStableId;
     private LinkedHashSet<String> sampleIds;
     private DaoSampleList daoSampleList = new DaoSampleList();
+    private boolean removeFromRemainingStudyCaseLists = false;
 
     public UpdateCaseListsSampleIds(String[] args) {
         super(args);
@@ -91,6 +90,20 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
                 sampleList.setSampleList(newSampleArrayList);
                 //TODO no need to run expensive db update if sampleList hasn't effectively changed
                 daoSampleList.updateSampleListList(sampleList);
+            }
+            if (this.removeFromRemainingStudyCaseLists) {
+                CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(this.cancerStudyStableId);
+                List<SampleList> sampleLists = daoSampleList.getAllSampleLists(cancerStudy.getInternalId());
+                List<SampleList> remainingLists = sampleLists.stream().filter(sl ->
+                        !addSamplesToTheCaseListsStableIds.contains(sl.getStableId()) && sl.getSampleList().stream().anyMatch(this.sampleIds::contains)
+                ).collect(Collectors.toList());
+                for (SampleList remainingList: remainingLists) {
+                    ArrayList<String> newSampleList = new ArrayList<>(remainingList.getSampleList());
+                    newSampleList.removeAll(this.sampleIds);
+                    remainingList.setSampleList(newSampleList);
+                    //TODO for optimization purpose we could supply to the update method 2 set of samples: samples that have to be added and samples that have to be removed
+                    daoSampleList.updateSampleListList(remainingList);
+                }
             }
         } catch (DaoException e) {
             throw new RuntimeException(e);
@@ -153,16 +166,22 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         String description = "Updates (adds/removes) sample ids in specified case lists.";
 
         OptionParser parser = new OptionParser();
+        //TODO Do we want to have --sample-ids option instead to make command more flexible which samples we want to add to a given profile?
         OptionSpec<String> meta = parser.accepts( "meta",
                "clinical sample (genetic_alteration_type=CLINICAL and datatype=SAMPLE_ATTRIBUTES) meta data file" ).withRequiredArg().required().describedAs( "meta_clinical_sample.txt" ).ofType( String.class );
         OptionSpec<String> addToCaseLists = parser.accepts( "add-to-case-lists",
                 "comma-separated list of case list stable ids to add sample ids found in the data file" ).withRequiredArg().describedAs( "study_id_mrna,study_id_sequenced" ).ofType( String.class );
+        final String removeFromRemainingStudyCaseListsOption = "remove-from-remaining-study-case-lists";
+        parser.accepts( removeFromRemainingStudyCaseListsOption, "Enable removing sample ids from the remaining case lists that is not _all case list and that were not specified with add-to-case-lists");
 
         try {
             OptionSet options = parser.parse( args );
             this.metaFile = new File(options.valueOf(meta));
             if(options.has(addToCaseLists)){
                 this.addToCaseListsStableIds = new LinkedHashSet<>(List.of(options.valueOf(addToCaseLists).split(",")));
+            }
+            if(options.has(removeFromRemainingStudyCaseListsOption)) {
+               this.removeFromRemainingStudyCaseLists = true;
             }
         } catch (OptionException e) {
             throw new UsageException(

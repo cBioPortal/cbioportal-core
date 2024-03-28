@@ -44,7 +44,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
-import java.util.List;
 
 import static org.junit.Assert.*;
 
@@ -136,6 +135,31 @@ public class ITUpdateCaseListsSampleIds {
         assertSampleIdNotInCaseLists(sampleIdToAdd, caseListsSampleIsNotPartOf);
     }
 
+    /**
+     * Test removing sample ids from not specified case lists
+     */
+    @Test
+    public void testRemovingSampleIdsFromNotSpecifiedCaseLists() throws DaoException {
+        String sampleIdToAdd = "TCGA-A1-A0SH-01";
+
+        File singleTcgaSampleFolder = new File("src/test/resources/incremental/update_single_tcga_sample/");
+        File metaFile = new File(singleTcgaSampleFolder, "meta_clinical_sample.txt");
+
+        UpdateCaseListsSampleIds importClinicalData = new UpdateCaseListsSampleIds(new String[] {
+                "--meta", metaFile.getAbsolutePath(),
+                "--add-to-case-lists", "study_tcga_pub_acgh",
+                "--remove-from-remaining-study-case-lists"
+        });
+        importClinicalData.run();
+
+        assertSampleIdInCaseLists(sampleIdToAdd, "study_tcga_pub_all", "study_tcga_pub_acgh");
+        assertSampleIdNotInCaseLists(sampleIdToAdd, "study_tcga_pub_cnaseq",
+                "study_tcga_pub_complete",
+                "study_tcga_pub_log2CNA",
+                "study_tcga_pub_methylation_hm27",
+                "study_tcga_pub_mrna",
+                "study_tcga_pub_sequenced");
+    }
     @Before
     public void init() {
         // FIXME How we can remove this re-caching and keep tests to work?
