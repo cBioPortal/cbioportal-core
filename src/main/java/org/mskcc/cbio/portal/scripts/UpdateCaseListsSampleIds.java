@@ -50,10 +50,11 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
     private File metaFile;
     private File dataFile;
-    private Set<String> addToCaseListsStableIds = Set.of();
+    private List<File> caseListFiles = List.of();
     private String cancerStudyStableId;
-    private LinkedHashSet<String> sampleIds;
+    private Map<String, Set<String>> caseListSampleIdToSampleIds = new LinkedHashMap<>();
     private DaoSampleList daoSampleList = new DaoSampleList();
+    private LinkedHashSet<String> allSampleIds;
 
     public UpdateCaseListsSampleIds(String[] args) {
         super(args);
@@ -65,25 +66,64 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     public void run() {
         parseArguments();
         readStudyIdAndDataFileFromMetaFile();
-        readSampleIdsFromDataFile();
-        updateCaseLists();
+        this.allSampleIds = readSampleIdsFromDataFile(this.dataFile);
+        // TODO has the all case list always to exist?
+        this.caseListSampleIdToSampleIds.put(cancerStudyStableId + "_all", this.allSampleIds);
+        Map<String, Set<String>> readCaseListSampleIds = readCaseListFiles();
+        this.caseListSampleIdToSampleIds.putAll(readCaseListSampleIds);
+        updateCaseLists(this.caseListSampleIdToSampleIds);
     }
 
-    private void updateCaseLists() {
+    private Map<String, Set<String>> readCaseListFiles() {
+        LinkedHashMap<String, Set<String>> result = new LinkedHashMap<>();
+        for (File caseListFile: this.caseListFiles) {
+            Properties properties = new TrimmedProperties();
+            try {
+                properties.load(new FileReader(caseListFile));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            String studyId = properties.getProperty("cancer_study_identifier");
+            if (studyId == null || studyId.trim().equals("")) {
+                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No cancer_study_identifier specified.");
+            }
+            if (!studyId.equals(this.cancerStudyStableId)) {
+                throw new RuntimeException(caseListFile.getAbsolutePath() + ": cancer_study_identifier expected to be " + this.cancerStudyStableId + " but found to be " + studyId);
+            }
+            String caseListStableId = properties.getProperty("stable_id");
+            if (caseListStableId == null || caseListStableId.trim().equals("")) {
+                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No stable_id specified.");
+            }
+            String caseListSampleIds = properties.getProperty("case_list_ids");
+            if (caseListSampleIds == null || caseListSampleIds.trim().equals("")) {
+                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No case_list_ids specified.");
+            }
+            Set<String> sampleIds = Arrays.stream(caseListSampleIds.split("\t")).map(sampleId -> sampleId.trim()).filter(sampleId -> !"".equals(sampleId.trim())).collect(Collectors.toSet());
+            if (sampleIds.isEmpty()) {
+                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No sample ids specified.");
+            }
+            LinkedHashSet<String> extraSampleIds = new LinkedHashSet<>(sampleIds);
+            extraSampleIds.removeAll(this.allSampleIds);
+            if (!extraSampleIds.isEmpty()) {
+                throw new RuntimeException(caseListFile.getAbsolutePath() + ": The following sample ids present in the case list file, but not specified in the clinical sample file: " + String.join(", ", extraSampleIds));
+            }
+            result.put(caseListStableId, sampleIds);
+        }
+        return result;
+    }
+
+    private void updateCaseLists(Map<String, Set<String>> caseListSampleIdToSampleIds) {
         // TODO Do we really have to do this? Is there a better way?
         DaoCancerStudy.reCacheAll();
         try {
-            Set<String> addSamplesToTheCaseListsStableIds = new LinkedHashSet<>(this.addToCaseListsStableIds);
-            // TODO has the all case list always to exist?
-            String allCaseListStableId = this.cancerStudyStableId + "_all";
-            // we always add sample to the all case list
-            addSamplesToTheCaseListsStableIds.add(allCaseListStableId);
-            for (String caseListStableId: addSamplesToTheCaseListsStableIds) {
+            for (Map.Entry<String, Set<String>> caseListStableIdToSampleIds: caseListSampleIdToSampleIds.entrySet()) {
+                String caseListStableId = caseListStableIdToSampleIds.getKey();
+                Set<String> sampleIds = caseListStableIdToSampleIds.getValue();
                 SampleList sampleList = daoSampleList.getSampleListByStableId(caseListStableId);
                 if (sampleList == null) {
                     throw new RuntimeException("No case list with " + caseListStableId + " stable id is found");
                 }
-                LinkedHashSet<String> newCaseListSampleIds = new LinkedHashSet<>(this.sampleIds);
+                LinkedHashSet<String> newCaseListSampleIds = new LinkedHashSet<>(sampleIds);
                 newCaseListSampleIds.addAll(sampleList.getSampleList());
                 ArrayList<String> newSampleArrayList = new ArrayList<>(newCaseListSampleIds);
                 sampleList.setSampleList(newSampleArrayList);
@@ -93,11 +133,11 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
             CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(this.cancerStudyStableId);
             List<SampleList> sampleLists = daoSampleList.getAllSampleLists(cancerStudy.getInternalId());
             List<SampleList> remainingLists = sampleLists.stream().filter(sl ->
-                    !addSamplesToTheCaseListsStableIds.contains(sl.getStableId()) && sl.getSampleList().stream().anyMatch(this.sampleIds::contains)
+                    !caseListSampleIdToSampleIds.containsKey(sl.getStableId()) && sl.getSampleList().stream().anyMatch(this.allSampleIds::contains)
             ).collect(Collectors.toList());
             for (SampleList remainingList: remainingLists) {
                 ArrayList<String> newSampleList = new ArrayList<>(remainingList.getSampleList());
-                newSampleList.removeAll(this.sampleIds);
+                newSampleList.removeAll(this.allSampleIds);
                 remainingList.setSampleList(newSampleList);
                 //TODO for optimization purpose we could supply to the update method 2 set of samples: samples that have to be added and samples that have to be removed
                 daoSampleList.updateSampleListList(remainingList);
@@ -107,11 +147,11 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         }
     }
 
-    private void readSampleIdsFromDataFile() {
-        this.sampleIds = new LinkedHashSet<>();
+    private LinkedHashSet<String> readSampleIdsFromDataFile(File dataFile) {
+        LinkedHashSet<String> allSampleIds = new LinkedHashSet<>();
         FileReader reader = null;
         try {
-            reader = new FileReader(this.dataFile);
+            reader = new FileReader(dataFile);
             try (BufferedReader buff = new BufferedReader(reader)) {
                 String line;
                 int sampleIdPosition = -1;
@@ -128,9 +168,10 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
                             throw new RuntimeException("No SAMPLE_ID header is found");
                         }
                     } else {
-                        sampleIds.add(fieldValues[sampleIdPosition].trim());
+                        allSampleIds.add(fieldValues[sampleIdPosition].trim());
                     }
                 }
+                return allSampleIds;
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -163,17 +204,24 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         String description = "Updates (adds/removes) sample ids in specified case lists.";
 
         OptionParser parser = new OptionParser();
-        //TODO Do we want to have --sample-ids option instead to make command more flexible which samples we want to add to a given profile?
-        OptionSpec<String> meta = parser.accepts( "meta",
-               "clinical sample (genetic_alteration_type=CLINICAL and datatype=SAMPLE_ATTRIBUTES) meta data file" ).withRequiredArg().required().describedAs( "meta_clinical_sample.txt" ).ofType( String.class );
-        OptionSpec<String> addToCaseLists = parser.accepts( "add-to-case-lists",
-                "comma-separated list of case list stable ids to add sample ids found in the data file" ).withRequiredArg().describedAs( "study_id_mrna,study_id_sequenced" ).ofType( String.class );
+        OptionSpec<String> metaOpt = parser.accepts( "meta",
+               "clinical sample (genetic_alteration_type=CLINICAL and datatype=SAMPLE_ATTRIBUTES or datatype=MIXED_ATTRIBUTES) meta data file. All sample ids found in the file will be added to the _all case list." ).withRequiredArg().required().describedAs( "meta_clinical_sample.txt" ).ofType( String.class );
+        OptionSpec<String> caseListDirOrFileOpt = parser.accepts( "case-lists",
+                "case list file or a directory with case list files" ).withRequiredArg().describedAs( "case_lists/" ).ofType( String.class );
 
         try {
             OptionSet options = parser.parse( args );
-            this.metaFile = new File(options.valueOf(meta));
-            if(options.has(addToCaseLists)){
-                this.addToCaseListsStableIds = new LinkedHashSet<>(List.of(options.valueOf(addToCaseLists).split(",")));
+            this.metaFile = new File(options.valueOf(metaOpt));
+            if(options.has(caseListDirOrFileOpt)){
+                File caseListDirOrFile = new File(options.valueOf(caseListDirOrFileOpt));
+                if (caseListDirOrFile.isDirectory()) {
+                    this.caseListFiles = Arrays.stream(Objects.requireNonNull(caseListDirOrFile.listFiles()))
+                            .filter(file -> !file.getName().startsWith(".") && !file.getName().endsWith("~")).collect(Collectors.toList());
+                } else if (caseListDirOrFile.isFile()) {
+                    this.caseListFiles = List.of(caseListDirOrFile);
+                } else {
+                    throw new RuntimeException("No file " + caseListDirOrFile.getAbsolutePath() + " exists");
+                }
             }
         } catch (OptionException e) {
             throw new UsageException(

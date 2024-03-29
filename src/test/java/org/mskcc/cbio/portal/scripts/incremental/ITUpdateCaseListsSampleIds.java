@@ -66,7 +66,6 @@ public class ITUpdateCaseListsSampleIds {
     @Test
     public void testAddSampleIdToAllCaseList() throws DaoException {
         String sampleIdToAdd = "TCGA-XX-0800-01";
-        String allCaseListStableId = "study_tcga_pub_all";
         File singleTcgaSampleFolder = new File("src/test/resources/update_case_lists/add_sample_to_case_list/");
         File metaFile = new File(singleTcgaSampleFolder, "meta_clinical_sample.txt");
 
@@ -89,12 +88,13 @@ public class ITUpdateCaseListsSampleIds {
         String sampleIdToAdd = "TCGA-XX-0800-01";
         File singleTcgaSampleFolder = new File("src/test/resources/update_case_lists/add_sample_to_case_list/");
         File metaFile = new File(singleTcgaSampleFolder, "meta_clinical_sample.txt");
+        File caseListsDir = new File(singleTcgaSampleFolder, "case_lists/");
 
         assertSampleIdNotInCaseLists(sampleIdToAdd, "study_tcga_pub_all", "study_tcga_pub_mrna");
 
         UpdateCaseListsSampleIds importClinicalData = new UpdateCaseListsSampleIds(new String[] {
                 "--meta", metaFile.getAbsolutePath(),
-                "--add-to-case-lists", "study_tcga_pub_mrna"
+                "--case-lists", caseListsDir.getAbsolutePath()
         });
         importClinicalData.run();
 
@@ -119,15 +119,16 @@ public class ITUpdateCaseListsSampleIds {
                 "study_tcga_pub_methylation_hm27",
         };
 
-        File singleTcgaSampleFolder = new File("src/test/resources/incremental/update_single_tcga_sample/");
+        File singleTcgaSampleFolder = new File("src/test/resources/update_case_lists/update_tcga_samples/");
         File metaFile = new File(singleTcgaSampleFolder, "meta_clinical_sample.txt");
+        File caseListsDir = new File(singleTcgaSampleFolder, "case_lists/");
 
         assertSampleIdInCaseLists(sampleIdToAdd, caseListsSampleIsPartOf);
         assertSampleIdNotInCaseLists(sampleIdToAdd, caseListsSampleIsNotPartOf);
 
         UpdateCaseListsSampleIds importClinicalData = new UpdateCaseListsSampleIds(new String[] {
                 "--meta", metaFile.getAbsolutePath(),
-                "--add-to-case-lists", String.join(",", caseListsSampleIsPartOf)
+                "--case-lists", caseListsDir.getAbsolutePath()
         });
         importClinicalData.run();
 
@@ -142,12 +143,14 @@ public class ITUpdateCaseListsSampleIds {
     public void testRemovingSampleIdsFromNotSpecifiedCaseLists() throws DaoException {
         String sampleIdToAdd = "TCGA-A1-A0SH-01";
 
-        File singleTcgaSampleFolder = new File("src/test/resources/incremental/update_single_tcga_sample/");
+        File singleTcgaSampleFolder = new File("src/test/resources/update_case_lists/update_tcga_samples/");
         File metaFile = new File(singleTcgaSampleFolder, "meta_clinical_sample.txt");
+        File caseListsDir = new File(singleTcgaSampleFolder, "case_lists/");
+        File caseAcghFile = new File(caseListsDir, "case_acgh.txt");
 
         UpdateCaseListsSampleIds importClinicalData = new UpdateCaseListsSampleIds(new String[] {
                 "--meta", metaFile.getAbsolutePath(),
-                "--add-to-case-lists", "study_tcga_pub_acgh",
+                "--case-lists", caseAcghFile.getAbsolutePath()
         });
         importClinicalData.run();
 
