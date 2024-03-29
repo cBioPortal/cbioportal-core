@@ -148,7 +148,6 @@ public class ITUpdateCaseListsSampleIds {
         UpdateCaseListsSampleIds importClinicalData = new UpdateCaseListsSampleIds(new String[] {
                 "--meta", metaFile.getAbsolutePath(),
                 "--add-to-case-lists", "study_tcga_pub_acgh",
-                "--remove-from-remaining-study-case-lists"
         });
         importClinicalData.run();
 

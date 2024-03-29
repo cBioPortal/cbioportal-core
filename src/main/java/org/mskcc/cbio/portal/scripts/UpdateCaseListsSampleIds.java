@@ -54,7 +54,6 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     private String cancerStudyStableId;
     private LinkedHashSet<String> sampleIds;
     private DaoSampleList daoSampleList = new DaoSampleList();
-    private boolean removeFromRemainingStudyCaseLists = false;
 
     public UpdateCaseListsSampleIds(String[] args) {
         super(args);
@@ -91,19 +90,17 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
                 //TODO no need to run expensive db update if sampleList hasn't effectively changed
                 daoSampleList.updateSampleListList(sampleList);
             }
-            if (this.removeFromRemainingStudyCaseLists) {
-                CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(this.cancerStudyStableId);
-                List<SampleList> sampleLists = daoSampleList.getAllSampleLists(cancerStudy.getInternalId());
-                List<SampleList> remainingLists = sampleLists.stream().filter(sl ->
-                        !addSamplesToTheCaseListsStableIds.contains(sl.getStableId()) && sl.getSampleList().stream().anyMatch(this.sampleIds::contains)
-                ).collect(Collectors.toList());
-                for (SampleList remainingList: remainingLists) {
-                    ArrayList<String> newSampleList = new ArrayList<>(remainingList.getSampleList());
-                    newSampleList.removeAll(this.sampleIds);
-                    remainingList.setSampleList(newSampleList);
-                    //TODO for optimization purpose we could supply to the update method 2 set of samples: samples that have to be added and samples that have to be removed
-                    daoSampleList.updateSampleListList(remainingList);
-                }
+            CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(this.cancerStudyStableId);
+            List<SampleList> sampleLists = daoSampleList.getAllSampleLists(cancerStudy.getInternalId());
+            List<SampleList> remainingLists = sampleLists.stream().filter(sl ->
+                    !addSamplesToTheCaseListsStableIds.contains(sl.getStableId()) && sl.getSampleList().stream().anyMatch(this.sampleIds::contains)
+            ).collect(Collectors.toList());
+            for (SampleList remainingList: remainingLists) {
+                ArrayList<String> newSampleList = new ArrayList<>(remainingList.getSampleList());
+                newSampleList.removeAll(this.sampleIds);
+                remainingList.setSampleList(newSampleList);
+                //TODO for optimization purpose we could supply to the update method 2 set of samples: samples that have to be added and samples that have to be removed
+                daoSampleList.updateSampleListList(remainingList);
             }
         } catch (DaoException e) {
             throw new RuntimeException(e);
@@ -171,17 +168,12 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
                "clinical sample (genetic_alteration_type=CLINICAL and datatype=SAMPLE_ATTRIBUTES) meta data file" ).withRequiredArg().required().describedAs( "meta_clinical_sample.txt" ).ofType( String.class );
         OptionSpec<String> addToCaseLists = parser.accepts( "add-to-case-lists",
                 "comma-separated list of case list stable ids to add sample ids found in the data file" ).withRequiredArg().describedAs( "study_id_mrna,study_id_sequenced" ).ofType( String.class );
-        final String removeFromRemainingStudyCaseListsOption = "remove-from-remaining-study-case-lists";
-        parser.accepts( removeFromRemainingStudyCaseListsOption, "Enable removing sample ids from the remaining case lists that is not _all case list and that were not specified with add-to-case-lists");
 
         try {
             OptionSet options = parser.parse( args );
             this.metaFile = new File(options.valueOf(meta));
             if(options.has(addToCaseLists)){
                 this.addToCaseListsStableIds = new LinkedHashSet<>(List.of(options.valueOf(addToCaseLists).split(",")));
-            }
-            if(options.has(removeFromRemainingStudyCaseListsOption)) {
-               this.removeFromRemainingStudyCaseLists = true;
             }
         } catch (OptionException e) {
             throw new UsageException(
