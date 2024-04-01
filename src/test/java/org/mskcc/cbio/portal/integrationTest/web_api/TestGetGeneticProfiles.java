@@ -30,46 +30,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package org.mskcc.cbio.portal.scripts;
+package org.mskcc.cbio.portal.integrationTest.web_api;
 
 import org.junit.Test;
-import org.mskcc.cbio.portal.scripts.CutInvalidCases;
+import org.junit.runner.RunWith;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.web_api.GetGeneticProfiles;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.Assert.*;
 
-import java.io.File;
-
 /**
- * JUnit test for CutInvalidCases class.
+ * JUnit test for GeneticProfile class.
  */
-public class TestCutInvalidCases {
-    
-	@Test
-    public void testCutInvalidCases() throws Exception {
-		// TBD: change this to use getResourceAsStream()
-        File casesExcludedFile = new File("src/test/resources/cases_excluded_test.txt");
-        File dataFile = new File("src/test/resources/cna_test.txt");
-        CutInvalidCases parser = new CutInvalidCases(casesExcludedFile,
-                dataFile);
-        String out = parser.process();
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
+@Rollback
+@Transactional
+public class TestGetGeneticProfiles {
 
-        String lines[] = out.split("\n");
-        String headerLine = lines[0];
-        String parts[] = headerLine.split("\t");
-        for (String header : parts) {
-            if (header.trim().equals("TCGA-A1-A0SB-01")) {
-                fail("TCGA-06-0142 should have been stripped out.");
-            } else if (header.trim().equals("TCGA-A1-A0SD-01")) {
-                fail("TCGA-06-0142 should have been stripped out.");
-            } else if (header.trim().equals("TCGA-A1-A0SE-01")) {
-                fail("TCGA-06-0159 should have been stripped out.");
-            }
-        }
-        int numHeaders = parts.length;
-        parts = lines[4].split("\t");
+    @Test
+    public void testDaoGeneticProfile() throws DaoException {
 
-        //  Should go from 16 to 13 columns.
-        assertEquals (13, numHeaders);
-        assertEquals (13, parts.length);
+    	
+        String output = GetGeneticProfiles.getGeneticProfilesAsTable("study_tcga_pub");
+        assertTrue(output.contains("study_tcga_pub_mrna\tmRNA expression (microarray)\tExpression levels (Agilent microarray).\t1\tMRNA_EXPRESSION\tfalse"));
+        assertTrue(output.contains("study_tcga_pub_mutations\tMutations\tMutation data from whole exome sequencing.\t1\tMUTATION_EXTENDED\ttrue"));
     }
 }
