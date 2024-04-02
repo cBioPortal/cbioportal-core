@@ -88,6 +88,18 @@
         <property name="databaseIdProvider" ref="databaseIdProvider"/>
     </bean>
     
+    <!-- configure the data source to allow LOAD DATA LOCAL INFILE ... -->
+    <b:bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <b:property name="targetObject" ref="businessDataSource"/>
+        <b:property name="targetMethod" value="addConnectionProperty"/>
+        <b:property name="arguments">
+            <b:list>
+                <b:value>allowLoadLocalInfile</b:value>
+                <b:value>true</b:value>
+            </b:list>
+        </b:property>
+    </b:bean>
+
     <!-- scan for mappers and let them be autowired -->
     <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
         <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.persistence.mybatis" />

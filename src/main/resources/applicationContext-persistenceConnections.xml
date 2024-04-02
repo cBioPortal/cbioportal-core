@@ -74,6 +74,17 @@
             <property name="mapperLocations" value="classpath*:org/cbioportal/persistence/mybatis/**/*.xml" />
             <property name="databaseIdProvider" ref="databaseIdProvider"/>
         </bean>
+        <!-- configure the data source to allow LOAD DATA LOCAL INFILE ... -->
+        <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+            <property name="targetObject" ref="businessDataSource"/>
+            <property name="targetMethod" value="addConnectionProperty"/>
+            <property name="arguments">
+                <list>
+                    <value>allowLoadLocalInfile</value>
+                    <value>true</value>
+                </list>
+            </property>
+        </bean>
     </beans>
 
     <beans profile="dbcp">
@@ -98,4 +109,5 @@
             </property>
         </bean>
     </beans>
+
 </beans>
