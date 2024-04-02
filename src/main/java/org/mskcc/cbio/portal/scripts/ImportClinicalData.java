@@ -333,8 +333,8 @@ public class ImportClinicalData extends ConsoleRunnable {
         //check if sample is not already added:
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), stableSampleId, false);
         if (sample != null) {
+            internalSampleId = sample.getInternalId();
             if (overwriteExisting) {
-                internalSampleId = sample.getInternalId();
                 DaoClinicalData.removeSampleData(internalSampleId);
             } else {
                 //this should be a WARNING in case of TCGA studies (see https://github.com/cBioPortal/cbioportal/issues/839#issuecomment-203452415)
@@ -356,6 +356,9 @@ public class ImportClinicalData extends ConsoleRunnable {
         	if (patient != null) {
         		//patient exists, get internal id:
         		internalPatientId = patient.getInternalId();
+                if (overwriteExisting) {
+                    DaoClinicalData.removePatientData(internalPatientId);
+                }
         	}
         	else {
         		//add patient:

@@ -54,6 +54,8 @@ public final class DaoClinicalData {
     private static final String PATIENT_INSERT = "INSERT INTO " + PATIENT_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
 
     private static final String SAMPLE_DELETE = "DELETE FROM " + SAMPLE_TABLE + " WHERE `INTERNAL_ID` = ?";
+
+    private static final String PATIENT_DELETE = "DELETE FROM " + PATIENT_TABLE + " WHERE `INTERNAL_ID` = ?";
     private static final Map<String, String> sampleAttributes = new HashMap<String, String>();
     private static final Map<String, String> patientAttributes = new HashMap<String, String>();
 
@@ -676,6 +678,24 @@ public final class DaoClinicalData {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
+            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
+        }
+    }
+
+    public static void removePatientData(int internalPatientId) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+            pstmt = con.prepareStatement(PATIENT_DELETE);
+            pstmt.setInt(1, internalPatientId);
+            pstmt.executeUpdate();
+        }
+        catch (SQLException e) {
+            throw new DaoException(e);
+        }
+        finally {
             JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
         }
     }
