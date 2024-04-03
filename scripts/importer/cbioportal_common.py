@@ -37,6 +37,7 @@ REMOVE_STUDY_CLASS = "org.mskcc.cbio.portal.scripts.RemoveCancerStudy"
 IMPORT_CANCER_TYPE_CLASS = "org.mskcc.cbio.portal.scripts.ImportTypesOfCancers"
 IMPORT_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.ImportSampleList"
 ADD_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.AddCaseList"
+UPDATE_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds"
 VERSION_UTIL_CLASS = "org.mskcc.cbio.portal.util.VersionUtil"
 
 PORTAL_PROPERTY_DATABASE_USER = 'db.user'
@@ -363,6 +364,14 @@ META_FIELD_MAP = {
         'data_filename': True
     },
 }
+
+# in order of they should be loaded
+INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
+    MetaFileTypes.PATIENT_ATTRIBUTES,
+    MetaFileTypes.SAMPLE_ATTRIBUTES,
+    MetaFileTypes.MUTATION,
+    # TODO Add more types here as incremental upload is enabled
+]
 
 IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.STUDY: IMPORT_STUDY_CLASS,
