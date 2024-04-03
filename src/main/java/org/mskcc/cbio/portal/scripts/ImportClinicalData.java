@@ -43,6 +43,7 @@ import java.util.*;
 import java.util.regex.*;
 import org.apache.commons.collections4.map.MultiKeyMap;
 
+//TODO Remove MIXED_ATTRIBUTES data type https://github.com/cBioPortal/cbioportal-core/issues/31
 public class ImportClinicalData extends ConsoleRunnable {
 
     public static final String DELIMITER = "\t";
@@ -103,6 +104,7 @@ public class ImportClinicalData extends ConsoleRunnable {
     {
         PATIENT_ATTRIBUTES("PATIENT"),
         SAMPLE_ATTRIBUTES("SAMPLE"),
+        @Deprecated
         MIXED_ATTRIBUTES("MIXED");
         
         private String attributeType;
