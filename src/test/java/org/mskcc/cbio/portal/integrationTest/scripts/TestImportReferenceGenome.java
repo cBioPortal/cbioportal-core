@@ -2,11 +2,6 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import static org.junit.Assert.assertEquals;
-
-import java.io.File;
-
 import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
 import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.scripts.ImportReferenceGenome;
@@ -15,6 +10,10 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.File;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * JUnit tests for ImportGeneData class.

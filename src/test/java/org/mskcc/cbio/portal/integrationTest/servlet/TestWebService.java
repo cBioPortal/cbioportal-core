@@ -40,7 +40,11 @@ import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
-import org.mskcc.cbio.portal.model.*;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.model.SampleListCategory;
+import org.mskcc.cbio.portal.model.User;
 import org.mskcc.cbio.portal.servlet.NullHttpServletRequest;
 import org.mskcc.cbio.portal.servlet.NullHttpServletResponse;
 import org.mskcc.cbio.portal.servlet.WebService;
@@ -58,8 +62,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
+import static org.easymock.EasyMock.createMock;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.isA;
+import static org.easymock.EasyMock.replay;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * JUnit test for WebService class.

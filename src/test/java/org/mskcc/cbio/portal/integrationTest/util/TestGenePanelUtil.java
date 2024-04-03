@@ -15,7 +15,10 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.mskcc.cbio.portal.util.GenePanelUtil.*;
+import static org.mskcc.cbio.portal.util.GenePanelUtil.Pair;
+import static org.mskcc.cbio.portal.util.GenePanelUtil.extractGenes;
+import static org.mskcc.cbio.portal.util.GenePanelUtil.extractPropertyValue;
+import static org.mskcc.cbio.portal.util.GenePanelUtil.getAddRemove;
 
 
 @RunWith(SpringJUnit4ClassRunner.class)

@@ -29,20 +29,10 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import static org.junit.Assert.assertEquals;
-
-import java.io.File;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.List;
-
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneset;
-import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyNode;
 import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyLeaf;
+import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyNode;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.model.GenesetHierarchy;
@@ -54,6 +44,15 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.File;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
 
 /*
  * JUnit tests for ImportGenesetData class.

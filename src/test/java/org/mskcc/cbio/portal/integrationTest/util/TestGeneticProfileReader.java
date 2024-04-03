@@ -46,11 +46,11 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
-import static org.junit.Assert.*;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * JUnit test for GeneticProfileReader class.
