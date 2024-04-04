@@ -54,7 +54,7 @@ public class DaoSampleList {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
 
             pstmt = con.prepareStatement("INSERT INTO sample_list (`STABLE_ID`, `CANCER_STUDY_ID`, `NAME`, `CATEGORY`," +
-                    "`DESCRIPTION`)" + " VALUES (?,?,?,?,?)");
+                    "`DESCRIPTION`)" + " VALUES (?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
             pstmt.setString(1, sampleList.getStableId());
             pstmt.setInt(2, sampleList.getCancerStudyId());
             pstmt.setString(3, sampleList.getName());
