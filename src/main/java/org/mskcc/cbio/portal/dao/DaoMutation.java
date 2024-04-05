@@ -1499,10 +1499,17 @@ public final class DaoMutation {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
+            // TODO Move it to another class?
+            pstmt = con.prepareStatement("DELETE from alteration_driver_annotation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?");
+            pstmt.setLong(1, geneticProfileId);
+            pstmt.setLong(2, internalSampleId);
+            pstmt.executeUpdate();
+
             pstmt = con.prepareStatement("DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.setLong(2, internalSampleId);
             pstmt.executeUpdate();
+
             // TODO Remove row in mutation_event if it does not have mutations left
             // TODO Remove profile if no mutations nor mutation_event(s) left
         } catch (SQLException e) {
