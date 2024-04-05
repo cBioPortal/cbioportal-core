@@ -33,7 +33,6 @@
 package org.mskcc.cbio.portal.integrationTest.dao;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,7 +57,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * JUnit tests for DaoMutation class.
@@ -223,23 +224,23 @@ public class TestDaoMutation {
         Map<String, Map<String, String>> expectedAnnotationJsonMap = makeMockExpectedAnnotationJsonMap();
 
         // confirm expected sizes
-        Assert.assertTrue(annotationJsonMap.containsKey("namespace1"));
-        Assert.assertEquals(expectedAnnotationJsonMap.get("namespace1").size(), annotationJsonMap.get("namespace1").size());
-        Assert.assertEquals(2, annotationJsonMap.get("namespace1").size());
-        Assert.assertTrue(annotationJsonMap.containsKey("namespace2"));
-        Assert.assertEquals(1, annotationJsonMap.get("namespace2").size());
-        Assert.assertEquals(expectedAnnotationJsonMap.get("namespace2").size(), annotationJsonMap.get("namespace2").size());
+        assertTrue(annotationJsonMap.containsKey("namespace1"));
+        assertEquals(expectedAnnotationJsonMap.get("namespace1").size(), annotationJsonMap.get("namespace1").size());
+        assertEquals(2, annotationJsonMap.get("namespace1").size());
+        assertTrue(annotationJsonMap.containsKey("namespace2"));
+        assertEquals(1, annotationJsonMap.get("namespace2").size());
+        assertEquals(expectedAnnotationJsonMap.get("namespace2").size(), annotationJsonMap.get("namespace2").size());
 
         // compare namespace 1 annotation map values
         Map<String, String> namespace1Map = annotationJsonMap.get("namespace1");
         Map<String, String> expectedNamespace1Map = expectedAnnotationJsonMap.get("namespace1");
-        Assert.assertEquals(expectedNamespace1Map.get("header1"), namespace1Map.get("header1"));
-        Assert.assertEquals(expectedNamespace1Map.get("header2"), namespace1Map.get("header2"));
+        assertEquals(expectedNamespace1Map.get("header1"), namespace1Map.get("header1"));
+        assertEquals(expectedNamespace1Map.get("header2"), namespace1Map.get("header2"));
 
         // compare namespace 2 annotation map values
         Map<String, String> namespace2Map = annotationJsonMap.get("namespace2");
         Map<String, String> expectedNamespace2Map = expectedAnnotationJsonMap.get("namespace2");
-        Assert.assertEquals(expectedNamespace2Map.get("header1"), namespace2Map.get("header1"));
+        assertEquals(expectedNamespace2Map.get("header1"), namespace2Map.get("header1"));
     }
 
     private String makeMockAnnotationJsonString() {

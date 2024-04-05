@@ -32,7 +32,6 @@
 
 package org.mskcc.cbio.portal.integrationTest.dao;
 
-import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -71,7 +70,7 @@ public class TestDaoCancerStudy {
 	@Test
     public void testDaoCancerStudy() throws DaoException, IOException {
 
-        Assert.assertEquals("Breast Invasive Carcinoma", DaoTypeOfCancer.getTypeOfCancerById("BRCA").getName());
+        assertEquals("Breast Invasive Carcinoma", DaoTypeOfCancer.getTypeOfCancerById("BRCA").getName());
 
         CancerStudy cancerStudy = new CancerStudy("GBM", "GBM Description", "gbm", "brca", false);
         cancerStudy.setReferenceGenome("hg19");

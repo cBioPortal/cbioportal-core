@@ -70,6 +70,7 @@ import static java.util.stream.Collectors.toList;
 import static org.cbioportal.model.MolecularProfile.DataType.DISCRETE;
 import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -579,8 +580,8 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getCancerStudyId(),
             sampleStableId
         );
-        Assert.assertNotNull(sample);
-        Assert.assertTrue(DaoSampleProfile.sampleExistsInGeneticProfile(
+        assertNotNull(sample);
+        assertTrue(DaoSampleProfile.sampleExistsInGeneticProfile(
             sample.getInternalId(),
             geneticProfile.getGeneticProfileId()
         ));

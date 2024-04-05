@@ -33,11 +33,11 @@
 package org.mskcc.cbio.portal.scripts;
 
 import org.junit.Test;
-import org.mskcc.cbio.portal.scripts.CutInvalidCases;
-
-import static org.junit.Assert.*;
 
 import java.io.File;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * JUnit test for CutInvalidCases class.
