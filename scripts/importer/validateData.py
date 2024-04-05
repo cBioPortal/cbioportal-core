@@ -75,7 +75,7 @@ mutation_file_sample_ids = set()
 sample_ids_panel_dict = {}
 
 # resource globals
-RESOURCE_DEFINITION_DICTIONARY = {}
+RESOURCE_DEFINITION_DICTIONARY = None
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 
 # globals required for gene set scoring validation
@@ -3385,7 +3385,7 @@ class GenePanelMatrixValidator(Validator):
                 sample_ids_panel_dict[sample_id] = data[self.mutation_stable_id_index - 1]
                 # Sample ID has been removed from list, so subtract 1 position.
                 if data[self.mutation_stable_id_index - 1] != 'NA':
-                    if sample_id not in mutation_sample_ids:
+                    if mutation_sample_ids is not None and sample_id not in mutation_sample_ids:
                         self.logger.error('Sample ID has mutation gene panel, but is not in the sequenced case list',
                                           extra={'line_number': self.line_number,
                                                  'cause': sample_id})
@@ -3790,7 +3790,8 @@ class ResourceValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
                 # make sure that RESOURCE_ID is defined in the resource definition file
-                if value not in RESOURCE_DEFINITION_DICTIONARY:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and value not in RESOURCE_DEFINITION_DICTIONARY:
                     self.logger.error(
                         'RESOURCE_ID is not defined in resource definition file',
                         extra={'line_number': self.line_number,
@@ -3857,13 +3858,17 @@ class SampleResourceValidator(ResourceValidator):
                 value = data[col_index].strip()
             # make sure RESOURCE_ID is defined correctly
             if col_name == 'RESOURCE_ID':
-                if value not in RESOURCE_DEFINITION_DICTIONARY or 'SAMPLE' not in RESOURCE_DEFINITION_DICTIONARY[value]:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and (value not in RESOURCE_DEFINITION_DICTIONARY \
+                        or 'SAMPLE' not in RESOURCE_DEFINITION_DICTIONARY[value]):
                     self.logger.error(
                         'RESOURCE_ID for sample resource is not defined correctly in resource definition file',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
-                if value in RESOURCE_DEFINITION_DICTIONARY and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and value in RESOURCE_DEFINITION_DICTIONARY \
+                        and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
                     self.logger.warning(
                         'RESOURCE_ID for sample resource has been used by more than one RESOURCE_TYPE',
                         extra={'line_number': self.line_number,
@@ -3918,13 +3923,17 @@ class PatientResourceValidator(ResourceValidator):
                 value = data[col_index].strip()
             # make sure RESOURCE_ID is defined correctly
             if col_name == 'RESOURCE_ID':
-                if value not in RESOURCE_DEFINITION_DICTIONARY or 'PATIENT' not in RESOURCE_DEFINITION_DICTIONARY[value]:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and (value not in RESOURCE_DEFINITION_DICTIONARY \
+                        or 'PATIENT' not in RESOURCE_DEFINITION_DICTIONARY[value]):
                     self.logger.error(
                         'RESOURCE_ID for patient resource is not defined correctly in resource definition file',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
-                if value in RESOURCE_DEFINITION_DICTIONARY and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and value in RESOURCE_DEFINITION_DICTIONARY \
+                        and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
                     self.logger.warning(
                         'RESOURCE_ID for patient resource has been used by more than one RESOURCE_TYPE',
                         extra={'line_number': self.line_number,
@@ -3968,13 +3977,17 @@ class StudyResourceValidator(ResourceValidator):
                 value = data[col_index].strip()
             # make sure RESOURCE_ID is defined correctly
             if col_name == 'RESOURCE_ID':
-                if value not in RESOURCE_DEFINITION_DICTIONARY or 'STUDY' not in RESOURCE_DEFINITION_DICTIONARY[value]:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and (value not in RESOURCE_DEFINITION_DICTIONARY \
+                        or 'STUDY' not in RESOURCE_DEFINITION_DICTIONARY[value]):
                     self.logger.error(
                         'RESOURCE_ID for study resource is not defined correctly in resource definition file',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
-                if value in RESOURCE_DEFINITION_DICTIONARY and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
+                if RESOURCE_DEFINITION_DICTIONARY is not None \
+                        and value in RESOURCE_DEFINITION_DICTIONARY \
+                        and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
                     self.logger.warning(
                         'RESOURCE_ID for study resource has been used by more than one RESOURCE_TYPE',
                         extra={'line_number': self.line_number,
@@ -5557,7 +5570,9 @@ def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_ma
             continue
         logger.info("Validating %s", meta_file_type)
         for validator in validators:
-            validator.validate()
+            # TODO skip None's. Why do we even have them?
+            if validator:
+                validator.validate()
 
 
 def get_pom_path():
