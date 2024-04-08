@@ -30,7 +30,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package org.mskcc.cbio.portal.scripts.incremental;
+package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -61,7 +61,7 @@ import static org.junit.Assert.*;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class ITIncrementalSamplesImport {
+public class TestIncrementalSamplesImport {
 
     public static final String STUDY_ID = "study_tcga_pub";
     private CancerStudy cancerStudy;

@@ -30,7 +30,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package org.mskcc.cbio.portal.scripts.incremental;
+package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -44,7 +44,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -62,7 +61,7 @@ import static org.junit.Assert.assertNotNull;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class ITIncrementalPatientsImport {
+public class TestIncrementalPatientsImport {
 
     public static final String STUDY_ID = "study_tcga_pub";
     private CancerStudy cancerStudy;

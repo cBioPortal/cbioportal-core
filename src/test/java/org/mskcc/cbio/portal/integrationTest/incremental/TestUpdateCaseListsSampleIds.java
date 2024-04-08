@@ -30,7 +30,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package org.mskcc.cbio.portal.scripts.incremental;
+package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -57,7 +57,7 @@ import static org.junit.Assert.*;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class ITUpdateCaseListsSampleIds {
+public class TestUpdateCaseListsSampleIds {
 
     DaoSampleList daoSampleList = new DaoSampleList();
     /**
