@@ -30,46 +30,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package org.mskcc.cbio.portal.scripts;
+package org.mskcc.cbio.portal.integrationTest.dao;
 
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.model.ClinicalAttribute;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-/**
- * JUnit test for CutInvalidCases class.
- */
-public class TestCutInvalidCases {
-    
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
+@Rollback
+@Transactional
+public class TestDaoClinicalAttribute {
+	
 	@Test
-    public void testCutInvalidCases() throws Exception {
-		// TBD: change this to use getResourceAsStream()
-        File casesExcludedFile = new File("src/test/resources/cases_excluded_test.txt");
-        File dataFile = new File("src/test/resources/cna_test.txt");
-        CutInvalidCases parser = new CutInvalidCases(casesExcludedFile,
-                dataFile);
-        String out = parser.process();
+    public void testDaoClinicalAttribute() throws DaoException {
 
-        String lines[] = out.split("\n");
-        String headerLine = lines[0];
-        String parts[] = headerLine.split("\t");
-        for (String header : parts) {
-            if (header.trim().equals("TCGA-A1-A0SB-01")) {
-                fail("TCGA-06-0142 should have been stripped out.");
-            } else if (header.trim().equals("TCGA-A1-A0SD-01")) {
-                fail("TCGA-06-0142 should have been stripped out.");
-            } else if (header.trim().equals("TCGA-A1-A0SE-01")) {
-                fail("TCGA-06-0159 should have been stripped out.");
-            }
-        }
-        int numHeaders = parts.length;
-        parts = lines[4].split("\t");
+        int added = DaoClinicalAttributeMeta.addDatum(new ClinicalAttribute("attrId", "some attribute", "test attribute", "nonsense", true, "1", 1));
+        assertTrue(added == 1);
 
-        //  Should go from 16 to 13 columns.
-        assertEquals (13, numHeaders);
-        assertEquals (13, parts.length);
+        ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum("attrId", 1);
+        assertNotNull(clinicalAttribute);
     }
 }

@@ -9,17 +9,6 @@
      http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
      http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
 
-    <!-- Mock beans for Ehcache manager and statistics -->
-    <bean id="cacheManager" class="org.mockito.Mockito" factory-method="mock">
-        <constructor-arg value="javax.cache.CacheManager" />
-    </bean>
-    <bean id="ehcacheStatistics" class="org.mockito.Mockito" factory-method="mock">
-        <constructor-arg value="org.cbioportal.persistence.util.EhcacheStatistics" />
-    </bean>
-    <bean id="customEhcachingProvider" class="org.mockito.Mockito" factory-method="mock">
-        <constructor-arg value="org.cbioportal.persistence.util.CustomEhcachingProvider" />
-    </bean>
-
     <bean id="propertyPlaceholderConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
 	    <property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE" />
 	    <property name="searchSystemEnvironment" value="true" />
@@ -89,26 +78,22 @@
     </bean>
     
     <!-- configure the data source to allow LOAD DATA LOCAL INFILE ... -->
-    <b:bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
-        <b:property name="targetObject" ref="businessDataSource"/>
-        <b:property name="targetMethod" value="addConnectionProperty"/>
-        <b:property name="arguments">
-            <b:list>
-                <b:value>allowLoadLocalInfile</b:value>
-                <b:value>true</b:value>
-            </b:list>
-        </b:property>
-    </b:bean>
+    <!--<bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <property name="targetObject" ref="businessDataSource"/>
+        <property name="targetMethod" value="addConnectionProperty"/>
+        <property name="arguments">
+            <list>
+                <value>allowLoadLocalInfile</value>
+                <value>true</value>
+            </list>
+        </property>
+    </bean>-->
 
     <!-- scan for mappers and let them be autowired -->
     <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
         <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.persistence.mybatis" />
     </bean>
 
-    <!-- enable component scanning (beware that this does not enable mapper scanning!) -->
-    <context:component-scan base-package="org.cbioportal.persistence" />
-    <context:component-scan base-package="org.cbioportal.service" />
-   
     <!-- enable autowire -->
     <context:annotation-config />
 	

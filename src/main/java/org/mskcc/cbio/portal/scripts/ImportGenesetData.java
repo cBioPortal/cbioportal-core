@@ -278,7 +278,7 @@ public class ImportGenesetData extends ConsoleRunnable {
      * @param suppFile
      * @throws Exception 
      */
-    static void importSuppGenesetData(File suppFile) throws Exception {
+    public static void importSuppGenesetData(File suppFile) throws Exception {
     	
         ProgressMonitor.setCurrentMessage("Reading data from: " + suppFile.getCanonicalPath());
         
