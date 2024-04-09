@@ -89,12 +89,12 @@ public class TestIncrementalPatientsImport {
         assertNotNull("Patient with id " + newPatientId + " has to be injected to the DB.", newPatient);
 
         List<ClinicalData> clinicalData = DaoClinicalData.getData(cancerStudy.getInternalId(), List.of(newPatientId));
-        Map<String, String> sampleAttrs = clinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
+        Map<String, String> patientAttrs = clinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
         assertEquals(Map.of(
                 "SUBTYPE", "basal-like",
                 "OS_STATUS", "0:LIVING",
                 "OS_MONTHS", "45.6",
-                "DFS_STATUS", "1:Recurred/Progressed"), sampleAttrs);
+                "DFS_STATUS", "1:Recurred/Progressed"), patientAttrs);
     }
 
     @Test
@@ -122,11 +122,11 @@ public class TestIncrementalPatientsImport {
         assertNotNull("Patient with id " + updatedPatientId + " has to be injected to the DB.", newPatient);
 
         List<ClinicalData> clinicalData = DaoClinicalData.getData(cancerStudy.getInternalId(), List.of(updatedPatientId));
-        Map<String, String> sampleAttrs = clinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
+        Map<String, String> patientAttrs = clinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
         assertEquals(Map.of(
                 "SUBTYPE", "basal-like",
                 "OS_MONTHS", "56.7",
                 "DFS_STATUS", "1:Recurred/Progressed",
-                "DFS_MONTHS", "100"), sampleAttrs);
+                "DFS_MONTHS", "100"), patientAttrs);
     }
 }

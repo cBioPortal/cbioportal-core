@@ -79,8 +79,10 @@ public class TestIncrementalSamplesImport {
         /**
          * prepare a new patient without samples
          */
-        Patient patient = new Patient(cancerStudy, "TEST-INC-TCGA-P1");
+        String patientId = "TEST-INC-TCGA-P1";
+        Patient patient = new Patient(cancerStudy, patientId);
         int internalPatientId = DaoPatient.addPatient(patient);
+        DaoClinicalData.addPatientDatum(internalPatientId, "OS_STATUS", "0:LIVING");
 
         String newSampleId = "TEST-INC-TCGA-P1-S1";
         File singleTcgaSampleFolder = new File("src/test/resources/incremental/insert_single_tcga_sample/");
@@ -99,13 +101,20 @@ public class TestIncrementalSamplesImport {
         Sample sample = samples.get(0);
         assertEquals(newSampleId, sample.getStableId());
 
-        List<ClinicalData> clinicalData = DaoClinicalData.getSampleData(cancerStudy.getInternalId(), List.of(newSampleId));
-        Map<String, String> sampleAttrs = clinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
+        List<ClinicalData> sampleClinicalData = DaoClinicalData.getSampleData(cancerStudy.getInternalId(), List.of(newSampleId));
+        Map<String, String> sampleAttrs = sampleClinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
         assertEquals(Map.of(
                 "SUBTYPE", "basal-like",
                 "OS_STATUS", "1:DECEASED",
                 "OS_MONTHS", "12.34",
                 "DFS_STATUS", "1:Recurred/Progressed"), sampleAttrs);
+
+        // Patient attributes get SAMPLE_COUNT
+        List<ClinicalData> patientClinicalData = DaoClinicalData.getData(cancerStudy.getInternalId(), List.of(patientId));
+        Map<String, String> patientAttrs = patientClinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
+        assertEquals(Map.of(
+                "OS_STATUS", "0:LIVING",
+                "SAMPLE_COUNT", "1"), patientAttrs);
 	}
 
     /**
