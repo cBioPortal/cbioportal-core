@@ -477,7 +477,7 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     # TODO we could also validate not supported types after loading is done?
 
     if MetaFileTypes.SAMPLE_ATTRIBUTES in meta_file_type_to_meta_files:
-        # TODO Make meta attribute optional in command to update case lists
+        # TODO What if we have multiple clinical sample files? Throw exception or upload
         meta_filename, meta_dictionary = meta_file_type_to_meta_files[MetaFileTypes.SAMPLE_ATTRIBUTES][0]
         case_list_dirname = os.path.join(data_directory, 'case_lists')
         update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None)
