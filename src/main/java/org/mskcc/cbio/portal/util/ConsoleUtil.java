@@ -252,7 +252,7 @@ public class ConsoleUtil {
 			          .withRequiredArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 		}
 		parser.accepts("overwrite-existing",
-				"Flag that enables re-uploading molecular data that already exist (the same profile and sample id) in the database.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+				"Enables re-uploading molecular data that already exist for the given profile and sample.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
 
 		String progName = "importScript";
 		
