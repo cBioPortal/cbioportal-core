@@ -46,7 +46,7 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     }
 
     /**
-     * Imports clinical data and clinical attributes (from the worksheet)
+     * Updates case list sample ids from clinical sample and case list files
      */
     public void run() {
         parseArguments();
