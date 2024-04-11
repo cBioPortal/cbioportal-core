@@ -60,7 +60,7 @@ def interface():
     data_source_group.add_argument('-s', '--study_directory',
                                    type=str, help='path to study directory.')
     data_source_group.add_argument('-d', '--data_directory',
-                                   type=str, help='path to directory.')
+                                   type=str, help='path to data directory for incremental upload.')
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
                                    type=str,
