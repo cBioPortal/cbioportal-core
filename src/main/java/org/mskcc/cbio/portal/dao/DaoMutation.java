@@ -1509,9 +1509,6 @@ public final class DaoMutation {
             pstmt.setLong(1, geneticProfileId);
             pstmt.setLong(2, internalSampleId);
             pstmt.executeUpdate();
-
-            // TODO Remove row in mutation_event if it does not have mutations left
-            // TODO Remove profile if no mutations nor mutation_event(s) left
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
