@@ -26,13 +26,15 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.util.CaseList;
+import org.mskcc.cbio.portal.util.CaseListReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.validate.CaseListValidator;
 
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-//TODO Can we unify this class with ImportSampleList?
 public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
     private File metaFile;
@@ -61,45 +63,25 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         updateCaseLists(this.caseListSampleIdToSampleIds);
     }
 
-    // TODO Can we reuse this logic in ImportSampleList.importSampleList(File dataFile) as well
     private Map<String, Set<String>> readCaseListFiles() {
         LinkedHashMap<String, Set<String>> result = new LinkedHashMap<>();
         for (File caseListFile: this.caseListFiles) {
-            Properties properties = new TrimmedProperties();
-            try {
-                properties.load(new FileReader(caseListFile));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            String studyId = properties.getProperty("cancer_study_identifier");
-            if (studyId == null || studyId.trim().equals("")) {
-                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No cancer_study_identifier specified.");
-            }
-            if (!studyId.equals(this.cancerStudyStableId)) {
+            CaseList caseList = CaseListReader.readFile(caseListFile);
+            CaseListValidator.validateIdFields(caseList);
+            String cancerStudyIdentifier = caseList.getCancerStudyIdentifier();
+            if (!cancerStudyIdentifier.equals(this.cancerStudyStableId)) {
                 ProgressMonitor.logWarning(
                         String.format(
                                 "Skipping %s case list file as it belongs to %s study and we uploading %s study.",
-                                caseListFile, studyId, this.cancerStudyStableId));
+                                caseListFile, cancerStudyIdentifier, this.cancerStudyStableId));
                 continue;
             }
-            String caseListStableId = properties.getProperty("stable_id");
-            if (caseListStableId == null || caseListStableId.trim().equals("")) {
-                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No stable_id specified.");
-            }
-            String caseListSampleIds = properties.getProperty("case_list_ids");
-            if (caseListSampleIds == null || caseListSampleIds.trim().equals("")) {
-                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No case_list_ids specified.");
-            }
-            Set<String> sampleIds = Arrays.stream(caseListSampleIds.split("\t")).map(sampleId -> sampleId.trim()).filter(sampleId -> !"".equals(sampleId.trim())).collect(Collectors.toSet());
-            if (sampleIds.isEmpty()) {
-                throw new RuntimeException(caseListFile.getAbsolutePath() + ": No sample ids specified.");
-            }
-            LinkedHashSet<String> extraSampleIds = new LinkedHashSet<>(sampleIds);
+            LinkedHashSet<String> extraSampleIds = new LinkedHashSet<>(caseList.getSampleIds());
             extraSampleIds.removeAll(this.allSampleIds);
             if (!extraSampleIds.isEmpty()) {
                 throw new RuntimeException(caseListFile.getAbsolutePath() + ": The following sample ids present in the case list file, but not specified in the clinical sample file: " + String.join(", ", extraSampleIds));
             }
-            result.put(caseListStableId, sampleIds);
+            result.put(caseList.getStableId(), new LinkedHashSet<>(caseList.getSampleIds()));
         }
         return result;
     }
