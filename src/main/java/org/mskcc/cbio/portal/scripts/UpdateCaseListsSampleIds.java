@@ -26,6 +26,7 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.io.*;
 import java.util.*;
@@ -75,7 +76,11 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
                 throw new RuntimeException(caseListFile.getAbsolutePath() + ": No cancer_study_identifier specified.");
             }
             if (!studyId.equals(this.cancerStudyStableId)) {
-                throw new RuntimeException(caseListFile.getAbsolutePath() + ": cancer_study_identifier expected to be " + this.cancerStudyStableId + " but found to be " + studyId);
+                ProgressMonitor.logWarning(
+                        String.format(
+                                "Skipping %s case list file as it belongs to %s study and we uploading %s study.",
+                                caseListFile, studyId, this.cancerStudyStableId));
+                continue;
             }
             String caseListStableId = properties.getProperty("stable_id");
             if (caseListStableId == null || caseListStableId.trim().equals("")) {

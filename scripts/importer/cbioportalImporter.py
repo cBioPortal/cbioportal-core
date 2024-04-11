@@ -467,20 +467,20 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
     if not_supported_meta_types:
         raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
-    # TODO it's to fragile to rely on the order of types like that. Too implicit
     for meta_file_type in INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES:
         meta_pairs = meta_file_type_to_meta_files[meta_file_type]
         for meta_pair in meta_pairs:
             meta_filename, meta_dictionary = meta_pair
             data_filename = os.path.join(data_directory, meta_dictionary['data_filename'])
             import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
-    # TODO we could also validate not supported types after loading is done?
 
     if MetaFileTypes.SAMPLE_ATTRIBUTES in meta_file_type_to_meta_files:
-        # TODO What if we have multiple clinical sample files? Throw exception or upload
-        meta_filename, meta_dictionary = meta_file_type_to_meta_files[MetaFileTypes.SAMPLE_ATTRIBUTES][0]
         case_list_dirname = os.path.join(data_directory, 'case_lists')
-        update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None)
+        sample_attributes_metas = meta_file_type_to_meta_files[MetaFileTypes.SAMPLE_ATTRIBUTES]
+        for meta_pair in sample_attributes_metas:
+            meta_filename, meta_dictionary = meta_pair
+            LOGGER.info('Updating case lists with sample ids', extra={'filename_': meta_filename})
+            update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None)
 
 
 def usage():
