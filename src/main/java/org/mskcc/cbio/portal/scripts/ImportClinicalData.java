@@ -337,7 +337,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         if (sample != null) {
             internalSampleId = sample.getInternalId();
             if (overwriteExisting && this.attributesType == AttributeTypes.SAMPLE_ATTRIBUTES) {
-                DaoClinicalData.removeSampleData(internalSampleId);
+                DaoClinicalData.removeSampleAttributesData(internalSampleId);
             } else {
                 //this should be a WARNING in case of TCGA studies (see https://github.com/cBioPortal/cbioportal/issues/839#issuecomment-203452415)
                 //and an ERROR in other studies. I.e. a sample should occur only once in clinical file!
@@ -359,7 +359,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         		//patient exists, get internal id:
         		internalPatientId = patient.getInternalId();
                 if (overwriteExisting && this.attributesType == AttributeTypes.PATIENT_ATTRIBUTES) {
-                    DaoClinicalData.removePatientData(internalPatientId);
+                    DaoClinicalData.removePatientAttributesData(internalPatientId);
                 }
         	}
         	else {
