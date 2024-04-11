@@ -31,6 +31,7 @@ import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+//TODO Can we unify this class with ImportSampleList?
 public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
     private File metaFile;
@@ -59,6 +60,7 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         updateCaseLists(this.caseListSampleIdToSampleIds);
     }
 
+    // TODO Can we reuse this logic in ImportSampleList.importSampleList(File dataFile) as well
     private Map<String, Set<String>> readCaseListFiles() {
         LinkedHashMap<String, Set<String>> result = new LinkedHashMap<>();
         for (File caseListFile: this.caseListFiles) {
