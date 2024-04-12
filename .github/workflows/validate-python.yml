@@ -14,11 +14,7 @@ jobs:
       - name: 'Validate tests'
         working-directory: ./cbioportal-core
         run: |
-          docker run -v ${PWD}:/cbioportal-core python:3.6 /bin/sh -c '
+          docker run -v ${PWD}:/cbioportal-core python:3.6 /bin/bash -c '
             cd cbioportal-core &&
             pip install -r requirements.txt &&
-            export PYTHONPATH=/cbioportal-core/scripts &&
-            cd tests/ &&
-            python unit_tests_validate_data.py &&
-            python system_tests_validate_data.py &&
-            python system_tests_validate_studies.py'
+            source test_scripts.sh'
