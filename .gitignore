@@ -31,3 +31,14 @@ replay_pid*
 
 .idea
 /dependency-reduced-pom.xml
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# test html reports
+*.html~
+
+# app properties that contains credentials
+/application.properties

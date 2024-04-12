@@ -501,10 +501,11 @@ def locate_jar():
     """
     # get the directory name of the currently running script,
     # resolving any symlinks
-    script_dir = Path(__file__).resolve().parent
-    # go up from core/scripts/importer/ to core/
-    src_root = script_dir.parent.parent
-    jars = list((src_root ).glob('core-*.jar'))
+    this_file = Path(__file__).resolve()
+    importer_dir = this_file.parent
+    scripts_dir = importer_dir.parent
+    root_dir = scripts_dir.parent
+    jars = list((root_dir).glob('core-*.jar'))
     if len(jars) != 1:
         raise FileNotFoundError(
             'Expected to find 1 scripts-*.jar, but found ' + str(len(jars)))
