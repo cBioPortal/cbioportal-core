@@ -56,11 +56,8 @@ class Color(object):
 
 def interface():
     parser = argparse.ArgumentParser(description='cBioPortal meta Importer')
-    data_source_group = parser.add_mutually_exclusive_group()
-    data_source_group.add_argument('-s', '--study_directory',
-                                   type=str, help='path to study directory.')
-    data_source_group.add_argument('-d', '--data_directory',
-                                   type=str, help='path to data directory for incremental upload.')
+    parser.add_argument('-s', '--study_directory', type=str, required=True,
+                        help='path to directory.')
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
                                    type=str,
@@ -104,6 +101,8 @@ def interface():
                         help='Set as True to download OncoKB annotations for Mutations and CNA and load as custom driver annotations')
     parser.add_argument('-skipimport', '--skip_db_import', action='store_true',
                         help='Perform validation and OncoKB download but do not import study into database.')
+    parser.add_argument('-pids', '--patient_ids_only', type=str,
+                        help='Comma-separated list of patient ids to upload.')
     parser = parser.parse_args()
     return parser
 
@@ -118,7 +117,7 @@ if __name__ == '__main__':
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
 
-    data_dir = args.data_directory if args.data_directory is not None else args.study_directory
+    study_dir = args.study_directory
 
     # Validate the study directory.
     print("Starting validation...\n", file=sys.stderr)
@@ -142,9 +141,9 @@ if __name__ == '__main__':
     # Import OncoKB annotations when asked, and there are no validation warnings or warnings are overruled
     study_is_valid = exitcode == 0 or (exitcode == 3 and args.override_warning)
     if study_is_valid and args.import_oncokb:
-        mutation_meta_file_path = libImportOncokb.find_meta_file_by_fields(data_dir, {'genetic_alteration_type': 'MUTATION_EXTENDED'})
+        mutation_meta_file_path = libImportOncokb.find_meta_file_by_fields(study_dir, {'genetic_alteration_type': 'MUTATION_EXTENDED'})
         mutation_data_file_name = libImportOncokb.find_data_file_from_meta_file(mutation_meta_file_path)
-        mutation_data_file_path = os.path.join(data_dir, mutation_data_file_name)
+        mutation_data_file_path = os.path.join(study_dir, mutation_data_file_name)
         study_is_modified = False
         print("\n")
         if os.path.exists(mutation_data_file_path):
@@ -166,9 +165,9 @@ if __name__ == '__main__':
                 for log_handler in validator_logger.handlers:
                     log_handler.close()
                 validator_logger.handlers = []
-        cna_meta_file_path = libImportOncokb.find_meta_file_by_fields(data_dir, {'genetic_alteration_type': 'COPY_NUMBER_ALTERATION', 'datatype': 'DISCRETE'})
+        cna_meta_file_path = libImportOncokb.find_meta_file_by_fields(study_dir, {'genetic_alteration_type': 'COPY_NUMBER_ALTERATION', 'datatype': 'DISCRETE'})
         cna_data_file_name = libImportOncokb.find_data_file_from_meta_file(cna_meta_file_path)
-        cna_data_file_path = os.path.join(data_dir, cna_data_file_name)
+        cna_data_file_path = os.path.join(study_dir, cna_data_file_name)
         if os.path.exists(cna_data_file_path):
             print("Starting import of OncoKB annotations for discrete CNA file ...\n", file=sys.stderr)
             try:

@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
 
 /**
@@ -49,8 +50,13 @@ import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
 @Transactional
 public class TestIncrementalMutationsImport {
 
-    public static final String STUDY_ID = "study_tcga_pub";
-    private CancerStudy cancerStudy;
+    static final String INSERT_MUTATION_DATA_SAMPLE_ID = "TCGA-A1-A0SE-01";
+    static final String UPDATE_MUTATION_DATA_SAMPLE_ID = "TCGA-A1-A0SH-01";
+    static final String STUDY_ID = "study_tcga_pub";
+    CancerStudy cancerStudy;
+    static final File STUDY_FOLDER = new File("src/test/resources/incremental/study_tcga_pub");
+    static final File META_FILE = new File(STUDY_FOLDER, "meta_mutations.txt");
+    static final File DATA_FILE = new File(STUDY_FOLDER, "data_mutations_extended.txt");
 
     @Before
     public void setUp() throws DaoException {
@@ -63,21 +69,16 @@ public class TestIncrementalMutationsImport {
     public void testInsertNewMutationProfileDataForExistingSampleAndProfile() throws DaoException {
         GeneticProfile mutationGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mutations");
         assertNotNull(mutationGeneticProfile);
-        String mutationDataSampleId = "TCGA-A1-A0SE-01";
         /**
          * this sample does not have mutation data attached
          */
-        Sample mutationDataSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), mutationDataSampleId);
-
-        File singleTcgaSampleFolder = new File("src/test/resources/incremental/insert_mutation_data/");
-        File metaFile = new File(singleTcgaSampleFolder, "meta_mutations.txt");
-        File dataFile = new File(singleTcgaSampleFolder, "data_mutations_extended.txt");
+        Sample mutationDataSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), INSERT_MUTATION_DATA_SAMPLE_ID);
 
         ImportProfileData importProfileData = new ImportProfileData(new String[] {
                 "--loadMode", "bulkLoad",
-                "--meta", metaFile.getAbsolutePath(),
-                "--data", dataFile.getAbsolutePath(),
-                "--overwrite-existing",
+                "--meta", META_FILE.getAbsolutePath(),
+                "--data", DATA_FILE.getAbsolutePath(),
+                "--sample-ids-only", INSERT_MUTATION_DATA_SAMPLE_ID
         });
         importProfileData.run();
 
@@ -96,21 +97,16 @@ public class TestIncrementalMutationsImport {
     public void testUpdateMutationProfileDataForExistingSampleAndProfile() throws DaoException {
         GeneticProfile mutationGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mutations");
         assertNotNull(mutationGeneticProfile);
-        String mutationDataSampleId = "TCGA-A1-A0SH-01";
         /**
          * this sample does have 2 mutation data rows attached. See seed_mini.sql
          */
-        Sample mutationDataSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), mutationDataSampleId);
-
-        File singleTcgaSampleFolder = new File("src/test/resources/incremental/update_mutation_data/");
-        File metaFile = new File(singleTcgaSampleFolder, "meta_mutations.txt");
-        File dataFile = new File(singleTcgaSampleFolder, "data_mutations_extended.txt");
+        Sample mutationDataSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), UPDATE_MUTATION_DATA_SAMPLE_ID);
 
         ImportProfileData importProfileData = new ImportProfileData(new String[] {
                 "--loadMode", "bulkLoad",
-                "--meta", metaFile.getAbsolutePath(),
-                "--data", dataFile.getAbsolutePath(),
-                "--overwrite-existing",
+                "--meta", META_FILE.getAbsolutePath(),
+                "--data", DATA_FILE.getAbsolutePath(),
+                "--sample-ids-only", UPDATE_MUTATION_DATA_SAMPLE_ID
         });
         importProfileData.run();
 
@@ -124,6 +120,27 @@ public class TestIncrementalMutationsImport {
         Set<Long> entrezIds = insertedMutations.stream().map(m -> m.getEntrezGeneId()).collect(Collectors.toSet());
         Set<Long> expected = Set.of(207L, 208L, 672L);
         assertEquals(expected, entrezIds);
+    }
+
+    @Test
+    public void testSampleIdSelection() throws DaoException {
+        GeneticProfile mutationGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mutations");
+        assertNotNull(mutationGeneticProfile);
+        Sample insertMutationSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), INSERT_MUTATION_DATA_SAMPLE_ID);
+
+        ImportProfileData importProfileData = new ImportProfileData(new String[] {
+                "--loadMode", "bulkLoad",
+                "--meta", META_FILE.getAbsolutePath(),
+                "--data", DATA_FILE.getAbsolutePath(),
+                "--sample-ids-only", UPDATE_MUTATION_DATA_SAMPLE_ID
+        });
+        importProfileData.run();
+
+        ArrayList<ExtendedMutation> insertedMutations = getMutations(
+                mutationGeneticProfile.getGeneticProfileId(),
+                insertMutationSample.getInternalId());
+        assertTrue("Mutations datat for " + INSERT_MUTATION_DATA_SAMPLE_ID + " sample must not be inserted to the database as its sample is not selected",
+                insertedMutations.isEmpty());
     }
 
 }

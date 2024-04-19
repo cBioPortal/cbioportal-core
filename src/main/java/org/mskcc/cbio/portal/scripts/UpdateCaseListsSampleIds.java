@@ -35,6 +35,7 @@ import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+//TODO Make this loader to accept sample_ids_only
 public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
     private File metaFile;

@@ -55,15 +55,18 @@ public class ImportClinicalData extends ConsoleRunnable {
     private int numPatientSpecificClinicalAttributesAdded = 0;
     private int numEmptyClinicalAttributesSkipped = 0;
     private int numSamplesProcessed = 0;
-    
+
     private static Properties properties;
 
     private File clinicalDataFile;
     private CancerStudy cancerStudy;
     private AttributeTypes attributesType;
     private boolean relaxed;
-    private boolean overwriteExisting;
-    private Set<String> patientIds = new HashSet<String>();
+    private Set<String> patientIdsOnly;
+    private Set<String> sampleIdsOnly;
+    private Set<String> insertedStablePatientIds = new HashSet<String>();
+    private Set<String> seenStablePatientIds = new HashSet<>();
+    private Set<String> seenStableSampleIds = new HashSet<>();
 
     public static enum MissingAttributeValues
     {
@@ -77,19 +80,19 @@ public class ImportClinicalData extends ConsoleRunnable {
         NA("NA");
 
         private String propertyName;
-        
+
         MissingAttributeValues(String propertyName) { this.propertyName = propertyName; }
         public String toString() { return propertyName; }
 
         static public boolean has(String value) {
             if (value == null) return false;
             if (value.trim().equals("")) return true;
-            try { 
+            try {
                 value = value.replaceAll("[\\[|\\]]", "");
                 value = value.replaceAll(" ", "_");
-                return valueOf(value.toUpperCase()) != null; 
+                return valueOf(value.toUpperCase()) != null;
             }
-            catch (IllegalArgumentException x) { 
+            catch (IllegalArgumentException x) {
                 return false;
             }
         }
@@ -99,32 +102,32 @@ public class ImportClinicalData extends ConsoleRunnable {
             return "[" + NOT_AVAILABLE.toString() + "]";
         }
     }
-    
-    public static enum AttributeTypes 
+
+    public static enum AttributeTypes
     {
         PATIENT_ATTRIBUTES("PATIENT"),
         SAMPLE_ATTRIBUTES("SAMPLE"),
         @Deprecated
         MIXED_ATTRIBUTES("MIXED");
-        
+
         private String attributeType;
-        
+
         AttributeTypes(String attributeType) {this.attributeType = attributeType;}
-        
+
         public String toString() {return attributeType;}
     }
-    
-    public static enum DataTypes 
+
+    public static enum DataTypes
     {
         STRING,
         NUMBER,
         BOOLEAN;
-    	
+
     	static public boolean has(String value) {
-    		try { 
-                return valueOf(value.toUpperCase()) != null; 
+    		try {
+                return valueOf(value.toUpperCase()) != null;
             }
-            catch (IllegalArgumentException x) { 
+            catch (IllegalArgumentException x) {
                 return false;
             }
     	}
@@ -145,15 +148,15 @@ public class ImportClinicalData extends ConsoleRunnable {
         // a clinical attribute update should be
         // perform instead of an insert
         MySQLbulkLoader.bulkLoadOn();
-        
+
         if(relaxed) {
             MySQLbulkLoader.relaxedModeOn();
-        }    
-        
+        }
+
         FileReader reader =  new FileReader(clinicalDataFile);
         BufferedReader buff = new BufferedReader(reader);
         List<ClinicalAttribute> columnAttrs = grabAttrs(buff);
-        
+
         int patientIdIndex = findPatientIdColumn(columnAttrs);
         int sampleIdIndex = findSampleIdColumn(columnAttrs);
 
@@ -161,7 +164,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         if (patientIdIndex < 0) {
         	//PATIENT_ID is required in both file types:
         	throw new RuntimeException("Aborting owing to failure to find " +
-                    PATIENT_ID_COLUMN_NAME + 
+                    PATIENT_ID_COLUMN_NAME +
                     " in file. Please check your file format and try again.");
         }
         if (attributesType.toString().equals("SAMPLE") && sampleIdIndex < 0) {
@@ -171,12 +174,12 @@ public class ImportClinicalData extends ConsoleRunnable {
                     " in file. Please check your file format and try again.");
         }
         importData(buff, columnAttrs);
-        
+
         if (getAttributesType() == ImportClinicalData.AttributeTypes.SAMPLE_ATTRIBUTES ||
             getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES) {
             DaoPatient.createSampleCountClinicalData(cancerStudy.getInternalId());
         }
-        
+
         if (MySQLbulkLoader.isBulkLoad()) {
             MySQLbulkLoader.flushAll();
             MySQLbulkLoader.relaxedModeOff();
@@ -193,33 +196,33 @@ public class ImportClinicalData extends ConsoleRunnable {
             // contains meta data about the attributes
             descriptions = splitFields(buff.readLine());
             datatypes = splitFields(buff.readLine());
-            
+
             switch(this.attributesType)
             {
                 case PATIENT_ATTRIBUTES:
                 case SAMPLE_ATTRIBUTES:
                     attributeTypes = new String[displayNames.length];
-                    Arrays.fill(attributeTypes, this.attributesType.toString());   
+                    Arrays.fill(attributeTypes, this.attributesType.toString());
                     break;
                 case MIXED_ATTRIBUTES:
                     attributeTypes = splitFields(buff.readLine());
                     //quick validation: attributeTypes values should be either PATIENT or SAMPLE
                     for (String attributeTypeVal : attributeTypes) {
-                    	if (!attributeTypeVal.equalsIgnoreCase(AttributeTypes.PATIENT_ATTRIBUTES.toString()) && 
+                    	if (!attributeTypeVal.equalsIgnoreCase(AttributeTypes.PATIENT_ATTRIBUTES.toString()) &&
                     			!attributeTypeVal.equalsIgnoreCase(AttributeTypes.SAMPLE_ATTRIBUTES.toString())) {
-                    		throw new RuntimeException("Invalid value for attributeType: " + attributeTypeVal + ". Check the header rows of your data file."); 
-                    	}	
+                    		throw new RuntimeException("Invalid value for attributeType: " + attributeTypeVal + ". Check the header rows of your data file.");
+                    	}
                     }
                     break;
             }
-            
+
             //quick validation: datatypes values should be one of the valid types
             for (String datatype : datatypes) {
             	if (!DataTypes.has(datatype)) {
-            		throw new RuntimeException("Invalid value for datatype: " + datatype + ". Check the header rows of your data file."); 
-            	}	
+            		throw new RuntimeException("Invalid value for datatype: " + datatype + ". Check the header rows of your data file.");
+            	}
             }
-                     
+
             priorities = splitFields(buff.readLine());
             colnames = splitFields(buff.readLine());
 
@@ -267,7 +270,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         }
         return attrs;
     }
-   
+
     private String[] splitFields(String line) throws IOException {
         line = line.replaceAll("^"+METADATA_PREFIX+"+", "");
         String[] fields = line.split(DELIMITER, -1);
@@ -295,9 +298,9 @@ public class ImportClinicalData extends ConsoleRunnable {
     }
 
     /**
-     * Takes in the given line and returns the list of field values by 
+     * Takes in the given line and returns the list of field values by
      * splitting the line on DELIMITER.
-     *  
+     *
      * @param line
      * @param columnAttrs
      * @return the list of values, one for each column. Value will be "" for empty columns.
@@ -306,13 +309,13 @@ public class ImportClinicalData extends ConsoleRunnable {
     {
     	// split on delimiter:
         String[] fieldValues = line.split(DELIMITER, -1);
-        
+
         // validate: if number of fields is incorrect, give exception
         if (fieldValues.length != columnAttrs.size()) {
-        	throw new IllegalArgumentException("Number of columns in line is not as expected. Expected: " + 
+        	throw new IllegalArgumentException("Number of columns in line is not as expected. Expected: " +
         								columnAttrs.size() + " columns, found: " + fieldValues.length + ", for line: " + line);
         }
-        
+
         // now iterate over lines and trim each value:
         for (int i = 0; i < fieldValues.length; i++)
         {
@@ -326,17 +329,31 @@ public class ImportClinicalData extends ConsoleRunnable {
         int sampleIdIndex = findSampleIdColumn(columnAttrs);
         String stableSampleId = (sampleIdIndex >= 0) ? fields[sampleIdIndex] : "";
         stableSampleId = StableIdUtil.getSampleId(stableSampleId);
+        seenStableSampleIds.add(stableSampleId);
+
+        if (sampleIdsOnly != null && !sampleIdsOnly.contains(stableSampleId)) {
+            return false;
+        }
+
         int patientIdIndex = findPatientIdColumn(columnAttrs);
         String stablePatientId = (patientIdIndex >= 0) ? fields[patientIdIndex] : "";
         stablePatientId = StableIdUtil.getPatientId(stablePatientId);
+        seenStablePatientIds.add(stablePatientId);
+
+        if (patientIdsOnly != null && !patientIdsOnly.contains(stablePatientId)) {
+           return false;
+        }
+
         int internalSampleId = -1;
         int internalPatientId = -1;
-        
+
         //check if sample is not already added:
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), stableSampleId, false);
         if (sample != null) {
             internalSampleId = sample.getInternalId();
-            if (overwriteExisting && this.attributesType == AttributeTypes.SAMPLE_ATTRIBUTES) {
+            if (sampleIdsOnly != null
+                    && sampleIdsOnly.contains(sample.getStableId())
+                    && this.attributesType == AttributeTypes.SAMPLE_ATTRIBUTES) {
                 DaoClinicalData.removeSampleAttributesData(internalSampleId);
             } else {
                 //this should be a WARNING in case of TCGA studies (see https://github.com/cBioPortal/cbioportal/issues/839#issuecomment-203452415)
@@ -358,7 +375,9 @@ public class ImportClinicalData extends ConsoleRunnable {
         	if (patient != null) {
         		//patient exists, get internal id:
         		internalPatientId = patient.getInternalId();
-                if (overwriteExisting && this.attributesType == AttributeTypes.PATIENT_ATTRIBUTES) {
+                if (patientIdsOnly != null
+                        && patientIdsOnly.contains(patient.getStableId())
+                        && this.attributesType == AttributeTypes.PATIENT_ATTRIBUTES) {
                     DaoClinicalData.removePatientAttributesData(internalPatientId);
                 }
         	}
@@ -370,12 +389,12 @@ public class ImportClinicalData extends ConsoleRunnable {
         	// sample is new, so attempt to add to DB
 	        internalSampleId = (stableSampleId.length() > 0) ?
 	            addSampleToDatabase(stableSampleId, fields, columnAttrs) : -1;
-	        
-        }    
-		
+
+        }
+
     	//validate and count:
         if (internalSampleId != -1) {
-        	//some minimal validation/fail safe for now: only continue if patientId is same as patient id in 
+        	//some minimal validation/fail safe for now: only continue if patientId is same as patient id in
             //existing sample (can occur in case of this.isSupplementalData or in case of parsing bug in addSampleToDatabase):
     		internalPatientId = DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudy.getInternalId(), stablePatientId).getInternalId();
     		if (internalPatientId != DaoSample.getSampleById(internalSampleId).getInternalPatientId()) {
@@ -394,7 +413,7 @@ public class ImportClinicalData extends ConsoleRunnable {
             	numEmptyClinicalAttributesSkipped++;
                 continue;
             }
-            boolean isPatientAttribute = columnAttrs.get(lc).isPatientAttribute(); 
+            boolean isPatientAttribute = columnAttrs.get(lc).isPatientAttribute();
             if (isPatientAttribute && internalPatientId != -1) {
                 // The attributeMap keeps track what  patient/attribute to value pairs are being added to the DB. If there are duplicates,
                 // (which can happen in a MIXED_ATTRIBUTES type clinical file), we need to make sure that the value for the same
@@ -412,7 +431,7 @@ public class ImportClinicalData extends ConsoleRunnable {
                 // the previous value and give a warning. NB: this is a kind of "random" harmonization strategy and is 
                 // NOT recommended! TODO - change this to an Exception instead of just a warning. 
                 else if (!attributeMap.get(internalPatientId, columnAttrs.get(lc).getAttrId()).equals(fields[lc])) {
-                    ProgressMonitor.logWarning("Error: Duplicated patient " + stablePatientId + " with different values for patient attribute " + columnAttrs.get(lc).getAttrId() + 
+                    ProgressMonitor.logWarning("Error: Duplicated patient " + stablePatientId + " with different values for patient attribute " + columnAttrs.get(lc).getAttrId() +
                         "\n\tValues: " + attributeMap.get(internalPatientId, columnAttrs.get(lc).getAttrId()) + " " + fields[lc]);
                 }
             }
@@ -426,7 +445,7 @@ public class ImportClinicalData extends ConsoleRunnable {
                     throw new RuntimeException("Error: Duplicated sample in file");
                 }
                 else if (!attributeMap.get(internalSampleId, columnAttrs.get(lc).getAttrId()).equals(fields[lc])) {
-                    ProgressMonitor.logWarning("Error: Duplicated sample " + stableSampleId + " with different values for sample attribute " + columnAttrs.get(lc).getAttrId() + 
+                    ProgressMonitor.logWarning("Error: Duplicated sample " + stableSampleId + " with different values for sample attribute " + columnAttrs.get(lc).getAttrId() +
                         "\n\tValues: " + attributeMap.get(internalSampleId, columnAttrs.get(lc).getAttrId()) + " " + fields[lc]);
                 }
             }
@@ -448,7 +467,7 @@ public class ImportClinicalData extends ConsoleRunnable {
     {
         return findAttributeColumnIndex(SAMPLE_ID_COLUMN_NAME, attrs);
     }
-    
+
     private int findSampleTypeColumn(List<ClinicalAttribute> attrs) {
         return findAttributeColumnIndex(SAMPLE_TYPE_COLUMN_NAME, attrs);
     }
@@ -476,23 +495,23 @@ public class ImportClinicalData extends ConsoleRunnable {
         			throw new RuntimeException("Something has gone wrong. Patient " + patientId + " already has clinical data loaded.");
         		}
         		//if patient is duplicated, abort as well in this case:
-        		if (!patientIds.add(patientId)) {
+        		if (!insertedStablePatientIds.add(patientId)) {
         			throw new RuntimeException("Error. Patient " + patientId + " found to be duplicated in your file.");
         		}
         	}
-        	
+
             if (patient != null) {
             	//in all cases (SAMPLE, PATIENT, or MIXED data import) this can be expected, so just fetch it:
                 internalPatientId = patient.getInternalId();
             }
-            else {            	
+            else {
             	//in case of PATIENT data import and patient == null :
             	if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES) {
-            		//not finding the patient it unexpected (as SAMPLE data import should always precede it), but 
+            		//not finding the patient it unexpected (as SAMPLE data import should always precede it), but
                 	//can happen when this patient does not have any samples for example. In any case, warn about it:
             		ProgressMonitor.logWarning("Patient " + patientId + " being added for the first time. Apparently this patient was not in the samples file, or the samples file is not yet loaded (should be loaded before this one)");
             	}
-            	
+
                 patient = new Patient(cancerStudy, patientId);
                 internalPatientId = DaoPatient.addPatient(patient);
             }
@@ -509,7 +528,7 @@ public class ImportClinicalData extends ConsoleRunnable {
             sampleTypeStr = sampleTypeStr.trim().toUpperCase().replaceAll(" ", "_");
         }
         Sample.Type sampleType = Sample.Type.has(sampleTypeStr) ? Sample.Type.valueOf(sampleTypeStr) : null;
-        
+
         int internalSampleId = -1;
         if (validSampleId(sampleId) && !StableIdUtil.isNormal(sampleId)) {
             // want to try and capture normal sample types based on value for SAMPLE_TYPE
@@ -588,20 +607,20 @@ public class ImportClinicalData extends ConsoleRunnable {
     public int getNumPatientSpecificClinicalAttributesAdded() {
         return numPatientSpecificClinicalAttributesAdded;
     }
-    
+
     public int getNumEmptyClinicalAttributesSkipped() {
     	return numEmptyClinicalAttributesSkipped;
     }
-    
+
     public int getNumSamplesProcessed() {
     	return numSamplesProcessed;
     }
-    
+
     /**
-     * The type of attributes found in the file. Basically the 
-     * type of import running for this instance. Can be one of 
+     * The type of attributes found in the file. Basically the
+     * type of import running for this instance. Can be one of
      * AttributeTypes.
-     * 
+     *
      * @return
      */
     public AttributeTypes getAttributesType() {
@@ -616,7 +635,7 @@ public class ImportClinicalData extends ConsoleRunnable {
             String progName = "importClinicalData";
             String description = "Import clinical files.";
             // usage: --data <data_file.txt> --meta <meta_file.txt> --loadMode [directLoad|bulkLoad (default)] [--noprogress]
-	
+
 	        OptionParser parser = new OptionParser();
 	        OptionSpec<String> data = parser.accepts( "data",
 	               "profile data file" ).withRequiredArg().describedAs( "data_file.txt" ).ofType( String.class );
@@ -631,8 +650,12 @@ public class ImportClinicalData extends ConsoleRunnable {
 	        parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
 	          .withOptionalArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 	        parser.accepts("noprogress", "this option can be given to avoid the messages regarding memory usage and % complete");
-            OptionSpec<String> overWriteExistingFlag = parser.accepts("overwrite-existing",
-                    "Flag that enables re-uploading data for the patient/sample entries that already exist in the database").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+            OptionSpec<String> patientIdsOnlyOption = parser.accepts("patient-ids-only",
+                    "Comma-separated list of patient ids to upload to the database. The rest of the patients in the study are skipped.")
+                    .withOptionalArg().describedAs("PATIENT_ID1,PATIENT_ID2").ofType(String.class);
+            OptionSpec<String> sampleIdsOnlyOption = parser.accepts("sample-ids-only",
+                            "Comma-separated list of sample ids to upload to the database. The rest of the samples in the study are skipped.")
+                    .withOptionalArg().describedAs("SAMPLE_ID1,SAMPLE_ID2").ofType(String.class);
 
 	        OptionSet options = null;
 	        try {
@@ -673,10 +696,29 @@ public class ImportClinicalData extends ConsoleRunnable {
                 relaxed = true;
 
             }
-            if( options.has ( overWriteExistingFlag ) )
+            if( options.has ( patientIdsOnlyOption ) )
             {
-                overwriteExisting = true;
-
+                String patientIdsOnlyOptionValue = options.valueOf(patientIdsOnlyOption);
+                if (patientIdsOnlyOptionValue == null) {
+                    throw new UsageException(
+                            progName, description, parser,
+                            "'--patient-ids-only' argument has to come with a value (e.g. --patient-ids-only PATIENT_ID1,PATIENT_ID2)");
+                }
+                patientIdsOnly =  Set.of(patientIdsOnlyOptionValue.split(","));
+            }
+            if( options.has ( sampleIdsOnlyOption ) )
+            {
+                if (AttributeTypes.PATIENT_ATTRIBUTES == AttributeTypes.valueOf(attributesDatatype)) {
+                   throw new UsageException(progName, description, parser,
+                           "--sample-ids-only cannot be specified while loading patient clinical data.");
+                }
+                String sampleIdsOnlyOptionValue = options.valueOf(sampleIdsOnlyOption);
+                if (sampleIdsOnlyOptionValue == null) {
+                    throw new UsageException(
+                            progName, description, parser,
+                            "'--sample-ids-only' argument has to come with a value (e.g. --sample-ids-only SAMPLE_ID1,SAMPLE_ID2)");
+                }
+                sampleIdsOnly =  Set.of(sampleIdsOnlyOptionValue.split(","));
             }
             SpringUtil.initDataSource();
             CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyStableId);
@@ -691,50 +733,62 @@ public class ImportClinicalData extends ConsoleRunnable {
             setFile(cancerStudy, clinical_f, attributesDatatype, relaxed);
             importData();
 
-            if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES ||
-                    getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES) { 
+            if (getAttributesType() == AttributeTypes.PATIENT_ATTRIBUTES ||
+                    getAttributesType() == AttributeTypes.MIXED_ATTRIBUTES) {
                 ProgressMonitor.setCurrentMessage("Total number of patient specific clinical attributes added:  "
-                    + getNumPatientSpecificClinicalAttributesAdded());
+                        + getNumPatientSpecificClinicalAttributesAdded());
             }
-            if (getAttributesType() == ImportClinicalData.AttributeTypes.SAMPLE_ATTRIBUTES ||
-                    getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES) { 
+            if (getAttributesType() == AttributeTypes.SAMPLE_ATTRIBUTES ||
+                    getAttributesType() == AttributeTypes.MIXED_ATTRIBUTES) {
                 ProgressMonitor.setCurrentMessage("Total number of sample specific clinical attributes added:  "
-                    + getNumSampleSpecificClinicalAttributesAdded());
+                        + getNumSampleSpecificClinicalAttributesAdded());
                 ProgressMonitor.setCurrentMessage("Total number of samples processed:  "
-                    + getNumSamplesProcessed());
+                        + getNumSamplesProcessed());
             }
             ProgressMonitor.setCurrentMessage("Total number of attribute values skipped because of empty value:  "
                     + getNumEmptyClinicalAttributesSkipped());
-            if (getAttributesType() == ImportClinicalData.AttributeTypes.SAMPLE_ATTRIBUTES &&
-                (getNumSampleSpecificClinicalAttributesAdded() + getNumSamplesProcessed()) == 0) {
-                //should not occur: 
-                throw new RuntimeException("No data was added.  " +
-                        "Please check your file format and try again.");
-            }
-            if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES &&
-                getNumPatientSpecificClinicalAttributesAdded() == 0) {
-                //could occur if patient clinical file is given with only PATIENT_ID column:
-                throw new RuntimeException("No data was added.  " +
-                        "Please check your file format and try again. If you only have sample clinical data, then a patients file with only PATIENT_ID column is not required.");
-            }
-            //backward compatible check (TODO - remove this later):
-            if (getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES &&
-                (getNumPatientSpecificClinicalAttributesAdded() + getNumSampleSpecificClinicalAttributesAdded()) == 0) {
-                    //should not occur: 
-                    throw new RuntimeException("No data was added.  " +
-                            "Please check your data and try again.");
-                }
 
-            if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES &&
-                getNumPatientSpecificClinicalAttributesAdded() == 0) {
-                //could occur if patient clinical file is given with only PATIENT_ID column:
-                throw new RuntimeException("No data was added.  " +
-                        "Please check your file format and try again. If you only have sample clinical data, then a patients file with only PATIENT_ID column is not required.");
-            }
+            afterDataImportChecks();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void afterDataImportChecks() {
+        if (patientIdsOnly != null) {
+            Set<String> neverSeenStablePatientIds = new HashSet<>(patientIdsOnly);
+            neverSeenStablePatientIds.removeAll(seenStablePatientIds);
+            if (!neverSeenStablePatientIds.isEmpty()) {
+                throw new RuntimeException("The following patient ids are selected to be uploaded, but never found in the study files: " + String.join(", ", neverSeenStablePatientIds));
+            }
+        }
+        if (sampleIdsOnly != null) {
+            Set<String> neverSeenStableSampleIds = new HashSet<>(sampleIdsOnly);
+            neverSeenStableSampleIds.removeAll(seenStableSampleIds);
+            if (!neverSeenStableSampleIds.isEmpty()) {
+                throw new RuntimeException("The following sample ids are selected to be uploaded, but never found in the study files: " + String.join(", ", neverSeenStableSampleIds));
+            }
+        }
+        if (getAttributesType() == AttributeTypes.SAMPLE_ATTRIBUTES &&
+                (getNumSampleSpecificClinicalAttributesAdded() + getNumSamplesProcessed()) == 0) {
+            //should not occur:
+            throw new RuntimeException("No data was added.  " +
+                    "Please check your file format and try again.");
+        }
+        if (getAttributesType() == AttributeTypes.PATIENT_ATTRIBUTES &&
+                getNumPatientSpecificClinicalAttributesAdded() == 0) {
+            //could occur if patient clinical file is given with only PATIENT_ID column:
+            throw new RuntimeException("No data was added.  " +
+                    "Please check your file format and try again. If you only have sample clinical data, then a patients file with only PATIENT_ID column is not required.");
+        }
+        //backward compatible check (TODO - remove this later):
+        if (getAttributesType() == AttributeTypes.MIXED_ATTRIBUTES &&
+                (getNumPatientSpecificClinicalAttributesAdded() + getNumSampleSpecificClinicalAttributesAdded()) == 0) {
+            //should not occur:
+            throw new RuntimeException("No data was added.  " +
+                    "Please check your data and try again.");
         }
     }
 

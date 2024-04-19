@@ -365,14 +365,6 @@ META_FIELD_MAP = {
     },
 }
 
-# in order of they should be loaded
-INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
-    MetaFileTypes.PATIENT_ATTRIBUTES,
-    MetaFileTypes.SAMPLE_ATTRIBUTES,
-    MetaFileTypes.MUTATION,
-    # TODO Add more types here as incremental upload is enabled
-]
-
 IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.STUDY: IMPORT_STUDY_CLASS,
     MetaFileTypes.CANCER_TYPE: IMPORT_CANCER_TYPE_CLASS,

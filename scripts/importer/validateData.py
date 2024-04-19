@@ -70,12 +70,13 @@ from . import cbioportal_common
 DEFINED_SAMPLE_IDS = None
 DEFINED_SAMPLE_ATTRIBUTES = None
 PATIENTS_WITH_SAMPLES = None
+DEFINED_CANCER_TYPES = None
 mutation_sample_ids = None
 mutation_file_sample_ids = set()
 sample_ids_panel_dict = {}
 
 # resource globals
-RESOURCE_DEFINITION_DICTIONARY = None
+RESOURCE_DEFINITION_DICTIONARY = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 
 # globals required for gene set scoring validation
@@ -726,7 +727,7 @@ class Validator(object):
 
         Return True if the sample id was valid, False otherwise.
         """
-        if DEFINED_SAMPLE_IDS is not None and sample_id not in DEFINED_SAMPLE_IDS:
+        if sample_id not in DEFINED_SAMPLE_IDS:
             self.logger.error(
                 'Sample ID not defined in clinical file',
                 extra={'line_number': self.line_number,
@@ -740,7 +741,7 @@ class Validator(object):
 
         Return True if the patient id was valid, False otherwise.
         """
-        if PATIENTS_WITH_SAMPLES is not None and patient_id not in PATIENTS_WITH_SAMPLES:
+        if patient_id not in PATIENTS_WITH_SAMPLES:
             self.logger.error(
                 'Patient ID not defined in clinical file',
                 extra={'line_number': self.line_number,
@@ -2870,7 +2871,7 @@ class PatientClinicalValidator(ClinicalValidator):
                        'cause': 'SAMPLE_ID'})
         # refuse to define attributes also defined in the sample-level file
         for attribute_id in self.defined_attributes:
-            if DEFINED_SAMPLE_ATTRIBUTES is not None and attribute_id in DEFINED_SAMPLE_ATTRIBUTES:
+            if attribute_id in DEFINED_SAMPLE_ATTRIBUTES:
                 # log this as a file-aspecific error, using the base logger
                 self.logger.logger.error(
                     'Clinical attribute is defined both as sample-level and '
@@ -2911,7 +2912,7 @@ class PatientClinicalValidator(ClinicalValidator):
                                     self.patient_id_lines[value])})
                 else:
                     self.patient_id_lines[value] = self.line_number
-                    if PATIENTS_WITH_SAMPLES is not None and value not in PATIENTS_WITH_SAMPLES:
+                    if value not in PATIENTS_WITH_SAMPLES:
                         self.logger.warning(
                             'Clinical data defined for a patient with '
                             'no samples',
@@ -2978,13 +2979,12 @@ class PatientClinicalValidator(ClinicalValidator):
 
     def onComplete(self):
         """Perform final validations based on the data parsed."""
-        if PATIENTS_WITH_SAMPLES:
-            for patient_id in PATIENTS_WITH_SAMPLES:
-                if patient_id not in self.patient_id_lines:
-                    self.logger.warning(
-                        'Missing clinical data for a patient associated with '
-                        'samples',
-                        extra={'cause': patient_id})
+        for patient_id in PATIENTS_WITH_SAMPLES:
+            if patient_id not in self.patient_id_lines:
+                self.logger.warning(
+                    'Missing clinical data for a patient associated with '
+                    'samples',
+                    extra={'cause': patient_id})
         super(PatientClinicalValidator, self).onComplete()
 
 
@@ -3385,7 +3385,7 @@ class GenePanelMatrixValidator(Validator):
                 sample_ids_panel_dict[sample_id] = data[self.mutation_stable_id_index - 1]
                 # Sample ID has been removed from list, so subtract 1 position.
                 if data[self.mutation_stable_id_index - 1] != 'NA':
-                    if mutation_sample_ids is not None and sample_id not in mutation_sample_ids:
+                    if sample_id not in mutation_sample_ids:
                         self.logger.error('Sample ID has mutation gene panel, but is not in the sequenced case list',
                                           extra={'line_number': self.line_number,
                                                  'cause': sample_id})
@@ -3790,8 +3790,7 @@ class ResourceValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
                 # make sure that RESOURCE_ID is defined in the resource definition file
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and value not in RESOURCE_DEFINITION_DICTIONARY:
+                if value not in RESOURCE_DEFINITION_DICTIONARY:
                     self.logger.error(
                         'RESOURCE_ID is not defined in resource definition file',
                         extra={'line_number': self.line_number,
@@ -3858,17 +3857,13 @@ class SampleResourceValidator(ResourceValidator):
                 value = data[col_index].strip()
             # make sure RESOURCE_ID is defined correctly
             if col_name == 'RESOURCE_ID':
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and (value not in RESOURCE_DEFINITION_DICTIONARY \
-                        or 'SAMPLE' not in RESOURCE_DEFINITION_DICTIONARY[value]):
+                if value not in RESOURCE_DEFINITION_DICTIONARY or 'SAMPLE' not in RESOURCE_DEFINITION_DICTIONARY[value]:
                     self.logger.error(
                         'RESOURCE_ID for sample resource is not defined correctly in resource definition file',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and value in RESOURCE_DEFINITION_DICTIONARY \
-                        and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
+                if value in RESOURCE_DEFINITION_DICTIONARY and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
                     self.logger.warning(
                         'RESOURCE_ID for sample resource has been used by more than one RESOURCE_TYPE',
                         extra={'line_number': self.line_number,
@@ -3923,17 +3918,13 @@ class PatientResourceValidator(ResourceValidator):
                 value = data[col_index].strip()
             # make sure RESOURCE_ID is defined correctly
             if col_name == 'RESOURCE_ID':
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and (value not in RESOURCE_DEFINITION_DICTIONARY \
-                        or 'PATIENT' not in RESOURCE_DEFINITION_DICTIONARY[value]):
+                if value not in RESOURCE_DEFINITION_DICTIONARY or 'PATIENT' not in RESOURCE_DEFINITION_DICTIONARY[value]:
                     self.logger.error(
                         'RESOURCE_ID for patient resource is not defined correctly in resource definition file',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and value in RESOURCE_DEFINITION_DICTIONARY \
-                        and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
+                if value in RESOURCE_DEFINITION_DICTIONARY and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
                     self.logger.warning(
                         'RESOURCE_ID for patient resource has been used by more than one RESOURCE_TYPE',
                         extra={'line_number': self.line_number,
@@ -3977,17 +3968,13 @@ class StudyResourceValidator(ResourceValidator):
                 value = data[col_index].strip()
             # make sure RESOURCE_ID is defined correctly
             if col_name == 'RESOURCE_ID':
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and (value not in RESOURCE_DEFINITION_DICTIONARY \
-                        or 'STUDY' not in RESOURCE_DEFINITION_DICTIONARY[value]):
+                if value not in RESOURCE_DEFINITION_DICTIONARY or 'STUDY' not in RESOURCE_DEFINITION_DICTIONARY[value]:
                     self.logger.error(
                         'RESOURCE_ID for study resource is not defined correctly in resource definition file',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
-                if RESOURCE_DEFINITION_DICTIONARY is not None \
-                        and value in RESOURCE_DEFINITION_DICTIONARY \
-                        and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
+                if value in RESOURCE_DEFINITION_DICTIONARY and len(RESOURCE_DEFINITION_DICTIONARY[value]) > 1:
                     self.logger.warning(
                         'RESOURCE_ID for study resource has been used by more than one RESOURCE_TYPE',
                         extra={'line_number': self.line_number,
@@ -4814,6 +4801,11 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         else:
             validators_by_type[meta_file_type].append(None)
 
+    if study_cancer_type is None:
+        logger.error(
+            'Cancer type needs to be defined for a study. Verify that you have a study file '
+            'and have defined the cancer type correctly.')
+
     # prepend the cancer study id to any case list suffixes
     defined_case_list_fns = {}
     if study_id is not None:
@@ -4938,7 +4930,7 @@ def processCaseListDirectory(caseListDir, cancerStudyId, logger,
 
         for value in seen_sample_ids:
             # Compare case list sample ids with clinical file
-            if DEFINED_SAMPLE_IDS is not None and value not in DEFINED_SAMPLE_IDS:
+            if value not in DEFINED_SAMPLE_IDS:
                 logger.error(
                     'Sample ID not defined in clinical file',
                     extra={'filename_': case,
@@ -5301,11 +5293,8 @@ def load_portal_info(path, logger, offline=False):
 # ------------------------------------------------------------------------------
 def interface(args=None):
     parser = argparse.ArgumentParser(description='cBioPortal study validator')
-    data_source_group = parser.add_mutually_exclusive_group()
-    data_source_group.add_argument('-s', '--study_directory',
-                        type=str, help='path to study directory.')
-    data_source_group.add_argument('-d', '--data_directory',
-                        type=str, help='path to directory.')
+    parser.add_argument('-s', '--study_directory',
+                        type=str, required=True, help='path to directory.')
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
                                    type=str,
@@ -5352,6 +5341,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     attributes are not None.
     """
 
+    global DEFINED_CANCER_TYPES
     global DEFINED_SAMPLE_IDS
     global DEFINED_SAMPLE_ATTRIBUTES
     global PATIENTS_WITH_SAMPLES
@@ -5378,11 +5368,6 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
      study_id,
      stable_ids,
      tags_file_path) = process_metadata_files(study_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
-
-    if study_cancer_type is None:
-        logger.error(
-            'Cancer type needs to be defined for a study. Verify that you have a study file '
-            'and have defined the cancer type correctly.')
 
     # first parse and validate cancer type files
     studydefined_cancer_types = []
@@ -5560,19 +5545,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     # additional validation between meta files, after all meta files are processed
     validate_data_relations(validators_by_meta_type, logger)
 
-
-def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks):
-    # walk over the meta files in the dir and get properties of the study
-    validators_by_meta_type, *_ = process_metadata_files(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
-    for meta_file_type, validators in validators_by_meta_type.items():
-        # if there was no validator for this meta file
-        if not validators:
-            continue
-        logger.info("Validating %s", meta_file_type)
-        for validator in validators:
-            # TODO skip None's. Why do we even have them?
-            if validator:
-                validator.validate()
+    logger.info('Validation complete')
 
 
 def get_pom_path():
@@ -5592,15 +5565,7 @@ def main_validate(args):
     logger.addHandler(exit_status_handler)
 
     # process the options
-    if args.study_directory:
-        data_dir = args.study_directory
-        partial_data = False
-    elif args.data_directory:
-        data_dir = args.data_directory
-        partial_data = True
-    else:
-        raise RuntimeError("Neither study_directory nor data_directory argument is specified.")
-
+    study_dir = args.study_directory
     server_url = args.url_server
 
     html_output_filename = args.html_table
@@ -5613,14 +5578,14 @@ def main_validate(args):
         output_loglevel = logging.DEBUG
 
     # check existence of directory
-    if not os.path.exists(data_dir):
-        print('directory cannot be found: ' + data_dir, file=sys.stderr)
+    if not os.path.exists(study_dir):
+        print('directory cannot be found: ' + study_dir, file=sys.stderr)
         return 2
 
     # set default message handler
     text_handler = logging.StreamHandler(sys.stdout)
     text_handler.setFormatter(
-        cbioportal_common.LogfileStyleFormatter(data_dir))
+        cbioportal_common.LogfileStyleFormatter(study_dir))
     collapsing_text_handler = cbioportal_common.CollapsingLogMessageHandler(
         capacity=5e5,
         flushLevel=logging.CRITICAL,
@@ -5636,7 +5601,7 @@ def main_validate(args):
         import jinja2  # pylint: disable=import-error
 
         html_handler = Jinja2HtmlHandler(
-            data_dir,
+            study_dir,
             html_output_filename,
             capacity=1e5)
         # TODO extend CollapsingLogMessageHandler to flush to multiple targets,
@@ -5650,7 +5615,7 @@ def main_validate(args):
 
     if args.error_file:
         errfile_handler = logging.FileHandler(args.error_file, 'w')
-        errfile_handler.setFormatter(ErrorFileFormatter(data_dir))
+        errfile_handler.setFormatter(ErrorFileFormatter(study_dir))
         # TODO extend CollapsingLogMessageHandler to flush to multiple targets,
         # and get rid of the duplicated buffering of messages here
         coll_errfile_handler = cbioportal_common.CollapsingLogMessageHandler(
@@ -5679,17 +5644,13 @@ def main_validate(args):
     # set portal version
     cbio_version = portal_instance.portal_version
 
-    if partial_data:
-        validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
-    else:
-        validate_study(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
+    validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
 
     if html_handler is not None:
         # flush logger and generate HTML while overriding cbio_version after retrieving it from the API
         collapsing_html_handler.flush()
         html_handler.generateHtml(cbio_version=cbio_version)
 
-    logger.info('Validation complete')
     return exit_status_handler.get_exit_status()
 
 
@@ -5709,7 +5670,7 @@ if __name__ == '__main__':
     finally:
         logging.shutdown()
         del logging._handlerList[:]  # workaround for harmless exceptions on exit
-    print(('Validation of data {status}.'.format(
+    print(('Validation of study {status}.'.format(
         status={0: 'succeeded',
                 1: 'failed',
                 2: 'not performed as problems occurred',

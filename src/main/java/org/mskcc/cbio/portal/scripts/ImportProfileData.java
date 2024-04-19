@@ -73,7 +73,10 @@ public class ImportProfileData extends ConsoleRunnable {
             if (options.has("update-info") && (((String) options.valueOf("update-info")).equalsIgnoreCase("true") || options.valueOf("update-info").equals("1"))) {
                 updateInfo = true;
             }
-            boolean overwriteExisting = options.has("overwrite-existing");
+            Set<String> sampleIdsOnly = null;
+            if (options.has("sample-ids-only")) {
+                sampleIdsOnly = Set.of(((String) options.valueOf("sample-ids-only")).split(","));
+            }
             SpringUtil.initDataSource();
             ProgressMonitor.setCurrentMessage("Reading data from:  " + dataFile.getAbsolutePath());
             // Load genetic profile and gene panel
@@ -99,7 +102,7 @@ public class ImportProfileData extends ConsoleRunnable {
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_UNCALLED) {
                 Set<String> filteredMutations = GeneticProfileReader.getVariantClassificationFilter( descriptorFile );
                 Set<String> namespaces = GeneticProfileReader.getNamespaces( descriptorFile );
-                ImportExtendedMutationData importer = new ImportExtendedMutationData(dataFile, geneticProfile.getGeneticProfileId(), genePanel, filteredMutations, namespaces, overwriteExisting);
+                ImportExtendedMutationData importer = new ImportExtendedMutationData(dataFile, geneticProfile.getGeneticProfileId(), genePanel, filteredMutations, namespaces, sampleIdsOnly);
                 String swissprotIdType = geneticProfile.getOtherMetaDataField("swissprot_identifier");
                 if (swissprotIdType != null && swissprotIdType.equals("accession")) {
                     importer.setSwissprotIsAccession(true);

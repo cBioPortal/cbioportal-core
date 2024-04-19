@@ -75,17 +75,18 @@ public class ImportExtendedMutationData{
     private Pattern SEQUENCE_SAMPLES_REGEX = Pattern.compile("^.*sequenced_samples:(.*)$");
     private final String ASCN_NAMESPACE = "ASCN";
 
-    private final boolean overwriteExisting;
+    private final Set<String> sampleIdsOnly;
+    private Set<String> processedSamples;
 
     /**
      * construct an ImportExtendedMutationData.
      * Filter mutations according to the no argument MutationFilter().
      */
     public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces) {
-        this(mutationFile, geneticProfileId, genePanel, filteredMutations, namespaces, false);
+        this(mutationFile, geneticProfileId, genePanel, filteredMutations, namespaces, Set.of());
     }
 
-    public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces, boolean overwriteExisting) {
+    public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces, Set<String> sampleIdsOnly) {
         this.mutationFile = mutationFile;
         this.geneticProfileId = geneticProfileId;
         this.swissprotIsAccession = false;
@@ -95,7 +96,7 @@ public class ImportExtendedMutationData{
         // create default MutationFilter
         myMutationFilter = new MutationFilter( );
         this.namespaces = namespaces;
-        this.overwriteExisting = overwriteExisting;
+        this.sampleIdsOnly = sampleIdsOnly;
     }
 
     public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel) {
@@ -157,7 +158,7 @@ public class ImportExtendedMutationData{
             referenceGenome = GlobalProperties.getReferenceGenomeName();
         }
         String genomeBuildName = DaoReferenceGenome.getReferenceGenomeByGenomeName(referenceGenome).getBuildName();
-        Set<Integer> processedSamples = new HashSet<>();
+        processedSamples = new HashSet<>();
         while((line=buf.readLine()) != null)
         {
             ProgressMonitor.incrementCurValue();
@@ -173,6 +174,9 @@ public class ImportExtendedMutationData{
                 }
                 // process case id
                 String barCode = record.getTumorSampleID();
+                if (sampleIdsOnly != null && !sampleIdsOnly.contains(barCode)) {
+                    continue;
+                }
                 Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
                         StableIdUtil.getSampleId(barCode));
                 // can be null in case of 'normal' sample:
@@ -187,9 +191,8 @@ public class ImportExtendedMutationData{
                     else {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(barCode) + "' found in MAF file: " + this.mutationFile.getCanonicalPath());
                     }
-                } else if (overwriteExisting && !processedSamples.contains(sample.getInternalId())) {
+                } else if (sampleIdsOnly != null && sampleIdsOnly.contains(sample.getStableId()) && processedSamples.add(sample.getStableId())) {
                     DaoMutation.deleteAllRecordsInGeneticProfileForSample(geneticProfileId, sample.getInternalId());
-                    processedSamples.add(sample.getInternalId());
                 }
 
                 String validationStatus = record.getValidationStatus();
@@ -473,6 +476,16 @@ public class ImportExtendedMutationData{
 
         if( MySQLbulkLoader.isBulkLoad()) {
             MySQLbulkLoader.flushAll();
+        }
+        //TODO integration/unit test it
+        if (sampleIdsOnly != null) {
+           Set<String> neverSeenSampleIds = new HashSet<>(sampleIdsOnly);
+           neverSeenSampleIds.removeAll(processedSamples);
+           if (!neverSeenSampleIds.isEmpty()) {
+               ProgressMonitor
+                       .setCurrentMessage("The following sample ids were not found in mutation data: "
+                               + String.join(", ", neverSeenSampleIds));
+           }
         }
         // run sanity check on `mutation_event` to determine whether duplicate
         // events were introduced during current import
