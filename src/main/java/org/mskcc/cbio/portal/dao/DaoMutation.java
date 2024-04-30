@@ -67,6 +67,8 @@ import java.util.regex.Pattern;
 public final class DaoMutation {
     public static final String NAN = "NaN";
     private static final String MUTATION_COUNT_ATTR_ID = "MUTATION_COUNT";
+    public static final String DELETE_ALTERATION_DRIVER_ANNOTATION = "DELETE from alteration_driver_annotation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
+    public static final String DELETE_MUTATION = "DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
 
     public static int addMutation(ExtendedMutation mutation, boolean newMutationEvent) throws DaoException {
         if (!MySQLbulkLoader.isBulkLoad()) {
@@ -1499,13 +1501,12 @@ public final class DaoMutation {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
-            // TODO Move it to another class?
-            pstmt = con.prepareStatement("DELETE from alteration_driver_annotation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?");
+            pstmt = con.prepareStatement(DELETE_ALTERATION_DRIVER_ANNOTATION);
             pstmt.setLong(1, geneticProfileId);
             pstmt.setLong(2, internalSampleId);
             pstmt.executeUpdate();
 
-            pstmt = con.prepareStatement("DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?");
+            pstmt = con.prepareStatement(DELETE_MUTATION);
             pstmt.setLong(1, geneticProfileId);
             pstmt.setLong(2, internalSampleId);
             pstmt.executeUpdate();

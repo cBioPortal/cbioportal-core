@@ -70,6 +70,7 @@ from . import cbioportal_common
 DEFINED_SAMPLE_IDS = None
 DEFINED_SAMPLE_ATTRIBUTES = None
 PATIENTS_WITH_SAMPLES = None
+DEFINED_CANCER_TYPES = None
 mutation_sample_ids = None
 mutation_file_sample_ids = set()
 sample_ids_panel_dict = {}

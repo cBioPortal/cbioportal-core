@@ -42,7 +42,9 @@ import java.util.*;
  */
 public class DaoSampleList {
 
-	/**
+    public static final String DELETE_SAMPLE_LIST_LIST = "DELETE FROM sample_list_list WHERE `LIST_ID` = ?";
+
+    /**
 	 * Adds record to sample_list table.
 	 */
     public int addSampleList(SampleList sampleList) throws DaoException {
@@ -67,7 +69,7 @@ public class DaoSampleList {
                     int listListRow = addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
                     rows = (listListRow != -1) ? (rows + listListRow) : rows;
                 } else {
-                    throw new SQLException("Creating sample list failed, no ID obtained.");
+                    throw new DaoException("Creating sample list failed, no ID obtained.");
                 }
             }
         } catch (SQLException e) {
@@ -253,7 +255,7 @@ public class DaoSampleList {
         PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
-            pstmt = con.prepareStatement("DELETE FROM sample_list_list WHERE `LIST_ID` = ?");
+            pstmt = con.prepareStatement(DELETE_SAMPLE_LIST_LIST);
             pstmt.setInt(1, sampleList.getSampleListId());
             pstmt.executeUpdate();
 

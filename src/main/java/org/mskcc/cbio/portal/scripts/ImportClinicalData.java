@@ -43,7 +43,6 @@ import java.util.*;
 import java.util.regex.*;
 import org.apache.commons.collections4.map.MultiKeyMap;
 
-//TODO Remove MIXED_ATTRIBUTES data type https://github.com/cBioPortal/cbioportal-core/issues/31
 public class ImportClinicalData extends ConsoleRunnable {
 
     public static final String DELIMITER = "\t";
@@ -104,6 +103,10 @@ public class ImportClinicalData extends ConsoleRunnable {
     {
         PATIENT_ATTRIBUTES("PATIENT"),
         SAMPLE_ATTRIBUTES("SAMPLE"),
+        /**
+         * We want to encourage use patient or sample files instead, not mixed ones.
+         * See https://github.com/cBioPortal/cbioportal-core/issues/31
+          */
         @Deprecated
         MIXED_ATTRIBUTES("MIXED");
         
@@ -664,17 +667,13 @@ public class ImportClinicalData extends ConsoleRunnable {
 	            attributesDatatype = properties.getProperty("datatype");
 	            cancerStudyStableId = properties.getProperty("cancer_study_identifier");
 	        }
-            if( options.has ( attributeFlag ) )
-            {
+            if (options.has(attributeFlag)) {
                 attributesDatatype = "MIXED_ATTRIBUTES";
             }
-            if( options.has ( relaxedFlag ) )
-            {
+            if (options.has(relaxedFlag)) {
                 relaxed = true;
-
             }
-            if( options.has ( overWriteExistingFlag ) )
-            {
+            if (options.has(overWriteExistingFlag)) {
                 overwriteExisting = true;
 
             }

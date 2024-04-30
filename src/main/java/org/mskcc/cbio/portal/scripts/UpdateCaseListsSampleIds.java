@@ -31,8 +31,19 @@ import org.mskcc.cbio.portal.util.CaseListReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.validate.CaseListValidator;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class UpdateCaseListsSampleIds extends ConsoleRunnable {
@@ -41,8 +52,8 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     private File dataFile;
     private List<File> caseListFiles = List.of();
     private String cancerStudyStableId;
-    private Map<String, Set<String>> caseListSampleIdToSampleIds = new LinkedHashMap<>();
-    private DaoSampleList daoSampleList = new DaoSampleList();
+    private final Map<String, Set<String>> caseListSampleIdToSampleIds = new LinkedHashMap<>();
+    private final DaoSampleList daoSampleList = new DaoSampleList();
     private LinkedHashSet<String> allSampleIds;
 
     public UpdateCaseListsSampleIds(String[] args) {
@@ -56,7 +67,6 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         parseArguments();
         readStudyIdAndDataFileFromMetaFile();
         this.allSampleIds = readSampleIdsFromDataFile(this.dataFile);
-        // TODO has the all case list always to exist?
         this.caseListSampleIdToSampleIds.put(cancerStudyStableId + "_all", this.allSampleIds);
         Map<String, Set<String>> readCaseListSampleIds = readCaseListFiles();
         this.caseListSampleIdToSampleIds.putAll(readCaseListSampleIds);
@@ -65,7 +75,7 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
     private Map<String, Set<String>> readCaseListFiles() {
         LinkedHashMap<String, Set<String>> result = new LinkedHashMap<>();
-        for (File caseListFile: this.caseListFiles) {
+        for (File caseListFile : this.caseListFiles) {
             CaseList caseList = CaseListReader.readFile(caseListFile);
             CaseListValidator.validateIdFields(caseList);
             String cancerStudyIdentifier = caseList.getCancerStudyIdentifier();
@@ -87,34 +97,32 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     }
 
     private void updateCaseLists(Map<String, Set<String>> caseListSampleIdToSampleIds) {
-        // TODO Do we really have to do this? Is there a better way?
         DaoCancerStudy.reCacheAll();
         try {
-            for (Map.Entry<String, Set<String>> caseListStableIdToSampleIds: caseListSampleIdToSampleIds.entrySet()) {
+            for (Map.Entry<String, Set<String>> caseListStableIdToSampleIds : caseListSampleIdToSampleIds.entrySet()) {
                 String caseListStableId = caseListStableIdToSampleIds.getKey();
-                Set<String> sampleIds = caseListStableIdToSampleIds.getValue();
+                Set<String> uploadedSampleIds = caseListStableIdToSampleIds.getValue();
                 SampleList sampleList = daoSampleList.getSampleListByStableId(caseListStableId);
                 if (sampleList == null) {
                     throw new RuntimeException("No case list with " + caseListStableId + " stable id is found");
                 }
-                LinkedHashSet<String> newCaseListSampleIds = new LinkedHashSet<>(sampleIds);
-                newCaseListSampleIds.addAll(sampleList.getSampleList());
-                ArrayList<String> newSampleArrayList = new ArrayList<>(newCaseListSampleIds);
-                sampleList.setSampleList(newSampleArrayList);
-                //TODO no need to run expensive db update if sampleList hasn't effectively changed
-                daoSampleList.updateSampleListList(sampleList);
+                LinkedHashSet<String> newCaseListSampleIds = new LinkedHashSet<>(sampleList.getSampleList());
+                if (newCaseListSampleIds.addAll(uploadedSampleIds)) {
+                    sampleList.setSampleList(new ArrayList<>(newCaseListSampleIds));
+                    daoSampleList.updateSampleListList(sampleList);
+                }
             }
             CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(this.cancerStudyStableId);
             List<SampleList> sampleLists = daoSampleList.getAllSampleLists(cancerStudy.getInternalId());
             List<SampleList> remainingLists = sampleLists.stream().filter(sl ->
                     !caseListSampleIdToSampleIds.containsKey(sl.getStableId()) && sl.getSampleList().stream().anyMatch(this.allSampleIds::contains)
-            ).collect(Collectors.toList());
-            for (SampleList remainingList: remainingLists) {
+            ).toList();
+            for (SampleList remainingList : remainingLists) {
                 ArrayList<String> newSampleList = new ArrayList<>(remainingList.getSampleList());
-                newSampleList.removeAll(this.allSampleIds);
-                remainingList.setSampleList(newSampleList);
-                //TODO for optimization purpose we could supply to the update method 2 set of samples: samples that have to be added and samples that have to be removed
-                daoSampleList.updateSampleListList(remainingList);
+                if (newSampleList.removeAll(this.allSampleIds)) {
+                    remainingList.setSampleList(newSampleList);
+                    daoSampleList.updateSampleListList(remainingList);
+                }
             }
         } catch (DaoException e) {
             throw new RuntimeException(e);
@@ -123,40 +131,29 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
 
     private LinkedHashSet<String> readSampleIdsFromDataFile(File dataFile) {
         LinkedHashSet<String> allSampleIds = new LinkedHashSet<>();
-        FileReader reader = null;
-        try {
-            reader = new FileReader(dataFile);
-            try (BufferedReader buff = new BufferedReader(reader)) {
-                String line;
-                int sampleIdPosition = -1;
-                while ((line = buff.readLine()) != null) {
-                    String trimmedLine = line.trim();
-                    if (trimmedLine.isEmpty() || trimmedLine.startsWith("#")) {
-                        continue;
-                    }
+        try (FileReader reader = new FileReader(dataFile);
+             BufferedReader buff = new BufferedReader(reader)) {
+            String line;
+            int sampleIdPosition = -1;
+            while ((line = buff.readLine()) != null) {
+                String trimmedLine = line.trim();
+                if (trimmedLine.isEmpty() || trimmedLine.startsWith("#")) {
+                    continue;
+                }
 
-                    String[] fieldValues = line.split("\t");
+                String[] fieldValues = line.split("\t");
+                if (sampleIdPosition == -1) {
+                    sampleIdPosition = List.of(fieldValues).indexOf("SAMPLE_ID");
                     if (sampleIdPosition == -1) {
-                        sampleIdPosition = List.of(fieldValues).indexOf("SAMPLE_ID");
-                        if (sampleIdPosition == -1) {
-                            throw new RuntimeException("No SAMPLE_ID header is found");
-                        }
-                    } else {
-                        allSampleIds.add(fieldValues[sampleIdPosition].trim());
+                        throw new RuntimeException("No SAMPLE_ID header is found");
                     }
+                } else {
+                    allSampleIds.add(fieldValues[sampleIdPosition].trim());
                 }
-                return allSampleIds;
             }
-        } catch (Exception e) {
+            return allSampleIds;
+        } catch (IOException e) {
             throw new RuntimeException(e);
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
         }
     }
 
@@ -178,15 +175,15 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         String description = "Updates (adds/removes) sample ids in specified case lists.";
 
         OptionParser parser = new OptionParser();
-        OptionSpec<String> metaOpt = parser.accepts( "meta",
-               "clinical sample (genetic_alteration_type=CLINICAL and datatype=SAMPLE_ATTRIBUTES or datatype=MIXED_ATTRIBUTES) meta data file. All sample ids found in the file will be added to the _all case list." ).withRequiredArg().required().describedAs( "meta_clinical_sample.txt" ).ofType( String.class );
-        OptionSpec<String> caseListDirOrFileOpt = parser.accepts( "case-lists",
-                "case list file or a directory with case list files" ).withRequiredArg().describedAs( "case_lists/" ).ofType( String.class );
+        OptionSpec<String> metaOpt = parser.accepts("meta",
+                "clinical sample (genetic_alteration_type=CLINICAL and datatype=SAMPLE_ATTRIBUTES or datatype=MIXED_ATTRIBUTES) meta data file. All sample ids found in the file will be added to the _all case list.").withRequiredArg().required().describedAs("meta_clinical_sample.txt").ofType(String.class);
+        OptionSpec<String> caseListDirOrFileOpt = parser.accepts("case-lists",
+                "case list file or a directory with case list files").withRequiredArg().describedAs("case_lists/").ofType(String.class);
 
         try {
-            OptionSet options = parser.parse( args );
+            OptionSet options = parser.parse(args);
             this.metaFile = new File(options.valueOf(metaOpt));
-            if(options.has(caseListDirOrFileOpt)){
+            if (options.has(caseListDirOrFileOpt)) {
                 File caseListDirOrFile = new File(options.valueOf(caseListDirOrFileOpt));
                 if (caseListDirOrFile.isDirectory()) {
                     this.caseListFiles = Arrays.stream(Objects.requireNonNull(caseListDirOrFile.listFiles()))
@@ -207,7 +204,7 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
     /**
      * Runs the command as a script and exits with an appropriate exit code.
      *
-     * @param args  the arguments given on the command line
+     * @param args the arguments given on the command line
      */
     public static void main(String[] args) {
         ConsoleRunnable runner = new UpdateCaseListsSampleIds(args);

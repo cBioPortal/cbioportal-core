@@ -66,8 +66,7 @@ public class ImportSampleList extends ConsoleRunnable {
       boolean itemsAddedViaPatientLink = false;
       // construct sample id list
       ArrayList<String> sampleIDsList = new ArrayList<String>();
-      List<String> sampleIds = caseList.getSampleIds();
-      for (String sampleId : sampleIds) {
+      for (String sampleId : caseList.getSampleIds()) {
          sampleId = StableIdUtil.getSampleId(sampleId);
          Sample s = DaoSample.getSampleByCancerStudyAndSampleId(theCancerStudy.getInternalId(), sampleId);
          if (s==null) {
@@ -87,7 +86,7 @@ public class ImportSampleList extends ConsoleRunnable {
          } else if (!sampleIDsList.contains(s.getStableId())) {
             sampleIDsList.add(s.getStableId());
          } else {
-             ProgressMonitor.logWarning("Warning: duplicated sample ID "+s.getStableId()+" in case list "+caseList.getStableId());
+             ProgressMonitor.logWarning("Warning: duplicated sample ID " + s.getStableId() + " in case list " + caseList.getStableId());
          }
       }
 
@@ -111,7 +110,7 @@ public class ImportSampleList extends ConsoleRunnable {
 
       ProgressMonitor.setCurrentMessage(" --> stable ID:  " + sampleList.getStableId());
       ProgressMonitor.setCurrentMessage(" --> sample list name:  " + sampleList.getName());
-      ProgressMonitor.setCurrentMessage(" --> number of samples in file:  " + sampleIds.size());
+      ProgressMonitor.setCurrentMessage(" --> number of samples in file:  " + caseList.getSampleIds().size());
       String warningSamplesViaPatientLink = (itemsAddedViaPatientLink? "(nb: can be higher if samples were added via patient link)" : "");
       ProgressMonitor.setCurrentMessage(" --> number of samples stored in final sample list " + warningSamplesViaPatientLink + ":  " + sampleIDsList.size());
    }
