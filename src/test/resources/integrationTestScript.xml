@@ -25,7 +25,7 @@
                 <!-- #1 First, import cancer types and other metadata like gene sets -->
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportTypesOfCancers</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_cancer_type.txt</value>
+                    <value>tests/test_data/study_es_0/data_cancer_type.txt</value>
                     <value>false</value>
                     <value>--noprogress</value>
                 </list>
@@ -47,25 +47,25 @@
                 <!-- #3 Import study if exists -->
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportCancerStudy</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_study.txt</value>
+                    <value>tests/test_data/study_es_0/meta_study.txt</value>
                 </list>
 
                 <!-- #4 Samples -->            
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportClinicalData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_clinical_samples.txt</value>
+                    <value>tests/test_data/study_es_0/data_clinical_samples.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_clinical_samples.txt</value>
+                    <value>tests/test_data/study_es_0/meta_clinical_samples.txt</value>
                 </list>
                 
                 <!-- #5 patients -->           
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportClinicalData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_clinical_patients.txt</value>
+                    <value>tests/test_data/study_es_0/data_clinical_patients.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_clinical_patients.txt</value>
+                    <value>tests/test_data/study_es_0/meta_clinical_patients.txt</value>
                 </list>
 
                 <!-- ###################  Rest of the steps ################## -->
@@ -74,9 +74,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_cna_hg19.seg</value>
+                    <value>tests/test_data/study_es_0/data_cna_hg19.seg</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_cna_hg19_seg.txt</value>
+                    <value>tests/test_data/study_es_0/meta_cna_hg19_seg.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -86,9 +86,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_mutations_extended.maf</value>
+                    <value>tests/test_data/study_es_0/data_mutations_extended.maf</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_mutations_extended.txt</value>
+                    <value>tests/test_data/study_es_0/meta_mutations_extended.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -98,9 +98,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_cna_discrete.txt</value>
+                    <value>tests/test_data/study_es_0/data_cna_discrete.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_cna_discrete.txt</value>
+                    <value>tests/test_data/study_es_0/meta_cna_discrete.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -110,9 +110,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_expression_median.txt</value>
+                    <value>tests/test_data/study_es_0/data_expression_median.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_expression_median.txt</value>
+                    <value>tests/test_data/study_es_0/meta_expression_median.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -122,9 +122,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_structural_variants.txt</value>
+                    <value>tests/test_data/study_es_0/data_structural_variants.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_structural_variants.txt</value>
+                    <value>tests/test_data/study_es_0/meta_structural_variants.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -134,7 +134,7 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportGisticData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_gistic_genes_amp.txt</value>
+                    <value>tests/test_data/study_es_0/data_gistic_genes_amp.txt</value>
                     <value>--study</value>
                     <value>study_es_0</value>
                     <value>--noprogress</value>
@@ -144,9 +144,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_cna_log2.txt</value>
+                    <value>tests/test_data/study_es_0/data_cna_log2.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_cna_log2.txt</value>
+                    <value>tests/test_data/study_es_0/meta_cna_log2.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -156,9 +156,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_methylation_hm27.txt</value>
+                    <value>tests/test_data/study_es_0/data_methylation_hm27.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_methylation_hm27.txt</value>
+                    <value>tests/test_data/study_es_0/meta_methylation_hm27.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -168,9 +168,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_gsva_scores.txt</value>
+                    <value>tests/test_data/study_es_0/data_gsva_scores.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_gsva_scores.txt</value>
+                    <value>tests/test_data/study_es_0/meta_gsva_scores.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -178,9 +178,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_gsva_pvalues.txt</value>
+                    <value>tests/test_data/study_es_0/data_gsva_pvalues.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_gsva_pvalues.txt</value>
+                    <value>tests/test_data/study_es_0/meta_gsva_pvalues.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -190,9 +190,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_treatment_ic50.txt</value>
+                    <value>tests/test_data/study_es_0/data_treatment_ic50.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_treatment_ic50.txt</value>
+                    <value>tests/test_data/study_es_0/meta_treatment_ic50.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -200,9 +200,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_treatment_ec50.txt</value>
+                    <value>tests/test_data/study_es_0/data_treatment_ec50.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_treatment_ec50.txt</value>
+                    <value>tests/test_data/study_es_0/meta_treatment_ec50.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -212,9 +212,9 @@
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportProfileData</value>
                     <value>--data</value>
-                    <value>src/test/scripts/test_data/study_es_0/data_mutational_signature.txt</value>
+                    <value>tests/test_data/study_es_0/data_mutational_signature.txt</value>
                     <value>--meta</value>
-                    <value>src/test/scripts/test_data/study_es_0/meta_mutational_signature.txt</value>
+                    <value>tests/test_data/study_es_0/meta_mutational_signature.txt</value>
                     <value>--loadMode</value>
                     <value>bulkload</value>
                     <value>--noprogress</value>
@@ -223,7 +223,7 @@
                 <!-- case lists -->
                 <list>
                     <value>org.mskcc.cbio.portal.scripts.ImportSampleList</value>
-                    <value>src/test/scripts/test_data/study_es_0/case_lists/cases_custom.txt</value>
+                    <value>tests/test_data/study_es_0/case_lists/cases_custom.txt</value>
                 </list>
  
                 <!-- add_global_case_list -->
