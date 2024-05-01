@@ -5547,6 +5547,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
 
     # additional validation between meta files, after all meta files are processed
     validate_data_relations(validators_by_meta_type, logger)
+    logger.info('Validation complete')
 
 
 def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks):
@@ -5559,6 +5560,7 @@ def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_ma
         logger.info("Validating %s", meta_file_type)
         for validator in validators:
             validator.validate()
+    logger.info('Validation complete')
 
 
 def get_pom_path():
@@ -5675,7 +5677,6 @@ def main_validate(args):
         collapsing_html_handler.flush()
         html_handler.generateHtml(cbio_version=cbio_version)
 
-    logger.info('Validation complete')
     return exit_status_handler.get_exit_status()
 
 
