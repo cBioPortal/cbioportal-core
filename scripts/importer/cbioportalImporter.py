@@ -207,7 +207,7 @@ def check_version(jvm_args):
         raise
 
 def process_case_lists(jvm_args, case_list_dir):
-    for case_list in os.listdir(case_list_dir):
+    for case_list in sorted(os.listdir(case_list_dir)):
         # skip "temp"/backup files made by some text editors:
         if not (case_list.startswith('.') or case_list.endswith('~')):
             import_case_list(jvm_args, os.path.join(case_list_dir, case_list))
@@ -232,13 +232,13 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
         import_case_list(jvm_args, meta_filename)
 
 def get_meta_filenames(data_directory):
-    meta_filenames = (
+    meta_filenames = [
         os.path.join(data_directory, meta_filename) for
         meta_filename in os.listdir(data_directory) if
         re.search(r'(\b|_)meta(\b|[_0-9])', meta_filename,
                   flags=re.IGNORECASE) and
-        not (meta_filename.startswith('.') or meta_filename.endswith('~')))
-    return meta_filenames
+        not (meta_filename.startswith('.') or meta_filename.endswith('~'))]
+    return sorted(meta_filenames)
 
 def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None):
     """
@@ -525,7 +525,7 @@ def add_parser_args(parser):
     parser.add_argument('-data', '--data_filename', type=str, required=False,
                         help='Path to Data file')
 
-def interface():
+def interface(args=None):
     parent_parser = argparse.ArgumentParser(description='cBioPortal meta Importer')
     add_parser_args(parent_parser)
     parser = argparse.ArgumentParser()
@@ -555,7 +555,7 @@ def interface():
     # TODO - add same argument to metaimporter
     # TODO - harmonize on - and _
 
-    parser = parser.parse_args()
+    parser = parser.parse_args(args)
     if parser.command is not None and parser.subcommand is not None:
         print('Cannot call multiple commands')
         sys.exit(2)
@@ -637,5 +637,5 @@ def main(args):
 # ready to roll
 
 if __name__ == '__main__':
-    parsed_args = interface()
+    parsed_args = interface(args)
     main(parsed_args)
