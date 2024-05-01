@@ -78,7 +78,7 @@ After you are done with the setup, you can build and test the project.
 
 1. Execute tests through the provided script:
 ```bash
-source test_scripts.sh
+./test_scripts.sh
 ```
 
 2. Build the loader jar using Maven (includes testing):
