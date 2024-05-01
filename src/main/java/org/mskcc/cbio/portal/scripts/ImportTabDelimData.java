@@ -265,9 +265,11 @@ public class ImportTabDelimData {
             DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
 
             //cache for data found in  cna_event' table:
-            Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
+            Map<CnaEvent.Event, CnaEvent.Event> existingCnaEvents = new HashMap<>();
             if (isDiscretizedCnaProfile) {
-                existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
+                for (CnaEvent.Event event : DaoCnaEvent.getAllCnaEvents()) {
+                    existingCnaEvents.put(event, event);
+                }
                 MySQLbulkLoader.bulkLoadOn();
             }
 
@@ -502,7 +504,7 @@ public class ImportTabDelimData {
                               boolean isRppaProfile, boolean isDiscretizedCnaProfile,
                               DaoGeneOptimized daoGene,
                               List<Integer> filteredSampleIndices, List<Integer> orderedSampleList,
-                              Set<CnaEvent.Event> existingCnaEvents
+                              Map<CnaEvent.Event, CnaEvent.Event> existingCnaEvents
     ) throws DaoException {
 
         //TODO: refactor this entire function - split functionality into smaller units / subroutines
