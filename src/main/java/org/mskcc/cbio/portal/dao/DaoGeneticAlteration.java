@@ -65,12 +65,10 @@ public class DaoGeneticAlteration {
      * Gets Instance of Dao Object. (Singleton pattern).
      *
      * @return DaoGeneticAlteration Object.
-     * @throws DaoException Dao Initialization Error.
      */
-    public static DaoGeneticAlteration getInstance() throws DaoException {
+    public static DaoGeneticAlteration getInstance() {
         if (daoGeneticAlteration == null) {
             daoGeneticAlteration = new DaoGeneticAlteration();
-            
         }
 
         return daoGeneticAlteration;

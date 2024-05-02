@@ -7,7 +7,6 @@ import org.mskcc.cbio.portal.util.*;
 import java.io.*;
 import joptsimple.*;
 import java.util.*;
-import java.util.regex.*;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.map.MultiKeyMap;
