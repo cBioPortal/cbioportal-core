@@ -36,6 +36,7 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -74,6 +75,11 @@ public class ImportTabDelimData {
 
     private DaoGeneOptimized daoGene;
 
+    private boolean updateMode;
+    private HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
+    private ArrayList<Integer> orderedImportedSampleList;
+    private ArrayList<Integer> orderedSampleList;
+
     /**
      * Constructor.
      *
@@ -83,7 +89,8 @@ public class ImportTabDelimData {
      * @param geneticProfileId        GeneticProfile ID.
      * @param genePanel               GenePanel
      * @param genericEntityProperties Generic Assay Entities.
-     * 
+     * @param updateMode if true, update/append data to the existing one
+     *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
     public ImportTabDelimData(
@@ -92,10 +99,11 @@ public class ImportTabDelimData {
         int geneticProfileId,
         String genePanel,
         String genericEntityProperties,
+        boolean updateMode,
         DaoGeneticAlteration daoGeneticAlteration,
         DaoGeneOptimized daoGene
     ) {
-       this(dataFile, targetLine, geneticProfileId, genePanel, daoGeneticAlteration, daoGene);
+       this(dataFile, targetLine, geneticProfileId, genePanel, updateMode, daoGeneticAlteration, daoGene);
        this.genericEntityProperties = genericEntityProperties;
     }
 
@@ -106,7 +114,8 @@ public class ImportTabDelimData {
      * @param targetLine       The line we want to import.
      *                         If null, all lines are imported.
      * @param geneticProfileId GeneticProfile ID.
-     * 
+     * @param updateMode if true, update/append data to the existing one
+     *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
     public ImportTabDelimData(
@@ -114,16 +123,18 @@ public class ImportTabDelimData {
         String targetLine,
         int geneticProfileId,
         String genePanel,
+        boolean updateMode,
         DaoGeneticAlteration daoGeneticAlteration,
         DaoGeneOptimized daoGene
     ) {
-        this(dataFile, geneticProfileId, genePanel, daoGeneticAlteration, daoGene);
+        this(dataFile, geneticProfileId, genePanel, updateMode, daoGeneticAlteration, daoGene);
         this.targetLine = targetLine;
     }
 
     /**
      * Constructor.
      *
+     * @param updateMode if true, update/append data to the existing one
      * @param dataFile         Data File containing Copy Number Alteration, MRNA Expression Data, or protein RPPA data
      * @param geneticProfileId GeneticProfile ID.
      */
@@ -131,15 +142,18 @@ public class ImportTabDelimData {
         File dataFile, 
         int geneticProfileId, 
         String genePanel,
+        boolean updateMode,
         DaoGeneticAlteration daoGeneticAlteration,
         DaoGeneOptimized daoGene
     ) {
         this.dataFile = dataFile;
         this.geneticProfileId = geneticProfileId;
         this.genePanel = genePanel;
+        this.updateMode = updateMode;
         this.daoGeneticAlteration = daoGeneticAlteration;
         this.geneticAlterationImporter = new GeneticAlterationImporter(geneticProfileId, daoGeneticAlteration);
         this.daoGene = daoGene;
+        this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
     }
 
     /**
@@ -154,10 +168,10 @@ public class ImportTabDelimData {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        if (updateMode) {
+            geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfile.getGeneticProfileId(), null);
+        }
         ProgressMonitor.setMaxValue(numLines);
-
-        geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-
         FileReader reader = new FileReader(dataFile);
         BufferedReader buf = new BufferedReader(reader);
         String headerLine = buf.readLine();
@@ -214,9 +228,9 @@ public class ImportTabDelimData {
                 pdAnnotationsForStableSampleIds = readPdAnnotations(this.pdAnnotationsFile);
             }
             // link Samples to the genetic profile
-            ArrayList<Integer> orderedSampleList = new ArrayList<Integer>();
             ArrayList<Integer> filteredSampleIndices = new ArrayList<Integer>();
             this.pdAnnotations = new HashMap<>();
+            this.orderedSampleList = new ArrayList<>();
             for (int i = 0; i < sampleIds.length; i++) {
                 Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
                     StableIdUtil.getSampleId(sampleIds[i]));
@@ -231,10 +245,7 @@ public class ImportTabDelimData {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(sampleIds[i]) + "' found in tab-delimited file: " + this.dataFile.getCanonicalPath());
                     }
                 }
-                if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-                    Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-                    DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
-                }
+                ensureSampleGeneticProfile(sample);
                 orderedSampleList.add(sample.getInternalId());
                 if (pdAnnotationsForStableSampleIds != null) {
                     Set<Map.Entry<String, Long>> keys = new HashSet<>(pdAnnotationsForStableSampleIds.keySet());
@@ -259,7 +270,7 @@ public class ImportTabDelimData {
             }
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines - 1));
 
-            DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+            saveOrderedSampleList();
 
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
@@ -331,7 +342,7 @@ public class ImportTabDelimData {
                                 if (targetLine == null || firstCellValue.equals(targetLine)) {
                                     recordAdded = saveLine(sampleValues,
                                             entrez, geneSymbol,
-                                            isRppaProfile, isDiscretizedCnaProfile, orderedSampleList,
+                                            isRppaProfile, isDiscretizedCnaProfile,
                                             existingCnaEvents);
                                 }
                             }
@@ -350,6 +361,7 @@ public class ImportTabDelimData {
 
                 line = buf.readLine();
             }
+            expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
             if (MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
             }
@@ -369,6 +381,66 @@ public class ImportTabDelimData {
         finally {
             buf.close();
         }
+    }
+
+    private void expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue() {
+        if (updateMode) {
+            // Expand remaining genetic entity id rows that were not mentioned in the file
+            new HashSet<>(geneticAlterationMap.keySet()).forEach(geneticEntityId -> {
+                try {
+                    String[] values = orderedImportedSampleList.stream()
+                            .map(sampleId ->
+                                    geneticAlterationMap.get(geneticEntityId).containsKey(sampleId) ?
+                                            geneticAlterationMap.get(geneticEntityId).get(sampleId) : "")
+                            .toArray(String[]::new);
+
+                    saveValues(geneticEntityId, values);
+                } catch (DaoException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+    }
+
+    private void ensureSampleGeneticProfile(Sample sample) throws DaoException {
+        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
+            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
+            if (updateMode) {
+                DaoSampleProfile.deleteRecords(List.of(sample.getInternalId()), List.of(geneticProfileId));
+            }
+            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
+        }
+    }
+
+    private void saveOrderedSampleList() throws DaoException {
+        if (updateMode) {
+            ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(geneticProfileId);
+            // add all new sample ids at the end
+            ArrayList<Integer> extendedSampleList = new ArrayList<>(savedOrderedSampleList);
+            List<Integer> newSampleIds = orderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
+            extendedSampleList.addAll(newSampleIds);
+            orderedImportedSampleList = orderedSampleList;
+            orderedSampleList = extendedSampleList;
+
+
+            DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(geneticProfileId);
+        }
+        DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+    }
+
+    //TODO move somewhere else
+    private <K, V> Map<K, V> zip(K[] keys, V[] values) {
+        Map<K, V> map = new HashMap<>();
+
+        // Check if both arrays have the same length
+        if (keys.length == values.length) {
+            for (int i = 0; i < keys.length; i++) {
+                map.put(keys[i], values[i]);
+            }
+        } else {
+            throw new IllegalArgumentException("Arrays must be of the same length");
+        }
+        return map;
     }
 
     private Map<Map.Entry<String, Long>, Map<String, String>> readPdAnnotations(File pdAnnotationsFile) {
@@ -524,7 +596,6 @@ public class ImportTabDelimData {
      *
      * @param isRppaProfile           true if this is an rppa profile (i.e. alteration type is PROTEIN_LEVEL and the first column is Composite.Element.Ref)
      * @param isDiscretizedCnaProfile true if this is a discretized CNA profile (i.e. alteration type COPY_NUMBER_ALTERATION and showProfileInAnalysisTab is true)
-     * @param orderedSampleList       a list of the internal sample ids corresponding to the sample names in the header line
      * @param existingCnaEvents       a collection of CnaEvents, to be added to or updated during parsing of individual lines
      * @return true if any record was stored in genetic_alteration, else false
      * @throws DaoException if any DaoException is thrown while using daoGene or daoGeneticAlteration
@@ -534,7 +605,6 @@ public class ImportTabDelimData {
                              String geneSymbol,
                              boolean isRppaProfile,
                              boolean isDiscretizedCnaProfile,
-                             List<Integer> orderedSampleList,
                              Set<CnaEvent.Event> existingCnaEvents
     ) throws DaoException {
 
@@ -600,7 +670,7 @@ public class ImportTabDelimData {
         if (!microRNAGenes.isEmpty()) {
             // for micro rna, duplicate the data
             for (CanonicalGene gene : microRNAGenes) {
-                if (this.geneticAlterationImporter.store(values, gene, geneSymbol)) {
+                if (this.saveValues(gene, values)) {
                     recordStored = true;
                 }
             }
@@ -620,14 +690,14 @@ public class ImportTabDelimData {
             // none of the matched genes are type "miRNA"
             if (genes.size() == 1) {
                 // Store all values per gene:
-                recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
+                recordStored = this.saveValues(genes.get(0), values);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, orderedSampleList, genes));
+                    CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, genes));
                 }
             } else {
                 if (isRppaProfile) { // for protein data, duplicate the data
-                    recordStored = saveRppaValues(values, geneSymbol, recordStored, genes);
+                    recordStored = saveRppaValues(values, recordStored, genes);
                 } else {
                     if (!recordStored) {
                         // this case :
@@ -640,9 +710,51 @@ public class ImportTabDelimData {
         return recordStored;
     }
 
-    private boolean saveRppaValues(String[] values, String geneSymbol, boolean recordStored, List<CanonicalGene> genes) throws DaoException {
+    private boolean saveValues(CanonicalGene canonicalGene, String[] values) throws DaoException {
+        //TODO Think of better way. We do that to do not remove genes that contain duplicate
+        if (geneticAlterationImporter.isImportedAlready(canonicalGene)) {
+            return false;
+        }
+        if (updateMode) {
+            values = updateValues(canonicalGene.getGeneticEntityId(), values);
+            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), canonicalGene.getGeneticEntityId());
+        }
+        return geneticAlterationImporter.store(values, canonicalGene, canonicalGene.getHugoGeneSymbolAllCaps());
+    }
+    //TODO unify saveValues versions
+    // With update mode the last duplicate wins. It's different from the other function
+    private boolean saveValues(int geneticEntityId, String[] values) throws DaoException {
+        if (updateMode) {
+            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), geneticEntityId);
+            values = updateValues(geneticEntityId, values);
+        }
+        return daoGeneticAlteration.addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values) > 0;
+    }
+
+    private String[] updateValues(int geneticEntityId, String[] values) {
+        //TODO swap variables
+        Map<Integer, String> sampleIdToValue = zip(orderedImportedSampleList.toArray(new Integer[0]), values);
+        String[] updatedSampleValues = new String[orderedSampleList.size()];
+        for (int i = 0; i < orderedSampleList.size(); i++) {
+            updatedSampleValues[i] = "";
+            int sampleId = orderedSampleList.get(i);
+            if (geneticAlterationMap.containsKey(geneticEntityId)) {
+                HashMap<Integer, String> savedSampleIdToValue = geneticAlterationMap.get(geneticEntityId);
+                updatedSampleValues[i] = savedSampleIdToValue.containsKey(sampleId) ? savedSampleIdToValue.remove(sampleId): "";
+                if (savedSampleIdToValue.isEmpty()) {
+                    geneticAlterationMap.remove(geneticEntityId);
+                }
+            }
+            if (sampleIdToValue.containsKey(sampleId)) {
+                updatedSampleValues[i] = sampleIdToValue.get(sampleId);
+            }
+        }
+        return updatedSampleValues;
+    }
+
+    private boolean saveRppaValues(String[] values, boolean recordStored, List<CanonicalGene> genes) throws DaoException {
         for (CanonicalGene gene : genes) {
-            if (this.geneticAlterationImporter.store(values, gene, geneSymbol)) {
+            if (this.saveValues(gene, values)) {
                 recordStored = true;
                 nrExtraRecords++;
             }
@@ -677,7 +789,7 @@ public class ImportTabDelimData {
         return List.of();
     }
 
-    private List<CnaEvent> composeCnaEventsToAdd(String[] values, List<Integer> orderedSampleList, List<CanonicalGene> genes) {
+    private List<CnaEvent> composeCnaEventsToAdd(String[] values, List<CanonicalGene> genes) {
         List<CnaEvent> cnaEventsToAdd = new ArrayList<CnaEvent>();
         long entrezGeneId = genes.get(0).getEntrezGeneId();
         for (int i = 0; i < values.length; i++) {
@@ -758,8 +870,7 @@ public class ImportTabDelimData {
     private boolean storeGeneticEntityGeneticAlterations(String[] values, Integer geneticEntityId, EntityType geneticEntityType, String geneticEntityName) {
         try {
             if (importedGeneticEntitySet.add(geneticEntityId)) {
-                daoGeneticAlteration.addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values);
-                return true;
+                return saveValues(geneticEntityId, values);
             }
             else {
                 ProgressMonitor.logWarning("Data for genetic entity " + geneticEntityName
