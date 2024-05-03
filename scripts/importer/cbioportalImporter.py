@@ -207,7 +207,7 @@ def check_version(jvm_args):
         raise
 
 def process_case_lists(jvm_args, case_list_dir):
-    for case_list in sorted(os.listdir(case_list_dir)):
+    for case_list in os.listdir(case_list_dir):
         # skip "temp"/backup files made by some text editors:
         if not (case_list.startswith('.') or case_list.endswith('~')):
             import_case_list(jvm_args, os.path.join(case_list_dir, case_list))
@@ -238,7 +238,7 @@ def get_meta_filenames(data_directory):
         re.search(r'(\b|_)meta(\b|[_0-9])', meta_filename,
                   flags=re.IGNORECASE) and
         not (meta_filename.startswith('.') or meta_filename.endswith('~'))]
-    return sorted(meta_filenames)
+    return meta_filenames
 
 def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None):
     """
