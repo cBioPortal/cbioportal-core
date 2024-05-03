@@ -12,6 +12,7 @@ import argparse
 import logging
 import re
 from pathlib import Path
+from typing import Dict, Tuple
 
 # configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module
@@ -431,16 +432,10 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     # enable study
     update_study_status(jvm_args, study_id)
 
-
-def process_data_directory(jvm_args, data_directory, update_generic_assay_entity = None):
+def get_meta_filenames_by_type(data_directory) -> Dict[str, Tuple[str, Dict]]:
     """
-    Incremental import of data directory based on meta files found.
-
-    1. Determine meta files in directory.
-    2. Read all meta files and determine file types.
-    3. Import data files in specific order by file type with the incremental flag.
+    Read all meta files in the data directory and return meta information (filename, content) grouped by type.
     """
-
     meta_file_type_to_meta_files = {}
 
     # Determine meta filenames in study directory
@@ -462,11 +457,12 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
             meta_file_type_to_meta_files[meta_file_type] = []
 
         meta_file_type_to_meta_files[meta_file_type].append((meta_filename, meta_dictionary))
+    return meta_file_type_to_meta_files
 
-
-    not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
-    if not_supported_meta_types:
-        raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
+def import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files):
+    """
+    Load all data types that are available and support incremental upload
+    """
     for meta_file_type in INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES:
         meta_pairs = meta_file_type_to_meta_files[meta_file_type]
         for meta_pair in meta_pairs:
@@ -474,6 +470,12 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
             data_filename = os.path.join(data_directory, meta_dictionary['data_filename'])
             import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
 
+def update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files):
+    """
+    Updates case lists if clinical sample provided.
+    The command takes case_list/ folder as optional argument.
+    If folder exists case lists will be updated accordingly.
+    """
     if MetaFileTypes.SAMPLE_ATTRIBUTES in meta_file_type_to_meta_files:
         case_list_dirname = os.path.join(data_directory, 'case_lists')
         sample_attributes_metas = meta_file_type_to_meta_files[MetaFileTypes.SAMPLE_ATTRIBUTES]
@@ -482,6 +484,18 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
             LOGGER.info('Updating case lists with sample ids', extra={'filename_': meta_filename})
             update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None)
 
+def process_data_directory(jvm_args, data_directory, update_generic_assay_entity = None):
+    """
+    Incremental import of data directory based on meta files found.
+    """
+
+    meta_file_type_to_meta_files = get_meta_filenames_by_type(data_directory)
+
+    not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
+    if not_supported_meta_types:
+        raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
+    import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files)
+    update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files)
 
 def usage():
     # TODO : replace this by usage string from interface()
