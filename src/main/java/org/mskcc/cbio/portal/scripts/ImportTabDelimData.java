@@ -300,7 +300,9 @@ public class ImportTabDelimData {
                     if (rowParts.length > headerColumns && line.split("\t").length > headerColumns) {
                         ProgressMonitor.logWarning("Ignoring line with more fields (" + rowParts.length
                                 + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
-
+                    } else if (rowParts.length < headerColumns) {
+                        ProgressMonitor.logWarning("Ignoring line with less fields (" + rowParts.length
+                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
                     } else {
                         String sampleValues[] = ArrayUtils.subarray(rowParts, sampleStartIndex, rowParts.length > headerColumns ? headerColumns : rowParts.length);
 

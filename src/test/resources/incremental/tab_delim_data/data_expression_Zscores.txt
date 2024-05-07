@@ -22,6 +22,8 @@ CDK1	983	-0.1735	0.1	-0.6412
 # These lines have to be skipped
 # One column too much
 FGFR3	2261	0.045	0.1	0.675	0.0224575
+# No sample columns
+PIEZO1	9780
 # Multigene sign
 ///	369	0.6393	0.1	0.5377
 # Unknown gene sign
