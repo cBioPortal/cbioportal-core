@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.util.EntrezValidator;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
@@ -322,7 +323,7 @@ public class DaoGeneOptimized {
         }
 
         CanonicalGene gene;
-        if (geneId.matches("[0-9]+")) { // likely to be a entrez gene id
+        if (EntrezValidator.isaValidEntrezId(geneId)) { // likely to be a entrez gene id
             gene = getGene(Integer.parseInt(geneId));
             if (gene!=null) {
                 return Collections.singletonList(gene);

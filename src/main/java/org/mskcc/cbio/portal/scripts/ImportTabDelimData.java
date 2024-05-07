@@ -336,8 +336,7 @@ public class ImportTabDelimData {
                             if (entrez != null && entrez.isEmpty()) {
                                 entrez = null;
                             }
-                            if (entrez != null && !entrez.matches("[0-9]+")) {
-                                //TODO - would be better to give an exception in some cases, like negative Entrez values
+                            if (entrez != null && !EntrezValidator.isaValidEntrezId(entrez)) {
                                 ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
                             } else {
                                 String firstCellValue = rowParts[0];

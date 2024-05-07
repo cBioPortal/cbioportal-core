@@ -188,7 +188,7 @@ public class ImportGeneData extends ConsoleRunnable {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
                 String parts[] = line.split("\t", -1); // include trailing empty strings
-                if (!parts[0].matches("[0-9]+")) {
+                if (!EntrezValidator.isaValidEntrezId(parts[0])) {
                     ProgressMonitor.logWarning("Skipping gene with invalid entrez gene id '" + parts[1] + "'");
                     continue;
                 }
