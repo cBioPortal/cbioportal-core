@@ -136,4 +136,59 @@ public class TestIncrementalTabDelimData {
         assertEquals("-1.12475", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
     }
 
+    /**
+     * Test incremental upload of PROTEIN_LEVEL
+     */
+    @Test
+    public void testRppa() throws DaoException, IOException {
+        /**
+         * Prior checks
+         */
+        GeneticProfile rppaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_rppa");
+        assertNotNull(rppaProfile);
+        HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(rppaProfile.getGeneticProfileId(), null);
+        assertEquals("All but new entrez gene id expected to be in the database for this profile before the upload", TEST_ENTREZ_GENE_IDS.size() - 1, beforeResult.size());
+        assertFalse("No new entrez gene id expected to be in the database for this profile before the upload", beforeResult.containsKey(NEW_GENE_ENTREZ_ID));
+        beforeResult.forEach((entrezGeneId, sampleIdToValue) -> {
+            assertEquals("All but new sample id expected to be in the database for this profile for gene with entrez id " + entrezGeneId + " before the upload", TEST_SAMPLE_IDS.size() - 1, beforeResult.get(entrezGeneId).size());
+            assertFalse("No new entrez gene id expected to be in the database for this profile for gene with entrez id " + entrezGeneId + " before the upload", beforeResult.get(entrezGeneId).containsKey(NEW_SAMPLE_ID));
+        });
+
+        File dataFolder = new File("src/test/resources/incremental/tab_delim_data/");
+        File dataFile = new File(dataFolder, "data_rppa.txt");
+
+        /**
+         * Test
+         */
+        new ImportTabDelimData(dataFile,
+                rppaProfile.getGeneticProfileId(),
+                null,
+                true,
+                DaoGeneticAlteration.getInstance(),
+                DaoGeneOptimized.getInstance()).importData();
+
+        /**
+         * After test assertions
+         */
+        HashMap<Long, HashMap<Integer, String>> afterResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(rppaProfile.getGeneticProfileId(), null);
+        assertEquals("These genes expected to be found after upload", TEST_ENTREZ_GENE_IDS, afterResult.keySet());
+        afterResult.forEach((entrezGeneId, sampleIdToValue) -> {
+            assertEquals("These sample ids expected to be found for gene with entrez id " + entrezGeneId+ " after upload", TEST_SAMPLE_IDS, afterResult.get(entrezGeneId).keySet());
+            if (entrezGeneId == NEW_GENE_ENTREZ_ID || entrezGeneId == ABSENT_GENE_ENTREZ_ID) {
+                return;
+            }
+            sampleIdToValue.forEach((sampleId, value) -> {
+                if (sampleId == NEW_SAMPLE_ID || sampleId == UPDATED_SAMPLE_ID) {
+                    return;
+                }
+                assertEquals("The associated value is not expected change associated sample id " + sampleId + " and entrez gene id " + entrezGeneId,
+                        beforeResult.get(entrezGeneId).get(sampleId), afterResult.get(entrezGeneId).get(sampleId));
+            });
+        });
+        assertEquals("-0.141047088398489", afterResult.get(NEW_GENE_ENTREZ_ID).get(NEW_SAMPLE_ID));
+        assertEquals("1.61253243564957", afterResult.get(NEW_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
+        assertEquals("", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(NEW_SAMPLE_ID));
+        assertEquals("-1.129", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
+    }
+
 }

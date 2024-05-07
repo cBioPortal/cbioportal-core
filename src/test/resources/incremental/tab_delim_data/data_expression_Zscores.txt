@@ -1,7 +1,7 @@
 Hugo_Symbol	Entrez_Gene_Id	TCGA-A1-A0SB-01	TCGA-A1-A0SD-01
 AKT3	10000	0.6393	0.5377
 AKT1	207	0.7850	0.0426
-# The pipe and after have to be removed
+# All after the pipe has to be removed
 AKT2|TEST	208	1.0741	0.7180
 HRAS	3265	-0.1735	-0.6412
 # This gene absent in this file, but it's still part of the profile and has to be updated
