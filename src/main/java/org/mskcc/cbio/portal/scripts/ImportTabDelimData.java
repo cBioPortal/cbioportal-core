@@ -153,6 +153,11 @@ public class ImportTabDelimData {
         this.geneticAlterationImporter = new GeneticAlterationImporter(geneticProfileId, daoGeneticAlteration);
         this.daoGene = daoGene;
         this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
+        if (this.updateMode
+                && geneticProfile != null
+                && this.geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE) {
+            throw new UnsupportedOperationException("Incremental upload of geneset scores is not supported.");
+        }
     }
 
     /**

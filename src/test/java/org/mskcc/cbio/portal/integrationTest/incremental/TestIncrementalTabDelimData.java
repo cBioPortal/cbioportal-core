@@ -28,6 +28,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.springframework.test.annotation.Rollback;
@@ -47,6 +48,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -303,6 +305,25 @@ public class TestIncrementalTabDelimData {
                         newGeneEntrezId, CNA.AMP
                 ),
                 updatedSampleEntrezGeneIdToCnaAlteration);
+    }
+
+    @Test
+    public void testGsvaIsNotSupported() throws DaoException, IOException {
+        GeneticProfile gsvaProfile = new GeneticProfile();
+        gsvaProfile.setCancerStudyId(DaoCancerStudy.getCancerStudyByStableId("study_tcga_pub").getInternalId());
+        gsvaProfile.setStableId("gsva_scores");
+        gsvaProfile.setDatatype("GENESET_SCORE");
+        gsvaProfile.setGeneticAlterationType(GeneticAlterationType.GENESET_SCORE);
+        gsvaProfile.setProfileName("gsva test platform");
+        DaoGeneticProfile.addGeneticProfile(gsvaProfile);
+
+        assertThrows(UnsupportedOperationException.class, () ->
+                new ImportTabDelimData(File.createTempFile("gsva", "test"),
+                        DaoGeneticProfile.getGeneticProfileByStableId("gsva_scores").getGeneticProfileId(),
+                        null,
+                        true,
+                        DaoGeneticAlteration.getInstance(),
+                        DaoGeneOptimized.getInstance()));
     }
 
     private void assertPriorDataState(HashMap<Long, HashMap<Integer, String>> beforeResult, Set<Long> expectedGeneEntrezIds, Set<Integer> expectedSampleIds) {
