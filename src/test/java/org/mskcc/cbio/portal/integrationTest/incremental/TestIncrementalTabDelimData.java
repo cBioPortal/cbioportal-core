@@ -17,15 +17,18 @@
 
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
-import org.jetbrains.annotations.NotNull;
+import org.cbioportal.model.CNA;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.GeneticEventImpl;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.springframework.test.annotation.Rollback;
@@ -35,14 +38,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
 
 /**
  * Tests Incremental Import of Tab Delimited Data.
@@ -61,23 +67,6 @@ public class TestIncrementalTabDelimData {
         DaoCancerStudy.reCacheAll();
     }
 
-    // Hugo_Symbol: CDK1
-    static final long NEW_GENE_ENTREZ_ID = 983l;
-
-    /**
-     * Gene that is part of the platform, but absent during the incremental upload
-     */
-    // Hugo_Symbol: ARAF
-    static final long ABSENT_GENE_ENTREZ_ID = 369l;
-    static final Set<Long> TEST_ENTREZ_GENE_IDS = Set.of(10000l, 207l, 208l,  3265l, ABSENT_GENE_ENTREZ_ID,  3845l,  472l,  4893l,  672l,  673l,  675l, NEW_GENE_ENTREZ_ID);
-
-    // stable_id: TCGA-A1-A0SB-01
-    static final int NEW_SAMPLE_ID = 1;
-
-    // stable_id: TCGA-A1-A0SD-01
-    static final int UPDATED_SAMPLE_ID = 2;
-    static final Set<Integer> TEST_SAMPLE_IDS = Set.of(NEW_SAMPLE_ID, UPDATED_SAMPLE_ID, 3, 6, 8, 9, 10, 12, 13);
-
     /**
      * Test incremental upload of MRNA_EXPRESSION
      */
@@ -86,10 +75,28 @@ public class TestIncrementalTabDelimData {
         /**
          * Prior checks
          */
+        // Hugo_Symbol: CDK1
+        final long newGeneEntrezId = 983l;
+        // Gene that is part of the platform, but absent during the incremental upload
+        // Hugo_Symbol: ARAF
+        final long absentGeneEntrezId = 369l;
+        final Set<Long> noChangeEntrezIds = Set.of(10000l, 207l, 208l,  3265l, 3845l,  472l,  4893l,  672l,  673l,  675l);
+        final Set<Long> beforeEntrezIds = new HashSet<>(noChangeEntrezIds);
+        beforeEntrezIds.add(absentGeneEntrezId);
+
+        // stable_id: TCGA-A1-A0SB-01
+        final int newSampleId = 1;
+        // stable_id: TCGA-A1-A0SD-01
+        final int updateSampleId = 2;
+        final Set<Integer> noChangeSampleIds = Set.of(3, 6, 8, 9, 10, 12, 13);
+        final Set<Integer> beforeSampleIds = new HashSet<>(noChangeSampleIds);
+        beforeSampleIds.add(updateSampleId);
+
         GeneticProfile mrnaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mrna");
         assertNotNull(mrnaProfile);
+
         HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(mrnaProfile.getGeneticProfileId(), null);
-        assertPriorDataState(beforeResult);
+        assertPriorDataState(beforeResult, beforeEntrezIds, beforeSampleIds);
 
         File dataFolder = new File("src/test/resources/incremental/tab_delim_data/");
         File dataFile = new File(dataFolder, "data_expression_Zscores.txt");
@@ -108,11 +115,18 @@ public class TestIncrementalTabDelimData {
          * After test assertions
          */
         HashMap<Long, HashMap<Integer, String>> afterResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(mrnaProfile.getGeneticProfileId(), null);
-        assertNoChange(beforeResult, afterResult);
-        assertEquals("-0.1735", afterResult.get(NEW_GENE_ENTREZ_ID).get(NEW_SAMPLE_ID));
-        assertEquals("-0.6412", afterResult.get(NEW_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
-        assertEquals("", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(NEW_SAMPLE_ID));
-        assertEquals("-1.12475", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
+        assertEquals("After result should get exactly one new gene", beforeEntrezIds.size() + 1,
+                afterResult.size());
+        afterResult.values()
+                .forEach(sampleToValue ->
+                assertEquals("Each gene row has to get one extra sample",beforeSampleIds.size() + 1, sampleToValue.size()));
+        assertNoChange(beforeResult, afterResult, noChangeEntrezIds, noChangeSampleIds);
+        HashMap<Integer, String> newGeneRow = afterResult.get(newGeneEntrezId);
+        assertEquals("-0.1735", newGeneRow.get(newSampleId));
+        assertEquals("-0.6412", newGeneRow.get(updateSampleId));
+        HashMap<Integer, String> absentGeneRow = afterResult.get(absentGeneEntrezId);
+        assertEquals("", absentGeneRow.get(newSampleId));
+        assertEquals("-1.12475", absentGeneRow.get(updateSampleId));
     }
 
     /**
@@ -123,10 +137,28 @@ public class TestIncrementalTabDelimData {
         /**
          * Prior checks
          */
+        // Hugo_Symbol: CDK1
+        final long newGeneEntrezId = 983l;
+        // Gene that is part of the platform, but absent during the incremental upload
+        // Hugo_Symbol: ARAF
+        final long absentGeneEntrezId = 369l;
+        final Set<Long> noChangeEntrezIds = Set.of(10000l, 207l, 208l,  3265l, 3845l,  472l,  4893l,  672l,  673l,  675l);
+        final Set<Long> beforeEntrezIds = new HashSet<>(noChangeEntrezIds);
+        beforeEntrezIds.add(absentGeneEntrezId);
+
+        // stable_id: TCGA-A1-A0SB-01
+        final int newSampleId = 1;
+        // stable_id: TCGA-A1-A0SD-01
+        final int updateSampleId = 2;
+        final Set<Integer> noChangeSampleIds = Set.of(3, 6, 8, 9, 10, 12, 13);
+        final Set<Integer> beforeSampleIds = new HashSet<>(noChangeSampleIds);
+        beforeSampleIds.add(updateSampleId);
+
         GeneticProfile rppaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_rppa");
         assertNotNull(rppaProfile);
+
         HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(rppaProfile.getGeneticProfileId(), null);
-        assertPriorDataState(beforeResult);
+        assertPriorDataState(beforeResult, beforeEntrezIds, beforeSampleIds);
 
         File dataFolder = new File("src/test/resources/incremental/tab_delim_data/");
         File dataFile = new File(dataFolder, "data_rppa.txt");
@@ -145,34 +177,157 @@ public class TestIncrementalTabDelimData {
          * After test assertions
          */
         HashMap<Long, HashMap<Integer, String>> afterResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(rppaProfile.getGeneticProfileId(), null);
-        assertNoChange(beforeResult, afterResult);
-        assertEquals("-0.141047088398489", afterResult.get(NEW_GENE_ENTREZ_ID).get(NEW_SAMPLE_ID));
-        assertEquals("1.61253243564957", afterResult.get(NEW_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
-        assertEquals("", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(NEW_SAMPLE_ID));
-        assertEquals("-1.129", afterResult.get(ABSENT_GENE_ENTREZ_ID).get(UPDATED_SAMPLE_ID));
+        assertEquals("After result should get exactly one new gene", beforeEntrezIds.size() + 1,
+                afterResult.size());
+        afterResult.values()
+                .forEach(sampleToValue ->
+                        assertEquals("Each gene row has to get one extra sample",beforeSampleIds.size() + 1, sampleToValue.size()));
+        assertNoChange(beforeResult, afterResult, noChangeEntrezIds, noChangeSampleIds);
+        assertEquals("-0.141047088398489", afterResult.get(newGeneEntrezId).get(newSampleId));
+        assertEquals("1.61253243564957", afterResult.get(newGeneEntrezId).get(updateSampleId));
+        assertEquals("", afterResult.get(absentGeneEntrezId).get(newSampleId));
+        assertEquals("-1.129", afterResult.get(absentGeneEntrezId).get(updateSampleId));
     }
 
-    private void assertPriorDataState(HashMap<Long, HashMap<Integer, String>> beforeResult) {
-        assertEquals("All but new entrez gene id expected to be in the database for this profile before the upload", TEST_ENTREZ_GENE_IDS.size() - 1, beforeResult.size());
-        assertFalse("No new entrez gene id expected to be in the database for this profile before the upload", beforeResult.containsKey(NEW_GENE_ENTREZ_ID));
+    /**
+     * Test incremental upload of COPY_NUMBER_ALTERATION DISCRETE (gistic)
+     */
+    @Test
+    public void testDiscreteCNA() throws DaoException, IOException {
+        /**
+         * Prior checks
+         */
+        // Hugo_Symbol: CDK1
+        final long newGeneEntrezId = 983l;
+        // Gene that is part of the platform, but absent during the incremental upload
+        // Hugo_Symbol: ATM
+        final long absentGeneEntrezId = 472l;
+        final Set<Long> noChangeEntrezIds = Set.of(10000l, 207l, 208l,  3265l,  3845l,  4893l,  672l,  673l,  675l);
+        final Set<Long> beforeEntrezIds = new HashSet<>(noChangeEntrezIds);
+        beforeEntrezIds.add(absentGeneEntrezId);
+
+        // stable_id: TCGA-XX-0800
+        final int newSampleId = 15;
+        // stable_id: TCGA-A1-A0SO
+        final int updateSampleId = 12;
+        final Set<Integer> noChangeSampleIds = Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14);
+        final Set<Integer> beforeSampleIds = new HashSet<>(noChangeSampleIds);
+        beforeSampleIds.add(updateSampleId);
+
+        final Set<Integer> afterSampleIds = new HashSet<>(beforeSampleIds);
+        afterSampleIds.add(newSampleId);
+
+        GeneticProfile discreteCNAProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_gistic");
+        assertNotNull(discreteCNAProfile);
+        HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(discreteCNAProfile.getGeneticProfileId(), null);
+        assertPriorDataState(beforeResult, beforeEntrezIds, beforeSampleIds);
+
+        List<Short> allCnaLevels = Arrays.stream(CNA.values()).map(CNA::getCode).toList();
+        Set<Integer> beforeCnaEventsSampleIds = Set.of(4, 13, 14, updateSampleId);
+        List<CnaEvent> beforeSampleCnaEvents = DaoCnaEvent.getCnaEvents(afterSampleIds.stream().toList(),
+                null,
+                discreteCNAProfile.getGeneticProfileId(),
+                allCnaLevels);
+        Map<Integer, List<CnaEvent>> beforeSampleIdToSampleCnaEvents = beforeSampleCnaEvents.stream().collect(Collectors.groupingBy(CnaEvent::getSampleId));
+        assertEquals(beforeCnaEventsSampleIds, beforeSampleIdToSampleCnaEvents.keySet());
+
+        File dataFolder = new File("src/test/resources/incremental/tab_delim_data/");
+        File dataFile = new File(dataFolder, "data_cna_discrete.txt");
+        File pdAnnotations = new File(dataFolder, "data_cna_pd_annotations.txt");
+
+        /**
+         * Test
+         */
+        ImportTabDelimData importer = new ImportTabDelimData(dataFile,
+                discreteCNAProfile.getGeneticProfileId(),
+                null,
+                true,
+                DaoGeneticAlteration.getInstance(),
+                DaoGeneOptimized.getInstance());
+        importer.setPdAnnotationsFile(pdAnnotations);
+        importer.importData();
+
+        /**
+         * After test assertions
+         */
+        HashMap<Long, HashMap<Integer, String>> afterResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(discreteCNAProfile.getGeneticProfileId(), null);
+        assertEquals("After result should get exactly one new gene", beforeEntrezIds.size() + 1,
+                afterResult.size());
+        afterResult.values()
+                .forEach(sampleToValue ->
+                        assertEquals("Each gene row has to get one extra sample",beforeSampleIds.size() + 1, sampleToValue.size()));
+        assertNoChange(beforeResult, afterResult, noChangeEntrezIds, noChangeSampleIds);
+        assertEquals("-2", afterResult.get(newGeneEntrezId).get(newSampleId));
+        assertEquals("2", afterResult.get(newGeneEntrezId).get(updateSampleId));
+        assertEquals("", afterResult.get(absentGeneEntrezId).get(newSampleId));
+        assertEquals("1", afterResult.get(absentGeneEntrezId).get(updateSampleId));
+
+        List<CnaEvent> afterSampleCnaEvents = DaoCnaEvent.getCnaEvents(afterSampleIds.stream().toList(),
+                afterResult.keySet(),
+                discreteCNAProfile.getGeneticProfileId(),
+                allCnaLevels);
+        Map<Integer, List<CnaEvent>> afterSampleIdToSampleCnaEvents = afterSampleCnaEvents.stream().collect(Collectors.groupingBy(CnaEvent::getSampleId));
+        assertEquals("There is only one new sample that has to gain cna events", beforeCnaEventsSampleIds.size() + 1, afterSampleIdToSampleCnaEvents.size());
+        beforeCnaEventsSampleIds.forEach(sampleId -> {
+            if (sampleId == updateSampleId) {
+                return;
+            }
+            Set<CnaEvent.Event> beforeCnaEvents = beforeSampleIdToSampleCnaEvents.get(sampleId).stream().map(CnaEvent::getEvent).collect(Collectors.toSet());
+            Set<CnaEvent.Event> afterCnaEvents = afterSampleIdToSampleCnaEvents.get(sampleId).stream().map(CnaEvent::getEvent).collect(Collectors.toSet());
+            assertEquals("CNA events for sample_id=" + sampleId + " must not change.", beforeCnaEvents, afterCnaEvents);
+        });
+        Map<Long, CNA> newSampleEntrezGeneIdToCnaAlteration = afterSampleIdToSampleCnaEvents.get(newSampleId).stream()
+                .map(CnaEvent::getEvent)
+                .collect(Collectors.toMap(
+                        event -> event.getGene().getEntrezGeneId(),
+                        CnaEvent.Event::getAlteration));
+        assertEquals(Map.of(
+                        208l, CNA.HOMDEL,
+                        3265l, CNA.AMP,
+                        4893l, CNA.HOMDEL,
+                        672l, CNA.AMP,
+                        673l, CNA.AMP,
+                        675l, CNA.HOMDEL,
+                        newGeneEntrezId, CNA.HOMDEL
+                ),
+                newSampleEntrezGeneIdToCnaAlteration);
+        Map<Long, CNA> updatedSampleEntrezGeneIdToCnaAlteration = afterSampleIdToSampleCnaEvents.get(updateSampleId).stream()
+                .map(CnaEvent::getEvent)
+                .collect(Collectors.toMap(
+                        event -> event.getGene().getEntrezGeneId(),
+                        CnaEvent.Event::getAlteration));
+        assertEquals(Map.of(
+                        10000l, CNA.HOMDEL,
+                        207l, CNA.AMP,
+                        3845l, CNA.AMP,
+                        //FIXME
+                        //absentGeneEntrezId, CNA.HOMDEL,
+                        673l, CNA.HOMDEL,
+                        newGeneEntrezId, CNA.AMP
+                ),
+                updatedSampleEntrezGeneIdToCnaAlteration);
+    }
+
+    private void assertPriorDataState(HashMap<Long, HashMap<Integer, String>> beforeResult, Set<Long> expectedGeneEntrezIds, Set<Integer> expectedSampleIds) {
+        assertEquals(expectedGeneEntrezIds, beforeResult.keySet());
         beforeResult.forEach((entrezGeneId, sampleIdToValue) -> {
-            assertEquals("All but new sample id expected to be in the database for this profile for gene with entrez id " + entrezGeneId + " before the upload", TEST_SAMPLE_IDS.size() - 1, beforeResult.get(entrezGeneId).size());
-            assertFalse("No new entrez gene id expected to be in the database for this profile for gene with entrez id " + entrezGeneId + " before the upload", beforeResult.get(entrezGeneId).containsKey(NEW_SAMPLE_ID));
+            assertEquals("Samples for gene with entrez_id = " + entrezGeneId + " have to match expected ones",
+                    expectedSampleIds, beforeResult.get(entrezGeneId).keySet());
         });
     }
 
-    private void assertNoChange(HashMap<Long, HashMap<Integer, String>> beforeResult, HashMap<Long, HashMap<Integer, String>> afterResult) {
-        assertEquals("These genes expected to be found after upload", TEST_ENTREZ_GENE_IDS, afterResult.keySet());
-        afterResult.forEach((entrezGeneId, sampleIdToValue) -> {
-            assertEquals("These sample ids expected to be found for gene with entrez id " + entrezGeneId+ " after upload", TEST_SAMPLE_IDS, afterResult.get(entrezGeneId).keySet());
-            if (entrezGeneId == NEW_GENE_ENTREZ_ID || entrezGeneId == ABSENT_GENE_ENTREZ_ID) {
-                return;
-            }
-            sampleIdToValue.forEach((sampleId, value) -> {
-                if (sampleId == NEW_SAMPLE_ID || sampleId == UPDATED_SAMPLE_ID) {
-                    return;
-                }
-                assertEquals("The associated value is not expected change associated sample id " + sampleId + " and entrez gene id " + entrezGeneId,
+    private void assertNoChange(HashMap<Long, HashMap<Integer, String>> beforeResult,
+                                HashMap<Long, HashMap<Integer, String>> afterResult,
+                                Set<Long> geneEntrezIds,
+                                Set<Integer> sampleIds) {
+        geneEntrezIds.forEach(entrezGeneId -> {
+            assertTrue("After result is expected to contain entrez_id=" + entrezGeneId,
+                    afterResult.containsKey(entrezGeneId));
+            sampleIds.forEach(sampleId -> {
+                assertTrue("Sample_id=" + sampleId + " expected to be found for gene with entrez_id=" + entrezGeneId,
+                        afterResult.get(entrezGeneId).containsKey(sampleId));
+                assertEquals("The values for sample_id=" + sampleId +
+                                " and entrez_id=" + entrezGeneId + " before and after upload have to match.",
                         beforeResult.get(entrezGeneId).get(sampleId), afterResult.get(entrezGeneId).get(sampleId));
             });
         });

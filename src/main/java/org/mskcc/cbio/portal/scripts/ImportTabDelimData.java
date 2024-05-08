@@ -36,7 +36,6 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -694,7 +693,11 @@ public class ImportTabDelimData {
                 recordStored = this.saveValues(genes.get(0), values);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, genes));
+                    if (updateMode) {
+                        DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedImportedSampleList);
+                    }
+                    long entrezGeneId = genes.get(0).getEntrezGeneId();
+                    CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, entrezGeneId));
                 }
             } else {
                 if (isRppaProfile) { // for protein data, duplicate the data
@@ -790,9 +793,11 @@ public class ImportTabDelimData {
         return List.of();
     }
 
-    private List<CnaEvent> composeCnaEventsToAdd(String[] values, List<CanonicalGene> genes) {
+    private List<CnaEvent> composeCnaEventsToAdd(String[] values, long entrezGeneId) {
+        if (updateMode) {
+            values = updateValues((int) entrezGeneId, values);
+        }
         List<CnaEvent> cnaEventsToAdd = new ArrayList<CnaEvent>();
-        long entrezGeneId = genes.get(0).getEntrezGeneId();
         for (int i = 0; i < values.length; i++) {
 
             // temporary solution -- change partial deletion back to full deletion.
