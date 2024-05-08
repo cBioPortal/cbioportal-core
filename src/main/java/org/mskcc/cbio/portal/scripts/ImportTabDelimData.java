@@ -667,7 +667,7 @@ public class ImportTabDelimData {
         if (!microRNAGenes.isEmpty()) {
             // for micro rna, duplicate the data
             for (CanonicalGene gene : microRNAGenes) {
-                if (this.saveValues(gene, values)) {
+                if (this.saveValues(gene, values, geneSymbol)) {
                     recordStored = true;
                 }
             }
@@ -687,7 +687,7 @@ public class ImportTabDelimData {
             // none of the matched genes are type "miRNA"
             if (genes.size() == 1) {
                 // Store all values per gene:
-                recordStored = this.saveValues(genes.get(0), values);
+                recordStored = this.saveValues(genes.get(0), values, geneSymbol);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
                     if (updateMode) {
@@ -698,7 +698,7 @@ public class ImportTabDelimData {
                 }
             } else {
                 if (isRppaProfile) { // for protein data, duplicate the data
-                    recordStored = saveRppaValues(values, recordStored, genes);
+                    recordStored = saveRppaValues(values, recordStored, genes, geneSymbol);
                 } else {
                     if (!recordStored) {
                         // this case :
@@ -711,16 +711,14 @@ public class ImportTabDelimData {
         return recordStored;
     }
 
-    private boolean saveValues(CanonicalGene canonicalGene, String[] values) throws DaoException {
-        //TODO Think of better way. We do that to do not remove genes that contain duplicate
-        if (geneticAlterationImporter.isImportedAlready(canonicalGene)) {
-            return false;
-        }
+    private boolean saveValues(CanonicalGene canonicalGene, String[] values, String geneSymbol) throws DaoException {
         if (updateMode) {
             values = updateValues(canonicalGene.getGeneticEntityId(), values);
-            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), canonicalGene.getGeneticEntityId());
+            if (!geneticAlterationImporter.isImportedAlready(canonicalGene)) {
+                daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), canonicalGene.getGeneticEntityId());
+            }
         }
-        return geneticAlterationImporter.store(values, canonicalGene, canonicalGene.getHugoGeneSymbolAllCaps());
+        return geneticAlterationImporter.store(values, canonicalGene, geneSymbol);
     }
     //TODO unify saveValues versions
     // With update mode the last duplicate wins. It's different from the other function
@@ -753,9 +751,9 @@ public class ImportTabDelimData {
         return updatedSampleValues;
     }
 
-    private boolean saveRppaValues(String[] values, boolean recordStored, List<CanonicalGene> genes) throws DaoException {
+    private boolean saveRppaValues(String[] values, boolean recordStored, List<CanonicalGene> genes, String geneSymbol) throws DaoException {
         for (CanonicalGene gene : genes) {
-            if (this.saveValues(gene, values)) {
+            if (this.saveValues(gene, values, geneSymbol)) {
                 recordStored = true;
                 nrExtraRecords++;
             }

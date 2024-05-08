@@ -180,7 +180,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterations() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -205,7 +205,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsMissingGeneticAlterations() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test_with_cna_events_missing.txt");
         new ImportCnaDiscreteLongData(
@@ -233,7 +233,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterationsAndProfileSamplesInCorrectOrder() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -260,7 +260,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataHandlesEntriesWithoutEntrezButWithHugo() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test_without_entrez_with_hugo.txt");
         new ImportCnaDiscreteLongData(
@@ -283,7 +283,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataHandlesEntriesWithWrongEntrezAndCorrectHugo() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test_with_wrong_entrez_and_correct_hugo.txt");
         new ImportCnaDiscreteLongData(
@@ -306,7 +306,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterationsFromNonCnaEvents() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -334,7 +334,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataIgnoresLineWithDuplicateGene() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
