@@ -199,6 +199,11 @@ INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYP
 INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
 SET @max_entity_id = (Select MAX(ID) from genetic_entity);
 INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,2261,'FGFR3','protein-coding');
+-- Generic genetic entities
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Erlotinib');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Irinotecan');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'L-685458');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Lapatinib');
 
 -- cna_event
 INSERT INTO "cna_event" ("CNA_EVENT_ID","ENTREZ_GENE_ID","ALTERATION") VALUES (20093,207,-2);
@@ -329,6 +334,7 @@ INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID
 INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (7,'study_tcga_pub_structural_variants',1,'STRUCTURAL_VARIANT','SV','Structural Variants','Structural Variants test data.','1');
 INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (8,'study_tcga_pub_cna_long',1,'COPY_NUMBER_ALTERATION','DISCRETE_LONG','CNA values','CNA values dummy data','1');
 INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (9,'study_tcga_pub_rppa',1,'PROTEIN_LEVEL','LOG2-VALUE','RPPA values','RPPA values dummy data','0');
+INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (10,'study_tcga_pub_treatment_ic50',1,'GENERIC_ASSAY','TREATMENT_RESPONSE','test treatment values','treatment values dummy data','0');
 
 -- gene_panel
 INSERT INTO gene_panel (INTERNAL_ID,STABLE_ID,DESCRIPTION) VALUES (1,'TESTPANEL_CNA_DISCRETE_LONG_FORMAT','Some test panel');
@@ -388,6 +394,11 @@ INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALU
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 672),'-1.661,-1.392,-1.924,-1.656,-0.361,-1.998,-0.136,-0.709,');
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 673),'0.233,0.561,-0.106,-0.085,-0.012,0.143,0.141,0.609,');
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 675),'-0.570,-1.340,-1.544,-0.404,0.632,-1.231,0.771,-0.036,');
+-- Generic assay data
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'Erlotinib'),'5.2,>8,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'Irinotecan'),'>8,7.1,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'L-685458'),'>4.6,7.2,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'Lapatinib'),'6.9,>~8,');
 
 -- genetic_profile_samples
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (2,'1,2,3,4,5,6,7,8,9,10,11,12,13,14,');
@@ -395,6 +406,7 @@ INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (4,'1,2,3,4,5,6,7,8,9,10,11,12,13,14,');
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (5,'2,');
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (9,'2,3,6,8,9,10,12,13,');
+INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (10,'2,3,');
 
 -- patient
 INSERT INTO "patient" ("INTERNAL_ID","STABLE_ID","CANCER_STUDY_ID") VALUES (1,'TCGA-A1-A0SB',1);

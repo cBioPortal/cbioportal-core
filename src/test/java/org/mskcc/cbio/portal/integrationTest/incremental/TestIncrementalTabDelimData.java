@@ -18,6 +18,7 @@
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import org.cbioportal.model.CNA;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,6 +27,7 @@ import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
+import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
@@ -48,6 +50,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -326,27 +329,111 @@ public class TestIncrementalTabDelimData {
                         DaoGeneOptimized.getInstance()));
     }
 
-    private void assertPriorDataState(HashMap<Long, HashMap<Integer, String>> beforeResult, Set<Long> expectedGeneEntrezIds, Set<Integer> expectedSampleIds) {
-        assertEquals(expectedGeneEntrezIds, beforeResult.keySet());
-        beforeResult.forEach((entrezGeneId, sampleIdToValue) -> {
-            assertEquals("Samples for gene with entrez_id = " + entrezGeneId + " have to match expected ones",
-                    expectedSampleIds, beforeResult.get(entrezGeneId).keySet());
+    /**
+     * Test incremental upload of GENERIC_ASSAY
+     */
+    @Test
+    public void testGenericAssay() throws DaoException, IOException {
+        /**
+         * Prior checks
+         */
+        // Stable id that is part of the platform, but absent during the incremental upload
+        final String absentStableId = "L-685458";
+        final Set<String> noChangeStableIds = Set.of("Erlotinib", "Irinotecan", "Lapatinib");
+        final Set<String> beforeStableIds = new HashSet<>(noChangeStableIds);
+        beforeStableIds.add(absentStableId);
+
+        // stable_id: TCGA-A1-A0SB-01
+        final int newSampleId = 1;
+        // stable_id: TCGA-A1-A0SD-01
+        final int updateSampleId = 2;
+        // stable_id: TCGA-A1-A0SE-01
+        final int noChangeSampleId = 3;
+        final Set<Integer> beforeSampleIds = Set.of(updateSampleId, noChangeSampleId);
+
+        GeneticProfile ic50Profile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_treatment_ic50");
+        assertNotNull(ic50Profile);
+
+        HashMap<Integer, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(ic50Profile.getGeneticProfileId(), null);
+        Set<Integer> beforeEntityIds = geneStableIdsToEntityIds(beforeStableIds);
+        assertPriorDataState(beforeResult, beforeEntityIds, beforeSampleIds);
+
+        File dataFolder = new File("src/test/resources/incremental/tab_delim_data/");
+        File dataFile = new File(dataFolder, "data_treatment_ic50.txt");
+
+        /**
+         * Test
+         */
+        new ImportTabDelimData(
+                dataFile,
+                null,
+                ic50Profile.getGeneticProfileId(),
+                null,
+                "NAME,DESCRIPTION,URL",
+                true,
+                DaoGeneticAlteration.getInstance(),
+                DaoGeneOptimized.getInstance()).importData();
+
+        /**
+         * After test assertions
+         */
+        HashMap<Integer, HashMap<Integer, String>> afterResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(ic50Profile.getGeneticProfileId(), null);
+        assertEquals("After result should have the same amount of entries", beforeResult.size(), afterResult.size());
+        afterResult.values()
+                .forEach(sampleToValue ->
+                        assertEquals("Each gene row has to get one extra sample",beforeSampleIds.size() + 1, sampleToValue.size()));
+        assertNoChange(beforeResult, afterResult, geneStableIdsToEntityIds(noChangeStableIds), Set.of(noChangeSampleId));
+        int erlotinibEntityId = geneStableIdToEntityId("Erlotinib");
+        assertEquals(">8", afterResult.get(erlotinibEntityId).get(newSampleId));
+        assertEquals("7.5", afterResult.get(erlotinibEntityId).get(updateSampleId));
+        int irinotecanEntityId = geneStableIdToEntityId("Irinotecan");
+        assertEquals("", afterResult.get(irinotecanEntityId).get(newSampleId));
+        assertEquals("0.081", afterResult.get(irinotecanEntityId).get(updateSampleId));
+        int absentEntityId = geneStableIdToEntityId(absentStableId);
+        assertEquals("", afterResult.get(absentEntityId).get(newSampleId));
+        assertEquals("", afterResult.get(absentEntityId).get(updateSampleId));
+        int lapatinibEntityId = geneStableIdToEntityId("Lapatinib");
+        assertEquals("6.2", afterResult.get(lapatinibEntityId).get(newSampleId));
+        assertEquals("7.848", afterResult.get(lapatinibEntityId).get(updateSampleId));
+        assertNull("No new generic entity has been added", DaoGeneticEntity.getGeneticEntityByStableId("LBW242"));
+    }
+
+    @NotNull
+    private Set<Integer> geneStableIdsToEntityIds(Set<String> beforeStableIds) {
+        return beforeStableIds.stream().map(stableId -> {
+            try {
+                return geneStableIdToEntityId(stableId);
+            } catch (DaoException e) {
+                throw new RuntimeException(e);
+            }
+        }).collect(Collectors.toSet());
+    }
+
+    private int geneStableIdToEntityId(String stableId) throws DaoException {
+        return DaoGeneticEntity.getGeneticEntityByStableId(stableId).getId();
+    }
+
+    private <N> void assertPriorDataState(HashMap<N, HashMap<Integer, String>> beforeResult, Set<N> expectedEntityIds, Set<Integer> expectedSampleIds) {
+        assertEquals(expectedEntityIds, beforeResult.keySet());
+        beforeResult.forEach((entityId, sampleIdToValue) -> {
+            assertEquals("Samples for gene with entityId = " + entityId + " have to match expected ones",
+                    expectedSampleIds, beforeResult.get(entityId).keySet());
         });
     }
 
-    private void assertNoChange(HashMap<Long, HashMap<Integer, String>> beforeResult,
-                                HashMap<Long, HashMap<Integer, String>> afterResult,
-                                Set<Long> geneEntrezIds,
+    private <N> void assertNoChange(HashMap<N, HashMap<Integer, String>> beforeResult,
+                                HashMap<N, HashMap<Integer, String>> afterResult,
+                                Set<N> entityIds,
                                 Set<Integer> sampleIds) {
-        geneEntrezIds.forEach(entrezGeneId -> {
-            assertTrue("After result is expected to contain entrez_id=" + entrezGeneId,
-                    afterResult.containsKey(entrezGeneId));
+        entityIds.forEach(entityId -> {
+            assertTrue("After result is expected to contain entityId=" + entityId,
+                    afterResult.containsKey(entityId));
             sampleIds.forEach(sampleId -> {
-                assertTrue("Sample_id=" + sampleId + " expected to be found for gene with entrez_id=" + entrezGeneId,
-                        afterResult.get(entrezGeneId).containsKey(sampleId));
+                assertTrue("Sample_id=" + sampleId + " expected to be found for gene with entityId=" + entityId,
+                        afterResult.get(entityId).containsKey(sampleId));
                 assertEquals("The values for sample_id=" + sampleId +
-                                " and entrez_id=" + entrezGeneId + " before and after upload have to match.",
-                        beforeResult.get(entrezGeneId).get(sampleId), afterResult.get(entrezGeneId).get(sampleId));
+                                " and entityId=" + entityId + " before and after upload have to match.",
+                        beforeResult.get(entityId).get(sampleId), afterResult.get(entityId).get(sampleId));
             });
         });
     }
