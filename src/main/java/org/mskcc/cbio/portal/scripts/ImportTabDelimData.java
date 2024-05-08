@@ -219,7 +219,6 @@ public class ImportTabDelimData {
             sampleIds = new String[headerParts.length - sampleStartIndex];
             System.arraycopy(headerParts, sampleStartIndex, sampleIds, 0, headerParts.length - sampleStartIndex);
 
-            int nrUnknownSamplesAdded = 0;
             ProgressMonitor.setCurrentMessage(" --> total number of samples: " + sampleIds.length);
 
             Map<Map.Entry<String, Long>, Map<String, String>> pdAnnotationsForStableSampleIds = null;
@@ -260,9 +259,6 @@ public class ImportTabDelimData {
             }
             if (pdAnnotationsForStableSampleIds != null && !pdAnnotationsForStableSampleIds.keySet().isEmpty()) {
                 ProgressMonitor.logWarning("WARNING: Following pd annotation sample-entrezId pairs newer used in the data file:  " + pdAnnotationsForStableSampleIds.keySet());
-            }
-            if (nrUnknownSamplesAdded > 0) {
-                ProgressMonitor.logWarning("WARNING: Number of samples added on the fly because they were missing in clinical data:  " + nrUnknownSamplesAdded);
             }
             if (samplesSkipped > 0) {
                 ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + samplesSkipped);
