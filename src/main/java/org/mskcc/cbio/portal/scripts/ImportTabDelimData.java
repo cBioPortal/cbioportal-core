@@ -388,12 +388,8 @@ public class ImportTabDelimData {
             // Expand remaining genetic entity id rows that were not mentioned in the file
             new HashSet<>(geneticAlterationMap.keySet()).forEach(geneticEntityId -> {
                 try {
-                    String[] values = orderedImportedSampleList.stream()
-                            .map(sampleId ->
-                                    geneticAlterationMap.get(geneticEntityId).containsKey(sampleId) ?
-                                            geneticAlterationMap.get(geneticEntityId).get(sampleId) : "")
-                            .toArray(String[]::new);
-
+                    String[] values = new String[orderedImportedSampleList.size()];
+                    Arrays.fill(values, "");
                     saveValues(geneticEntityId, values);
                 } catch (DaoException e) {
                     throw new RuntimeException(e);

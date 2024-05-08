@@ -28,7 +28,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.CnaEvent;
-import org.mskcc.cbio.portal.model.GeneticEventImpl;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.springframework.test.annotation.Rollback;
@@ -126,7 +125,7 @@ public class TestIncrementalTabDelimData {
         assertEquals("-0.6412", newGeneRow.get(updateSampleId));
         HashMap<Integer, String> absentGeneRow = afterResult.get(absentGeneEntrezId);
         assertEquals("", absentGeneRow.get(newSampleId));
-        assertEquals("-1.12475", absentGeneRow.get(updateSampleId));
+        assertEquals("", absentGeneRow.get(updateSampleId));
     }
 
     /**
@@ -186,7 +185,7 @@ public class TestIncrementalTabDelimData {
         assertEquals("-0.141047088398489", afterResult.get(newGeneEntrezId).get(newSampleId));
         assertEquals("1.61253243564957", afterResult.get(newGeneEntrezId).get(updateSampleId));
         assertEquals("", afterResult.get(absentGeneEntrezId).get(newSampleId));
-        assertEquals("-1.129", afterResult.get(absentGeneEntrezId).get(updateSampleId));
+        assertEquals("", afterResult.get(absentGeneEntrezId).get(updateSampleId));
     }
 
     /**
@@ -260,7 +259,7 @@ public class TestIncrementalTabDelimData {
         assertEquals("-2", afterResult.get(newGeneEntrezId).get(newSampleId));
         assertEquals("2", afterResult.get(newGeneEntrezId).get(updateSampleId));
         assertEquals("", afterResult.get(absentGeneEntrezId).get(newSampleId));
-        assertEquals("1", afterResult.get(absentGeneEntrezId).get(updateSampleId));
+        assertEquals("", afterResult.get(absentGeneEntrezId).get(updateSampleId));
 
         List<CnaEvent> afterSampleCnaEvents = DaoCnaEvent.getCnaEvents(afterSampleIds.stream().toList(),
                 afterResult.keySet(),
@@ -300,8 +299,6 @@ public class TestIncrementalTabDelimData {
                         10000l, CNA.HOMDEL,
                         207l, CNA.AMP,
                         3845l, CNA.AMP,
-                        //FIXME
-                        //absentGeneEntrezId, CNA.HOMDEL,
                         673l, CNA.HOMDEL,
                         newGeneEntrezId, CNA.AMP
                 ),
