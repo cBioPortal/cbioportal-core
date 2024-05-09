@@ -163,10 +163,19 @@ public class ImportTabDelimData {
     /**
      * Import the Copy Number Alteration, mRNA Expression, protein RPPA, GSVA or generic_assay data
      *
-     * @throws IOException  IO Error.
-     * @throws DaoException Database Error.
      */
-    public void importData() throws IOException, DaoException {
+    public void importData() {
+       JdbcUtil.getTransactionTemplate().execute(status -> {
+            try {
+                doImportData();
+            } catch (Throwable e) {
+                status.setRollbackOnly();
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+    }
+    private void doImportData() throws IOException, DaoException {
         try {
             this.numLines = FileUtil.getNumLines(dataFile);
         } catch (IOException e) {
