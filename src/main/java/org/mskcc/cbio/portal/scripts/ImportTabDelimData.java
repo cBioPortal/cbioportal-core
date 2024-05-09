@@ -421,6 +421,8 @@ public class ImportTabDelimData {
     private void saveOrderedSampleList() throws DaoException {
         if (updateMode) {
             ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(geneticProfileId);
+            int initialOrderSampleListSize = savedOrderedSampleList.size();
+            checkSamplesInDataEqualTo(initialOrderSampleListSize);
             // add all new sample ids at the end
             ArrayList<Integer> extendedSampleList = new ArrayList<>(savedOrderedSampleList);
             List<Integer> newSampleIds = orderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
@@ -432,6 +434,17 @@ public class ImportTabDelimData {
             DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(geneticProfileId);
         }
         DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+    }
+
+    private void checkSamplesInDataEqualTo(int initialOrderSampleListSize) {
+        geneticAlterationMap.forEach((geneticEntityId, sampleToValue) -> {
+            if (sampleToValue.size() != initialOrderSampleListSize) {
+                throw new IllegalStateException("Number of samples ("
+                        + sampleToValue.size() + ") for genetic entity with id "
+                        + geneticEntityId + " does not match with the number in the inital sample list ("
+                        + initialOrderSampleListSize + ").");
+            }
+        });
     }
 
     //TODO move somewhere else
