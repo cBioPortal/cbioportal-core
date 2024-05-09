@@ -464,6 +464,8 @@ def import_incremental_data(jvm_args, data_directory, update_generic_assay_entit
     Load all data types that are available and support incremental upload
     """
     for meta_file_type in INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES:
+        if meta_file_type not in meta_file_type_to_meta_files:
+            continue
         meta_pairs = meta_file_type_to_meta_files[meta_file_type]
         for meta_pair in meta_pairs:
             meta_filename, meta_dictionary = meta_pair

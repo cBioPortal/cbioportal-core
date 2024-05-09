@@ -127,7 +127,7 @@ public class ImportProfileData extends ConsoleRunnable {
                         geneticProfile.getGeneticProfileId(), 
                         genePanel, 
                         geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"),
-                        false,
+                        overwriteExisting,
                         daoGeneticAlteration, daoGene
                     );
                     genericAssayProfileImporter.importData();
@@ -152,7 +152,7 @@ public class ImportProfileData extends ConsoleRunnable {
                     geneticProfile.getTargetLine(), 
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
-                    false,
+                    overwriteExisting,
                     daoGeneticAlteration, daoGene
                 );
                 String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");

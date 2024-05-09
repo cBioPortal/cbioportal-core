@@ -370,7 +370,16 @@ INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
     MetaFileTypes.PATIENT_ATTRIBUTES,
     MetaFileTypes.SAMPLE_ATTRIBUTES,
     MetaFileTypes.MUTATION,
-    # TODO Add more types here as incremental upload is enabled
+    MetaFileTypes.MUTATION_UNCALLED,
+    MetaFileTypes.EXPRESSION,
+    MetaFileTypes.CNA_DISCRETE,
+    MetaFileTypes.CNA_CONTINUOUS,
+    MetaFileTypes.CNA_LOG2,
+    MetaFileTypes.METHYLATION,
+    MetaFileTypes.PROTEIN,
+    MetaFileTypes.GENERIC_ASSAY_CONTINUOUS,
+    MetaFileTypes.GENERIC_ASSAY_BINARY,
+    MetaFileTypes.GENERIC_ASSAY_CATEGORICAL,
 ]
 
 IMPORTER_CLASSNAME_BY_META_TYPE = {
