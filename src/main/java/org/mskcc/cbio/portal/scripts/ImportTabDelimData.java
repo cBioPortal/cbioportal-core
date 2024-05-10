@@ -447,21 +447,6 @@ public class ImportTabDelimData {
         });
     }
 
-    //TODO move somewhere else
-    private <K, V> Map<K, V> zip(K[] keys, V[] values) {
-        Map<K, V> map = new HashMap<>();
-
-        // Check if both arrays have the same length
-        if (keys.length == values.length) {
-            for (int i = 0; i < keys.length; i++) {
-                map.put(keys[i], values[i]);
-            }
-        } else {
-            throw new IllegalArgumentException("Arrays must be of the same length");
-        }
-        return map;
-    }
-
     private Map<Map.Entry<String, Long>, Map<String, String>> readPdAnnotations(File pdAnnotationsFile) {
         Map<Map.Entry<String, Long>, Map<String, String>> pdAnnotations = new HashMap<>();
         BufferedReader reader;
@@ -742,8 +727,6 @@ public class ImportTabDelimData {
         }
         return geneticAlterationImporter.store(values, canonicalGene, geneSymbol);
     }
-    //TODO unify saveValues versions
-    // With update mode the last duplicate wins. It's different from the other function
     private boolean saveValues(int geneticEntityId, String[] values) throws DaoException {
         if (updateMode) {
             daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), geneticEntityId);
@@ -753,8 +736,7 @@ public class ImportTabDelimData {
     }
 
     private String[] updateValues(int geneticEntityId, String[] values) {
-        //TODO swap variables
-        Map<Integer, String> sampleIdToValue = zip(orderedImportedSampleList.toArray(new Integer[0]), values);
+        Map<Integer, String> sampleIdToValue = ArrayUtil.zip(orderedImportedSampleList.toArray(new Integer[0]), values);
         String[] updatedSampleValues = new String[orderedSampleList.size()];
         for (int i = 0; i < orderedSampleList.size(); i++) {
             updatedSampleValues[i] = "";
