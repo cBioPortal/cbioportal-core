@@ -95,7 +95,6 @@ public class DaoGeneticAlteration {
     	return addGeneticAlterationsForGeneticEntity(geneticProfileId, DaoGeneOptimized.getGeneticEntityId(entrezGeneId), values);
     }
 
-    // TODO inc: update instead
     public int addGeneticAlterationsForGeneticEntity(int geneticProfileId, int geneticEntityId, String[] values)
             throws DaoException {
     
