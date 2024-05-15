@@ -8,11 +8,7 @@
 
 name: Java CI with Maven
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -20,18 +16,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up JDK 21
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
-    - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      - uses: actions/checkout@v3
+      - name: Get the cbioportal db version from pom.xml
+        run: |
+          CBIO_DB_VERSION=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('pom.xml'); root = tree.getroot(); ns = {'ns': 'http://maven.apache.org/POM/4.0.0'}; print(root.find('.//ns:cbioportal.version', ns).text)")
+          echo "CBIO_DB_VERSION=$CBIO_DB_VERSION" | tee -a $GITHUB_ENV
 
-    # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
-    - name: Update dependency graph
-      uses: advanced-security/maven-dependency-submission-action@v4.0.0
+      - name: Download cgds.sql with cBioPortal DB schema of the given version
+        run: |
+          curl -o cgds.sql https://raw.githubusercontent.com/cBioPortal/cbioportal/${{ env.CBIO_DB_VERSION }}/src/main/resources/db-scripts/cgds.sql
+
+      - name: Prepare cbioportal db container
+        run: |
+          docker run -d -p 3306:3306 \
+            -v $(pwd)/src/test/resources/seed_mini.sql:/docker-entrypoint-initdb.d/seed.sql:ro \
+            -v $(pwd)/cgds.sql:/docker-entrypoint-initdb.d/cgds.sql:ro \
+            -e MYSQL_ROOT_PASSWORD=root \
+            -e MYSQL_USER=cbio_user \
+            -e MYSQL_PASSWORD=somepassword \
+            -e MYSQL_DATABASE=cgds_test \
+            mysql:5.7
+
+      - name: Wait for cBioPortal database
+        run: |
+          until mysqladmin ping -h"127.0.0.1" -P"3306" --silent; do
+            echo 'waiting for cBioPortal database'
+            sleep 3
+          done
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and run tests
+        run: mvn -B integration-test --file pom.xml
+
+      # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
+      - name: Update dependency graph
+        uses: advanced-security/maven-dependency-submission-action@v4.0.0
 
 
