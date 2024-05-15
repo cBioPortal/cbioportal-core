@@ -67,6 +67,8 @@ import java.util.regex.Pattern;
 public final class DaoMutation {
     public static final String NAN = "NaN";
     private static final String MUTATION_COUNT_ATTR_ID = "MUTATION_COUNT";
+    public static final String DELETE_ALTERATION_DRIVER_ANNOTATION = "DELETE from alteration_driver_annotation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
+    public static final String DELETE_MUTATION = "DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
 
     public static int addMutation(ExtendedMutation mutation, boolean newMutationEvent) throws DaoException {
         if (!MySQLbulkLoader.isBulkLoad()) {
@@ -475,18 +477,10 @@ public final class DaoMutation {
         return mutationList;
     }
 
-    /**
-     * @deprecated  We believe that this method is no longer called by any part of the codebase, and it will soon be deleted.
-     */
-    @Deprecated
     public static ArrayList<ExtendedMutation> getMutations (int geneticProfileId, int sampleId) throws DaoException {
         return getMutations(geneticProfileId, Arrays.asList(Integer.valueOf(sampleId)));
     }
 
-    /**
-     * @deprecated  We believe that this method is no longer called by any part of the codebase, and it will soon be deleted.
-     */
-    @Deprecated
     public static ArrayList<ExtendedMutation> getMutations (int geneticProfileId, List<Integer> sampleIds) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
@@ -1501,18 +1495,20 @@ public final class DaoMutation {
         return value ? "1" : "0";
     }
 
-    /**
-     * @deprecated  We believe that this method is no longer called by any part of the codebase, and it will soon be deleted.
-     */
-    @Deprecated
-    public static void deleteAllRecordsInGeneticProfile(long geneticProfileId) throws DaoException {
+    public static void deleteAllRecordsInGeneticProfileForSample(long geneticProfileId, long internalSampleId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement("DELETE from mutation WHERE GENETIC_PROFILE_ID=?");
+            pstmt = con.prepareStatement(DELETE_ALTERATION_DRIVER_ANNOTATION);
             pstmt.setLong(1, geneticProfileId);
+            pstmt.setLong(2, internalSampleId);
+            pstmt.executeUpdate();
+
+            pstmt = con.prepareStatement(DELETE_MUTATION);
+            pstmt.setLong(1, geneticProfileId);
+            pstmt.setLong(2, internalSampleId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

@@ -61,6 +61,7 @@ public class ImportClinicalData extends ConsoleRunnable {
     private CancerStudy cancerStudy;
     private AttributeTypes attributesType;
     private boolean relaxed;
+    private boolean overwriteExisting;
     private Set<String> patientIds = new HashSet<String>();
 
     public static enum MissingAttributeValues
@@ -102,6 +103,11 @@ public class ImportClinicalData extends ConsoleRunnable {
     {
         PATIENT_ATTRIBUTES("PATIENT"),
         SAMPLE_ATTRIBUTES("SAMPLE"),
+        /**
+         * We want to encourage use patient or sample files instead, not mixed ones.
+         * See https://github.com/cBioPortal/cbioportal-core/issues/31
+          */
+        @Deprecated
         MIXED_ATTRIBUTES("MIXED");
         
         private String attributeType;
@@ -332,25 +338,32 @@ public class ImportClinicalData extends ConsoleRunnable {
         //check if sample is not already added:
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), stableSampleId, false);
         if (sample != null) {
-        	//this should be a WARNING in case of TCGA studies (see https://github.com/cBioPortal/cbioportal/issues/839#issuecomment-203452415)
-        	//and an ERROR in other studies. I.e. a sample should occur only once in clinical file!
-        	if (stableSampleId.startsWith("TCGA-")) {
-        		ProgressMonitor.logWarning("Sample " + stableSampleId + " found to be duplicated in your file. Only data of the first sample will be processed.");
-        		return false;
-        	}
-        	//give error or warning if sample is already in DB and this is NOT expected (i.e. not supplemental data):
-        	if (!this.isSupplementalData()) {
-	        	throw new RuntimeException("Error: Sample " + stableSampleId + " found to be duplicated in your file.");
-        	}
-        	else {
-        		internalSampleId = sample.getInternalId();
-        	}
+            internalSampleId = sample.getInternalId();
+            if (overwriteExisting && this.attributesType == AttributeTypes.SAMPLE_ATTRIBUTES) {
+                DaoClinicalData.removeSampleAttributesData(internalSampleId);
+            } else {
+                //this should be a WARNING in case of TCGA studies (see https://github.com/cBioPortal/cbioportal/issues/839#issuecomment-203452415)
+                //and an ERROR in other studies. I.e. a sample should occur only once in clinical file!
+                if (stableSampleId.startsWith("TCGA-")) {
+                    ProgressMonitor.logWarning("Sample " + stableSampleId + " found to be duplicated in your file. Only data of the first sample will be processed.");
+                    return false;
+                }
+                if (this.isSupplementalData()) {
+                    internalSampleId = sample.getInternalId();
+                } else {
+                    //give error or warning if sample is already in DB and this is NOT expected (i.e. not supplemental data):
+                    throw new RuntimeException("Error: Sample " + stableSampleId + " found to be duplicated in your file.");
+                }
+            }
         }
         else {
         	Patient patient = DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudy.getInternalId(), stablePatientId);
         	if (patient != null) {
         		//patient exists, get internal id:
         		internalPatientId = patient.getInternalId();
+                if (overwriteExisting && this.attributesType == AttributeTypes.PATIENT_ATTRIBUTES) {
+                    DaoClinicalData.removePatientAttributesData(internalPatientId);
+                }
         	}
         	else {
         		//add patient:
@@ -616,12 +629,14 @@ public class ImportClinicalData extends ConsoleRunnable {
 	                "cancer study id").withOptionalArg().describedAs("study").ofType(String.class);
 	        OptionSpec<String> attributeFlag = parser.accepts("a",
 	                "(deprecated) Flag for using MIXED_ATTRIBUTES").withOptionalArg().describedAs("a").ofType(String.class);
-                	        OptionSpec<String> relaxedFlag = parser.accepts("r",
+            OptionSpec<String> relaxedFlag = parser.accepts("r",
 	                "(not recommended) Flag for relaxed mode, determining how to handle detected data harmonization problems in the same study").withOptionalArg().describedAs("r").ofType(String.class);
 	        parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
 	          .withOptionalArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 	        parser.accepts("noprogress", "this option can be given to avoid the messages regarding memory usage and % complete");
-	        
+            OptionSpec<String> overWriteExistingFlag = parser.accepts("overwrite-existing",
+                    "Flag that enables re-uploading data for the patient/sample entries that already exist in the database").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+
 	        OptionSet options = null;
 	        try {
 	            options = parser.parse( args );
@@ -652,15 +667,16 @@ public class ImportClinicalData extends ConsoleRunnable {
 	            attributesDatatype = properties.getProperty("datatype");
 	            cancerStudyStableId = properties.getProperty("cancer_study_identifier");
 	        }
-                if( options.has ( attributeFlag ) )
-                {
-                    attributesDatatype = "MIXED_ATTRIBUTES";
-                }
-                if( options.has ( relaxedFlag ) )
-                {
-                    relaxed = true;
+            if (options.has(attributeFlag)) {
+                attributesDatatype = "MIXED_ATTRIBUTES";
+            }
+            if (options.has(relaxedFlag)) {
+                relaxed = true;
+            }
+            if (options.has(overWriteExistingFlag)) {
+                overwriteExisting = true;
 
-                }
+            }
             SpringUtil.initDataSource();
             CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyStableId);
             if (cancerStudy == null) {

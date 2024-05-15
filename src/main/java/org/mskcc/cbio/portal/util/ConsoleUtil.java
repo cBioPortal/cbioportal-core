@@ -251,6 +251,9 @@ public class ConsoleUtil {
 			parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
 			          .withRequiredArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 		}
+		parser.accepts("overwrite-existing",
+				"Enables re-uploading molecular data that already exist for the given profile and sample.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+
 		String progName = "importScript";
 		
 		OptionSet options = null;
