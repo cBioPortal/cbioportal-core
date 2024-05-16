@@ -83,7 +83,6 @@ public class ImportProfileData extends ConsoleRunnable {
             }
             
             // Print profile report
-            int numLines = FileUtil.getNumLines(dataFile);
             ProgressMonitor.setCurrentMessage(
                     " --> profile id:  " + geneticProfile.getGeneticProfileId() +
                     "\n --> profile name:  " + geneticProfile.getProfileName() +
@@ -118,7 +117,7 @@ public class ImportProfileData extends ConsoleRunnable {
                 String patientLevel = geneticProfile.getOtherMetaDataField("patient_level");
                 if (patientLevel != null && patientLevel.trim().toLowerCase().equals("true")) {
                     ImportGenericAssayPatientLevelData genericAssayProfileImporter = new ImportGenericAssayPatientLevelData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel, geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"));
-                    genericAssayProfileImporter.importData(numLines);
+                    genericAssayProfileImporter.importData();
                 } else {
                     // use ImportTabDelimData importer for non-patient level data
                     ImportTabDelimData genericAssayProfileImporter = new ImportTabDelimData(

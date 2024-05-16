@@ -53,7 +53,6 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportGenericAssayPatientLevelData;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
@@ -151,8 +150,7 @@ public class TestImportGenericAssayPatientLevelData {
         File file = new File("src/test/resources/tabDelimitedData/data_patient_generic_assay.txt");
         ImportGenericAssayPatientLevelData parser = new ImportGenericAssayPatientLevelData(file, null, geneticProfileId, null, "name,description");
 
-        int numLines = FileUtil.getNumLines(file);
-        parser.importData(numLines);
+        parser.importData();
 
         HashMap<Integer,HashMap<Integer, String>> geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfileId, Arrays.asList(geneticEntity1.getId(), geneticEntity2.getId()));
 
