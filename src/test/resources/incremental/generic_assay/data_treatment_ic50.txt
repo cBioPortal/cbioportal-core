@@ -4,5 +4,5 @@ Irinotecan	Name of Irinotecan	Desc of Irinotecan	Url of Irinotecan		0.081
 # The database has this entity, but not the file
 #L-685458
 Lapatinib	Name of Lapatinib	Desc of Lapatinib	Url of Lapatinib	6.2	7.848
-#The line will be skipped as the entity stable id is not in the database already
+#The entity will be added
 LBW242	Name of LBW242	Desc of LBW242	Url of LBW242	0.1	>~8
