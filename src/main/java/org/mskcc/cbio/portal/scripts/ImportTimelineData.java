@@ -48,8 +48,10 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Imports timeline data for display in patient view
@@ -58,7 +60,7 @@ import java.util.Properties;
  */
 public class ImportTimelineData extends ConsoleRunnable {
 
-	private static void importData(String dataFile, int cancerStudyId) throws IOException, DaoException {
+	private static void importData(String dataFile, int cancerStudyId, boolean overwriteExisting) throws IOException, DaoException {
 		MySQLbulkLoader.bulkLoadOn();
 
 		ProgressMonitor.setCurrentMessage("Reading file " + dataFile);
@@ -81,9 +83,10 @@ public class ImportTimelineData extends ConsoleRunnable {
 				throw new RuntimeException("The first line must start with\n'PATIENT_ID\tSTART_DATE\tEVENT_TYPE'\nor\n"
 					+ "PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE");
 			}
-	
+
 			long clinicalEventId = DaoClinicalEvent.getLargestClinicalEventId();
-	
+			Set<Integer> processedPatientIds = new HashSet<>();
+
 			while ((line = buff.readLine()) != null) {
 				line = line.trim();
 	
@@ -98,6 +101,9 @@ public class ImportTimelineData extends ConsoleRunnable {
 				if (patient == null) {
 					ProgressMonitor.logWarning("Patient " + patientId + " not found in study " + cancerStudyId + ". Skipping entry.");
 					continue;
+				}
+				if (overwriteExisting && processedPatientIds.add(patient.getInternalId())) {
+					DaoClinicalEvent.deleteByPatientId(patient.getInternalId());
 				}
 				ClinicalEvent event = new ClinicalEvent();
 				event.setClinicalEventId(++clinicalEventId);
@@ -128,17 +134,18 @@ public class ImportTimelineData extends ConsoleRunnable {
     public void run() {
         try {
 		    String description = "Import 'timeline' data";
-            
-		    OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
+
+		    OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, false);
 		    String dataFile = (String) options.valueOf("data");
 		    File descriptorFile = new File((String) options.valueOf("meta"));
+			boolean overwriteExisting = options.has("overwrite-existing");
             
 			Properties properties = new TrimmedProperties();
 			properties.load(new FileInputStream(descriptorFile));
             
 			int cancerStudyInternalId = ValidationUtils.getInternalStudyId(properties.getProperty("cancer_study_identifier"));
             
-			importData(dataFile, cancerStudyInternalId);
+			importData(dataFile, cancerStudyInternalId, overwriteExisting);
         } catch (RuntimeException e) {
             throw e;
         } catch (IOException|DaoException e) {
