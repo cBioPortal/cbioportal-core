@@ -116,6 +116,9 @@ public class ImportProfileData extends ConsoleRunnable {
                 // use a different importer for patient level data
                 String patientLevel = geneticProfile.getOtherMetaDataField("patient_level");
                 if (patientLevel != null && patientLevel.trim().toLowerCase().equals("true")) {
+                    if (overwriteExisting) {
+                        throw new UnsupportedOperationException("Incremental upload for generic assay patient_level data is not supported. Please use sample level instead.");
+                    }
                     ImportGenericAssayPatientLevelData genericAssayProfileImporter = new ImportGenericAssayPatientLevelData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel, geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"));
                     genericAssayProfileImporter.importData();
                 } else {
