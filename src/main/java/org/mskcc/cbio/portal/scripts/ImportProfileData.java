@@ -58,7 +58,6 @@ public class ImportProfileData extends ConsoleRunnable {
         DaoGeneOptimized daoGene;
         DaoGeneticAlteration daoGeneticAlteration;
         daoGene = DaoGeneOptimized.getInstance();
-        daoGeneticAlteration = DaoGeneticAlteration.getInstance();
 
         try {
             // Parse arguments
@@ -132,7 +131,7 @@ public class ImportProfileData extends ConsoleRunnable {
                         genePanel, 
                         geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"),
                         overwriteExisting,
-                        daoGeneticAlteration, daoGene
+                        daoGene
                     );
                     genericAssayProfileImporter.importData();
                 }
@@ -146,7 +145,6 @@ public class ImportProfileData extends ConsoleRunnable {
                     geneticProfile.getGeneticProfileId(),
                     genePanel,
                     daoGene,
-                    daoGeneticAlteration,
                     namespaces,
                     overwriteExisting
                 );
@@ -158,7 +156,7 @@ public class ImportProfileData extends ConsoleRunnable {
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
                     overwriteExisting,
-                    daoGeneticAlteration, daoGene
+                    daoGene
                 );
                 String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
                 if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {

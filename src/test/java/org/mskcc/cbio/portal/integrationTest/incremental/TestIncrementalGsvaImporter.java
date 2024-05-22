@@ -74,7 +74,6 @@ public class TestIncrementalGsvaImporter {
                         DaoGeneticProfile.getGeneticProfileByStableId("gsva_scores").getGeneticProfileId(),
                         null,
                         true,
-                        DaoGeneticAlteration.getInstance(),
                         DaoGeneOptimized.getInstance()));
     }
 
