@@ -204,6 +204,11 @@ public class ImportTabDelimData {
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY
             && headerParts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
 
+        long typesDetected = List.of(isDiscretizedCnaProfile, isRppaProfile, isGsvaProfile, isGenericAssayProfile).stream().filter(Boolean::booleanValue).count();
+        if (typesDetected > 1) {
+            throw new IllegalStateException("More then one data type is detected.");
+        }
+
         int numRecordsToAdd = 0;
         int samplesSkipped = 0;
         try {
