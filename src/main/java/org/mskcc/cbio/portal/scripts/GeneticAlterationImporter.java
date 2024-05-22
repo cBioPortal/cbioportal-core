@@ -5,7 +5,8 @@ import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 import static java.lang.String.format;
 
@@ -13,6 +14,7 @@ public class GeneticAlterationImporter {
 
     private final int geneticProfileId;
     private Set<Long> importSetOfGenes = new HashSet<>();
+    private Set<Integer> importSetOfGeneticEntityIds = new HashSet<>();
     private DaoGeneticAlteration daoGeneticAlteration;
 
     public GeneticAlterationImporter(
@@ -52,6 +54,27 @@ public class GeneticAlterationImporter {
             }
         } catch (Exception e) {
             throw new RuntimeException("Aborted: Error found for row starting with " + geneSymbol + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Universal method that stores values for different genetic entities
+     * @param geneticEntityId
+     * @param values
+     * @return true if entity has been stored, false - if entity already existed
+     * @throws DaoException
+     */
+    public boolean store(
+            int geneticEntityId,
+            String[] values
+    ) throws DaoException {
+        if (importSetOfGeneticEntityIds.add(geneticEntityId)) {
+            daoGeneticAlteration.addGeneticAlterationsForGeneticEntity(geneticProfileId, geneticEntityId, values);
+            return true;
+        }
+        else {
+            ProgressMonitor.logWarning("Data for genetic entity with id " + geneticEntityId + " already imported from file. Record will be skipped.");
+            return false;
         }
     }
 

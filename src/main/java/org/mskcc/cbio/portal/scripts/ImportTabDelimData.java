@@ -32,18 +32,51 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.*;
+import org.apache.commons.lang3.ArrayUtils;
+import org.mskcc.cbio.portal.dao.DaoCnaEvent;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneset;
+import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.dao.JdbcUtil;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.Geneset;
+import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.ArrayUtil;
+import org.mskcc.cbio.portal.util.CnaUtil;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.EntrezValidator;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.GeneticProfileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-
-import org.apache.commons.lang3.ArrayUtils;
-import org.cbioportal.model.EntityType;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
 
 
 /**
@@ -55,7 +88,6 @@ public class ImportTabDelimData {
     public static final String CNA_VALUE_AMPLIFICATION = "2";
     public static final String CNA_VALUE_HOMOZYGOUS_DELETION = "-2";
     public static final String CNA_VALUE_PARTIAL_DELETION = "-1.5";
-    private HashSet<Integer> importedGeneticEntitySet = new HashSet<>();
     private File dataFile;
     private String targetLine;
     private int geneticProfileId;
@@ -737,7 +769,7 @@ public class ImportTabDelimData {
             daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), geneticEntityId);
             values = updateValues(geneticEntityId, values);
         }
-        return daoGeneticAlteration.addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values) > 0;
+        return geneticAlterationImporter.store(geneticEntityId, values);
     }
 
     private String[] updateValues(int geneticEntityId, String[] values) {
@@ -840,10 +872,9 @@ public class ImportTabDelimData {
     private boolean saveGenesetLine(String[] values, String genesetId) throws DaoException {
         boolean storedRecord = false;
 
-
         Geneset geneset = DaoGeneset.getGenesetByExternalId(genesetId);
         if (geneset != null) {
-            storedRecord = storeGeneticEntityGeneticAlterations(values, geneset.getGeneticEntityId(), EntityType.GENESET, geneset.getExternalId());
+            storedRecord = saveValues(geneset.getGeneticEntityId(), values);
         }
         else {
             ProgressMonitor.logWarning("Geneset " + genesetId + " not found in DB. Record will be skipped.");
@@ -854,7 +885,7 @@ public class ImportTabDelimData {
     /**
      * Parses line for generic assay profile record and stores record in 'genetic_alteration' table.
      */
-    private boolean saveGenericAssayLine(String[] values, String genericAssayId, Map<String, Integer> genericAssayStableIdToEntityIdMap) {
+    private boolean saveGenericAssayLine(String[] values, String genericAssayId, Map<String, Integer> genericAssayStableIdToEntityIdMap) throws DaoException {
 
         boolean recordIsStored = false;
 
@@ -863,34 +894,10 @@ public class ImportTabDelimData {
         if (entityId == null) {
             ProgressMonitor.logWarning("Generic Assay entity " + genericAssayId + " not found in DB. Record will be skipped.");
         } else {
-            recordIsStored = storeGeneticEntityGeneticAlterations(values, entityId, EntityType.GENERIC_ASSAY, genericAssayId);
+            recordIsStored = saveValues(entityId, values);
         }
 
         return recordIsStored;
-    }
-
-    /**
-     * Stores genetic alteration data for a genetic entity.
-     * @param values
-     * @param geneticEntityId      - internal id for genetic entity
-     * @param geneticEntityType    - "GENE", "GENESET", "PHOSPHOPROTEIN"
-     * @param geneticEntityName    - hugo symbol for "GENE", external id for "GENESET", phospho gene name for "PHOSPHOPROTEIN"
-     * @return boolean indicating if record was stored successfully or not
-     */
-    private boolean storeGeneticEntityGeneticAlterations(String[] values, Integer geneticEntityId, EntityType geneticEntityType, String geneticEntityName) {
-        try {
-            if (importedGeneticEntitySet.add(geneticEntityId)) {
-                return saveValues(geneticEntityId, values);
-            }
-            else {
-                ProgressMonitor.logWarning("Data for genetic entity " + geneticEntityName
-                    + " [" + geneticEntityType + "] already imported from file. Record will be skipped.");
-                return false;
-            }
-        }
-        catch (Exception ex) {
-            throw new RuntimeException("Aborted: Error found for row starting with " + geneticEntityName + ": " + ex.getMessage());
-        }
     }
 
     /**

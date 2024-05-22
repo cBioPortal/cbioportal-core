@@ -295,7 +295,7 @@ public class ImportCnaDiscreteLongData {
             DaoGeneticAlteration.getInstance().deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), geneticEntityId);
             values = updateValues(geneticEntityId, values);
         }
-        return DaoGeneticAlteration.getInstance().addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values) > 0;
+        return geneticAlterationGeneImporter.store(geneticEntityId, values);
     }
 
     //TODO duplicate
