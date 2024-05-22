@@ -36,6 +36,7 @@ import java.util.stream.*;
 import static com.google.common.collect.Lists.*;
 import static java.lang.String.*;
 import static org.cbioportal.model.MolecularProfile.DataType.DISCRETE;
+import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 public class ImportCnaDiscreteLongData {
 
@@ -49,7 +50,40 @@ public class ImportCnaDiscreteLongData {
     private int samplesSkipped = 0;
     private Set<String> namespaces;
 
+    private boolean updateMode;
+
+    private GeneticProfile geneticProfile;
+
     private final ArrayList<SampleIdGeneticProfileId> sampleIdGeneticProfileIds = new ArrayList<>();
+    private ArrayList<Integer> orderedImportedSampleList;
+    private ArrayList<Integer> orderedSampleList;
+
+    private HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
+
+    public ImportCnaDiscreteLongData(
+            File cnaFile,
+            int geneticProfileId,
+            String genePanel,
+            DaoGeneOptimized daoGene,
+            DaoGeneticAlteration daoGeneticAlteration,
+            Set<String> namespaces,
+            boolean updateMode
+    ) {
+        this.namespaces = namespaces;
+        this.cnaFile = cnaFile;
+        this.geneticProfileId = geneticProfileId;
+        this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
+        if (!Set.of(DISCRETE.name(), DISCRETE_LONG.name()).contains(geneticProfile.getDatatype())) {
+            throw new IllegalStateException("Platform "
+                    + geneticProfileId
+                    + " has not supported datatype: "
+                    + geneticProfile.getDatatype());
+        }
+        this.genePanel = genePanel;
+        this.daoGene = daoGene;
+        this.geneticAlterationGeneImporter = new GeneticAlterationImporter(geneticProfileId, daoGeneticAlteration);
+        this.updateMode = updateMode;
+    }
 
     public ImportCnaDiscreteLongData(
         File cnaFile,
@@ -59,12 +93,7 @@ public class ImportCnaDiscreteLongData {
         DaoGeneticAlteration daoGeneticAlteration,
         Set<String> namespaces
     ) {
-        this.namespaces = namespaces;
-        this.cnaFile = cnaFile;
-        this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
-        this.daoGene = daoGene;
-        this.geneticAlterationGeneImporter = new GeneticAlterationImporter(geneticProfileId, daoGeneticAlteration);
+       this(cnaFile, geneticProfileId, genePanel, daoGene, daoGeneticAlteration, namespaces, false);
     }
 
     public void importData() throws Exception {
@@ -76,8 +105,9 @@ public class ImportCnaDiscreteLongData {
         int lineIndex = 1;
         String[] headerParts = line.split("\t", -1);
         this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
-
-        GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
+        if (updateMode) {
+            geneticAlterationMap = DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(geneticProfile.getGeneticProfileId(), null);
+        }
 
         boolean isDiscretizedCnaProfile = geneticProfile != null
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
@@ -97,10 +127,22 @@ public class ImportCnaDiscreteLongData {
             this.extractDataToImport(geneticProfile, line, lineIndex, toImport);
         }
 
-        DaoGeneticProfileSamples.addGeneticProfileSamples(
-            geneticProfileId,
-            newArrayList(toImport.eventsTable.columnKeySet())
-        );
+        orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
+        if (updateMode) {
+            ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(geneticProfileId);
+            int initialOrderSampleListSize = savedOrderedSampleList.size();
+            checkSamplesInDataEqualTo(initialOrderSampleListSize);
+            // add all new sample ids at the end
+            ArrayList<Integer> extendedSampleList = new ArrayList<>(savedOrderedSampleList);
+            List<Integer> newSampleIds = orderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
+            extendedSampleList.addAll(newSampleIds);
+            orderedImportedSampleList = orderedSampleList;
+            orderedSampleList = extendedSampleList;
+
+
+            DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(geneticProfileId);
+        }
+        DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);
@@ -117,6 +159,7 @@ public class ImportCnaDiscreteLongData {
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
         buf.close();
+        expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
         MySQLbulkLoader.flushAll();
     }
 
@@ -130,8 +173,7 @@ public class ImportCnaDiscreteLongData {
         int lineIndex,
         CnaImportData importContainer
     ) throws Exception {
-        boolean hasData = !line.startsWith("#") && line.trim().length() > 0;
-        if (!hasData) {
+        if (!FileUtil.isInfoLine(line)) {
             return;
         }
         String[] lineParts = line.split("\t", -1);
@@ -147,6 +189,12 @@ public class ImportCnaDiscreteLongData {
 
         String sampleIdStr = cnaUtil.getSampleIdStr(lineParts);
         Sample sample = findSample(sampleIdStr, cancerStudyId);
+        if (sample == null) {
+            if (StableIdUtil.isNormal(sampleIdStr)) {
+                return;
+            }
+            throw new RuntimeException("Sample with stable id " + sampleIdStr + " is not found in the database.");
+        }
         createSampleProfile(sample);
 
         long entrezId = gene.getEntrezGeneId();
@@ -175,6 +223,9 @@ public class ImportCnaDiscreteLongData {
             .filter(v -> v.cnaEvent != null)
             .map(v -> v.cnaEvent)
             .collect(Collectors.toList());
+        if (updateMode) {
+            DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedImportedSampleList);
+        }
         CnaUtil.storeCnaEvents(existingCnaEvents, events);
     }
 
@@ -213,7 +264,75 @@ public class ImportCnaDiscreteLongData {
             ? gene.get().getHugoGeneSymbolAllCaps()
             : "" + entrezId;
 
-        return this.geneticAlterationGeneImporter.store(values, gene.get(), geneSymbol);
+        return saveValues(gene.get(), values, geneSymbol);
+    }
+
+    //TODO duplicate
+    private void checkSamplesInDataEqualTo(int initialOrderSampleListSize) {
+        geneticAlterationMap.forEach((geneticEntityId, sampleToValue) -> {
+            if (sampleToValue.size() != initialOrderSampleListSize) {
+                throw new IllegalStateException("Number of samples ("
+                        + sampleToValue.size() + ") for genetic entity with id "
+                        + geneticEntityId + " does not match with the number in the inital sample list ("
+                        + initialOrderSampleListSize + ").");
+            }
+        });
+    }
+
+    //TODO duplicate
+    private boolean saveValues(CanonicalGene canonicalGene, String[] values, String geneSymbol) throws DaoException {
+        if (updateMode) {
+            values = updateValues(canonicalGene.getGeneticEntityId(), values);
+            if (!geneticAlterationGeneImporter.isImportedAlready(canonicalGene)) {
+                DaoGeneticAlteration.getInstance().deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), canonicalGene.getGeneticEntityId());
+            }
+        }
+        return geneticAlterationGeneImporter.store(values, canonicalGene, geneSymbol);
+    }
+    //TODO duplicate
+    private boolean saveValues(int geneticEntityId, String[] values) throws DaoException {
+        if (updateMode) {
+            DaoGeneticAlteration.getInstance().deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), geneticEntityId);
+            values = updateValues(geneticEntityId, values);
+        }
+        return DaoGeneticAlteration.getInstance().addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values) > 0;
+    }
+
+    //TODO duplicate
+    private String[] updateValues(int geneticEntityId, String[] values) {
+        Map<Integer, String> sampleIdToValue = ArrayUtil.zip(orderedImportedSampleList.toArray(new Integer[0]), values);
+        String[] updatedSampleValues = new String[orderedSampleList.size()];
+        for (int i = 0; i < orderedSampleList.size(); i++) {
+            updatedSampleValues[i] = "";
+            int sampleId = orderedSampleList.get(i);
+            if (geneticAlterationMap.containsKey(geneticEntityId)) {
+                HashMap<Integer, String> savedSampleIdToValue = geneticAlterationMap.get(geneticEntityId);
+                updatedSampleValues[i] = savedSampleIdToValue.containsKey(sampleId) ? savedSampleIdToValue.remove(sampleId): "";
+                if (savedSampleIdToValue.isEmpty()) {
+                    geneticAlterationMap.remove(geneticEntityId);
+                }
+            }
+            if (sampleIdToValue.containsKey(sampleId)) {
+                updatedSampleValues[i] = sampleIdToValue.get(sampleId);
+            }
+        }
+        return updatedSampleValues;
+    }
+
+    //TODO duplicate
+    private void expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue() {
+        if (updateMode) {
+            // Expand remaining genetic entity id rows that were not mentioned in the file
+            new HashSet<>(geneticAlterationMap.keySet()).forEach(geneticEntityId -> {
+                try {
+                    String[] values = new String[orderedImportedSampleList.size()];
+                    Arrays.fill(values, "");
+                    saveValues(geneticEntityId, values);
+                } catch (DaoException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
     }
 
     /**

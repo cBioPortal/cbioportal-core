@@ -138,16 +138,17 @@ public class ImportProfileData extends ConsoleRunnable {
                 }
             } else if(
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
-                && DISCRETE_LONG.name().equals(geneticProfile.getDatatype())
+                && DISCRETE_LONG.name().equals(geneticProfile.getOtherMetaDataField("datatype"))
             ) {
                 Set<String> namespaces = GeneticProfileReader.getNamespaces(descriptorFile);
                 ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(
-                    dataFile, 
-                    geneticProfile.getGeneticProfileId(), 
+                    dataFile,
+                    geneticProfile.getGeneticProfileId(),
                     genePanel,
                     daoGene,
                     daoGeneticAlteration,
-                    namespaces
+                    namespaces,
+                    overwriteExisting
                 );
                 importer.importData();
             } else {

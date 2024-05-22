@@ -18,8 +18,12 @@
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import org.cbioportal.model.CNA;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
@@ -27,14 +31,15 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.TestContextManager;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,40 +58,51 @@ import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlteratio
  * @author Ruslan Forostianov
  * @author Pieter Lukasse
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@RunWith(Parameterized.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
-@Rollback
-@Transactional
 public class TestIncrementalCopyNumberAlterationImport {
 
+    // Hugo_Symbol: CDK1
+    final long newGeneEntrezId = 983l;
+    // Gene that is part of the platform, but absent during the incremental upload
+    // Hugo_Symbol: ATM
+    final long absentGeneEntrezId = 472l;
+    final Set<Long> noChangeEntrezIds = Set.of(10000l, 207l, 208l,  3265l,  3845l,  4893l,  672l,  673l,  675l);
+    final Set<Long> beforeEntrezIds = new HashSet<>(noChangeEntrezIds);
+    private final String metaFile;
+    private final String dataFile;
+
+    { beforeEntrezIds.add(absentGeneEntrezId); }
+
+    // stable_id: TCGA-XX-0800
+    final int newSampleId = 15;
+    // stable_id: TCGA-A1-A0SO
+    final int updateSampleId = 12;
+    final Set<Integer> noChangeSampleIds = Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14);
+    final Set<Integer> beforeSampleIds = new HashSet<>(noChangeSampleIds);
+    { beforeSampleIds.add(updateSampleId); }
+
+    final Set<Integer> afterSampleIds = new HashSet<>(beforeSampleIds);
+    { afterSampleIds.add(newSampleId); }
+
+    @Parameterized.Parameters
+    public static Collection<Object[]> primeNumbers() {
+        return Arrays.asList(new Object[][] {
+                { "meta_cna_discrete.txt", "data_cna_discrete.txt" },
+                { "meta_cna_discrete_long.txt", "data_cna_discrete_long.txt" },
+        });
+    }
+
+    public TestIncrementalCopyNumberAlterationImport(String metaFile, String dataFile) {
+        this.metaFile = metaFile;
+        this.dataFile = dataFile;
+    }
+
     /**
-     * Test incremental upload of COPY_NUMBER_ALTERATION DISCRETE (gistic)
+     * Test incremental upload of COPY_NUMBER_ALTERATION DISCRETE
      */
     @Test
-    public void testDiscreteCNA() throws DaoException, IOException {
-        /**
-         * Prior checks
-         */
-        // Hugo_Symbol: CDK1
-        final long newGeneEntrezId = 983l;
-        // Gene that is part of the platform, but absent during the incremental upload
-        // Hugo_Symbol: ATM
-        final long absentGeneEntrezId = 472l;
-        final Set<Long> noChangeEntrezIds = Set.of(10000l, 207l, 208l,  3265l,  3845l,  4893l,  672l,  673l,  675l);
-        final Set<Long> beforeEntrezIds = new HashSet<>(noChangeEntrezIds);
-        beforeEntrezIds.add(absentGeneEntrezId);
-
-        // stable_id: TCGA-XX-0800
-        final int newSampleId = 15;
-        // stable_id: TCGA-A1-A0SO
-        final int updateSampleId = 12;
-        final Set<Integer> noChangeSampleIds = Set.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14);
-        final Set<Integer> beforeSampleIds = new HashSet<>(noChangeSampleIds);
-        beforeSampleIds.add(updateSampleId);
-
-        final Set<Integer> afterSampleIds = new HashSet<>(beforeSampleIds);
-        afterSampleIds.add(newSampleId);
-
+    public void testDiscreteCNA() throws DaoException {
         GeneticProfile discreteCNAProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_gistic");
         assertNotNull(discreteCNAProfile);
         HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(discreteCNAProfile.getGeneticProfileId(), null);
@@ -102,8 +118,8 @@ public class TestIncrementalCopyNumberAlterationImport {
         assertEquals(beforeCnaEventsSampleIds, beforeSampleIdToSampleCnaEvents.keySet());
 
         File dataFolder = new File("src/test/resources/incremental/copy_number_alteration/");
-        File metaFile = new File(dataFolder, "meta_cna_discrete.txt");
-        File dataFile = new File(dataFolder, "data_cna_discrete.txt");
+        File metaFile = new File(dataFolder, this.metaFile);
+        File dataFile = new File(dataFolder, this.dataFile);
 
         /**
          * Test
@@ -174,4 +190,22 @@ public class TestIncrementalCopyNumberAlterationImport {
                 updatedSampleEntrezGeneIdToCnaAlteration);
     }
 
+    private TestContextManager testContextManager;
+
+    private PlatformTransactionManager transactionManager;
+
+    private TransactionStatus transactionStatus;
+    @Before
+    public void before() throws Exception {
+        this.testContextManager = new TestContextManager(getClass());
+        this.testContextManager.prepareTestInstance(this);
+        this.transactionManager = this.testContextManager.getTestContext().getApplicationContext().getBean(PlatformTransactionManager.class);
+        this.transactionStatus = transactionManager.getTransaction(new DefaultTransactionDefinition());
+        DaoCancerStudy.reCacheAll();
+    }
+
+    @After
+    public void after() {
+        this.transactionManager.rollback(transactionStatus);
+    }
 }
