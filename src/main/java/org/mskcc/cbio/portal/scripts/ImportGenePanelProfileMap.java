@@ -85,6 +85,10 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
                    "gene panel file" ).withRequiredArg().describedAs( "meta_file.txt" ).ofType( String.class );
             parser.accepts("noprogress", "this option can be given to avoid the messages regarding memory usage and % complete");
 
+            // supported by the uploader already. Added for uniformity, to do not cause error when upstream software uses this flag
+            parser.accepts("overwrite-existing",
+                    "Enables re-uploading molecular data that already exist for the given profile and sample.")
+                    .withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
             OptionSet options;
             try {
                 options = parser.parse( args );

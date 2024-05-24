@@ -88,6 +88,10 @@ public class TestIncrementalMutationsImport {
         assertNotNull(insertedMutations.get(0).getEvent());
         assertNotNull(insertedMutations.get(1).getEvent());
         assertNotNull(insertedMutations.get(2).getEvent());
+        GenePanel genePanel = DaoGenePanel.getGenePanelByStableId("TSTGNPNLMUTEXT");
+        assertEquals("Sample profile has to point to TSTGNPNLMUTEXT panel",
+                genePanel.getInternalId(),
+                DaoSampleProfile.getPanelId(mutationDataSample.getInternalId(), mutationGeneticProfile.getGeneticProfileId()));
     }
     /**
      * Test updating mutation profile data for existing sample. The mutation genetic profile exists.
@@ -124,6 +128,10 @@ public class TestIncrementalMutationsImport {
         Set<Long> entrezIds = insertedMutations.stream().map(m -> m.getEntrezGeneId()).collect(Collectors.toSet());
         Set<Long> expected = Set.of(207L, 208L, 672L);
         assertEquals(expected, entrezIds);
+        GenePanel genePanel = DaoGenePanel.getGenePanelByStableId("TSTGNPNLMUTEXT");
+        assertEquals("Sample profile has to point to TSTGNPNLMUTEXT panel",
+                genePanel.getInternalId(),
+                DaoSampleProfile.getPanelId(mutationDataSample.getInternalId(), mutationGeneticProfile.getGeneticProfileId()));
     }
 
 }

@@ -52,7 +52,7 @@ public final class DaoSampleProfile {
     private static final int NO_SUCH_PROFILE_ID = -1;
     private static final String TABLE_NAME = "sample_profile";
 
-    public static int addSampleProfile(Integer sampleId, Integer geneticProfileId, Integer panelId) throws DaoException {        
+    public static int addSampleProfile(Integer sampleId, Integer geneticProfileId, Integer panelId) throws DaoException {
         if (MySQLbulkLoader.isBulkLoad()) {
 
             // Add new record using bulk loader. Order of fields is:
@@ -80,27 +80,19 @@ public final class DaoSampleProfile {
         ResultSet rs = null;
 
         try {
-            if (!sampleExistsInGeneticProfile(sampleId, geneticProfileId)) {
-                con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-                pstmt = con.prepareStatement
-                        ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`) "
-                                + "VALUES (?,?,?)");
-                pstmt.setInt(1, sampleId);
-                pstmt.setInt(2, geneticProfileId);
-                if (panelId != null) {
-                    pstmt.setInt(3, panelId);
-                }
-                else {
-                    pstmt.setNull(3, java.sql.Types.INTEGER);
-                }
-                return pstmt.executeUpdate();
-            } else {
-                // This should be an error, because the record already exists.
-                return 0;
+            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
+            pstmt = con.prepareStatement
+                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`) VALUES (?,?,?)");
+            pstmt.setInt(1, sampleId);
+            pstmt.setInt(2, geneticProfileId);
+            if (panelId != null) {
+                pstmt.setInt(3, panelId);
             }
-        } catch (NullPointerException e) {
-            throw new DaoException(e);
-        } catch (SQLException e) {
+            else {
+                pstmt.setNull(3, java.sql.Types.INTEGER);
+            }
+            return pstmt.executeUpdate();
+        } catch (NullPointerException | SQLException e) {
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, rs);
@@ -168,6 +160,35 @@ public final class DaoSampleProfile {
         } catch (NullPointerException e) {
             throw new DaoException(e);
         } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, rs);
+        }
+    }
+
+    public static Integer getPanelId(int sampleId, int geneticProfileId)
+            throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
+            pstmt = con.prepareStatement
+                    ("SELECT PANEL_ID FROM sample_profile WHERE SAMPLE_ID = ? AND GENETIC_PROFILE_ID = ?");
+            pstmt.setInt(1, sampleId);
+            pstmt.setInt(2, geneticProfileId);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                int panelId = rs.getInt(1);
+                if (rs.wasNull()) {
+                    return null;
+                }
+                return panelId;
+            } else {
+                throw new NoSuchElementException("No sample_profile with SAMPLE_ID=" + sampleId + " and GENETIC_PROFILE_ID=" + geneticProfileId);
+            }
+        } catch (NoSuchElementException | SQLException e) {
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, rs);

@@ -6,3 +6,4 @@ show_profile_in_analysis_tab: true
 profile_name: Test Mutations
 profile_description: Mutation data for testing.
 data_filename: data_mutations_extended.txt
+gene_panel: TSTGNPNLMUTEXT

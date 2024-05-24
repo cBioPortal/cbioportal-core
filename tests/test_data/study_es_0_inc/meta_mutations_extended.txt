@@ -8,3 +8,4 @@ profile_name: Mutations
 data_filename: data_mutations_extended.maf
 swissprot_identifier: name
 namespaces: Zygosity
+gene_panel: TSTGNPNLMUTEXT

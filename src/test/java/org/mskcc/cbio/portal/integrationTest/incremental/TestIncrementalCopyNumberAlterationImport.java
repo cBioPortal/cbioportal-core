@@ -26,9 +26,12 @@ import org.junit.runners.Parameterized;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGenePanel;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
 import org.springframework.test.context.ContextConfiguration;
@@ -49,6 +52,8 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertNoChange;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertPriorDataState;
 
@@ -85,7 +90,7 @@ public class TestIncrementalCopyNumberAlterationImport {
     final Set<Integer> afterSampleIds = new HashSet<>(beforeSampleIds);
     { afterSampleIds.add(newSampleId); }
 
-    @Parameterized.Parameters
+    @Parameterized.Parameters(name = "{0}")
     public static Collection<Object[]> primeNumbers() {
         return Arrays.asList(new Object[][] {
                 { "meta_cna_discrete.txt", "data_cna_discrete.txt" },
@@ -107,6 +112,16 @@ public class TestIncrementalCopyNumberAlterationImport {
         assertNotNull(discreteCNAProfile);
         HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(discreteCNAProfile.getGeneticProfileId(), null);
         assertPriorDataState(beforeResult, beforeEntrezIds, beforeSampleIds);
+
+        Map<Integer, Integer> beforeSampleIdToPanelId = new HashMap<>();
+        for (int sampleId : noChangeSampleIds) {
+            try {
+                beforeSampleIdToPanelId.put(sampleId,
+                        DaoSampleProfile.getPanelId(sampleId, discreteCNAProfile.getGeneticProfileId()));
+            } catch (DaoException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
         List<Short> allCnaLevels = Arrays.stream(CNA.values()).map(CNA::getCode).toList();
         Set<Integer> beforeCnaEventsSampleIds = Set.of(4, 13, 14, updateSampleId);
@@ -188,6 +203,24 @@ public class TestIncrementalCopyNumberAlterationImport {
                         newGeneEntrezId, CNA.AMP
                 ),
                 updatedSampleEntrezGeneIdToCnaAlteration);
+
+        Map<Integer, Integer> afterSampleIdToPanelId = new HashMap<>();
+        for (int sampleId : noChangeSampleIds) {
+            try {
+                afterSampleIdToPanelId.put(sampleId,
+                        DaoSampleProfile.getPanelId(sampleId, discreteCNAProfile.getGeneticProfileId()));
+            } catch (DaoException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        assertEquals(beforeSampleIdToPanelId, afterSampleIdToPanelId);
+
+        GenePanel genePanel = DaoGenePanel.getGenePanelByStableId("TSTGNPNLCNADS");
+        for (int sampleId : Set.of(updateSampleId, newSampleId)) {
+            assertEquals("Sample profile has to point to TSTGNPNLCNADS panel",
+                    genePanel.getInternalId(),
+                    DaoSampleProfile.getPanelId(sampleId, discreteCNAProfile.getGeneticProfileId()));
+        }
     }
 
     private TestContextManager testContextManager;

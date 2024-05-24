@@ -65,7 +65,6 @@ public class ImportCnaDiscreteLongData {
     private final File cnaFile;
     private final int geneticProfileId;
     private GeneticAlterationImporter geneticAlterationGeneImporter;
-    private String genePanel;
     private final DaoGeneOptimized daoGene;
     private CnaUtil cnaUtil;
     private Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
@@ -78,6 +77,7 @@ public class ImportCnaDiscreteLongData {
 
     private final ArrayList<SampleIdGeneticProfileId> sampleIdGeneticProfileIds = new ArrayList<>();
     private ArrayList<Integer> orderedSampleList;
+    private final Integer genePanelId;
 
     public ImportCnaDiscreteLongData(
             File cnaFile,
@@ -97,7 +97,7 @@ public class ImportCnaDiscreteLongData {
                     + " has not supported datatype: "
                     + geneticProfile.getDatatype());
         }
-        this.genePanel = genePanel;
+        this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.daoGene = daoGene;
         this.updateMode = updateMode;
     }
@@ -206,7 +206,7 @@ public class ImportCnaDiscreteLongData {
             }
             throw new RuntimeException("Sample with stable id " + sampleIdStr + " is not found in the database.");
         }
-        createSampleProfile(sample);
+        ensureSampleProfileExists(sample);
 
         long entrezId = gene.getEntrezGeneId();
         int sampleId = sample.getInternalId();
@@ -221,6 +221,18 @@ public class ImportCnaDiscreteLongData {
             ProgressMonitor.logWarning(format("Skipping line %d with duplicate gene %d and sample %d", lineIndex, entrezId, sampleId));
         }
 
+    }
+
+    private void ensureSampleProfileExists(Sample sample) throws DaoException {
+        if (updateMode) {
+            upsertSampleProfile(sample);
+        } else {
+            createSampleProfileIfNotExists(sample);
+        }
+    }
+
+    private void upsertSampleProfile(Sample sample) throws DaoException {
+        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
     }
 
     /**
@@ -338,15 +350,14 @@ public class ImportCnaDiscreteLongData {
      *
      * @return boolean created or not
      */
-    public boolean createSampleProfile(
+    public boolean createSampleProfileIfNotExists(
         Sample sample
-    ) throws Exception {
+    ) throws DaoException {
         boolean inDatabase = DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId);
-        Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         SampleIdGeneticProfileId toCreate = new SampleIdGeneticProfileId(sample.getInternalId(), geneticProfileId);
         boolean isQueued = this.sampleIdGeneticProfileIds.contains(toCreate);
         if (!inDatabase && !isQueued) {
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
+            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
             this.sampleIdGeneticProfileIds.add(toCreate);
             return true;
         }

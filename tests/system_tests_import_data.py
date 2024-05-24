@@ -121,6 +121,8 @@ class DataImporterTests(unittest.TestCase):
             '--meta', f'{data_directory}/meta_timeline.txt', '--loadMode', 'bulkload', '--data', f'{data_directory}/data_timeline.txt', '--noprogress')
         case_list_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds',
             '--meta', f'{data_directory}/meta_clinical_samples.txt', '--case-lists', f'{data_directory}/case_lists')
+        gene_panel_matrix_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_gene_panel_matrix.txt', '--data', f'{data_directory}/data_gene_panel_matrix.txt', '--noprogress')
 
         self.assertCountEqual(run_java.call_args_list, [
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
@@ -133,6 +135,7 @@ class DataImporterTests(unittest.TestCase):
             methylation_hm27_call,
             treatment_ic50_call,
             timeline_call,
+            gene_panel_matrix_call,
             case_list_call,
         ])
 
