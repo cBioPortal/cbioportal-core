@@ -91,7 +91,7 @@ public class TestImportStructuralVariantData {
 
         // Load test structural variants
         File file = new File("src/test/resources/data_structural_variants.txt");
-        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, noNamespaces);
+        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, noNamespaces, false);
         importer.importData();
         MySQLbulkLoader.flushAll();
 
@@ -133,7 +133,7 @@ public class TestImportStructuralVariantData {
         // Load test structural variants
         File file = new File("src/test/resources/data_structural_variants.txt");
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
-        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport);
+        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
         MySQLbulkLoader.flushAll();
 
@@ -159,7 +159,7 @@ public class TestImportStructuralVariantData {
         // Load test structural variants
         File file = new File("src/test/resources/data_structural_variants_with_unspecified_namespace.txt");
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
-        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport);
+        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
         MySQLbulkLoader.flushAll();
 
@@ -182,7 +182,7 @@ public class TestImportStructuralVariantData {
         // Load test structural variants
         File file = new File("src/test/resources/data_structural_variants_with_no_namespace_data.txt");
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
-        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport);
+        ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
         MySQLbulkLoader.flushAll();
 

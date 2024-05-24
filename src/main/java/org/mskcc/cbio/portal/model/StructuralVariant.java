@@ -468,4 +468,58 @@ public class StructuralVariant {
     public void setAnnotationJson(String annotationJson) {
         this.annotationJson = annotationJson;
     }
+
+    @Override
+    public String toString() {
+        return "StructuralVariant{" +
+                "internalId=" + internalId +
+                ", geneticProfileId=" + geneticProfileId +
+                ", structuralVariantId=" + structuralVariantId +
+                ", sampleIdInternal=" + sampleIdInternal +
+                ", sampleId='" + sampleId + '\'' +
+                ", site1EntrezGeneId=" + site1EntrezGeneId +
+                ", site1HugoSymbol='" + site1HugoSymbol + '\'' +
+                ", site1EnsemblTranscriptId='" + site1EnsemblTranscriptId + '\'' +
+                ", site1Chromosome='" + site1Chromosome + '\'' +
+                ", site1Position=" + site1Position +
+                ", site1Contig='" + site1Contig + '\'' +
+                ", site1Region='" + site1Region + '\'' +
+                ", site1RegionNumber=" + site1RegionNumber +
+                ", site1Description='" + site1Description + '\'' +
+                ", site2EntrezGeneId=" + site2EntrezGeneId +
+                ", site2HugoSymbol='" + site2HugoSymbol + '\'' +
+                ", site2EnsemblTranscriptId='" + site2EnsemblTranscriptId + '\'' +
+                ", site2Chromosome='" + site2Chromosome + '\'' +
+                ", site2Position=" + site2Position +
+                ", site2Contig='" + site2Contig + '\'' +
+                ", site2Region='" + site2Region + '\'' +
+                ", site2RegionNumber=" + site2RegionNumber +
+                ", site2Description='" + site2Description + '\'' +
+                ", site2EffectOnFrame='" + site2EffectOnFrame + '\'' +
+                ", ncbiBuild='" + ncbiBuild + '\'' +
+                ", dnaSupport='" + dnaSupport + '\'' +
+                ", rnaSupport='" + rnaSupport + '\'' +
+                ", normalReadCount=" + normalReadCount +
+                ", tumorReadCount=" + tumorReadCount +
+                ", normalVariantCount=" + normalVariantCount +
+                ", tumorVariantCount=" + tumorVariantCount +
+                ", normalPairedEndReadCount=" + normalPairedEndReadCount +
+                ", tumorPairedEndReadCount=" + tumorPairedEndReadCount +
+                ", normalSplitReadCount=" + normalSplitReadCount +
+                ", tumorSplitReadCount=" + tumorSplitReadCount +
+                ", annotation='" + annotation + '\'' +
+                ", breakpointType='" + breakpointType + '\'' +
+                ", connectionType='" + connectionType + '\'' +
+                ", eventInfo='" + eventInfo + '\'' +
+                ", variantClass='" + variantClass + '\'' +
+                ", length=" + length +
+                ", comments='" + comments + '\'' +
+                ", svStatus='" + svStatus + '\'' +
+                ", driverFilter='" + driverFilter + '\'' +
+                ", driverFilterAnn='" + driverFilterAnn + '\'' +
+                ", driverTiersFilter='" + driverTiersFilter + '\'' +
+                ", driverTiersFilterAnn='" + driverTiersFilterAnn + '\'' +
+                ", annotationJson='" + annotationJson + '\'' +
+                '}';
+    }
 }

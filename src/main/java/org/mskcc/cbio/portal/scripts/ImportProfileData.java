@@ -108,7 +108,8 @@ public class ImportProfileData extends ConsoleRunnable {
                     dataFile, 
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
-                    namespaces
+                    namespaces,
+                    overwriteExisting
                 );
                 importer.importData();
             } else if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY) {
