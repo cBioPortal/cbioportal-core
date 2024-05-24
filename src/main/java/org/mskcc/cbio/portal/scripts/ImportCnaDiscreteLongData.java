@@ -28,7 +28,6 @@ import com.google.common.collect.Table;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
@@ -50,7 +49,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -80,8 +78,6 @@ public class ImportCnaDiscreteLongData {
 
     private final ArrayList<SampleIdGeneticProfileId> sampleIdGeneticProfileIds = new ArrayList<>();
     private ArrayList<Integer> orderedSampleList;
-
-    private HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
 
     public ImportCnaDiscreteLongData(
             File cnaFile,
@@ -136,9 +132,6 @@ public class ImportCnaDiscreteLongData {
         int lineIndex = 1;
         String[] headerParts = line.split("\t", -1);
         this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
-        if (updateMode) {
-            geneticAlterationMap = DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(geneticProfile.getGeneticProfileId(), null);
-        }
 
         boolean isDiscretizedCnaProfile = geneticProfile != null
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
