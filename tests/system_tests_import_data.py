@@ -109,6 +109,8 @@ class DataImporterTests(unittest.TestCase):
             '--meta', f'{data_directory}/meta_mutations_extended.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_mutations_extended.maf', '--noprogress')
         cna_discrete_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_cna_discrete.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete.txt', '--noprogress')
+        cna_discrete_long_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_cna_discrete_long.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete_long.txt', '--noprogress')
         cna_log2_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_cna_log2.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_log2.txt', '--noprogress')
         expression_median_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
@@ -128,6 +130,7 @@ class DataImporterTests(unittest.TestCase):
             clinical_sample_call,
             mutation_call,
             cna_discrete_call,
+            cna_discrete_long_call,
             cna_log2_call,
             expression_median_call,
             methylation_hm27_call,
