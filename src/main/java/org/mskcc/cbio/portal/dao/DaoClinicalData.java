@@ -370,7 +370,6 @@ public final class DaoClinicalData {
     public static void removeSampleAttributesData(int sampleInternalId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
             pstmt = con.prepareStatement(SAMPLE_ATTRIBUTES_DELETE);
@@ -381,7 +380,31 @@ public final class DaoClinicalData {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, null);
+        }
+    }
+
+    public static void removeSampleAttributesData(Set<Integer> sampleInternalIds, String attrId) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+            pstmt = con.prepareStatement("DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE
+                    + " WHERE `ATTR_ID` = ? AND `INTERNAL_ID` IN ("
+                    + String.join(",", Collections.nCopies(sampleInternalIds.size(), "?"))
+                    + ")");
+            int parameterIndex = 1;
+            pstmt.setString(parameterIndex++, attrId);
+            for (Integer sampleInternalId : sampleInternalIds) {
+                pstmt.setInt(parameterIndex++, sampleInternalId);
+            }
+            pstmt.executeUpdate();
+        }
+        catch (SQLException e) {
+            throw new DaoException(e);
+        }
+        finally {
+            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, null);
         }
     }
 

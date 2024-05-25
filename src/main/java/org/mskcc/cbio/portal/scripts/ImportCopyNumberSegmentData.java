@@ -55,7 +55,9 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Import Segment data into database.
@@ -64,7 +66,9 @@ import java.util.Properties;
 public class ImportCopyNumberSegmentData extends ConsoleRunnable {
 
     private int entriesSkipped;
-    
+    private boolean updateMode;
+    private Set<Integer> processedSampleIds;
+
     private void importData(File file, int cancerStudyId) throws IOException, DaoException {
         MySQLbulkLoader.bulkLoadOn();
         FileReader reader = new FileReader(file);
@@ -72,6 +76,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
         try {
             String line = buf.readLine(); // skip header line
             long segId = DaoCopyNumberSegment.getLargestId();
+            processedSampleIds = new HashSet<>();
             while ((line=buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
@@ -81,8 +86,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                     System.err.println("wrong format: "+line);
                 }
 
-                CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByInternalId(cancerStudyId);
-                String chrom = strs[1].trim(); 
+                String chrom = strs[1].trim();
                 //validate in same way as GistitReader:
                 ValidationUtils.validateChromosome(chrom);
                 
@@ -112,6 +116,10 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                 CopyNumberSegment cns = new CopyNumberSegment(cancerStudyId, s.getInternalId(), chrom, start, end, numProbes, segMean);
                 cns.setSegId(++segId);
                 DaoCopyNumberSegment.addCopyNumberSegment(cns);
+                processedSampleIds.add(s.getInternalId());
+            }
+            if (updateMode) {
+                DaoCopyNumberSegment.deleteSegmentDataForSamples(cancerStudyId, processedSampleIds);
             }
             MySQLbulkLoader.flushAll();
         }
@@ -127,6 +135,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
             String dataFile = (String) options.valueOf("data");
             File descriptorFile = new File((String) options.valueOf("meta"));
+            updateMode = options.has("overwrite-existing");
         
             Properties properties = new Properties();
             properties.load(new FileInputStream(descriptorFile));
@@ -135,13 +144,13 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             
             CancerStudy cancerStudy = getCancerStudy(properties);
             
-            if (segmentDataExistsForCancerStudy(cancerStudy)) {
+            if (!updateMode && segmentDataExistsForCancerStudy(cancerStudy)) {
                  throw new IllegalArgumentException("Seg data for cancer study " + cancerStudy.getCancerStudyStableId() + " has already been imported: " + dataFile);
             }
         
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
-            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId());
+            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, updateMode);
             if( MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
             }
@@ -164,7 +173,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
         return (DaoCopyNumberSegment.segmentDataExistForCancerStudy(cancerStudy.getInternalId()));
     }
 
-    private static void importCopyNumberSegmentFileMetadata(CancerStudy cancerStudy, Properties properties) throws DaoException {
+    private void importCopyNumberSegmentFileMetadata(CancerStudy cancerStudy, Properties properties) throws DaoException {
         CopyNumberSegmentFile copyNumSegFile = new CopyNumberSegmentFile();
         copyNumSegFile.cancerStudyId = cancerStudy.getInternalId();
         String referenceGenomeId = properties.getProperty("reference_genome_id").trim();
@@ -179,7 +188,18 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
         copyNumSegFile.referenceGenomeId = getRefGenId(referenceGenomeId); 
         copyNumSegFile.description = properties.getProperty("description").trim();
         copyNumSegFile.filename = properties.getProperty("data_filename").trim();
-        DaoCopyNumberSegmentFile.addCopyNumberSegmentFile(copyNumSegFile);
+        CopyNumberSegmentFile storedCopyNumSegFile = DaoCopyNumberSegmentFile.getCopyNumberSegmentFile(cancerStudy.getInternalId());
+        if (updateMode && storedCopyNumSegFile != null) {
+            if (storedCopyNumSegFile.referenceGenomeId != copyNumSegFile.referenceGenomeId) {
+                throw new IllegalStateException("You are trying to upload "
+                        + copyNumSegFile.referenceGenomeId
+                        + " reference genome data into "
+                        + storedCopyNumSegFile.referenceGenomeId
+                        + " reference genome data.");
+            }
+        } else {
+            DaoCopyNumberSegmentFile.addCopyNumberSegmentFile(copyNumSegFile);
+        }
     }
 
     private void importCopyNumberSegmentFileData(CancerStudy cancerStudy, String dataFilename) throws IOException, DaoException {
