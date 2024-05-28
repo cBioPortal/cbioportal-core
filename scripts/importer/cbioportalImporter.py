@@ -653,5 +653,5 @@ def main(args):
 # ready to roll
 
 if __name__ == '__main__':
-    parsed_args = interface(args)
+    parsed_args = interface()
     main(parsed_args)
