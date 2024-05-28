@@ -178,10 +178,6 @@ public class ConsoleUtil {
 							"Error: unknown loadMode action:  " + actionArg);
 				}
 			}
-			else {
-				throw new UsageException(progName, description, parser,
-						"Error: 'loadMode' argument required.");
-			}
 		}
 		return options;
 	}

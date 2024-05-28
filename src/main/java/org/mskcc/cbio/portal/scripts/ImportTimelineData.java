@@ -135,8 +135,13 @@ public class ImportTimelineData extends ConsoleRunnable {
         try {
 		    String description = "Import 'timeline' data";
 
-		    OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, false);
-		    String dataFile = (String) options.valueOf("data");
+		    OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
+			if (options.has("loadMode") && !"bulkLoad".equals(options.valueOf("loadMode"))) {
+				throw new UnsupportedOperationException("This loader supports bulkLoad load mode only, but "
+						+ options.valueOf("loadMode")
+						+ " has been supplied.");
+			}
+			String dataFile = (String) options.valueOf("data");
 		    File descriptorFile = new File((String) options.valueOf("meta"));
 			boolean overwriteExisting = options.has("overwrite-existing");
             
