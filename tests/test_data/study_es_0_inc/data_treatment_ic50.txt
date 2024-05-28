@@ -6,6 +6,5 @@ AZD6244	Name of AZD6244	Desc of AZD6244	Url of AZD6244	>8	>8	>8
 Erlotinib	Name of Erlotinib	Desc of Erlotinib	Url of Erlotinib	>8	>8	>8
 Irinotecan	Name of Irinotecan	Desc of Irinotecan	Url of Irinotecan	NA	0.083	NA
 L-685458	Name of L-685458	Desc of L-685458	Url of L-685458	>8	>8	3.267752409
-#Lapatinib	Name of Lapatinib	Desc of Lapatinib	Url of Lapatinib
 LBW242	Name of LBW242	Desc of LBW242	Url of LBW242	NA	>8	>8
 Nilotinib	Name of Nilotinib	Desc of Nilotinib	Url of Nilotinib	>8	>8	NA
