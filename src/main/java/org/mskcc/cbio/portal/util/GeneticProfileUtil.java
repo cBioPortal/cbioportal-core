@@ -87,6 +87,9 @@ public class GeneticProfileUtil {
 
     public static int getGenePanelId(String panelId) {
         GenePanel genePanel = DaoGenePanel.getGenePanelByStableId(panelId);
+        if (genePanel == null) {
+            throw new NoSuchElementException("No gene panel with id " + genePanel);
+        }
         return genePanel.getInternalId();
     }
 
