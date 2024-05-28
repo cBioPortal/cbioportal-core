@@ -23,9 +23,6 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
@@ -33,9 +30,10 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.SampleList;
 import org.mskcc.cbio.portal.model.SampleListCategory;
-import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.SpringUtil;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Command Line tool to Add new case lists by generating them based on some rules.
@@ -131,7 +129,6 @@ public class AddCaseList extends ConsoleRunnable {
               throw new UsageException(progName, null, argSpec,
                       "cancer_study_identifier is not specified.");
 	      }
-	 	  SpringUtil.initDataSource();
 	      CancerStudy theCancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyIdentifier);
 	      if (theCancerStudy == null) {
 	          throw new IllegalArgumentException("cancer study identified by cancer_study_identifier '"

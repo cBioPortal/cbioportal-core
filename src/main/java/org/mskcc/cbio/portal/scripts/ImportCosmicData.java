@@ -32,16 +32,26 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.portal.model.*;
+import org.mskcc.cbio.portal.dao.DaoCosmicData;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.CosmicMutationFrequency;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.MutationKeywordUtils;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.springframework.util.Assert;
 
-import java.io.*;
-
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 public class ImportCosmicData {
@@ -180,7 +190,6 @@ public class ImportCosmicData {
             System.out.println("command line usage:  importCosmicData.pl <CosmicCodingMuts.vcf>");
             return;
         }
-        SpringUtil.initDataSource();
         DaoCosmicData.deleteAllRecords();
         ProgressMonitor.setConsoleMode(true);
 

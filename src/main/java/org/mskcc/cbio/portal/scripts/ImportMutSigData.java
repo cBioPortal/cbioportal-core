@@ -32,10 +32,12 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.util.*;
-
 import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.MutSigReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,8 +56,7 @@ public class ImportMutSigData extends ConsoleRunnable {
 	    	OptionSet options = ConsoleUtil.parseStandardDataAndStudyOptions(args, description);
 		    String dataFile = (String) options.valueOf("data");
 		    String studyId = (String) options.valueOf("study");
-			SpringUtil.initDataSource();
-	
+
 	        File mutSigFile = new File(dataFile);
 	        ProgressMonitor.setCurrentMessage(
 	                "Reading data from: " + mutSigFile.getAbsolutePath());

@@ -32,16 +32,40 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
+import joptsimple.OptionException;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+import org.apache.commons.collections4.map.MultiKeyMap;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
+import org.mskcc.cbio.portal.dao.DaoClinicalData;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.ClinicalAttribute;
+import org.mskcc.cbio.portal.model.Patient;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.SurvivalAttributeUtil;
 import org.mskcc.cbio.portal.util.SurvivalAttributeUtil.SurvivalStatusAttributes;
 
-import java.io.*;
-import joptsimple.*;
-import java.util.*;
-import java.util.regex.*;
-import org.apache.commons.collections4.map.MultiKeyMap;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.regex.Matcher;
 
 public class ImportClinicalData extends ConsoleRunnable {
 
@@ -677,7 +701,6 @@ public class ImportClinicalData extends ConsoleRunnable {
                 overwriteExisting = true;
 
             }
-            SpringUtil.initDataSource();
             CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyStableId);
             if (cancerStudy == null) {
                 throw new IllegalArgumentException("Unknown cancer study: " + cancerStudyStableId);

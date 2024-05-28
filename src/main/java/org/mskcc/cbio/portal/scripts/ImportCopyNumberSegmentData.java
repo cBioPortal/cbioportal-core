@@ -32,15 +32,30 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.portal.model.*;
+import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
+import org.mskcc.cbio.portal.dao.DaoCopyNumberSegmentFile;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.CopyNumberSegment;
+import org.mskcc.cbio.portal.model.CopyNumberSegmentFile;
+import org.mskcc.cbio.portal.model.ReferenceGenome;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
 
-import joptsimple.*;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.Properties;
 
 /**
  * Import Segment data into database.
@@ -118,7 +133,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             
             ProgressMonitor.setCurrentMessage("Reading data from:  " + dataFile);
             
-            SpringUtil.initDataSource();
             CancerStudy cancerStudy = getCancerStudy(properties);
             
             if (segmentDataExistsForCancerStudy(cancerStudy)) {

@@ -37,10 +37,8 @@ import java.util.*;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
 import org.mskcc.cbio.portal.model.TypeOfCancer;
-import org.mskcc.cbio.portal.scripts.ConsoleRunnable;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.SpringUtil;
 
 /**
  * Load all the types of cancer and their names from a file.
@@ -76,7 +74,6 @@ public class ImportTypesOfCancers extends ConsoleRunnable {
     public static void load(File file, boolean clobber) throws IOException, DaoException {
         ProgressMonitor.setCurrentMessage("Loading cancer types...");
         List<TypeOfCancer> typeOfCancerList = parseCancerTypesFromFile(file);
-        SpringUtil.initDataSource();
         if (clobber) {
             ProgressMonitor.setCurrentMessage("Deleting all previous cancer types...");
             DaoTypeOfCancer.deleteAllRecords(); //TODO - remove this option - foreign key constraints may mean large cascade effects (possibly the deletion of all studies) - instead, change the option to 'deleteTypeOfCancerIfNotPresent' and add a loop through existing typeOfCancer records, removing those which are not in the parsed typeOfCancerList

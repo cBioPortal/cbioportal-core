@@ -17,11 +17,15 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import java.sql.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.SpringUtil;
+import org.mskcc.cbio.portal.model.ReferenceGenome;
 
-import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -36,7 +40,6 @@ public final class DaoReferenceGenome {
     private static final Map<String, Integer> genomeInternalIds = new HashMap<String,Integer>();
 
     static {
-        SpringUtil.initDataSource();
         reCache();
     }
 

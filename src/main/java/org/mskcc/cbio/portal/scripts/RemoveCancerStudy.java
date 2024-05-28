@@ -32,9 +32,9 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.util.*;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
  * Command Line Tool to Remove a Single Cancer Study.
@@ -51,8 +51,7 @@ public class RemoveCancerStudy extends ConsoleRunnable {
                         "<cancer_study_identifier>");
 	        }
 	        String cancerStudyIdentifier = args[0];
-	
-			SpringUtil.initDataSource();
+
             ProgressMonitor.setCurrentMessage(
                     "Checking if Cancer study with identifier " +
                     cancerStudyIdentifier +

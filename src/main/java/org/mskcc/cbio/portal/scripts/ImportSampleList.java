@@ -32,13 +32,26 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.*;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleList;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.Patient;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.model.SampleListCategory;
+import org.mskcc.cbio.portal.util.CaseList;
+import org.mskcc.cbio.portal.util.CaseListReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.validate.CaseListValidator;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Command Line tool to Import Sample Lists.
@@ -50,7 +63,6 @@ public class ImportSampleList extends ConsoleRunnable {
       CaseList caseList = CaseListReader.readFile(dataFile);
       CaseListValidator.validateAll(caseList);
 
-	  SpringUtil.initDataSource();
       CancerStudy theCancerStudy = DaoCancerStudy.getCancerStudyByStableId(caseList.getCancerStudyIdentifier());
       if (theCancerStudy == null) {
          throw new IllegalArgumentException("cancer study identified by cancer_study_identifier '"

@@ -32,8 +32,26 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.*;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoClinicalData;
+import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
+import org.mskcc.cbio.portal.dao.DaoCopyNumberSegmentFile;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneset;
+import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
+import org.mskcc.cbio.portal.dao.DaoInfo;
+import org.mskcc.cbio.portal.dao.DaoMutSig;
+import org.mskcc.cbio.portal.dao.DaoMutation;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleList;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
+import org.mskcc.cbio.portal.dao.DaoUser;
+import org.mskcc.cbio.portal.dao.DaoUserAuthorities;
 
 /**
  * Empty the database.
@@ -91,7 +109,6 @@ public class ResetDatabase {
     }
 
     public static void main(String[] args) throws DaoException {
-		SpringUtil.initDataSource();
         StatDatabase.statDb();
         ResetDatabase.resetDatabase();
         System.err.println("Database Cleared and Reset.");
