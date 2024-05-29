@@ -72,7 +72,7 @@ public class TestDaoGeneticProfile {
 	public void testDaoGetAllGeneticProfiles() throws DaoException {
 
 		ArrayList<GeneticProfile> list = DaoGeneticProfile.getAllGeneticProfiles(studyId);
-		assertEquals(9, list.size());
+		assertEquals(11, list.size());
 	}
 		
 	@Test
@@ -134,12 +134,12 @@ public class TestDaoGeneticProfile {
 
 		GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(2);
 
-		assertEquals(9, DaoGeneticProfile.getCount());
+		int numberOfProfiles = DaoGeneticProfile.getCount();
 		DaoGeneticProfile.deleteGeneticProfile(geneticProfile);
-		assertEquals(8, DaoGeneticProfile.getCount());
+		assertEquals(numberOfProfiles - 1, DaoGeneticProfile.getCount());
 		
 		ArrayList<GeneticProfile> list = DaoGeneticProfile.getAllGeneticProfiles(studyId);
-		assertEquals(8, list.size());
+		assertEquals(numberOfProfiles - 1, list.size());
 		geneticProfile = list.get(0);
 		assertEquals(studyId, geneticProfile.getCancerStudyId());
 		assertEquals("mRNA expression (microarray)", geneticProfile.getProfileName());
@@ -154,12 +154,10 @@ public class TestDaoGeneticProfile {
 		assertTrue(DaoGeneticProfile.updateNameAndDescription(
 				geneticProfile.getGeneticProfileId(), "Updated Name",
 				"Updated Description"));
-		ArrayList<GeneticProfile> list = DaoGeneticProfile.getAllGeneticProfiles(studyId);
-		assertEquals(9, list.size());
-		geneticProfile = list.get(0);
-		assertEquals(studyId, geneticProfile.getCancerStudyId());
-		assertEquals("Updated Name", geneticProfile.getProfileName());
-		assertEquals(GeneticAlterationType.COPY_NUMBER_ALTERATION, geneticProfile.getGeneticAlterationType());
-		assertEquals("Updated Description", geneticProfile.getProfileDescription());
+		GeneticProfile updatedGeneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfile.getGeneticProfileId());
+		assertEquals(studyId, updatedGeneticProfile.getCancerStudyId());
+		assertEquals("Updated Name", updatedGeneticProfile.getProfileName());
+		assertEquals(GeneticAlterationType.COPY_NUMBER_ALTERATION, updatedGeneticProfile.getGeneticAlterationType());
+		assertEquals("Updated Description", updatedGeneticProfile.getProfileDescription());
 	}
 }

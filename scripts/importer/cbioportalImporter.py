@@ -36,6 +36,8 @@ from .cbioportal_common import IMPORT_CANCER_TYPE_CLASS
 from .cbioportal_common import IMPORT_STUDY_CLASS
 from .cbioportal_common import UPDATE_STUDY_STATUS_CLASS
 from .cbioportal_common import REMOVE_STUDY_CLASS
+from .cbioportal_common import REMOVE_SAMPLES_CLASS
+from .cbioportal_common import REMOVE_PATIENTS_CLASS
 from .cbioportal_common import IMPORT_CASE_LIST_CLASS
 from .cbioportal_common import ADD_CASE_LIST_CLASS
 from .cbioportal_common import VERSION_UTIL_CLASS
@@ -53,10 +55,12 @@ LOGGER = None
 IMPORT_CANCER_TYPE = "import-cancer-type"
 IMPORT_STUDY = "import-study"
 REMOVE_STUDY = "remove-study"
+REMOVE_SAMPLES = "remove-samples"
+REMOVE_PATIENTS = "remove-patients"
 IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
 
-COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, REMOVE_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST]
+COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS]
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -102,6 +106,24 @@ def remove_study_id(jvm_args, study_id):
     args.append(REMOVE_STUDY_CLASS)
     args.append(study_id)
     args.append("--noprogress") # don't report memory usage and % progress
+    run_java(*args)
+
+def remove_samples(jvm_args, study_ids, sample_ids):
+    args = jvm_args.split(' ')
+    args.append(REMOVE_SAMPLES_CLASS)
+    args.append("--study_ids")
+    args.append(study_ids)
+    args.append("--sample_ids")
+    args.append(sample_ids)
+    run_java(*args)
+
+def remove_patients(jvm_args, study_ids, patient_ids):
+    args = jvm_args.split(' ')
+    args.append(REMOVE_PATIENTS_CLASS)
+    args.append("--study_ids")
+    args.append(study_ids)
+    args.append("--patient_ids")
+    args.append(patient_ids)
     run_java(*args)
 
 def update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir = None):
@@ -213,7 +235,7 @@ def process_case_lists(jvm_args, case_list_dir):
         if not (case_list.startswith('.') or case_list.endswith('~')):
             import_case_list(jvm_args, os.path.join(case_list_dir, case_list))
 
-def process_command(jvm_args, command, meta_filename, data_filename, study_ids, update_generic_assay_entity = None):
+def process_command(jvm_args, command, meta_filename, data_filename, study_ids, patient_ids, sample_ids, update_generic_assay_entity = None):
     if command == IMPORT_CANCER_TYPE:
         import_cancer_type(jvm_args, data_filename)
     elif command == IMPORT_STUDY:
@@ -227,6 +249,10 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
                 remove_study_id(jvm_args, study_id)
         else:
             raise RuntimeError('Your command uses both -id and -meta. Please, use only one of the two parameters.')
+    elif command == REMOVE_SAMPLES:
+        remove_samples(jvm_args, study_ids, sample_ids)
+    elif command == REMOVE_PATIENTS:
+        remove_patients(jvm_args, study_ids, patient_ids)
     elif command == IMPORT_STUDY_DATA:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity)
     elif command == IMPORT_CASE_LIST:
@@ -505,7 +531,7 @@ def usage():
                            '--command [%s] --study_directory <path to directory> '
                            '--meta_filename <path to metafile>'
                            '--data_filename <path to datafile>'
-                           '--study_ids <cancer study ids for remove-study command, comma separated>' % (COMMANDS)), file=OUTPUT_FILE)
+                           '--study_ids <cancer study ids for remove-study or remove-samples command, comma separated>' % (COMMANDS)), file=OUTPUT_FILE)
 
 def check_args(command):
     if command not in COMMANDS:
@@ -545,23 +571,32 @@ def interface(args=None):
     parent_parser = argparse.ArgumentParser(description='cBioPortal meta Importer')
     add_parser_args(parent_parser)
     parser = argparse.ArgumentParser()
+    allowed_commands_csv = ', '.join(COMMANDS)
     subparsers = parser.add_subparsers(title='subcommands', dest='subcommand',
-                          help='Command for import. Allowed commands: import-cancer-type, '
-                          'import-study, import-study-data, import-case-list or '
-                          'remove-study')
+                          help='Command for import. Allowed commands: ' + allowed_commands_csv)
     import_cancer_type = subparsers.add_parser('import-cancer-type', parents=[parent_parser], add_help=False)
     import_study = subparsers.add_parser('import-study', parents=[parent_parser], add_help=False)
     import_study_data = subparsers.add_parser('import-study-data', parents=[parent_parser], add_help=False)
     import_case_list = subparsers.add_parser('import-case-list', parents=[parent_parser], add_help=False)
     remove_study = subparsers.add_parser('remove-study', parents=[parent_parser], add_help=False)
-    
     remove_study.add_argument('-id', '--study_ids', type=str, required=False,
                         help='Cancer Study IDs for `remove-study` command, comma separated')
-    parser.add_argument('-c', '--command', type=str, required=False, 
+
+    remove_samples = subparsers.add_parser('remove-samples', parents=[], add_help=True)
+    remove_samples.add_argument('--study_ids', type=str, required=True,
+                        help='Cancer Study ID(s) that contains sample(s). Comma separated, if multiple.')
+    remove_samples.add_argument('--sample_ids', type=str, required=True,
+                        help='Sample ID(s). Comma separated, if multiple.')
+
+    remove_patients = subparsers.add_parser('remove-patients', parents=[], add_help=True)
+    remove_patients.add_argument('--study_ids', type=str, required=True,
+                        help='Cancer Study ID(s) that contains sample(s). Comma separated, if multiple.')
+    remove_patients.add_argument('--patient_ids', type=str, required=True,
+                        help='Patient ID(s). Comma separated, if multiple.')
+
+    parser.add_argument('-c', '--command', type=str, required=False,
                         help='This argument is outdated. Please use the listed subcommands, without the -c flag. '
-                        'Command for import. Allowed commands: import-cancer-type, '
-                        'import-study, import-study-data, import-case-list or '
-                        'remove-study')
+                        'Command for import. Allowed commands: ' + allowed_commands_csv)
     add_parser_args(parser)
     parser.add_argument('-id', '--study_ids', type=str, required=False,
                         help='Cancer Study IDs for `remove-study` command, comma separated')
@@ -647,7 +682,15 @@ def main(args):
     else:
         check_args(args.command)
         check_files(args.meta_filename, args.data_filename)
-        process_command(jvm_args, args.command, args.meta_filename, args.data_filename, args.study_ids, args.update_generic_assay_entity)
+        process_command(
+            jvm_args,
+            args.command,
+            args.meta_filename,
+            args.data_filename,
+            args.study_ids,
+            args.patient_ids if hasattr(args, 'patient_ids') else None,
+            args.sample_ids if hasattr(args, 'sample_ids') else None,
+            args.update_generic_assay_entity)
 
 # ------------------------------------------------------------------------------
 # ready to roll

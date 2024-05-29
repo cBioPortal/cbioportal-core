@@ -35,9 +35,12 @@ package org.mskcc.cbio.portal.dao;
 import org.mskcc.cbio.portal.model.*;
 
 import org.apache.commons.collections4.map.MultiKeyMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * DAO to `patient`.
@@ -45,6 +48,8 @@ import java.util.*;
  * @author Benjamin Gross
  */
 public class DaoPatient {
+
+    private static final Logger log = LoggerFactory.getLogger(DaoPatient.class);
 
     private static final String SAMPLE_COUNT_ATTR_ID = "SAMPLE_COUNT";
 
@@ -214,5 +219,59 @@ public class DaoPatient {
 		catch (DaoException e) {
 			throw new SQLException(e);
 		}
+    }
+
+    /**
+     * Removes patients information from the study
+     * @param internalStudyId - id of the study that contains the patients
+     * @param patientStableIds - patient stable ids to remove
+     * @throws DaoException
+     */
+    public static void deletePatients(int internalStudyId, Set<String> patientStableIds) throws DaoException
+    {
+        if (patientStableIds == null || patientStableIds.isEmpty()) {
+            log.info("No patients specified to remove for study with internal id={}. Skipping.", internalStudyId);
+            return;
+        }
+        log.info("Removing {} patients from study with internal id={} ...", patientStableIds, internalStudyId);
+
+        Set<Integer> internalPatientIds = findInternalPatientIdsInStudy(internalStudyId, patientStableIds);
+        Set<String> patientsSampleStableIds = internalPatientIds.stream().flatMap(internalPatientId ->
+                DaoSample.getSamplesByPatientId(internalPatientId).stream().map(Sample::getStableId))
+                .collect(Collectors.toSet());
+        DaoSample.deleteSamples(internalStudyId, patientsSampleStableIds);
+
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoPatient.class);
+            pstmt = con.prepareStatement("DELETE FROM `patient` WHERE `INTERNAL_ID` IN ("
+                    + String.join(",", Collections.nCopies(internalPatientIds.size(), "?"))
+                    + ")");
+            int parameterIndex = 1;
+            for (Integer internalPatientId : internalPatientIds) {
+                pstmt.setInt(parameterIndex++, internalPatientId);
+            };
+            pstmt.executeUpdate();
+        }
+        catch (SQLException e) {
+            throw new DaoException(e);
+        }
+        finally {
+            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, null);
+        }
+        log.info("Removing {} patients from study with internal id={} done.", patientStableIds, internalStudyId);
+    }
+
+    public static Set<Integer> findInternalPatientIdsInStudy(Integer internalStudyId, Set<String> patientStableIds) {
+        HashSet<Integer> internalPatientIds = new HashSet<>();
+        for (String patientId : patientStableIds) {
+            Patient patientByCancerStudyAndPatientId = DaoPatient.getPatientByCancerStudyAndPatientId(internalStudyId, patientId);
+            if (patientByCancerStudyAndPatientId == null) {
+                throw new NoSuchElementException("Patient with stable id=" + patientId + " not found in study with internal id=" + internalStudyId + ".");
+            }
+            internalPatientIds.add(patientByCancerStudyAndPatientId.getInternalId());
+        }
+        return internalPatientIds;
     }
 }
