@@ -281,7 +281,6 @@ public class ImportTabDelimData {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(sampleIds[i]) + "' found in tab-delimited file: " + this.dataFile.getCanonicalPath());
                     }
                 }
-                ensureSampleProfileExists(sample);
                 orderedSampleList.add(sample.getInternalId());
                 if (pdAnnotationsForStableSampleIds != null) {
                     Set<Map.Entry<String, Long>> keys = new HashSet<>(pdAnnotationsForStableSampleIds.keySet());
@@ -387,6 +386,7 @@ public class ImportTabDelimData {
 
                 line = buf.readLine();
             }
+            DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelId);
             geneticAlterationImporter.finalise();
             if (MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
@@ -406,24 +406,6 @@ public class ImportTabDelimData {
         }
         finally {
             buf.close();
-        }
-    }
-
-    private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (isIncrementalUpdateMode) {
-            upsertSampleProfile(sample);
-        } else {
-            createSampleProfileIfNotExists(sample);
-        }
-    }
-
-    private void upsertSampleProfile(Sample sample) throws DaoException {
-        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-    }
-
-    private void createSampleProfileIfNotExists(Sample sample) throws DaoException {
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
         }
     }
 

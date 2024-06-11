@@ -182,26 +182,17 @@ public class ImportStructuralVariantData {
                 }
             }
         }
+
+        DaoSampleProfile.upsertSampleProfiles(sampleIds, geneticProfileId, genePanelId);
         if (isIncrementalUpdateMode) {
-            DaoSampleProfile.upsertSampleProfile(sampleIds, geneticProfileId, genePanelId);
             DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
-        } else {
-            for (Integer sampleId : sampleIds) {
-                createSampleProfileIfNotExists(sampleId);
-            }
         }
 
         buf.close();
         MySQLbulkLoader.flushAll();
     }
 
-    private void createSampleProfileIfNotExists(int internalSampleId) throws DaoException {
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(internalSampleId, geneticProfileId)) {
-            DaoSampleProfile.addSampleProfile(internalSampleId, geneticProfileId, genePanelId);
-        }
-    }
-
-        private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {
+    private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {
         CanonicalGene siteCanonicalGene = null;
 
         // If the Entrez Gene Id is not "NA" set the canonical gene.

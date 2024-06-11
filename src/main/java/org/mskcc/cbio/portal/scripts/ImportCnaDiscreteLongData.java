@@ -75,7 +75,6 @@ public class ImportCnaDiscreteLongData {
 
     private GeneticProfile geneticProfile;
 
-    private final ArrayList<SampleIdGeneticProfileId> sampleIdGeneticProfileIds = new ArrayList<>();
     private ArrayList<Integer> orderedSampleList;
     private final Integer genePanelId;
 
@@ -154,6 +153,7 @@ public class ImportCnaDiscreteLongData {
         orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
         this.geneticAlterationGeneImporter = isIncrementalUpdateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                 : new GeneticAlterationImporterImpl(geneticProfileId, orderedSampleList);
+        DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelId);
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);
@@ -206,7 +206,6 @@ public class ImportCnaDiscreteLongData {
             }
             throw new RuntimeException("Sample with stable id " + sampleIdStr + " is not found in the database.");
         }
-        ensureSampleProfileExists(sample);
 
         long entrezId = gene.getEntrezGeneId();
         int sampleId = sample.getInternalId();
@@ -221,18 +220,6 @@ public class ImportCnaDiscreteLongData {
             ProgressMonitor.logWarning(format("Skipping line %d with duplicate gene %d and sample %d", lineIndex, entrezId, sampleId));
         }
 
-    }
-
-    private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (isIncrementalUpdateMode) {
-            upsertSampleProfile(sample);
-        } else {
-            createSampleProfileIfNotExists(sample);
-        }
-    }
-
-    private void upsertSampleProfile(Sample sample) throws DaoException {
-        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
     }
 
     /**
@@ -343,48 +330,6 @@ public class ImportCnaDiscreteLongData {
         }
         ProgressMonitor.logWarning("Entrez_Id " + entrez + " not found. Record will be skipped for this gene.");
         return null;
-    }
-
-    /**
-     * Find sample and create sample profile when needed
-     *
-     * @return boolean created or not
-     */
-    public boolean createSampleProfileIfNotExists(
-        Sample sample
-    ) throws DaoException {
-        boolean inDatabase = DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId);
-        SampleIdGeneticProfileId toCreate = new SampleIdGeneticProfileId(sample.getInternalId(), geneticProfileId);
-        boolean isQueued = this.sampleIdGeneticProfileIds.contains(toCreate);
-        if (!inDatabase && !isQueued) {
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-            this.sampleIdGeneticProfileIds.add(toCreate);
-            return true;
-        }
-        return false;
-    }
-
-
-    private static class SampleIdGeneticProfileId {
-        public int sampleId;
-        public int geneticProfileId;
-
-        public SampleIdGeneticProfileId(int sampleId, int geneticProfileId) {
-            this.sampleId = sampleId;
-            this.geneticProfileId = geneticProfileId;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-
-            SampleIdGeneticProfileId that = (SampleIdGeneticProfileId) o;
-            return sampleId == that.sampleId
-                && geneticProfileId == that.geneticProfileId;
-        }
     }
 
     /**

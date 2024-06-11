@@ -55,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -105,8 +106,8 @@ public class TestDaoSampleProfile {
         Patient patient = DaoPatient.getPatientByCancerStudyAndPatientId(study.getInternalId(), "TCGA-12345");
         Sample sample = DaoSample.getSampleByPatientAndSampleId(patient.getInternalId(), "TCGA-12345-01");
 
-        int num = DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, null);
-        assertEquals(1, num);
+        DaoSampleProfile.upsertSampleProfiles(List.of(
+                new DaoSampleProfile.SampleProfileTuple(geneticProfileId, sample.getInternalId(), null)));
 
         boolean exists = DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId);
         assertTrue(exists);
@@ -114,8 +115,8 @@ public class TestDaoSampleProfile {
         assertEquals(geneticProfileId, DaoSampleProfile.getProfileIdForSample(sample.getInternalId()));
 
         sample = DaoSample.getSampleByPatientAndSampleId(patient.getInternalId(), "TCGA-123456-01");
-        num = DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanel.getInternalId());
-        assertEquals(1, num);
+        DaoSampleProfile.upsertSampleProfiles(List.of(
+                new DaoSampleProfile.SampleProfileTuple(geneticProfileId, sample.getInternalId(), genePanel.getInternalId())));
 
         boolean existsByPanelId = DaoSampleProfile.sampleProfileMappingExistsByPanel(genePanel.getInternalId());
         assertTrue(existsByPanelId);

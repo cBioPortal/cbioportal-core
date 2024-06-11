@@ -29,7 +29,6 @@ import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
@@ -41,11 +40,9 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -93,8 +90,9 @@ public class TestIncrementalStructuralVariantsImport {
         structuralVariant.setSite2RegionNumber(2);
         structuralVariant.setComments("This record has to be overwritten");
         DaoStructuralVariant.addStructuralVariantToBulkLoader(structuralVariant);
-        DaoSampleProfile.addSampleProfile(svDataSample.getInternalId(), svGeneticProfile.getGeneticProfileId(), null);
         MySQLbulkLoader.flushAll();
+        DaoSampleProfile.upsertSampleProfiles(List.of(
+                new DaoSampleProfile.SampleProfileTuple(svGeneticProfile.getGeneticProfileId(), svDataSample.getInternalId(), null)));
 
         File singleTcgaSampleFolder = new File("src/test/resources/incremental/structural_variants/");
         File metaFile = new File(singleTcgaSampleFolder, "meta_structural_variants.txt");

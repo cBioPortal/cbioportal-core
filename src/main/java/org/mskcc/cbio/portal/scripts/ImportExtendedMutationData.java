@@ -32,8 +32,6 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
@@ -97,6 +95,8 @@ public class ImportExtendedMutationData {
     private int entriesSkipped = 0;
     private int samplesSkipped = 0;
     private Set<String> sampleSet = new HashSet<String>();
+    private Set<Integer> internalSampleIds = new HashSet<Integer>();
+
     private Set<String> geneSet = new HashSet<String>();
     private Set<String> filteredMutations = new HashSet<String>();
     private Set<String> namespaces = new HashSet<String>();
@@ -457,9 +457,6 @@ public class ImportExtendedMutationData {
                         } else {
                             mutations.put(mutation,mutation);
                         }
-                        if(!sampleSet.contains(sample.getStableId())) {
-                            ensureSampleProfileExists(sample);
-                        }
                         // update ascn object with mutation unique key details
                         if (ascn != null){
                             ascn.updateAscnUniqueKeyDetails(mutation);
@@ -468,6 +465,7 @@ public class ImportExtendedMutationData {
 
                         //keep track:
                         sampleSet.add(sample.getStableId());
+                        internalSampleIds.add(sample.getInternalId());
                         geneSet.add(mutation.getEntrezGeneId()+"");
                     }
                     else {
@@ -476,6 +474,7 @@ public class ImportExtendedMutationData {
                 }
             }
         }
+        DaoSampleProfile.upsertSampleProfiles(internalSampleIds, geneticProfileId, genePanelId);
 
         for (MutationEvent event : newEvents) {
             try {
@@ -603,19 +602,21 @@ public class ImportExtendedMutationData {
     private String processMAFHeader(BufferedReader buffer) throws IOException, DaoException {
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
         String line = buffer.readLine().trim();
+        Set<Integer> internalSampleIds = new HashSet<>();
         while (line.startsWith("#")) {
             Matcher seqSamplesMatcher = SEQUENCE_SAMPLES_REGEX.matcher(line);
             // line is of format #sequenced_samples: STABLE_ID STABLE_ID STABLE_ID STABLE_ID
             if (seqSamplesMatcher.find()) {
-                addSampleProfileRecords(getSequencedSamples(seqSamplesMatcher.group(1), geneticProfile));
+                internalSampleIds.addAll(getSequencedInternalSampleId(seqSamplesMatcher.group(1), geneticProfile));
             }
             line = buffer.readLine().trim();
         }
+        DaoSampleProfile.upsertSampleProfiles(internalSampleIds, geneticProfileId, genePanelId);
         return line;
     }
 
-    private List<Sample> getSequencedSamples(String sequencedSamplesIDList, GeneticProfile geneticProfile) {
-        ArrayList<Sample> toReturn = new ArrayList<Sample>();
+    private Set<Integer> getSequencedInternalSampleId(String sequencedSamplesIDList, GeneticProfile geneticProfile) {
+        Set<Integer> toReturn = new HashSet<>();
         for (String stableSampleID : sequencedSamplesIDList.trim().split("\\s")) {
             Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
                                                                         StableIdUtil.getSampleId(stableSampleID));
@@ -623,44 +624,13 @@ public class ImportExtendedMutationData {
             if (sample == null) {
                 missingSample(stableSampleID);
             }
-            toReturn.add(sample);
+            toReturn.add(sample.getInternalId());
         }
         return toReturn;
-    }
-
-    private void addSampleProfileRecords(List<Sample> sequencedSamples) throws DaoException {
-        for (Sample sample : sequencedSamples) {
-            ensureSampleProfileExists(sample);
-        }
-        if( MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-        }
-    }
-
-    private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (overwriteExisting) {
-            upsertSampleProfile(sample);
-        } else {
-            createSampleProfileIfNotExists(sample);
-        }
-    }
-
-    private void upsertSampleProfile(Sample sample) throws DaoException {
-        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-    }
-
-    private void createSampleProfileIfNotExists(Sample sample) throws DaoException {
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-        }
     }
 
     private void missingSample(String stableSampleID) {
         throw new NullPointerException("Sample is not found in database (is it missing from clinical data file?): " + stableSampleID);
     }
 
-    private String convertMapToJsonString(Map<String, Map<String, Object>> map) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.writeValueAsString(map);
-    }
 }
