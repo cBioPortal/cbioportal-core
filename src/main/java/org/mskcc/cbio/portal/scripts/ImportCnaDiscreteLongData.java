@@ -71,7 +71,7 @@ public class ImportCnaDiscreteLongData {
     private int samplesSkipped = 0;
     private Set<String> namespaces;
 
-    private boolean updateMode;
+    private boolean isIncrementalUpdateMode;
 
     private GeneticProfile geneticProfile;
 
@@ -85,7 +85,7 @@ public class ImportCnaDiscreteLongData {
             String genePanel,
             DaoGeneOptimized daoGene,
             Set<String> namespaces,
-            boolean updateMode
+            boolean isIncrementalUpdateMode
     ) {
         this.namespaces = namespaces;
         this.cnaFile = cnaFile;
@@ -99,7 +99,7 @@ public class ImportCnaDiscreteLongData {
         }
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.daoGene = daoGene;
-        this.updateMode = updateMode;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
     }
 
     public ImportCnaDiscreteLongData(
@@ -152,7 +152,7 @@ public class ImportCnaDiscreteLongData {
         }
 
         orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
-        this.geneticAlterationGeneImporter = updateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
+        this.geneticAlterationGeneImporter = isIncrementalUpdateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                 : new GeneticAlterationImporterImpl(geneticProfileId, orderedSampleList);
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
@@ -224,7 +224,7 @@ public class ImportCnaDiscreteLongData {
     }
 
     private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (updateMode) {
+        if (isIncrementalUpdateMode) {
             upsertSampleProfile(sample);
         } else {
             createSampleProfileIfNotExists(sample);
@@ -246,7 +246,7 @@ public class ImportCnaDiscreteLongData {
             .filter(v -> v.cnaEvent != null)
             .map(v -> v.cnaEvent)
             .collect(Collectors.toList());
-        if (updateMode) {
+        if (isIncrementalUpdateMode) {
             DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
         }
         CnaUtil.storeCnaEvents(existingCnaEvents, events);

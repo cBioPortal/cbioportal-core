@@ -102,7 +102,7 @@ public class ImportTabDelimData {
 
     private DaoGeneOptimized daoGene;
 
-    private boolean updateMode;
+    private boolean isIncrementalUpdateMode;
     private ArrayList<Integer> orderedSampleList;
     private final Integer genePanelId;
 
@@ -115,7 +115,7 @@ public class ImportTabDelimData {
      * @param geneticProfileId        GeneticProfile ID.
      * @param genePanel               GenePanel
      * @param genericEntityProperties Generic Assay Entities.
-     * @param updateMode if true, update/append data to the existing one
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
      *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
@@ -125,10 +125,10 @@ public class ImportTabDelimData {
         int geneticProfileId,
         String genePanel,
         String genericEntityProperties,
-        boolean updateMode,
+        boolean isIncrementalUpdateMode,
         DaoGeneOptimized daoGene
     ) {
-       this(dataFile, targetLine, geneticProfileId, genePanel, updateMode, daoGene);
+       this(dataFile, targetLine, geneticProfileId, genePanel, isIncrementalUpdateMode, daoGene);
        this.genericEntityProperties = genericEntityProperties;
     }
 
@@ -139,7 +139,7 @@ public class ImportTabDelimData {
      * @param targetLine       The line we want to import.
      *                         If null, all lines are imported.
      * @param geneticProfileId GeneticProfile ID.
-     * @param updateMode if true, update/append data to the existing one
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
      *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
@@ -148,17 +148,17 @@ public class ImportTabDelimData {
         String targetLine,
         int geneticProfileId,
         String genePanel,
-        boolean updateMode,
+        boolean isIncrementalUpdateMode,
         DaoGeneOptimized daoGene
     ) {
-        this(dataFile, geneticProfileId, genePanel, updateMode, daoGene);
+        this(dataFile, geneticProfileId, genePanel, isIncrementalUpdateMode, daoGene);
         this.targetLine = targetLine;
     }
 
     /**
      * Constructor.
      *
-     * @param updateMode if true, update/append data to the existing one
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
      * @param dataFile         Data File containing Copy Number Alteration, MRNA Expression Data, or protein RPPA data
      * @param geneticProfileId GeneticProfile ID.
      */
@@ -166,16 +166,16 @@ public class ImportTabDelimData {
         File dataFile, 
         int geneticProfileId, 
         String genePanel,
-        boolean updateMode,
+        boolean isIncrementalUpdateMode,
         DaoGeneOptimized daoGene
     ) {
         this.dataFile = dataFile;
         this.geneticProfileId = geneticProfileId;
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-        this.updateMode = updateMode;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
         this.daoGene = daoGene;
         this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-        if (this.updateMode
+        if (this.isIncrementalUpdateMode
                 && geneticProfile != null
                 && this.geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE) {
             throw new UnsupportedOperationException("Incremental upload of geneset scores is not supported.");
@@ -303,7 +303,7 @@ public class ImportTabDelimData {
             }
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines - 1));
 
-            this.geneticAlterationImporter = updateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
+            this.geneticAlterationImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                     : new GeneticAlterationImporterImpl(geneticProfileId, orderedSampleList);
 
             //cache for data found in  cna_event' table:
@@ -410,7 +410,7 @@ public class ImportTabDelimData {
     }
 
     private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (updateMode) {
+        if (isIncrementalUpdateMode) {
             upsertSampleProfile(sample);
         } else {
             createSampleProfileIfNotExists(sample);
@@ -677,7 +677,7 @@ public class ImportTabDelimData {
                 recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    if (updateMode) {
+                    if (isIncrementalUpdateMode) {
                         DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
                     }
                     long entrezGeneId = genes.get(0).getEntrezGeneId();

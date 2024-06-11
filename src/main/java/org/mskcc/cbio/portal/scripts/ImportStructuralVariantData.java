@@ -50,20 +50,20 @@ public class ImportStructuralVariantData {
     private final Integer genePanelId;
     private final Set<String> namespaces;
 
-    private final boolean updateMode;
+    private final boolean isIncrementalUpdateMode;
 
     public ImportStructuralVariantData(
         File structuralVariantFile, 
         int geneticProfileId, 
         String genePanel, 
         Set<String> namespaces,
-        boolean updateMode
+        boolean isIncrementalUpdateMode
     ) throws DaoException {
         this.structuralVariantFile = structuralVariantFile;
         this.geneticProfileId = geneticProfileId;
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.namespaces = namespaces;
-        this.updateMode = updateMode;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
     }
 
     public void importData() throws IOException, DaoException {
@@ -183,7 +183,7 @@ public class ImportStructuralVariantData {
             }
         }
         // TODO the dao methods could receive a set of sample ids (like the deletion does) instead of looping
-        if (updateMode) {
+        if (isIncrementalUpdateMode) {
             for (Integer sampleId : sampleIds) {
                 DaoSampleProfile.updateSampleProfile(sampleId, geneticProfileId, genePanelId);
             }

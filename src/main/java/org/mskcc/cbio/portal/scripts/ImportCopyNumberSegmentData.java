@@ -66,7 +66,7 @@ import java.util.Set;
 public class ImportCopyNumberSegmentData extends ConsoleRunnable {
 
     private int entriesSkipped;
-    private boolean updateMode;
+    private boolean isIncrementalUpdateMode;
     private Set<Integer> processedSampleIds;
 
     private void importData(File file, int cancerStudyId) throws IOException, DaoException {
@@ -118,7 +118,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                 DaoCopyNumberSegment.addCopyNumberSegment(cns);
                 processedSampleIds.add(s.getInternalId());
             }
-            if (updateMode) {
+            if (isIncrementalUpdateMode) {
                 DaoCopyNumberSegment.deleteSegmentDataForSamples(cancerStudyId, processedSampleIds);
             }
             MySQLbulkLoader.flushAll();
@@ -135,7 +135,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
             String dataFile = (String) options.valueOf("data");
             File descriptorFile = new File((String) options.valueOf("meta"));
-            updateMode = options.has("overwrite-existing");
+            isIncrementalUpdateMode = options.has("overwrite-existing");
         
             Properties properties = new Properties();
             properties.load(new FileInputStream(descriptorFile));
@@ -144,13 +144,13 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             
             CancerStudy cancerStudy = getCancerStudy(properties);
             
-            if (!updateMode && segmentDataExistsForCancerStudy(cancerStudy)) {
+            if (!isIncrementalUpdateMode && segmentDataExistsForCancerStudy(cancerStudy)) {
                  throw new IllegalArgumentException("Seg data for cancer study " + cancerStudy.getCancerStudyStableId() + " has already been imported: " + dataFile);
             }
         
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
-            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, updateMode);
+            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
             if( MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
             }
@@ -189,7 +189,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
         copyNumSegFile.description = properties.getProperty("description").trim();
         copyNumSegFile.filename = properties.getProperty("data_filename").trim();
         CopyNumberSegmentFile storedCopyNumSegFile = DaoCopyNumberSegmentFile.getCopyNumberSegmentFile(cancerStudy.getInternalId());
-        if (updateMode && storedCopyNumSegFile != null) {
+        if (isIncrementalUpdateMode && storedCopyNumSegFile != null) {
             if (storedCopyNumSegFile.referenceGenomeId != copyNumSegFile.referenceGenomeId) {
                 throw new IllegalStateException("You are trying to upload "
                         + copyNumSegFile.referenceGenomeId
