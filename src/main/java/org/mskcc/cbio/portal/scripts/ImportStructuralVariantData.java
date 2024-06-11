@@ -182,11 +182,8 @@ public class ImportStructuralVariantData {
                 }
             }
         }
-        // TODO the dao methods could receive a set of sample ids (like the deletion does) instead of looping
         if (isIncrementalUpdateMode) {
-            for (Integer sampleId : sampleIds) {
-                DaoSampleProfile.updateSampleProfile(sampleId, geneticProfileId, genePanelId);
-            }
+            DaoSampleProfile.upsertSampleProfile(sampleIds, geneticProfileId, genePanelId);
             DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
         } else {
             for (Integer sampleId : sampleIds) {

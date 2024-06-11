@@ -142,7 +142,37 @@ public final class DaoSampleProfile {
             JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, rs);
         }
     }
-    
+
+    public static void upsertSampleProfile(Collection<Integer> sampleIds, Integer geneticProfileId, Integer panelId) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
+
+            pstmt = con.prepareStatement
+                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
+                            " VALUES" +
+                            String.join(",", Collections.nCopies(sampleIds.size(), " (?,?,?)")) +
+                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);");
+            int parameterIndex = 1;
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+                pstmt.setInt(parameterIndex++, geneticProfileId);
+                if (panelId != null) {
+                    pstmt.setInt(parameterIndex, panelId);
+                } else {
+                    pstmt.setNull(parameterIndex, java.sql.Types.INTEGER);
+                }
+                parameterIndex++;
+            }
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, null);
+        }
+    }
+
     public static boolean sampleExistsInGeneticProfile(int sampleId, int geneticProfileId)
             throws DaoException {
         Connection con = null;
