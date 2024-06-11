@@ -38,6 +38,7 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
 import org.mskcc.cbio.portal.model.TypeOfCancer;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
@@ -89,7 +90,7 @@ public class ImportTypesOfCancers extends ConsoleRunnable {
         Scanner scanner = new Scanner(file);
         while (scanner.hasNextLine()) {
             String nextLine = scanner.nextLine();
-            String[] fields = nextLine.split("\t", -1);
+            String[] fields = FileUtil.splitTsvLine(nextLine);
             throwExceptionIfColumnCountIsWrong(file, nextLine, fields, EXPECTED_DATAFILE_COLUMN_COUNT);
             TypeOfCancer typeOfCancer = new TypeOfCancer();
             String typeOfCancerId = fields[0].trim();

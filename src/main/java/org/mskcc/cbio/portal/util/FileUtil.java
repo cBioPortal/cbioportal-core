@@ -32,6 +32,8 @@
 
 package org.mskcc.cbio.portal.util;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -73,6 +75,11 @@ public class FileUtil {
      */
     public static boolean isInfoLine(String line) {
         return !line.startsWith("#") && line.trim().length() > 0;
+    }
+
+    @NotNull
+    public static String[] splitTsvLine(String line) {
+        return line.split("\t", -1);
     }
 
 }

@@ -47,6 +47,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.DataValidator;
+import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
@@ -91,7 +92,7 @@ public class DaoGeneOptimized {
                 if (line.startsWith("#")) {
                     continue;
                 }
-                String[] parts = line.trim().split("\t",-1);
+                String[] parts = FileUtil.splitTsvLine(line);
                 CanonicalGene gene = getGene(Long.parseLong(parts[1]));
                 if (gene==null) {
                     ProgressMonitor.logWarning(line+" in config file [resources" + GENE_SYMBOL_DISAMBIGUATION_FILE +

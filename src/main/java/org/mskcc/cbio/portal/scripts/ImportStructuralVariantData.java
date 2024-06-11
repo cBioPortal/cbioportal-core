@@ -86,7 +86,7 @@ public class ImportStructuralVariantData {
             ConsoleUtil.showProgress();
             if( !line.startsWith("#") && line.trim().length() > 0) {
                 recordCount++;
-                String parts[] = line.split("\t", -1);
+                String parts[] = FileUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
                 structuralVariant.setInternalId(++id);
                 structuralVariant.setGeneticProfileId(geneticProfileId);

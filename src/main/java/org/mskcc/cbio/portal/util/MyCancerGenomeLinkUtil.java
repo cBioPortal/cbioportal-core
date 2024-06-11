@@ -107,7 +107,7 @@ public final class MyCancerGenomeLinkUtil {
             while ((line=in.readLine())!=null && line.startsWith("#")) {}
             
             for (; line!=null; line=in.readLine()) {
-                String[] parts = line.trim().split("\t",-1);
+                String[] parts = FileUtil.splitTsvLine(line);
                 if (parts.length<4) {
                     continue;
                 }

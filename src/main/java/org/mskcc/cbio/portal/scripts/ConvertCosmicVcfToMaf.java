@@ -68,7 +68,7 @@ public class ConvertCosmicVcfToMaf {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
             if (!line.startsWith("#")) {
-                String parts[] = line.split("\t",-1);
+                String parts[] = FileUtil.splitTsvLine(line);
                 if (parts.length<8) {
                     System.err.println("Wrong line in cosmic: "+line);
                     continue;

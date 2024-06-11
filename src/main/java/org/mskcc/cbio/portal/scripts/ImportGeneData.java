@@ -204,7 +204,7 @@ public class ImportGeneData extends ConsoleRunnable {
             while ((line = buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
-                String parts[] = line.split("\t", -1); // include trailing empty strings
+                String parts[] = FileUtil.splitTsvLine(line); // include trailing empty strings
                 if (!DataValidator.isValidNumericSequence(parts[0])) {
                     ProgressMonitor.logWarning("Skipping gene with invalid entrez gene id '" + parts[1] + "'");
                     continue;

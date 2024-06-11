@@ -206,7 +206,7 @@ public class ImportTabDelimData {
         FileReader reader = new FileReader(dataFile);
         BufferedReader buf = new BufferedReader(reader);
         String headerLine = buf.readLine();
-        String headerParts[] = headerLine.split("\t");
+        String[] headerParts = FileUtil.splitTsvLine(headerLine);
 
         //Whether data regards CNA or RPPA:
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -328,7 +328,7 @@ public class ImportTabDelimData {
                 boolean recordAdded = false;
 
                 if (FileUtil.isInfoLine(line)) {
-                    String[] rowParts = line.split("\t", -1);
+                    String[] rowParts = FileUtil.splitTsvLine(line);
 
                     if (rowParts.length > headerColumns && line.split("\t").length > headerColumns) {
                         ProgressMonitor.logWarning("Ignoring line with more fields (" + rowParts.length
@@ -468,7 +468,7 @@ public class ImportTabDelimData {
             String line = reader.readLine();
 
             while (line != null) {
-                String[] row = line.split("\t", -1);
+                String[] row = FileUtil.splitTsvLine(line);
                 if (row.length < 6) {
                     throw new RuntimeException("Mis-formatted row: " + String.join(", ", row));
                 }

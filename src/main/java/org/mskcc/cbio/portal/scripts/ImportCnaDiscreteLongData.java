@@ -130,7 +130,7 @@ public class ImportCnaDiscreteLongData {
         // Pass first line with headers to util:
         String line = buf.readLine();
         int lineIndex = 1;
-        String[] headerParts = line.split("\t", -1);
+        String[] headerParts = FileUtil.splitTsvLine(line);
         this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
 
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -187,7 +187,7 @@ public class ImportCnaDiscreteLongData {
         if (!FileUtil.isInfoLine(line)) {
             return;
         }
-        String[] lineParts = line.split("\t", -1);
+        String[] lineParts = FileUtil.splitTsvLine(line);
         CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(lineParts), lineParts, cnaUtil);
         importContainer.genes.add(gene);
 

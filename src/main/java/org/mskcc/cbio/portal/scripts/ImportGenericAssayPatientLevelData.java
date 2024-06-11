@@ -191,7 +191,7 @@ public class ImportGenericAssayPatientLevelData {
         boolean recordIsStored = false;
         
         if (!line.startsWith("#") && line.trim().length() > 0) {
-            String[] parts = line.split("\t", -1);
+            String[] parts = FileUtil.splitTsvLine(line);
 
             if (parts.length > nrColumns) {
                 if (line.split("\t").length > nrColumns) {
