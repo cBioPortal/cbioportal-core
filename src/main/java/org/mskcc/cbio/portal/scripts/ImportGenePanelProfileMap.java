@@ -87,7 +87,7 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
 
             // supported by the uploader already. Added for uniformity, to do not cause error when upstream software uses this flag
             parser.accepts("overwrite-existing",
-                    "Enables re-uploading molecular data that already exist for the given profile and sample.")
+                    "Enables overwriting data if it turns out it already exists in DB.")
                     .withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
             OptionSet options;
             try {
