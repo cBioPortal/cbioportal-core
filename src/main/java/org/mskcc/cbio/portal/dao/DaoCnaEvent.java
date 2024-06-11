@@ -130,6 +130,7 @@ public final class DaoCnaEvent {
                     ("DELETE sample_cna_event, alteration_driver_annotation" +
                             " FROM sample_cna_event" +
                             " LEFT JOIN alteration_driver_annotation ON alteration_driver_annotation.`ALTERATION_EVENT_ID` = sample_cna_event.`CNA_EVENT_ID`" +
+                            " AND alteration_driver_annotation.`SAMPLE_ID` = sample_cna_event.`SAMPLE_ID`" +
                             " WHERE sample_cna_event.`GENETIC_PROFILE_ID` = ? AND sample_cna_event.`SAMPLE_ID` IN (" +
                             String.join(",", Collections.nCopies(sampleIds.size(), "?"))
                             + ")");
