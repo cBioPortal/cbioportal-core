@@ -70,7 +70,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
     private Set<Integer> processedSampleIds;
 
     private void importData(File file, int cancerStudyId) throws IOException, DaoException {
-        MySQLbulkLoader.bulkLoadOn();
         FileReader reader = new FileReader(file);
         BufferedReader buf = new BufferedReader(reader);
         try {
@@ -121,7 +120,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             if (isIncrementalUpdateMode) {
                 DaoCopyNumberSegment.deleteSegmentDataForSamples(cancerStudyId, processedSampleIds);
             }
-            MySQLbulkLoader.flushAll();
         }
         finally {
             buf.close();
@@ -152,9 +150,11 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             if (!isIncrementalUpdateMode && segmentDataExistsForCancerStudy(cancerStudy)) {
                  throw new IllegalArgumentException("Seg data for cancer study " + cancerStudy.getCancerStudyStableId() + " has already been imported: " + dataFile);
             }
-        
+            MySQLbulkLoader.bulkLoadOn();
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
+            MySQLbulkLoader.flushAll();
+            MySQLbulkLoader.bulkLoadOff();
             DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
         } catch (RuntimeException e) {
             throw e;
