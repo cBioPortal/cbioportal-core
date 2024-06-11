@@ -40,11 +40,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.cbioportal.model.EntityType;
 import org.cbioportal.model.GenericEntityProperty;
@@ -52,12 +50,12 @@ import org.cbioportal.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
 * Note; Imports genetic entities from generic assay files. Has been written for treatment response data
@@ -188,7 +186,7 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         currentLine = buf.readLine();
         
         while (currentLine != null) {
-            if (!FileUtil.isInfoLine(currentLine)) {
+            if (!TsvUtil.isInfoLine(currentLine)) {
                 currentLine = buf.readLine();
                 continue;
             }

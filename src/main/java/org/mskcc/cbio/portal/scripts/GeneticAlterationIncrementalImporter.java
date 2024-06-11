@@ -1,6 +1,5 @@
 package org.mskcc.cbio.portal.scripts;
 
-import org.jetbrains.annotations.NotNull;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
@@ -70,7 +69,6 @@ public class GeneticAlterationIncrementalImporter implements GeneticAlterationIm
         geneticAlterationImporter.finalise();
     }
 
-    @NotNull
     private String[] extendValues(int geneticEntityId, String[] values) {
         Map<Integer, String> sampleIdToValue = mapWithFileOrderedSampleList(values);
         String[] updatedSampleValues = new String[extendedOrderedSampleList.size()];
@@ -91,7 +89,6 @@ public class GeneticAlterationIncrementalImporter implements GeneticAlterationIm
         return updatedSampleValues;
     }
 
-    @NotNull
     private Map<Integer, String> mapWithFileOrderedSampleList(String[] values) {
         return ArrayUtil.zip(fileOrderedSampleList.toArray(new Integer[0]), values);
     }

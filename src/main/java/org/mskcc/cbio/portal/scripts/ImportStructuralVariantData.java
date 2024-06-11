@@ -34,7 +34,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -84,9 +83,9 @@ public class ImportStructuralVariantData {
         while ((line = buf.readLine()) != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if(FileUtil.isInfoLine(line)) {
+            if(TsvUtil.isInfoLine(line)) {
                 recordCount++;
-                String parts[] = FileUtil.splitTsvLine(line);
+                String parts[] = TsvUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
                 structuralVariant.setInternalId(++id);
                 structuralVariant.setGeneticProfileId(geneticProfileId);

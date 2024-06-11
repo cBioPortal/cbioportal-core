@@ -36,6 +36,7 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -109,7 +110,7 @@ public class CutInvalidCases {
 
         HashSet excludedCaseSet = new HashSet();
         while (line != null) {
-            if (FileUtil.isInfoLine(line)) {
+            if (TsvUtil.isInfoLine(line)) {
                 String parts[] = line.split("\t");
                 excludedCaseSet.add(parts[0]);
             }

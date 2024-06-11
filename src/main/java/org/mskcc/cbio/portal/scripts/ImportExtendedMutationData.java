@@ -57,11 +57,11 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ExtendedMutationUtil;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.GlobalProperties;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -193,9 +193,9 @@ public class ImportExtendedMutationData {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
 
-            if(FileUtil.isInfoLine(line))
+            if(TsvUtil.isInfoLine(line))
             {
-                String[] parts = FileUtil.splitTsvLine(line);
+                String[] parts = TsvUtil.splitTsvLine(line);
                 MafRecord record = mafUtil.parseRecord(line);
 
                 if (!record.getNcbiBuild().equalsIgnoreCase(genomeBuildName)) {

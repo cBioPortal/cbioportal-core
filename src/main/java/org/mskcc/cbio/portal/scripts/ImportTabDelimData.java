@@ -55,6 +55,7 @@ import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -206,7 +207,7 @@ public class ImportTabDelimData {
         FileReader reader = new FileReader(dataFile);
         BufferedReader buf = new BufferedReader(reader);
         String headerLine = buf.readLine();
-        String[] headerParts = FileUtil.splitTsvLine(headerLine);
+        String[] headerParts = TsvUtil.splitTsvLine(headerLine);
 
         //Whether data regards CNA or RPPA:
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -318,7 +319,6 @@ public class ImportTabDelimData {
                 genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             }
 
-            int headerColumns = headerParts.length;
 
             String line = buf.readLine();
             while (line != null) {
@@ -327,62 +327,54 @@ public class ImportTabDelimData {
                 ConsoleUtil.showProgress();
                 boolean recordAdded = false;
 
-                if (FileUtil.isInfoLine(line)) {
-                    String[] rowParts = FileUtil.splitTsvLine(line);
+                if (TsvUtil.isInfoLine(line)) {
+                    String[] rowParts = TsvUtil.splitTsvLine(line);
 
-                    if (rowParts.length > headerColumns && line.split("\t").length > headerColumns) {
-                        ProgressMonitor.logWarning("Ignoring line with more fields (" + rowParts.length
-                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
-                    } else if (rowParts.length < headerColumns) {
-                        ProgressMonitor.logWarning("Ignoring line with less fields (" + rowParts.length
-                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
+                    TsvUtil.ensureHeaderAndRowMatch(headerParts, rowParts);
+                    String[] sampleValues = ArrayUtils.subarray(rowParts, sampleStartIndex, rowParts.length);
+
+                    // trim whitespace from values
+                    sampleValues = Stream.of(sampleValues).map(String::trim).toArray(String[]::new);
+                    sampleValues = filterOutNormalValues(filteredSampleIndices, sampleValues);
+
+                    // either parse line as geneset or gene for importing into 'genetic_alteration' table
+                    if (isGsvaProfile) {
+                        String genesetId = rowParts[genesetIdIndex];
+                        recordAdded = saveGenesetLine(sampleValues, genesetId);
+                    } else if (isGenericAssayProfile) {
+                        String genericAssayId = rowParts[genericAssayIdIndex];
+                        recordAdded = saveGenericAssayLine(sampleValues, genericAssayId, genericAssayStableIdToEntityIdMap);
                     } else {
-                        String sampleValues[] = ArrayUtils.subarray(rowParts, sampleStartIndex, rowParts.length > headerColumns ? headerColumns : rowParts.length);
-
-                        // trim whitespace from values
-                        sampleValues = Stream.of(sampleValues).map(String::trim).toArray(String[]::new);
-                        sampleValues = filterOutNormalValues(filteredSampleIndices, sampleValues);
-
-                        // either parse line as geneset or gene for importing into 'genetic_alteration' table
-                        if (isGsvaProfile) {
-                            String genesetId = rowParts[genesetIdIndex];
-                            recordAdded = saveGenesetLine(sampleValues, genesetId);
-                        } else if (isGenericAssayProfile) {
-                            String genericAssayId = rowParts[genericAssayIdIndex];
-                            recordAdded = saveGenericAssayLine(sampleValues, genericAssayId, genericAssayStableIdToEntityIdMap);
+                        String geneSymbol = null;
+                        if (hugoSymbolIndex != -1) {
+                            geneSymbol = rowParts[hugoSymbolIndex];
+                        }
+                        if (rppaGeneRefIndex != -1) {
+                            geneSymbol = rowParts[rppaGeneRefIndex];
+                        }
+                        if (geneSymbol != null && geneSymbol.isEmpty()) {
+                            geneSymbol = null;
+                        }
+                        //get entrez
+                        String entrez = null;
+                        if (entrezGeneIdIndex != -1) {
+                            entrez = rowParts[entrezGeneIdIndex];
+                        }
+                        if (entrez != null && entrez.isEmpty()) {
+                            entrez = null;
+                        }
+                        if (entrez != null && !DataValidator.isValidNumericSequence(entrez)) {
+                            ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
                         } else {
-                            String geneSymbol = null;
-                            if (hugoSymbolIndex != -1) {
-                                geneSymbol = rowParts[hugoSymbolIndex];
-                            }
-                            if (rppaGeneRefIndex != -1) {
-                                geneSymbol = rowParts[rppaGeneRefIndex];
-                            }
-                            if (geneSymbol != null && geneSymbol.isEmpty()) {
-                                geneSymbol = null;
-                            }
-                            //get entrez
-                            String entrez = null;
-                            if (entrezGeneIdIndex != -1) {
-                                entrez = rowParts[entrezGeneIdIndex];
-                            }
-                            if (entrez != null && entrez.isEmpty()) {
-                                entrez = null;
-                            }
-                            if (entrez != null && !DataValidator.isValidNumericSequence(entrez)) {
-                                ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
-                            } else {
-                                String firstCellValue = rowParts[0];
-                                if (targetLine == null || firstCellValue.equals(targetLine)) {
-                                    recordAdded = saveLine(sampleValues,
-                                            entrez, geneSymbol,
-                                            isRppaProfile, isDiscretizedCnaProfile,
-                                            existingCnaEvents);
-                                }
+                            String firstCellValue = rowParts[0];
+                            if (targetLine == null || firstCellValue.equals(targetLine)) {
+                                recordAdded = saveLine(sampleValues,
+                                        entrez, geneSymbol,
+                                        isRppaProfile, isDiscretizedCnaProfile,
+                                        existingCnaEvents);
                             }
                         }
                     }
-
                 }
 
                 // increment number of records added or entries skipped
@@ -468,7 +460,7 @@ public class ImportTabDelimData {
             String line = reader.readLine();
 
             while (line != null) {
-                String[] row = FileUtil.splitTsvLine(line);
+                String[] row = TsvUtil.splitTsvLine(line);
                 if (row.length < 6) {
                     throw new RuntimeException("Mis-formatted row: " + String.join(", ", row));
                 }

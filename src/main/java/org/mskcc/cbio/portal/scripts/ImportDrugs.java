@@ -38,6 +38,7 @@ import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -64,7 +65,7 @@ public class ImportDrugs {
         while (line != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (FileUtil.isInfoLine(line)) {
+            if (TsvUtil.isInfoLine(line)) {
                 line = line.trim();
                 String parts[] = line.split("\t");
                 String geneSymbol = parts[0];

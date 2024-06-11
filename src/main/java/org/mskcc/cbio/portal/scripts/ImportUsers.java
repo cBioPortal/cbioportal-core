@@ -39,8 +39,8 @@ import org.mskcc.cbio.portal.dao.DaoUserAuthorities;
 import org.mskcc.cbio.portal.model.User;
 import org.mskcc.cbio.portal.model.UserAuthorities;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -78,7 +78,7 @@ public class ImportUsers {
         while (line != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (FileUtil.isInfoLine(line)) {
+            if (TsvUtil.isInfoLine(line)) {
                 try {
                     addUser(line);
                     count++;

@@ -1,6 +1,5 @@
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
-import org.jetbrains.annotations.NotNull;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 
@@ -12,7 +11,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class GeneticAlterationsTestHelper {
-    @NotNull
     public static Set<Integer> geneStableIdsToEntityIds(Set<String> beforeStableIds) {
         return beforeStableIds.stream().map(stableId -> {
             try {

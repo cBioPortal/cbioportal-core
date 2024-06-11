@@ -40,10 +40,10 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -130,7 +130,7 @@ public class ImportCnaDiscreteLongData {
         // Pass first line with headers to util:
         String line = buf.readLine();
         int lineIndex = 1;
-        String[] headerParts = FileUtil.splitTsvLine(line);
+        String[] headerParts = TsvUtil.splitTsvLine(line);
         this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
 
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -184,10 +184,10 @@ public class ImportCnaDiscreteLongData {
         int lineIndex,
         CnaImportData importContainer
     ) throws Exception {
-        if (!FileUtil.isInfoLine(line)) {
+        if (!TsvUtil.isInfoLine(line)) {
             return;
         }
-        String[] lineParts = FileUtil.splitTsvLine(line);
+        String[] lineParts = TsvUtil.splitTsvLine(line);
         CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(lineParts), lineParts, cnaUtil);
         importContainer.genes.add(gene);
 

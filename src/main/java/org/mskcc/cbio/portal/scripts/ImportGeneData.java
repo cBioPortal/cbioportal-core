@@ -49,6 +49,7 @@ import org.mskcc.cbio.portal.util.DataValidator;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GlobalProperties;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -204,7 +205,7 @@ public class ImportGeneData extends ConsoleRunnable {
             while ((line = buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
-                String parts[] = FileUtil.splitTsvLine(line); // include trailing empty strings
+                String parts[] = TsvUtil.splitTsvLine(line); // include trailing empty strings
                 if (!DataValidator.isValidNumericSequence(parts[0])) {
                     ProgressMonitor.logWarning("Skipping gene with invalid entrez gene id '" + parts[1] + "'");
                     continue;

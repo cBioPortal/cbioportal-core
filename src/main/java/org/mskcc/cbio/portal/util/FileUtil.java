@@ -32,8 +32,6 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -58,28 +56,13 @@ public class FileUtil {
         try (FileReader reader = new FileReader(file); BufferedReader buffered = new BufferedReader(reader)) {
             String line = buffered.readLine();
             while (line != null) {
-                if (isInfoLine(line)) {
+                if (TsvUtil.isInfoLine(line)) {
                     numLines++;
                 }
                 line = buffered.readLine();
             }
             return numLines;
         }
-    }
-
-    /**
-     * Does line brings any information?
-     * e.g. blank like and comments do not
-     * @param line
-     * @return
-     */
-    public static boolean isInfoLine(String line) {
-        return !line.startsWith("#") && line.trim().length() > 0;
-    }
-
-    @NotNull
-    public static String[] splitTsvLine(String line) {
-        return line.split("\t", -1);
     }
 
 }
