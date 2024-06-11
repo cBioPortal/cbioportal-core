@@ -193,7 +193,7 @@ public class ImportExtendedMutationData {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
 
-            if( !line.startsWith("#") && line.trim().length() > 0)
+            if(FileUtil.isInfoLine(line))
             {
                 String[] parts = FileUtil.splitTsvLine(line);
                 MafRecord record = mafUtil.parseRecord(line);

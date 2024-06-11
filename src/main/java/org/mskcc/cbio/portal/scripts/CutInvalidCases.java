@@ -109,7 +109,7 @@ public class CutInvalidCases {
 
         HashSet excludedCaseSet = new HashSet();
         while (line != null) {
-            if (!line.startsWith("#") && line.trim().length() > 0) {
+            if (FileUtil.isInfoLine(line)) {
                 String parts[] = line.split("\t");
                 excludedCaseSet.add(parts[0]);
             }
