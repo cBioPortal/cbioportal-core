@@ -50,7 +50,7 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.EntrezValidator;
+import org.mskcc.cbio.portal.util.DataValidator;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -369,7 +369,7 @@ public class ImportTabDelimData {
                             if (entrez != null && entrez.isEmpty()) {
                                 entrez = null;
                             }
-                            if (entrez != null && !EntrezValidator.isaValidEntrezId(entrez)) {
+                            if (entrez != null && !DataValidator.isValidNumericSequence(entrez)) {
                                 ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
                             } else {
                                 String firstCellValue = rowParts[0];

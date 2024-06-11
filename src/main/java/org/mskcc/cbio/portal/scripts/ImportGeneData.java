@@ -45,7 +45,7 @@ import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.model.ReferenceGenomeGene;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.EntrezValidator;
+import org.mskcc.cbio.portal.util.DataValidator;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GlobalProperties;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -205,7 +205,7 @@ public class ImportGeneData extends ConsoleRunnable {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
                 String parts[] = line.split("\t", -1); // include trailing empty strings
-                if (!EntrezValidator.isaValidEntrezId(parts[0])) {
+                if (!DataValidator.isValidNumericSequence(parts[0])) {
                     ProgressMonitor.logWarning("Skipping gene with invalid entrez gene id '" + parts[1] + "'");
                     continue;
                 }
