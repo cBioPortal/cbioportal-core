@@ -57,8 +57,7 @@ To execute an incremental upload, use the -d (or --data_directory) option instea
 docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -d /data/study_es_0_inc -p /data/api_json -o
 ```
 **Note:**
-While the directory should adhere to the standard cBioPortal file formats and study structure. 
-Incremental uploads are not supported for all data types though.
+While the directory should adhere to the standard cBioPortal file formats and study structure, incremental uploads are not supported for all data types though.
 For instance, uploading study metadata, resources, or GSVA data incrementally is currently unsupported.
 
 This method ensures efficient updates without the need for complete study reuploads, saving time and computational resources.
