@@ -236,8 +236,20 @@ public class DaoGeneticAlteration {
                 HashMap<Integer, String> mapSampleValue = new HashMap<Integer, String>();
                 int geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
                 String values = rs.getString("VALUES");
-                //hm.debug..
-                String valueParts[] = values.split(DELIM, -1);
+                String[] valueParts = values.split(DELIM, -1);
+                int valuesLength = valueParts.length;
+                boolean hasMeaninglessTrailingDelimiter = valuesLength - orderedSampleList.size() == 1 && valueParts[valuesLength - 1].isEmpty();
+                if (hasMeaninglessTrailingDelimiter) {
+                    // adjust value length to account for the trailing delimiter
+                    valuesLength -= 1;
+                }
+                if (valuesLength != orderedSampleList.size()) {
+                    throw new IllegalStateException(
+                            "Data inconsistency detected: The length of the values for genetic profile with Id = "
+                                    + geneticProfileId + " and genetic entity with ID = " + geneticEntityId
+                                    + " (" + valuesLength + " elements) does not match the expected length of the sample list ("
+                                    + orderedSampleList.size() + " elements).");
+                }
                 for (int i = 0; i < orderedSampleList.size(); i++) {
                     String value = valueParts[i];
                     Integer sampleId = orderedSampleList.get(i);
