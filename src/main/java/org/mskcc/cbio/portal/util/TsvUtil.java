@@ -6,12 +6,12 @@ package org.mskcc.cbio.portal.util;
  */
 public class TsvUtil {
     /**
-     * Does line brings any information?
-     * e.g. blank like and comments do not
+     * is the line has some data
+     * e.g. blank line and comments do not
      * @param line
      * @return
      */
-    public static boolean isInfoLine(String line) {
+    public static boolean isDataLine(String line) {
         return !line.startsWith("#") && line.trim().length() > 0;
     }
 

@@ -270,7 +270,7 @@ public class TestMafUtil {
 
         List<AlleleSpecificCopyNumber> ascnRecords = new ArrayList<>();
         while((line=buf.readLine()) != null) {
-            if (TsvUtil.isInfoLine(line)) {
+            if (TsvUtil.isDataLine(line)) {
                 MafRecord record = mafUtil.parseRecord(line);
                 // every record in test MAF should have ASCN data
                 Assert.assertTrue(record.getNamespacesMap().containsKey(ASCN_NAMESPACE));

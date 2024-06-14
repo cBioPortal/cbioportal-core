@@ -326,7 +326,7 @@ public class ImportTabDelimData {
                 ConsoleUtil.showProgress();
                 boolean recordAdded = false;
 
-                if (TsvUtil.isInfoLine(line)) {
+                if (TsvUtil.isDataLine(line)) {
                     String[] rowParts = TsvUtil.splitTsvLine(line);
 
                     TsvUtil.ensureHeaderAndRowMatch(headerParts, rowParts);

@@ -110,7 +110,7 @@ public class CutInvalidCases {
 
         HashSet excludedCaseSet = new HashSet();
         while (line != null) {
-            if (TsvUtil.isInfoLine(line)) {
+            if (TsvUtil.isDataLine(line)) {
                 String parts[] = line.split("\t");
                 excludedCaseSet.add(parts[0]);
             }

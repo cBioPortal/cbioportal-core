@@ -185,7 +185,7 @@ public class ImportGenericAssayPatientLevelData {
 
         boolean recordIsStored = false;
         
-        if (TsvUtil.isInfoLine(line)) {
+        if (TsvUtil.isDataLine(line)) {
             String[] parts = TsvUtil.splitTsvLine(line);
 
             if (parts.length > nrColumns) {

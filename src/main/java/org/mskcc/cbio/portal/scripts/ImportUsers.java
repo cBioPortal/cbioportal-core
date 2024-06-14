@@ -78,7 +78,7 @@ public class ImportUsers {
         while (line != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (TsvUtil.isInfoLine(line)) {
+            if (TsvUtil.isDataLine(line)) {
                 try {
                     addUser(line);
                     count++;

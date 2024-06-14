@@ -186,7 +186,7 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         currentLine = buf.readLine();
         
         while (currentLine != null) {
-            if (!TsvUtil.isInfoLine(currentLine)) {
+            if (!TsvUtil.isDataLine(currentLine)) {
                 currentLine = buf.readLine();
                 continue;
             }

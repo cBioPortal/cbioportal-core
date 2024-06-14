@@ -184,7 +184,7 @@ public class ImportCnaDiscreteLongData {
         int lineIndex,
         CnaImportData importContainer
     ) throws Exception {
-        if (!TsvUtil.isInfoLine(line)) {
+        if (!TsvUtil.isDataLine(line)) {
             return;
         }
         String[] lineParts = TsvUtil.splitTsvLine(line);

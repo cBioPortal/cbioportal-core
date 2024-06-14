@@ -56,7 +56,7 @@ public class FileUtil {
         try (FileReader reader = new FileReader(file); BufferedReader buffered = new BufferedReader(reader)) {
             String line = buffered.readLine();
             while (line != null) {
-                if (TsvUtil.isInfoLine(line)) {
+                if (TsvUtil.isDataLine(line)) {
                     numLines++;
                 }
                 line = buffered.readLine();

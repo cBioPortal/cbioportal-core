@@ -65,7 +65,7 @@ public class ImportDrugs {
         while (line != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (TsvUtil.isInfoLine(line)) {
+            if (TsvUtil.isDataLine(line)) {
                 line = line.trim();
                 String parts[] = line.split("\t");
                 String geneSymbol = parts[0];

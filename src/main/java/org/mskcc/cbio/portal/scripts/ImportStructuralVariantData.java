@@ -83,7 +83,7 @@ public class ImportStructuralVariantData {
         while ((line = buf.readLine()) != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if(TsvUtil.isInfoLine(line)) {
+            if(TsvUtil.isDataLine(line)) {
                 recordCount++;
                 String parts[] = TsvUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
