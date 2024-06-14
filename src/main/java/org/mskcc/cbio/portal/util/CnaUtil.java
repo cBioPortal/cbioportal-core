@@ -45,7 +45,6 @@ public class CnaUtil {
         this.namespaceColumnParser = new NamespaceColumnParser(namespaces, headerParts);
     }
 
-    // TODO inc: update
     public static void storeCnaEvents(
         Set<CnaEvent.Event> existingCnaEvents,
         List<CnaEvent> cnaEventsToAdd
@@ -54,7 +53,6 @@ public class CnaUtil {
             if (!CNA.AMP.equals(cnaEvent.getAlteration()) && !CNA.HOMDEL.equals(cnaEvent.getAlteration())) {
                 continue;
             }
-            // TODO Clean cnv event
             // Revert PR https://github.com/cBioPortal/cbioportal-core/pull/1 breaks importer
             Optional<CnaEvent.Event> existingCnaEvent = existingCnaEvents
                     .stream()
