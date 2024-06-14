@@ -13,12 +13,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-public class GeneticAlterationIncrementalImporter implements GeneticAlterationImporter {
+public class GeneticAlterationIncrementalImporter extends GeneticAlterationImporter {
 
-    private final GeneticAlterationImporterImpl geneticAlterationImporter;
-    private final int geneticProfileId;
     private final List<Integer> fileOrderedSampleList;
-    private final List<Integer> extendedOrderedSampleList;
     private final DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
     private final HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
 
@@ -26,7 +23,8 @@ public class GeneticAlterationIncrementalImporter implements GeneticAlterationIm
             int geneticProfileId,
             List<Integer> fileOrderedSampleList
     ) throws DaoException {
-        this.geneticProfileId = geneticProfileId;
+
+        super.geneticProfileId = geneticProfileId;
         this.geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfileId, null);
         this.fileOrderedSampleList = fileOrderedSampleList;
 
@@ -41,11 +39,11 @@ public class GeneticAlterationIncrementalImporter implements GeneticAlterationIm
             }
         });
         // add all new sample ids at the end
-        this.extendedOrderedSampleList = new ArrayList<>(savedOrderedSampleList);
+        super.orderedSampleList = new ArrayList<>(savedOrderedSampleList);
         List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
-        this.extendedOrderedSampleList.addAll(newSampleIds);
+        super.orderedSampleList.addAll(newSampleIds);
         DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(this.geneticProfileId);
-        this.geneticAlterationImporter = new GeneticAlterationImporterImpl(geneticProfileId, extendedOrderedSampleList);
+        super.storeOrderedSampleList();
     }
 
     @Override
@@ -53,28 +51,28 @@ public class GeneticAlterationIncrementalImporter implements GeneticAlterationIm
         int geneticEntityId = gene.getGeneticEntityId();
         daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfileId, geneticEntityId);
         String[] expandedValues = extendValues(geneticEntityId, values);
-        return geneticAlterationImporter.store(expandedValues, gene, geneSymbol);
+        return super.store(expandedValues, gene, geneSymbol);
     }
 
     @Override
     public boolean store(int geneticEntityId, String[] values) throws DaoException {
         daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfileId, geneticEntityId);
         String[] expandedValues = extendValues(geneticEntityId, values);
-        return geneticAlterationImporter.store(geneticEntityId, expandedValues);
+        return super.store(geneticEntityId, expandedValues);
     }
 
     @Override
     public void finalise() {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
-        geneticAlterationImporter.finalise();
+        super.finalise();
     }
 
     private String[] extendValues(int geneticEntityId, String[] values) {
         Map<Integer, String> sampleIdToValue = mapWithFileOrderedSampleList(values);
-        String[] updatedSampleValues = new String[extendedOrderedSampleList.size()];
-        for (int i = 0; i < extendedOrderedSampleList.size(); i++) {
+        String[] updatedSampleValues = new String[orderedSampleList.size()];
+        for (int i = 0; i < orderedSampleList.size(); i++) {
             updatedSampleValues[i] = "";
-            int sampleId = extendedOrderedSampleList.get(i);
+            int sampleId = orderedSampleList.get(i);
             if (geneticAlterationMap.containsKey(geneticEntityId)) {
                 HashMap<Integer, String> savedSampleIdToValue = geneticAlterationMap.get(geneticEntityId);
                 updatedSampleValues[i] = savedSampleIdToValue.containsKey(sampleId) ? savedSampleIdToValue.remove(sampleId): "";

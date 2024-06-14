@@ -303,7 +303,7 @@ public class ImportTabDelimData {
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines - 1));
 
             this.geneticAlterationImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
-                    : new GeneticAlterationImporterImpl(geneticProfileId, orderedSampleList);
+                    : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
 
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
