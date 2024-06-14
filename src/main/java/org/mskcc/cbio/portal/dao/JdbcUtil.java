@@ -62,12 +62,12 @@ public class JdbcUtil {
     public static DataSource getDataSource() {
         if (dataSource == null) {
             dataSource = new TransactionAwareDataSourceProxy(new JdbcDataSource());
-            initSpringTx();
+            setupTransactionManagement();
         }
         return dataSource;
     }
 
-    private static void initSpringTx() {
+    private static void setupTransactionManagement() {
         transactionManager = new DataSourceTransactionManager(dataSource);
         transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -78,7 +78,7 @@ public class JdbcUtil {
      */
     public static void setDataSource(DataSource value) {
         dataSource = value;
-        initSpringTx();
+        setupTransactionManagement();
     }
 
     public static TransactionTemplate getTransactionTemplate() {
