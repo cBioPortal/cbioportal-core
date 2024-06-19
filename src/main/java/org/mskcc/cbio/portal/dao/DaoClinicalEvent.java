@@ -32,6 +32,9 @@
 
 package org.mskcc.cbio.portal.dao;
 
+import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.model.ClinicalEvent;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -40,8 +43,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.ClinicalEvent;
 
 /**
  *
@@ -52,7 +53,7 @@ public final class DaoClinicalEvent {
     
     public static int addClinicalEvent(ClinicalEvent clinicalEvent) {
         if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new IllegalStateException("Only buld load mode is allowed for importing clinical events");
+            throw new IllegalStateException("Only bulk load mode is allowed for importing clinical events");
         }
         
         MySQLbulkLoader.getMySQLbulkLoader("clinical_event").insertRecord(
@@ -195,6 +196,26 @@ public final class DaoClinicalEvent {
             
             pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE PATIENT_ID in (SELECT INTERNAL_ID FROM patient where CANCER_STUDY_ID=?)");
             pstmt.setInt(1, cancerStudyId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoClinicalEvent.class, con, pstmt, rs);
+        }
+    }
+
+    public static void deleteByPatientId(int patientId) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
+
+            pstmt = con.prepareStatement("DELETE clinical_event, clinical_event_data" +
+                    " FROM clinical_event" +
+                    " LEFT JOIN clinical_event_data ON clinical_event_data.CLINICAL_EVENT_ID = clinical_event.CLINICAL_EVENT_ID" +
+                    " WHERE clinical_event.PATIENT_ID = ?");
+            pstmt.setInt(1, patientId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
