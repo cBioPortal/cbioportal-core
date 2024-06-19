@@ -441,19 +441,17 @@ public class DaoGeneticAlteration {
      * Deletes all Genetic Alteration Records associated with the specified Genetic Profile ID.
      *
      * @param geneticProfileId Genetic Profile ID.
-     * @param geneticEntityId Genetic Entity ID.
      * @throws DaoException Database Error.
      */
-    public void deleteAllRecordsInGeneticProfile(long geneticProfileId, long geneticEntityId) throws DaoException {
+    public void deleteAllRecordsInGeneticProfile(long geneticProfileId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_alteration WHERE GENETIC_PROFILE_ID=? and GENETIC_ENTITY_ID=?");
+                    "genetic_alteration WHERE GENETIC_PROFILE_ID=?");
             pstmt.setLong(1, geneticProfileId);
-            pstmt.setLong(2, geneticEntityId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

@@ -44,19 +44,18 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
         super.orderedSampleList.addAll(newSampleIds);
         DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(this.geneticProfileId);
         super.storeOrderedSampleList();
+        daoGeneticAlteration.deleteAllRecordsInGeneticProfile(this.geneticProfileId);
     }
 
     @Override
     public boolean store(String[] values, CanonicalGene gene, String geneSymbol) throws DaoException {
         int geneticEntityId = gene.getGeneticEntityId();
-        daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfileId, geneticEntityId);
         String[] expandedValues = extendValues(geneticEntityId, values);
         return super.store(expandedValues, gene, geneSymbol);
     }
 
     @Override
     public boolean store(int geneticEntityId, String[] values) throws DaoException {
-        daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfileId, geneticEntityId);
         String[] expandedValues = extendValues(geneticEntityId, values);
         return super.store(geneticEntityId, expandedValues);
     }
