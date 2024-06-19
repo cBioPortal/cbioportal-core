@@ -117,6 +117,8 @@ class DataImporterTests(unittest.TestCase):
             '--meta', f'{data_directory}/meta_methylation_hm27.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_methylation_hm27.txt', '--noprogress')
         treatment_ic50_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_treatment_ic50.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_treatment_ic50.txt', '--noprogress')
+        sv_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_structural_variants.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_structural_variants.txt', '--noprogress')
         timeline_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportTimelineData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_timeline.txt', '--loadMode', 'bulkload', '--data', f'{data_directory}/data_timeline.txt', '--noprogress')
         case_list_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds',
@@ -134,6 +136,7 @@ class DataImporterTests(unittest.TestCase):
             expression_median_call,
             methylation_hm27_call,
             treatment_ic50_call,
+            sv_call,
             timeline_call,
             gene_panel_matrix_call,
             case_list_call,

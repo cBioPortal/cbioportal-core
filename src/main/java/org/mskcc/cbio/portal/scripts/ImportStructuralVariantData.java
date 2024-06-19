@@ -46,22 +46,25 @@ import java.util.Set;
 public class ImportStructuralVariantData {
 
     // Initialize variables
-    private File structuralVariantFile;
-    private int geneticProfileId;
-    private String genePanel;
-    private Set<String> namespaces;
-    private Set<String> sampleSet  = new HashSet<>();
+    private final File structuralVariantFile;
+    private final int geneticProfileId;
+    private final Integer genePanelId;
+    private final Set<String> namespaces;
+
+    private final boolean updateMode;
 
     public ImportStructuralVariantData(
         File structuralVariantFile, 
         int geneticProfileId, 
         String genePanel, 
-        Set<String> namespaces
+        Set<String> namespaces,
+        boolean updateMode
     ) throws DaoException {
         this.structuralVariantFile = structuralVariantFile;
         this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
+        this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.namespaces = namespaces;
+        this.updateMode = updateMode;
     }
 
     public void importData() throws IOException, DaoException {
@@ -75,7 +78,7 @@ public class ImportStructuralVariantData {
         int recordCount = 0;
         // Genetic profile is read in first
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-        ArrayList <Integer> orderedSampleList = new ArrayList<Integer>();
+        Set<Integer> sampleIds = new HashSet<>();
         long id = DaoStructuralVariant.getLargestInternalId();
         Set<String> uniqueSVs = new HashSet<>();
         while ((line = buf.readLine()) != null) {
@@ -175,27 +178,34 @@ public class ImportStructuralVariantData {
                         // Add structural variant
                         DaoStructuralVariant.addStructuralVariantToBulkLoader(structuralVariant);
 
-                        // Add sample to sample profile list, which is important for gene panels
-                        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId) && !sampleSet.contains(sample.getStableId())) {
-                            if (genePanel != null) {
-                                DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, GeneticProfileUtil.getGenePanelId(genePanel));
-                            } else {
-                                DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, null);
-                            }
-                        }
-                        sampleSet.add(sample.getStableId());
-                        orderedSampleList.add(sample.getInternalId());
+                        sampleIds.add(sample.getInternalId());
                     }
                 }
             }
         }
-        DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+        // TODO the dao methods could receive a set of sample ids (like the deletion does) instead of looping
+        if (updateMode) {
+            for (Integer sampleId : sampleIds) {
+                DaoSampleProfile.updateSampleProfile(sampleId, geneticProfileId, genePanelId);
+            }
+            DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
+        } else {
+            for (Integer sampleId : sampleIds) {
+                createSampleProfileIfNotExists(sampleId);
+            }
+        }
 
         buf.close();
         MySQLbulkLoader.flushAll();
     }
 
-    private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {
+    private void createSampleProfileIfNotExists(int internalSampleId) throws DaoException {
+        if (!DaoSampleProfile.sampleExistsInGeneticProfile(internalSampleId, geneticProfileId)) {
+            DaoSampleProfile.addSampleProfile(internalSampleId, geneticProfileId, genePanelId);
+        }
+    }
+
+        private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {
         CanonicalGene siteCanonicalGene = null;
 
         // If the Entrez Gene Id is not "NA" set the canonical gene.
