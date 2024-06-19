@@ -54,12 +54,8 @@ public class ImportProfileData extends ConsoleRunnable {
     public void run() {
         DaoGeneOptimized daoGene;
         DaoGeneticAlteration daoGeneticAlteration;
-        try {
-            daoGene = DaoGeneOptimized.getInstance();
-            daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-        } catch (DaoException e) {
-            throw new RuntimeException("Could not create dao instances", e);
-        }
+        daoGene = DaoGeneOptimized.getInstance();
+        daoGeneticAlteration = DaoGeneticAlteration.getInstance();
 
         try {
             // Parse arguments
@@ -87,13 +83,11 @@ public class ImportProfileData extends ConsoleRunnable {
             }
             
             // Print profile report
-            int numLines = FileUtil.getNumLines(dataFile);
             ProgressMonitor.setCurrentMessage(
                     " --> profile id:  " + geneticProfile.getGeneticProfileId() +
                     "\n --> profile name:  " + geneticProfile.getProfileName() +
                     "\n --> genetic alteration type:  " + geneticProfile.getGeneticAlterationType().name());
-            ProgressMonitor.setMaxValue(numLines);
-            
+
             // Check genetic alteration type 
             if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_EXTENDED || 
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_UNCALLED) {
@@ -122,8 +116,11 @@ public class ImportProfileData extends ConsoleRunnable {
                 // use a different importer for patient level data
                 String patientLevel = geneticProfile.getOtherMetaDataField("patient_level");
                 if (patientLevel != null && patientLevel.trim().toLowerCase().equals("true")) {
+                    if (overwriteExisting) {
+                        throw new UnsupportedOperationException("Incremental upload for generic assay patient_level data is not supported. Please use sample level instead.");
+                    }
                     ImportGenericAssayPatientLevelData genericAssayProfileImporter = new ImportGenericAssayPatientLevelData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel, geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"));
-                    genericAssayProfileImporter.importData(numLines);
+                    genericAssayProfileImporter.importData();
                 } else {
                     // use ImportTabDelimData importer for non-patient level data
                     ImportTabDelimData genericAssayProfileImporter = new ImportTabDelimData(
@@ -132,9 +129,10 @@ public class ImportProfileData extends ConsoleRunnable {
                         geneticProfile.getGeneticProfileId(), 
                         genePanel, 
                         geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"),
-                        daoGeneticAlteration
+                        overwriteExisting,
+                        daoGeneticAlteration, daoGene
                     );
-                    genericAssayProfileImporter.importData(numLines);
+                    genericAssayProfileImporter.importData();
                 }
             } else if(
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
@@ -156,13 +154,14 @@ public class ImportProfileData extends ConsoleRunnable {
                     geneticProfile.getTargetLine(), 
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
-                    daoGeneticAlteration                    
+                    overwriteExisting,
+                    daoGeneticAlteration, daoGene
                 );
                 String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
                 if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
                     importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
                 }
-                importer.importData(numLines);
+                importer.importData();
             }
        }
        catch (Exception e) {

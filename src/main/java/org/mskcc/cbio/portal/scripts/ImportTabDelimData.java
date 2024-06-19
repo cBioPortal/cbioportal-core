@@ -53,11 +53,8 @@ import org.mskcc.cbio.portal.util.*;
  */
 public class ImportTabDelimData {
     public static final String CNA_VALUE_AMPLIFICATION = "2";
-    public static final String CNA_VALUE_GAIN = "1";
-    public static final String CNA_VALUE_HEMIZYGOUS_DELETION = "-1";
     public static final String CNA_VALUE_HOMOZYGOUS_DELETION = "-2";
     public static final String CNA_VALUE_PARTIAL_DELETION = "-1.5";
-    public static final String CNA_VALUE_ZERO = "0";
     private HashSet<Integer> importedGeneticEntitySet = new HashSet<>();
     private File dataFile;
     private String targetLine;
@@ -72,6 +69,16 @@ public class ImportTabDelimData {
     private Map<Map.Entry<Integer, Long>, Map<String, String>> pdAnnotations;
     private final GeneticAlterationImporter geneticAlterationImporter;
 
+    private int numLines;
+    private DaoGeneticAlteration daoGeneticAlteration;
+
+    private DaoGeneOptimized daoGene;
+
+    private boolean updateMode;
+    private HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
+    private ArrayList<Integer> orderedImportedSampleList;
+    private ArrayList<Integer> orderedSampleList;
+
     /**
      * Constructor.
      *
@@ -81,7 +88,8 @@ public class ImportTabDelimData {
      * @param geneticProfileId        GeneticProfile ID.
      * @param genePanel               GenePanel
      * @param genericEntityProperties Generic Assay Entities.
-     * 
+     * @param updateMode if true, update/append data to the existing one
+     *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
     public ImportTabDelimData(
@@ -90,17 +98,12 @@ public class ImportTabDelimData {
         int geneticProfileId,
         String genePanel,
         String genericEntityProperties,
-        DaoGeneticAlteration daoGeneticAlteration
+        boolean updateMode,
+        DaoGeneticAlteration daoGeneticAlteration,
+        DaoGeneOptimized daoGene
     ) {
-        this.dataFile = dataFile;
-        this.targetLine = targetLine;
-        this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
-        this.genericEntityProperties = genericEntityProperties;
-        this.geneticAlterationImporter = new GeneticAlterationImporter(
-            geneticProfileId,
-            daoGeneticAlteration
-        );
+       this(dataFile, targetLine, geneticProfileId, genePanel, updateMode, daoGeneticAlteration, daoGene);
+       this.genericEntityProperties = genericEntityProperties;
     }
 
     /**
@@ -110,7 +113,8 @@ public class ImportTabDelimData {
      * @param targetLine       The line we want to import.
      *                         If null, all lines are imported.
      * @param geneticProfileId GeneticProfile ID.
-     * 
+     * @param updateMode if true, update/append data to the existing one
+     *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
     public ImportTabDelimData(
@@ -118,18 +122,18 @@ public class ImportTabDelimData {
         String targetLine,
         int geneticProfileId,
         String genePanel,
-        DaoGeneticAlteration daoGeneticAlteration
+        boolean updateMode,
+        DaoGeneticAlteration daoGeneticAlteration,
+        DaoGeneOptimized daoGene
     ) {
-        this.dataFile = dataFile;
+        this(dataFile, geneticProfileId, genePanel, updateMode, daoGeneticAlteration, daoGene);
         this.targetLine = targetLine;
-        this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
-        this.geneticAlterationImporter = new GeneticAlterationImporter(geneticProfileId, daoGeneticAlteration);
     }
 
     /**
      * Constructor.
      *
+     * @param updateMode if true, update/append data to the existing one
      * @param dataFile         Data File containing Copy Number Alteration, MRNA Expression Data, or protein RPPA data
      * @param geneticProfileId GeneticProfile ID.
      */
@@ -137,28 +141,54 @@ public class ImportTabDelimData {
         File dataFile, 
         int geneticProfileId, 
         String genePanel,
-        DaoGeneticAlteration daoGeneticAlteration
+        boolean updateMode,
+        DaoGeneticAlteration daoGeneticAlteration,
+        DaoGeneOptimized daoGene
     ) {
         this.dataFile = dataFile;
         this.geneticProfileId = geneticProfileId;
         this.genePanel = genePanel;
+        this.updateMode = updateMode;
+        this.daoGeneticAlteration = daoGeneticAlteration;
         this.geneticAlterationImporter = new GeneticAlterationImporter(geneticProfileId, daoGeneticAlteration);
+        this.daoGene = daoGene;
+        this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
+        if (this.updateMode
+                && geneticProfile != null
+                && this.geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE) {
+            throw new UnsupportedOperationException("Incremental upload of geneset scores is not supported.");
+        }
     }
 
     /**
      * Import the Copy Number Alteration, mRNA Expression, protein RPPA, GSVA or generic_assay data
      *
-     * @throws IOException  IO Error.
-     * @throws DaoException Database Error.
      */
-    public void importData(int numLines) throws IOException, DaoException {
-
-        geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-
+    public void importData() {
+       JdbcUtil.getTransactionTemplate().execute(status -> {
+            try {
+                doImportData();
+            } catch (Throwable e) {
+                status.setRollbackOnly();
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+    }
+    private void doImportData() throws IOException, DaoException {
+        try {
+            this.numLines = FileUtil.getNumLines(dataFile);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        if (updateMode) {
+            geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfile.getGeneticProfileId(), null);
+        }
+        ProgressMonitor.setMaxValue(numLines);
         FileReader reader = new FileReader(dataFile);
         BufferedReader buf = new BufferedReader(reader);
         String headerLine = buf.readLine();
-        String parts[] = headerLine.split("\t");
+        String headerParts[] = headerLine.split("\t");
 
         //Whether data regards CNA or RPPA:
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -166,23 +196,23 @@ public class ImportTabDelimData {
             && geneticProfile.showProfileInAnalysisTab();
         boolean isRppaProfile = geneticProfile != null
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.PROTEIN_LEVEL
-            && "Composite.Element.Ref".equalsIgnoreCase(parts[0]);
+            && "Composite.Element.Ref".equalsIgnoreCase(headerParts[0]);
         boolean isGsvaProfile = geneticProfile != null
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE
-            && parts[0].equalsIgnoreCase("geneset_id");
+            && headerParts[0].equalsIgnoreCase("geneset_id");
         boolean isGenericAssayProfile = geneticProfile != null
             && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY
-            && parts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
+            && headerParts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
 
         int numRecordsToAdd = 0;
         int samplesSkipped = 0;
         try {
-            int hugoSymbolIndex = getHugoSymbolIndex(parts);
-            int entrezGeneIdIndex = getEntrezGeneIdIndex(parts);
-            int rppaGeneRefIndex = getRppaGeneRefIndex(parts);
-            int genesetIdIndex = getGenesetIdIndex(parts);
-            int sampleStartIndex = getStartIndex(parts, hugoSymbolIndex, entrezGeneIdIndex, rppaGeneRefIndex, genesetIdIndex);
-            int genericAssayIdIndex = getGenericAssayIdIndex(parts);
+            int hugoSymbolIndex = getHugoSymbolIndex(headerParts);
+            int entrezGeneIdIndex = getEntrezGeneIdIndex(headerParts);
+            int rppaGeneRefIndex = getRppaGeneRefIndex(headerParts);
+            int genesetIdIndex = getGenesetIdIndex(headerParts);
+            int sampleStartIndex = getStartIndex(headerParts, hugoSymbolIndex, entrezGeneIdIndex, rppaGeneRefIndex, genesetIdIndex);
+            int genericAssayIdIndex = getGenericAssayIdIndex(headerParts);
             if (isRppaProfile) {
                 if (rppaGeneRefIndex == -1) {
                     throw new RuntimeException("Error: the following column should be present for RPPA data: Composite.Element.Ref");
@@ -200,10 +230,9 @@ public class ImportTabDelimData {
             }
 
             String sampleIds[];
-            sampleIds = new String[parts.length - sampleStartIndex];
-            System.arraycopy(parts, sampleStartIndex, sampleIds, 0, parts.length - sampleStartIndex);
+            sampleIds = new String[headerParts.length - sampleStartIndex];
+            System.arraycopy(headerParts, sampleStartIndex, sampleIds, 0, headerParts.length - sampleStartIndex);
 
-            int nrUnknownSamplesAdded = 0;
             ProgressMonitor.setCurrentMessage(" --> total number of samples: " + sampleIds.length);
 
             Map<Map.Entry<String, Long>, Map<String, String>> pdAnnotationsForStableSampleIds = null;
@@ -211,9 +240,9 @@ public class ImportTabDelimData {
                 pdAnnotationsForStableSampleIds = readPdAnnotations(this.pdAnnotationsFile);
             }
             // link Samples to the genetic profile
-            ArrayList<Integer> orderedSampleList = new ArrayList<Integer>();
             ArrayList<Integer> filteredSampleIndices = new ArrayList<Integer>();
             this.pdAnnotations = new HashMap<>();
+            this.orderedSampleList = new ArrayList<>();
             for (int i = 0; i < sampleIds.length; i++) {
                 Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
                     StableIdUtil.getSampleId(sampleIds[i]));
@@ -228,10 +257,7 @@ public class ImportTabDelimData {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(sampleIds[i]) + "' found in tab-delimited file: " + this.dataFile.getCanonicalPath());
                     }
                 }
-                if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-                    Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-                    DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
-                }
+                ensureSampleGeneticProfile(sample);
                 orderedSampleList.add(sample.getInternalId());
                 if (pdAnnotationsForStableSampleIds != null) {
                     Set<Map.Entry<String, Long>> keys = new HashSet<>(pdAnnotationsForStableSampleIds.keySet());
@@ -248,21 +274,12 @@ public class ImportTabDelimData {
             if (pdAnnotationsForStableSampleIds != null && !pdAnnotationsForStableSampleIds.keySet().isEmpty()) {
                 ProgressMonitor.logWarning("WARNING: Following pd annotation sample-entrezId pairs newer used in the data file:  " + pdAnnotationsForStableSampleIds.keySet());
             }
-            if (nrUnknownSamplesAdded > 0) {
-                ProgressMonitor.logWarning("WARNING: Number of samples added on the fly because they were missing in clinical data:  " + nrUnknownSamplesAdded);
-            }
             if (samplesSkipped > 0) {
                 ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + samplesSkipped);
             }
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines - 1));
 
-            DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
-
-            //Gene cache:
-            DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
-
-            //Object to insert records in the generic 'genetic_alteration' table: 
-            DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+            saveOrderedSampleList();
 
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
@@ -277,28 +294,71 @@ public class ImportTabDelimData {
                 genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             }
 
-            int lenParts = parts.length;
+            int headerColumns = headerParts.length;
 
             String line = buf.readLine();
             while (line != null) {
+
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
                 boolean recordAdded = false;
 
-                // either parse line as geneset or gene for importing into 'genetic_alteration' table
-                if (isGsvaProfile) {
-                    recordAdded = parseGenesetLine(line, lenParts, sampleStartIndex, genesetIdIndex,
-                        filteredSampleIndices, daoGeneticAlteration);
-                } else if (isGenericAssayProfile) {
-                    recordAdded = parseGenericAssayLine(line, lenParts, sampleStartIndex, genericAssayIdIndex,
-                        filteredSampleIndices, daoGeneticAlteration, genericAssayStableIdToEntityIdMap);
-                } else {
-                    recordAdded = parseLine(line, lenParts, sampleStartIndex,
-                        hugoSymbolIndex, entrezGeneIdIndex, rppaGeneRefIndex,
-                        isRppaProfile, isDiscretizedCnaProfile,
-                        daoGene,
-                        filteredSampleIndices, orderedSampleList,
-                        existingCnaEvents);
+                if (FileUtil.isInfoLine(line)) {
+                    String[] rowParts = line.split("\t", -1);
+
+                    if (rowParts.length > headerColumns && line.split("\t").length > headerColumns) {
+                        ProgressMonitor.logWarning("Ignoring line with more fields (" + rowParts.length
+                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
+                    } else if (rowParts.length < headerColumns) {
+                        ProgressMonitor.logWarning("Ignoring line with less fields (" + rowParts.length
+                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
+                    } else {
+                        String sampleValues[] = ArrayUtils.subarray(rowParts, sampleStartIndex, rowParts.length > headerColumns ? headerColumns : rowParts.length);
+
+                        // trim whitespace from values
+                        sampleValues = Stream.of(sampleValues).map(String::trim).toArray(String[]::new);
+                        sampleValues = filterOutNormalValues(filteredSampleIndices, sampleValues);
+
+                        // either parse line as geneset or gene for importing into 'genetic_alteration' table
+                        if (isGsvaProfile) {
+                            String genesetId = rowParts[genesetIdIndex];
+                            recordAdded = saveGenesetLine(sampleValues, genesetId);
+                        } else if (isGenericAssayProfile) {
+                            String genericAssayId = rowParts[genericAssayIdIndex];
+                            recordAdded = saveGenericAssayLine(sampleValues, genericAssayId, genericAssayStableIdToEntityIdMap);
+                        } else {
+                            String geneSymbol = null;
+                            if (hugoSymbolIndex != -1) {
+                                geneSymbol = rowParts[hugoSymbolIndex];
+                            }
+                            if (rppaGeneRefIndex != -1) {
+                                geneSymbol = rowParts[rppaGeneRefIndex];
+                            }
+                            if (geneSymbol != null && geneSymbol.isEmpty()) {
+                                geneSymbol = null;
+                            }
+                            //get entrez
+                            String entrez = null;
+                            if (entrezGeneIdIndex != -1) {
+                                entrez = rowParts[entrezGeneIdIndex];
+                            }
+                            if (entrez != null && entrez.isEmpty()) {
+                                entrez = null;
+                            }
+                            if (entrez != null && !EntrezValidator.isaValidEntrezId(entrez)) {
+                                ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
+                            } else {
+                                String firstCellValue = rowParts[0];
+                                if (targetLine == null || firstCellValue.equals(targetLine)) {
+                                    recordAdded = saveLine(sampleValues,
+                                            entrez, geneSymbol,
+                                            isRppaProfile, isDiscretizedCnaProfile,
+                                            existingCnaEvents);
+                                }
+                            }
+                        }
+                    }
+
                 }
 
                 // increment number of records added or entries skipped
@@ -311,6 +371,7 @@ public class ImportTabDelimData {
 
                 line = buf.readLine();
             }
+            expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
             if (MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
             }
@@ -330,6 +391,60 @@ public class ImportTabDelimData {
         finally {
             buf.close();
         }
+    }
+
+    private void expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue() {
+        if (updateMode) {
+            // Expand remaining genetic entity id rows that were not mentioned in the file
+            new HashSet<>(geneticAlterationMap.keySet()).forEach(geneticEntityId -> {
+                try {
+                    String[] values = new String[orderedImportedSampleList.size()];
+                    Arrays.fill(values, "");
+                    saveValues(geneticEntityId, values);
+                } catch (DaoException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+    }
+
+    private void ensureSampleGeneticProfile(Sample sample) throws DaoException {
+        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
+            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
+            if (updateMode) {
+                DaoSampleProfile.deleteRecords(List.of(sample.getInternalId()), List.of(geneticProfileId));
+            }
+            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
+        }
+    }
+
+    private void saveOrderedSampleList() throws DaoException {
+        if (updateMode) {
+            ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(geneticProfileId);
+            int initialOrderSampleListSize = savedOrderedSampleList.size();
+            checkSamplesInDataEqualTo(initialOrderSampleListSize);
+            // add all new sample ids at the end
+            ArrayList<Integer> extendedSampleList = new ArrayList<>(savedOrderedSampleList);
+            List<Integer> newSampleIds = orderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
+            extendedSampleList.addAll(newSampleIds);
+            orderedImportedSampleList = orderedSampleList;
+            orderedSampleList = extendedSampleList;
+
+
+            DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(geneticProfileId);
+        }
+        DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+    }
+
+    private void checkSamplesInDataEqualTo(int initialOrderSampleListSize) {
+        geneticAlterationMap.forEach((geneticEntityId, sampleToValue) -> {
+            if (sampleToValue.size() != initialOrderSampleListSize) {
+                throw new IllegalStateException("Number of samples ("
+                        + sampleToValue.size() + ") for genetic entity with id "
+                        + geneticEntityId + " does not match with the number in the inital sample list ("
+                        + initialOrderSampleListSize + ").");
+            }
+        });
     }
 
     private Map<Map.Entry<String, Long>, Map<String, String>> readPdAnnotations(File pdAnnotationsFile) {
@@ -483,235 +598,119 @@ public class ImportTabDelimData {
      * <tr><td>AMIXED<td>0<td>...
      * </table>
      *
-     * @param line                    the line from the profile data file to be parsed
-     * @param nrColumns               the number of columns, defined by the header line
-     * @param sampleStartIndex        the index of the first column with a sample name in the header field
-     * @param hugoSymbolIndex         the index of the column Hugo_Symbol
-     * @param entrezGeneIdIndex       the index of the column Entrez_Gene_Id
-     * @param rppaGeneRefIndex        the index of the column Composite.Element.Ref
      * @param isRppaProfile           true if this is an rppa profile (i.e. alteration type is PROTEIN_LEVEL and the first column is Composite.Element.Ref)
      * @param isDiscretizedCnaProfile true if this is a discretized CNA profile (i.e. alteration type COPY_NUMBER_ALTERATION and showProfileInAnalysisTab is true)
-     * @param daoGene                 an instance of DaoGeneOptimized ... for use in resolving gene symbols
-     * @param orderedSampleList       a list of the internal sample ids corresponding to the sample names in the header line
      * @param existingCnaEvents       a collection of CnaEvents, to be added to or updated during parsing of individual lines
      * @return true if any record was stored in genetic_alteration, else false
      * @throws DaoException if any DaoException is thrown while using daoGene or daoGeneticAlteration
      */
-    private boolean parseLine(String line, int nrColumns, int sampleStartIndex,
-                              int hugoSymbolIndex, int entrezGeneIdIndex, int rppaGeneRefIndex,
-                              boolean isRppaProfile, boolean isDiscretizedCnaProfile,
-                              DaoGeneOptimized daoGene,
-                              List<Integer> filteredSampleIndices, List<Integer> orderedSampleList,
-                              Set<CnaEvent.Event> existingCnaEvents
+    private boolean saveLine(String[] values,
+                             String entrez,
+                             String geneSymbol,
+                             boolean isRppaProfile,
+                             boolean isDiscretizedCnaProfile,
+                             Set<CnaEvent.Event> existingCnaEvents
     ) throws DaoException {
-
-        //TODO: refactor this entire function - split functionality into smaller units / subroutines
 
         boolean recordStored = false;
 
-        //  Ignore lines starting with #
-        if (!line.startsWith("#") && line.trim().length() > 0) {
-            String[] parts = line.split("\t", -1);
+        if (isRppaProfile && geneSymbol == null) {
+            ProgressMonitor.logWarning("Ignoring line with no Composite.Element.REF value");
+            return false;
+        }
 
-            if (parts.length > nrColumns) {
-                if (line.split("\t").length > nrColumns) {
-                    ProgressMonitor.logWarning("Ignoring line with more fields (" + parts.length
-                        + ") than specified in the headers(" + nrColumns + "): \n" + parts[0]);
-                    return false;
-                }
-            }
-            String values[] = (String[]) ArrayUtils.subarray(parts, sampleStartIndex, parts.length > nrColumns ? nrColumns : parts.length);
-            values = filterOutNormalValues(filteredSampleIndices, values);
+        //If all are empty, skip line:
+        boolean noGeneSpecified = geneSymbol == null && entrez == null;
+        if (noGeneSpecified) {
+            ProgressMonitor.logWarning("Ignoring line with no Hugo_Symbol and no Entrez_Id");
+            return false;
+        }
 
-            String geneSymbol = null;
-            if (hugoSymbolIndex != -1) {
-                geneSymbol = parts[hugoSymbolIndex];
-            }
-            //RPPA: //TODO - we should split up the RPPA scenario from this code...too many if/else because of this
-            if (rppaGeneRefIndex != -1) {
-                geneSymbol = parts[rppaGeneRefIndex];
-            }
-            if (geneSymbol != null && geneSymbol.isEmpty()) {
-                geneSymbol = null;
-            }
-            if (isRppaProfile && geneSymbol == null) {
-                ProgressMonitor.logWarning("Ignoring line with no Composite.Element.REF value");
+        if (geneSymbol != null) {
+            boolean multipleGenesLine = geneSymbol.contains("///");
+            if (multipleGenesLine) {
+                ProgressMonitor.logWarning("Ignoring gene symbol:  " + geneSymbol
+                        + " It is separated by ///.  This indicates that the line contains information regarding multiple genes, and we cannot currently handle this");
                 return false;
             }
-            //get entrez
-            String entrez = null;
-            if (entrezGeneIdIndex != -1) {
-                entrez = parts[entrezGeneIdIndex];
-            }
-            if (entrez != null) {
-                if (entrez.isEmpty()) {
-                    entrez = null;
-                }
-                else if (!entrez.matches("[0-9]+")) {
-                    //TODO - would be better to give an exception in some cases, like negative Entrez values
-                    ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
-                    return false;
-                }
-            }
-
-            //If all are empty, skip line:
-            if (geneSymbol == null && entrez == null) {
-                ProgressMonitor.logWarning("Ignoring line with no Hugo_Symbol and no Entrez_Id");
+            boolean unknownGene = geneSymbol.contains("---");
+            if (unknownGene) {
+                ProgressMonitor.logWarning("Ignoring gene symbol:  " + geneSymbol
+                        + " It is specified as ---.  This indicates that the line contains information regarding an unknown gene, and we cannot currently handle this");
                 return false;
+            }
+        }
+
+        List<CanonicalGene> genes;
+        //If rppa, parse genes from "Composite.Element.REF" column:
+        if (isRppaProfile) {
+            genes = parseRPPAGenes(geneSymbol);
+        } else {
+            genes = parseGenes(entrez, geneSymbol);
+        }
+
+        //if genes still null, skip current record
+        if (genes == null || genes.isEmpty()) {
+            ProgressMonitor.logWarning("Gene with Entrez_Id " + entrez + " and gene symbol" +  geneSymbol +" not found. Record will be skipped for this gene.");
+            return false;
+        }
+
+        List<CanonicalGene> genesMatchingAnAlias = Collections.emptyList();
+        if (geneSymbol != null) {
+            genesMatchingAnAlias = daoGene.getGenesForAlias(geneSymbol);
+        }
+
+        Set<CanonicalGene> microRNAGenes = new HashSet<>();
+        Set<CanonicalGene> nonMicroRNAGenes = new HashSet<>();
+        Iterator<CanonicalGene> geneIterator = Stream.concat(genes.stream(), genesMatchingAnAlias.stream()).iterator();
+        while (geneIterator.hasNext()) {
+            CanonicalGene g = geneIterator.next();
+            if ("miRNA".equals(g.getType())) {
+                microRNAGenes.add(g);
             } else {
-                if (geneSymbol != null && (geneSymbol.contains("///") || geneSymbol.contains("---"))) {
-                    //  Ignore gene IDs separated by ///.  This indicates that
-                    //  the line contains information regarding multiple genes, and
-                    //  we cannot currently handle this.
-                    //  Also, ignore gene IDs that are specified as ---.  This indicates
-                    //  the line contains information regarding an unknown gene, and
-                    //  we cannot currently handle this.
-                    ProgressMonitor.logWarning("Ignoring gene ID:  " + geneSymbol);
-                    return false;
+                nonMicroRNAGenes.add(g);
+            }
+        }
+        if (!microRNAGenes.isEmpty()) {
+            // for micro rna, duplicate the data
+            for (CanonicalGene gene : microRNAGenes) {
+                if (this.saveValues(gene, values, geneSymbol)) {
+                    recordStored = true;
+                }
+            }
+            if (!recordStored) {
+                if (nonMicroRNAGenes.isEmpty()) {
+                    // this means that no microRNA records could not be stored
+                    ProgressMonitor.logWarning("Could not store microRNA data");
                 } else {
-                    List<CanonicalGene> genes = null;
-                    //If rppa, parse genes from "Composite.Element.REF" column:
-                    if (isRppaProfile) {
-                        genes = parseRPPAGenes(geneSymbol);
-                        if (genes == null) {
-                            //will be null when there is a parse error in this case, so we
-                            //can return here and avoid duplicated messages:
-                            return false;
-                        }
-                        if (genes.isEmpty()) {
-                            String gene = (geneSymbol != null) ? geneSymbol : entrez;
-                            ProgressMonitor.logWarning("Gene not found for:  [" + gene
-                                + "]. Ignoring it "
-                                + "and all tab-delimited data associated with it!");
-                            return false;
-                        }
-                    } else {
-                        //try entrez:
-                        if (entrez != null) {
-                            CanonicalGene gene = daoGene.getGene(Long.parseLong(entrez));
-                            if (gene != null) {
-                                genes = Arrays.asList(gene);
-                            }
-                        }
-                        //no entrez or could not resolve by entrez, try hugo:
-                        if ((genes == null || genes.isEmpty()) && geneSymbol != null) {
-                            // deal with multiple symbols separate by |, use the first one
-                            int ix = geneSymbol.indexOf("|");
-                            if (ix > 0) {
-                                geneSymbol = geneSymbol.substring(0, ix);
-                            }
-                            genes = daoGene.getGene(geneSymbol, true);
-                        }
-                        //if genes still null, skip current record
-                        if (genes == null || genes.isEmpty()) {
-                            ProgressMonitor.logWarning("Entrez_Id " + entrez + " not found. Record will be skipped for this gene.");
-                            return false;
-                        }
+                    // this case :
+                    //      - at least one of the entrez-gene-ids was not a microRNA
+                    //      - all of the matched microRNA ids (if any) failed to be imported (presumably already imported on a prior line)
+                    ProgressMonitor.logWarning("Gene symbol " + geneSymbol + " found to be ambiguous (a mixture of microRNA and other types). Record will be skipped for this gene.");
+                }
+                return false;
+            }
+        } else {
+            // none of the matched genes are type "miRNA"
+            if (genes.size() == 1) {
+                // Store all values per gene:
+                recordStored = this.saveValues(genes.get(0), values, geneSymbol);
+                //only add extra CNA related records if the step above worked, otherwise skip:
+                if (recordStored && isDiscretizedCnaProfile) {
+                    if (updateMode) {
+                        DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedImportedSampleList);
                     }
-
-                    //  If targetLine is specified and does not match the current line, skip the current line.
-                    if (targetLine != null && !(parts[0].equals(targetLine))) {
-                        return false;
-                    }
-
-                    List<CanonicalGene> genesMatchingAnAlias = Collections.emptyList();
-                    if (geneSymbol != null) {
-                        genesMatchingAnAlias = daoGene.getGenesForAlias(geneSymbol);
-                    }
-
-                    Set<CanonicalGene> microRNAGenes = new HashSet<>();
-                    Set<CanonicalGene> nonMicroRNAGenes = new HashSet<>();
-                    Iterator<CanonicalGene> geneIterator = Stream.concat(genes.stream(), genesMatchingAnAlias.stream()).iterator();
-                    while (geneIterator.hasNext()) {
-                        CanonicalGene g = geneIterator.next();
-                        if ("miRNA".equals(g.getType())) {
-                            microRNAGenes.add(g);
-                        } else {
-                            nonMicroRNAGenes.add(g);
-                        }
-                    }
-                    if (!microRNAGenes.isEmpty()) {
-                        // for micro rna, duplicate the data
-                        for (CanonicalGene gene : microRNAGenes) {
-                            if (this.geneticAlterationImporter.store(values, gene, geneSymbol)) {
-                                recordStored = true;
-                            }
-                        }
-                        if (!recordStored) {
-                            if (nonMicroRNAGenes.isEmpty()) {
-                                // this means that no microRNA records could not be stored
-                                ProgressMonitor.logWarning("Could not store microRNA data");
-                            } else {
-                                // this case :
-                                //      - at least one of the entrez-gene-ids was not a microRNA
-                                //      - all of the matched microRNA ids (if any) failed to be imported (presumably already imported on a prior line)
-                                ProgressMonitor.logWarning("Gene symbol " + geneSymbol + " found to be ambiguous (a mixture of microRNA and other types). Record will be skipped for this gene.");
-                            }
-                            return false;
-                        }
-                    } else {
-                        // none of the matched genes are type "miRNA"
-                        if (genes.size() == 1) {
-                            List<CnaEvent> cnaEventsToAdd = new ArrayList<CnaEvent>();
-
-                            if (isDiscretizedCnaProfile) {
-                                long entrezGeneId = genes.get(0).getEntrezGeneId();
-                                for (int i = 0; i < values.length; i++) {
-
-                                    // temporary solution -- change partial deletion back to full deletion.
-                                    if (values[i].equals(CNA_VALUE_PARTIAL_DELETION)) {
-                                        values[i] = CNA_VALUE_HOMOZYGOUS_DELETION;
-                                    }
-                                    if (values[i].equals(CNA_VALUE_AMPLIFICATION)
-                                        // || values[i].equals(CNA_VALUE_GAIN)  >> skipping GAIN, ZERO, HEMIZYGOUS_DELETION to minimize size of dataset in DB
-                                        // || values[i].equals(CNA_VALUE_ZERO)
-                                        // || values[i].equals(CNA_VALUE_HEMIZYGOUS_DELETION)
-                                        || values[i].equals(CNA_VALUE_HOMOZYGOUS_DELETION)
-                                    ) {
-                                        Integer sampleId = orderedSampleList.get(i);
-                                        CnaEvent cnaEvent = new CnaEvent(sampleId, geneticProfileId, entrezGeneId, Short.parseShort(values[i]));
-                                        //delayed add:
-                                        AbstractMap.SimpleEntry<Integer, Long> sampleGenePair = new AbstractMap.SimpleEntry<>(sampleId, entrezGeneId);
-                                        Map<String, String> pdAnnotationDetails = this.pdAnnotations.get(sampleGenePair);
-                                        if (pdAnnotationDetails != null) {
-                                            cnaEvent.setDriverFilter(pdAnnotationDetails.get("DRIVER_FILTER"));
-                                            cnaEvent.setDriverFilterAnnotation(pdAnnotationDetails.get("DRIVER_FILTER_ANNOTATION"));
-                                            cnaEvent.setDriverTiersFilter(pdAnnotationDetails.get("DRIVER_TIERS_FILTER"));
-                                            cnaEvent.setDriverTiersFilterAnnotation(pdAnnotationDetails.get("DRIVER_TIERS_FILTER_ANNOTATION"));
-                                        }
-                                        cnaEventsToAdd.add(cnaEvent);
-                                    }
-                                }
-                            }
-                            // Store all values per gene:
-                            recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
-                            //only add extra CNA related records if the step above worked, otherwise skip:
-                            if (recordStored) {
-                                CnaUtil.storeCnaEvents(existingCnaEvents, cnaEventsToAdd);
-                            }
-                        } else {
-                            if (isRppaProfile) { // for protein data, duplicate the data
-                                for (CanonicalGene gene : genes) {
-                                    if (this.geneticAlterationImporter.store(values, gene, geneSymbol)) {
-                                        recordStored = true;
-                                        nrExtraRecords++;
-                                    }
-                                }
-                                if (recordStored) {
-                                    //skip one, to avoid double counting:
-                                    nrExtraRecords--;
-                                } else {
-                                    // this means that RPPA could not be stored
-                                    ProgressMonitor.logWarning("Could not store RPPA data");
-                                }
-                            } else {
-                                if (!recordStored) {
-                                    // this case :
-                                    //      - the hugo gene symbol was ambiguous (matched multiple entrez-gene-ids)
-                                    ProgressMonitor.logWarning("Gene symbol " + geneSymbol + " found to be ambiguous. Record will be skipped for this gene.");
-                                }
-                            }
-                        }
+                    long entrezGeneId = genes.get(0).getEntrezGeneId();
+                    CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, entrezGeneId));
+                }
+            } else {
+                if (isRppaProfile) { // for protein data, duplicate the data
+                    recordStored = saveRppaValues(values, recordStored, genes, geneSymbol);
+                } else {
+                    if (!recordStored) {
+                        // this case :
+                        //      - the hugo gene symbol was ambiguous (matched multiple entrez-gene-ids)
+                        ProgressMonitor.logWarning("Gene symbol " + geneSymbol + " found to be ambiguous. Record will be skipped for this gene.");
                     }
                 }
             }
@@ -719,95 +718,147 @@ public class ImportTabDelimData {
         return recordStored;
     }
 
+    private boolean saveValues(CanonicalGene canonicalGene, String[] values, String geneSymbol) throws DaoException {
+        if (updateMode) {
+            values = updateValues(canonicalGene.getGeneticEntityId(), values);
+            if (!geneticAlterationImporter.isImportedAlready(canonicalGene)) {
+                daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), canonicalGene.getGeneticEntityId());
+            }
+        }
+        return geneticAlterationImporter.store(values, canonicalGene, geneSymbol);
+    }
+    private boolean saveValues(int geneticEntityId, String[] values) throws DaoException {
+        if (updateMode) {
+            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfile.getGeneticProfileId(), geneticEntityId);
+            values = updateValues(geneticEntityId, values);
+        }
+        return daoGeneticAlteration.addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values) > 0;
+    }
+
+    private String[] updateValues(int geneticEntityId, String[] values) {
+        Map<Integer, String> sampleIdToValue = ArrayUtil.zip(orderedImportedSampleList.toArray(new Integer[0]), values);
+        String[] updatedSampleValues = new String[orderedSampleList.size()];
+        for (int i = 0; i < orderedSampleList.size(); i++) {
+            updatedSampleValues[i] = "";
+            int sampleId = orderedSampleList.get(i);
+            if (geneticAlterationMap.containsKey(geneticEntityId)) {
+                HashMap<Integer, String> savedSampleIdToValue = geneticAlterationMap.get(geneticEntityId);
+                updatedSampleValues[i] = savedSampleIdToValue.containsKey(sampleId) ? savedSampleIdToValue.remove(sampleId): "";
+                if (savedSampleIdToValue.isEmpty()) {
+                    geneticAlterationMap.remove(geneticEntityId);
+                }
+            }
+            if (sampleIdToValue.containsKey(sampleId)) {
+                updatedSampleValues[i] = sampleIdToValue.get(sampleId);
+            }
+        }
+        return updatedSampleValues;
+    }
+
+    private boolean saveRppaValues(String[] values, boolean recordStored, List<CanonicalGene> genes, String geneSymbol) throws DaoException {
+        for (CanonicalGene gene : genes) {
+            if (this.saveValues(gene, values, geneSymbol)) {
+                recordStored = true;
+                nrExtraRecords++;
+            }
+        }
+        if (recordStored) {
+            //skip one, to avoid double counting:
+            nrExtraRecords--;
+        } else {
+            // this means that RPPA could not be stored
+            ProgressMonitor.logWarning("Could not store RPPA data");
+        }
+        return recordStored;
+    }
+
+    private List<CanonicalGene> parseGenes(String entrez, String geneSymbol) {
+        //try entrez:
+        if (entrez != null) {
+            CanonicalGene gene = daoGene.getGene(Long.parseLong(entrez));
+            if (gene != null) {
+                return Arrays.asList(gene);
+            }
+        }
+        //no entrez or could not resolve by entrez, try hugo:
+        if (geneSymbol != null) {
+            // deal with multiple symbols separate by |, use the first one
+            int ix = geneSymbol.indexOf("|");
+            if (ix > 0) {
+                geneSymbol = geneSymbol.substring(0, ix);
+            }
+            return daoGene.getGene(geneSymbol, true);
+        }
+        return List.of();
+    }
+
+    private List<CnaEvent> composeCnaEventsToAdd(String[] values, long entrezGeneId) {
+        if (updateMode) {
+            values = updateValues((int) entrezGeneId, values);
+        }
+        List<CnaEvent> cnaEventsToAdd = new ArrayList<CnaEvent>();
+        for (int i = 0; i < values.length; i++) {
+
+            // temporary solution -- change partial deletion back to full deletion.
+            if (values[i].equals(CNA_VALUE_PARTIAL_DELETION)) {
+                values[i] = CNA_VALUE_HOMOZYGOUS_DELETION;
+            }
+            if (values[i].equals(CNA_VALUE_AMPLIFICATION)
+                    // || values[i].equals(CNA_VALUE_GAIN)  >> skipping GAIN, ZERO, HEMIZYGOUS_DELETION to minimize size of dataset in DB
+                    // || values[i].equals(CNA_VALUE_ZERO)
+                    // || values[i].equals(CNA_VALUE_HEMIZYGOUS_DELETION)
+                    || values[i].equals(CNA_VALUE_HOMOZYGOUS_DELETION)
+            ) {
+                Integer sampleId = orderedSampleList.get(i);
+                CnaEvent cnaEvent = new CnaEvent(sampleId, geneticProfileId, entrezGeneId, Short.parseShort(values[i]));
+                //delayed add:
+                AbstractMap.SimpleEntry<Integer, Long> sampleGenePair = new AbstractMap.SimpleEntry<>(sampleId, entrezGeneId);
+                Map<String, String> pdAnnotationDetails = this.pdAnnotations.get(sampleGenePair);
+                if (pdAnnotationDetails != null) {
+                    cnaEvent.setDriverFilter(pdAnnotationDetails.get("DRIVER_FILTER"));
+                    cnaEvent.setDriverFilterAnnotation(pdAnnotationDetails.get("DRIVER_FILTER_ANNOTATION"));
+                    cnaEvent.setDriverTiersFilter(pdAnnotationDetails.get("DRIVER_TIERS_FILTER"));
+                    cnaEvent.setDriverTiersFilterAnnotation(pdAnnotationDetails.get("DRIVER_TIERS_FILTER_ANNOTATION"));
+                }
+                cnaEventsToAdd.add(cnaEvent);
+            }
+        }
+        return cnaEventsToAdd;
+    }
+
     /**
      * Parses line for gene set record and stores record in 'genetic_alteration' table.
-     * @param line
-     * @param nrColumns
-     * @param sampleStartIndex
-     * @param genesetIdIndex
-     * @param filteredSampleIndices
-     * @param daoGeneticAlteration
+     * @param genesetId
      * @return
      * @throws DaoException
      */
-    private boolean parseGenesetLine(String line, int nrColumns, int sampleStartIndex, int genesetIdIndex,
-                                     List<Integer> filteredSampleIndices, DaoGeneticAlteration daoGeneticAlteration) throws DaoException {
+    private boolean saveGenesetLine(String[] values, String genesetId) throws DaoException {
         boolean storedRecord = false;
 
-        if (!line.startsWith("#") && line.trim().length() > 0) {
-            String[] parts = line.split("\t", -1);
 
-            if (parts.length > nrColumns) {
-                if (line.split("\t").length > nrColumns) {
-                    ProgressMonitor.logWarning("Ignoring line with more fields (" + parts.length
-                        + ") than specified in the headers(" + nrColumns + "): \n" + parts[0]);
-                    return false;
-                }
-            }
-
-            String values[] = (String[]) ArrayUtils.subarray(parts, sampleStartIndex, parts.length > nrColumns ? nrColumns : parts.length);
-
-            // trim whitespace from values
-            values = Stream.of(values).map(String::trim).toArray(String[]::new);
-            values = filterOutNormalValues(filteredSampleIndices, values);
-
-            Geneset geneset = DaoGeneset.getGenesetByExternalId(parts[genesetIdIndex]);
-            if (geneset != null) {
-                storedRecord = storeGeneticEntityGeneticAlterations(values, daoGeneticAlteration, geneset.getGeneticEntityId(),
-                    EntityType.GENESET, geneset.getExternalId());
-            }
-            else {
-                ProgressMonitor.logWarning("Geneset " + parts[genesetIdIndex] + " not found in DB. Record will be skipped.");
-            }
+        Geneset geneset = DaoGeneset.getGenesetByExternalId(genesetId);
+        if (geneset != null) {
+            storedRecord = storeGeneticEntityGeneticAlterations(values, geneset.getGeneticEntityId(), EntityType.GENESET, geneset.getExternalId());
+        }
+        else {
+            ProgressMonitor.logWarning("Geneset " + genesetId + " not found in DB. Record will be skipped.");
         }
         return storedRecord;
     }
 
     /**
      * Parses line for generic assay profile record and stores record in 'genetic_alteration' table.
-     * @param line                  row from the separated-text that contains one or more values on a single sample
-     * @param nrColumns
-     * @param sampleStartIndex      index of the first sample column
-     * @param genericAssayIdIndex   index of the column that uniquely identifies a sample
-     * @param filteredSampleIndices
-     * @param daoGeneticAlteration
-     * @return
-     * @throws DaoException
      */
-
-    private boolean parseGenericAssayLine(String line, int nrColumns, int sampleStartIndex, int genericAssayIdIndex,
-                                          List<Integer> filteredSampleIndices, DaoGeneticAlteration daoGeneticAlteration, Map<String, Integer> genericAssayStableIdToEntityIdMap) throws DaoException {
+    private boolean saveGenericAssayLine(String[] values, String genericAssayId, Map<String, Integer> genericAssayStableIdToEntityIdMap) {
 
         boolean recordIsStored = false;
 
-        if (!line.startsWith("#") && line.trim().length() > 0) {
-            String[] parts = line.split("\t", -1);
+        Integer entityId = genericAssayStableIdToEntityIdMap.getOrDefault(genericAssayId, null);
 
-            if (parts.length > nrColumns) {
-                if (line.split("\t").length > nrColumns) {
-                    ProgressMonitor.logWarning("Ignoring line with more fields (" + parts.length
-                        + ") than specified in the headers(" + nrColumns + "): \n" + parts[0]);
-                    return false;
-                }
-            }
-
-            String values[] = (String[]) ArrayUtils.subarray(parts, sampleStartIndex, parts.length > nrColumns ? nrColumns : parts.length);
-
-            // trim whitespace from values
-            values = Stream.of(values).map(String::trim).toArray(String[]::new);
-            values = filterOutNormalValues(filteredSampleIndices, values);
-
-            String stableId = parts[genericAssayIdIndex];
-            Integer entityId = genericAssayStableIdToEntityIdMap.getOrDefault(stableId, null);
-
-            if (entityId == null) {
-                ProgressMonitor.logWarning("Generic Assay entity " + parts[genericAssayIdIndex] + " not found in DB. Record will be skipped.");
-            } else {
-                recordIsStored = storeGeneticEntityGeneticAlterations(values, daoGeneticAlteration, entityId,
-                    EntityType.GENERIC_ASSAY, stableId);
-            }
-
-            return recordIsStored;
+        if (entityId == null) {
+            ProgressMonitor.logWarning("Generic Assay entity " + genericAssayId + " not found in DB. Record will be skipped.");
+        } else {
+            recordIsStored = storeGeneticEntityGeneticAlterations(values, entityId, EntityType.GENERIC_ASSAY, genericAssayId);
         }
 
         return recordIsStored;
@@ -816,18 +867,15 @@ public class ImportTabDelimData {
     /**
      * Stores genetic alteration data for a genetic entity.
      * @param values
-     * @param daoGeneticAlteration
      * @param geneticEntityId      - internal id for genetic entity
      * @param geneticEntityType    - "GENE", "GENESET", "PHOSPHOPROTEIN"
      * @param geneticEntityName    - hugo symbol for "GENE", external id for "GENESET", phospho gene name for "PHOSPHOPROTEIN"
      * @return boolean indicating if record was stored successfully or not
      */
-    private boolean storeGeneticEntityGeneticAlterations(String[] values, DaoGeneticAlteration daoGeneticAlteration,
-                                                         Integer geneticEntityId, EntityType geneticEntityType, String geneticEntityName) {
+    private boolean storeGeneticEntityGeneticAlterations(String[] values, Integer geneticEntityId, EntityType geneticEntityType, String geneticEntityName) {
         try {
             if (importedGeneticEntitySet.add(geneticEntityId)) {
-                daoGeneticAlteration.addGeneticAlterationsForGeneticEntity(geneticProfile.getGeneticProfileId(), geneticEntityId, values);
-                return true;
+                return saveValues(geneticEntityId, values);
             }
             else {
                 ProgressMonitor.logWarning("Data for genetic entity " + geneticEntityName

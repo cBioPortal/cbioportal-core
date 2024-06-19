@@ -79,7 +79,8 @@ public class ImportGenericAssayPatientLevelData {
      * @throws IOException  IO Error.
      * @throws DaoException Database Error.
      */
-    public void importData(int numLines) throws IOException, DaoException {
+    public void importData() throws IOException, DaoException {
+        int numLines = FileUtil.getNumLines(dataFile);
 
         geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
 

@@ -40,9 +40,11 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.cbioportal.model.EntityType;
 import org.cbioportal.model.GenericEntityProperty;
@@ -50,6 +52,7 @@ import org.cbioportal.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import joptsimple.OptionParser;
@@ -160,7 +163,6 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
     * @throws Exception
     */
     public static void importData(File dataFile, GeneticAlterationType geneticAlterationType, String additionalProperties, boolean updateInfo) throws Exception {
-        
         ProgressMonitor.setCurrentMessage("Reading data from: " + dataFile.getCanonicalPath());
         
         // read generic assay data file
@@ -186,6 +188,10 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         currentLine = buf.readLine();
         
         while (currentLine != null) {
+            if (!FileUtil.isInfoLine(currentLine)) {
+                currentLine = buf.readLine();
+                continue;
+            }
             
             String[] parts = currentLine.split("\t");
             

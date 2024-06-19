@@ -9,6 +9,34 @@ This repo contains:
 ## Inclusion in main codebase
 The `cbioportal-core` code is currently included in the final Docker image during the Docker build process: https://github.com/cBioPortal/cbioportal/blob/master/docker/web-and-data/Dockerfile#L48
 
+## Running in docker
+
+Build docker image with:
+```bash
+docker build -t cbioportal-core .
+```
+
+Example of how to start loading of the whole study:
+```bash
+docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -s /data/study_es_0 -p /data/api_json -o
+```
+
+### Incremental upload of data
+
+To add or update specific patient, sample, or molecular data in an already loaded study, you can perform an incremental upload. This process is quicker than reloading the entire study.
+
+To execute an incremental upload, use the -d (or --data_directory) option instead of -s (or --study_directory). Here is an example command:
+```bash
+docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -d /data/study_es_0_inc -p /data/api_json -o
+```
+**Note:**
+While the directory should adhere to the standard cBioPortal file formats and study structure, please note the following specific guidelines for incremental uploads:
+
+- Incremental uploads are not supported for all data types. For instance, uploading study metadata, resources, or GSVA data incrementally is currently unsupported.
+- The data pertaining to patient or sample IDs should only include entries that are either new or need updates.
+
+This method ensures efficient updates without the need for complete study reuploads, saving time and computational resources.
+
 ## How to run integration tests
 
 This section guides you through the process of running integration tests by setting up a cBioPortal MySQL database environment using Docker. Please follow these steps carefully to ensure your testing environment is configured correctly.
@@ -117,17 +145,5 @@ To run scripts that require the loader jar, ensure the jar file is in the projec
 The script will search for `core-*.jar` in the root of the project:
 ```bash
 python scripts/importer/metaImport.py -s tests/test_data/study_es_0 -p tests/test_data/api_json_unit_tests -o
-```
-
-## Running in docker
-
-Build docker image with:
-```bash
-docker build -t cbioportal-core .
-```
-
-Example of how to start the loading:
-```bash
-docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -s /data/study_es_0 -p /data/api_json -o
 ```
 

@@ -65,12 +65,10 @@ public class DaoGeneticAlteration {
      * Gets Instance of Dao Object. (Singleton pattern).
      *
      * @return DaoGeneticAlteration Object.
-     * @throws DaoException Dao Initialization Error.
      */
-    public static DaoGeneticAlteration getInstance() throws DaoException {
+    public static DaoGeneticAlteration getInstance() {
         if (daoGeneticAlteration == null) {
             daoGeneticAlteration = new DaoGeneticAlteration();
-            
         }
 
         return daoGeneticAlteration;
@@ -96,7 +94,7 @@ public class DaoGeneticAlteration {
             throws DaoException {
     	return addGeneticAlterationsForGeneticEntity(geneticProfileId, DaoGeneOptimized.getGeneticEntityId(entrezGeneId), values);
     }
-    
+
     public int addGeneticAlterationsForGeneticEntity(int geneticProfileId, int geneticEntityId, String[] values)
             throws DaoException {
     
@@ -239,8 +237,8 @@ public class DaoGeneticAlteration {
                 int geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
                 String values = rs.getString("VALUES");
                 //hm.debug..
-                String valueParts[] = values.split(DELIM);
-                for (int i=0; i<valueParts.length; i++) {
+                String valueParts[] = values.split(DELIM, -1);
+                for (int i = 0; i < orderedSampleList.size(); i++) {
                     String value = valueParts[i];
                     Integer sampleId = orderedSampleList.get(i);
                     mapSampleValue.put(sampleId, value);
@@ -292,7 +290,11 @@ public class DaoGeneticAlteration {
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("GENETIC_ENTITY_ID"));
-                String[] values = rs.getString("VALUES").split(DELIM);
+                String valuesString = rs.getString("VALUES");
+                if (valuesString.endsWith(DELIM)) {
+                    valuesString = valuesString.substring(0, valuesString.length() - DELIM.length());
+                }
+                String[] values = valuesString.split(DELIM, -1);
                 ObjectNode datum = processor.process(
                         entrezGeneId,
                         values,
@@ -427,17 +429,19 @@ public class DaoGeneticAlteration {
      * Deletes all Genetic Alteration Records associated with the specified Genetic Profile ID.
      *
      * @param geneticProfileId Genetic Profile ID.
+     * @param geneticEntityId Genetic Entity ID.
      * @throws DaoException Database Error.
      */
-    public void deleteAllRecordsInGeneticProfile(long geneticProfileId) throws DaoException {
+    public void deleteAllRecordsInGeneticProfile(long geneticProfileId, long geneticEntityId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_alteration WHERE GENETIC_PROFILE_ID=?");
+                    "genetic_alteration WHERE GENETIC_PROFILE_ID=? and GENETIC_ENTITY_ID=?");
             pstmt.setLong(1, geneticProfileId);
+            pstmt.setLong(2, geneticEntityId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

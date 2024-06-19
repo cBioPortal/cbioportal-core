@@ -107,6 +107,16 @@ class DataImporterTests(unittest.TestCase):
             '--meta', f'{data_directory}/meta_clinical_samples.txt', '--loadMode', 'bulkload', '--data', f'{data_directory}/data_clinical_samples.txt', '--noprogress')
         mutation_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_mutations_extended.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_mutations_extended.maf', '--noprogress')
+        cna_discrete_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_cna_discrete.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete.txt', '--noprogress')
+        cna_log2_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_cna_log2.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_log2.txt', '--noprogress')
+        expression_median_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_expression_median.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_expression_median.txt', '--noprogress')
+        methylation_hm27_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_methylation_hm27.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_methylation_hm27.txt', '--noprogress')
+        treatment_ic50_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+            '--meta', f'{data_directory}/meta_treatment_ic50.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_treatment_ic50.txt', '--noprogress')
         case_list_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds',
             '--meta', f'{data_directory}/meta_clinical_samples.txt', '--case-lists', f'{data_directory}/case_lists')
 
@@ -115,6 +125,11 @@ class DataImporterTests(unittest.TestCase):
             clinical_patient_call,
             clinical_sample_call,
             mutation_call,
+            cna_discrete_call,
+            cna_log2_call,
+            expression_median_call,
+            methylation_hm27_call,
+            treatment_ic50_call,
             case_list_call,
         ])
 
