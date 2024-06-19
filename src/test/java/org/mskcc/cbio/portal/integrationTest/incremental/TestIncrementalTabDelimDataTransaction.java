@@ -17,49 +17,33 @@
 
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
-import org.cbioportal.model.CNA;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.runner.RunWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
-import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
-import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
-import org.mskcc.cbio.portal.model.CnaEvent;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests Transaction for Incremental Import of Tab Delimited Data.
@@ -81,15 +65,15 @@ public class TestIncrementalTabDelimDataTransaction {
     public void testTransaction() throws Exception {
         GeneticProfile mrnaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mrna");
 
-        File dataFolder = new File("src/test/resources/incremental/tab_delim_data/");
+        File dataFolder = new File("src/test/resources/incremental/mrna_expression/");
         File dataFile = new File(dataFolder, "data_expression_Zscores.txt");
 
         HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(mrnaProfile.getGeneticProfileId(), null);
 
-        DaoGeneticAlteration mockedDao = mock(DaoGeneticAlteration.class);
+        DaoGeneOptimized mockedDao = mock(DaoGeneOptimized.class);
 
-        doNothing().doNothing().doThrow(new DaoException("Simulated dao error"))
-                .when(mockedDao).deleteAllRecordsInGeneticProfile(anyLong(), anyLong());
+        when(mockedDao.getGene(anyLong()))
+                .thenThrow(new RuntimeException("Simulated error"));
         /**
          * Test
          */
@@ -98,10 +82,10 @@ public class TestIncrementalTabDelimDataTransaction {
                     mrnaProfile.getGeneticProfileId(),
                     null,
                     true,
-                    mockedDao,
-                    DaoGeneOptimized.getInstance()).importData();
+                    mockedDao).importData();
             fail("Import has to fail");
         } catch (RuntimeException runtimeException) {
+            assertTrue(runtimeException.getMessage(), runtimeException.getMessage().contains("Simulated error"));
             assertTrue(true);
         }
 

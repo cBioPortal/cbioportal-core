@@ -58,7 +58,6 @@ public class ImportProfileData extends ConsoleRunnable {
         DaoGeneOptimized daoGene;
         DaoGeneticAlteration daoGeneticAlteration;
         daoGene = DaoGeneOptimized.getInstance();
-        daoGeneticAlteration = DaoGeneticAlteration.getInstance();
 
         try {
             // Parse arguments
@@ -132,22 +131,22 @@ public class ImportProfileData extends ConsoleRunnable {
                         genePanel, 
                         geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"),
                         overwriteExisting,
-                        daoGeneticAlteration, daoGene
+                        daoGene
                     );
                     genericAssayProfileImporter.importData();
                 }
             } else if(
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
-                && DISCRETE_LONG.name().equals(geneticProfile.getDatatype())
+                && DISCRETE_LONG.name().equals(geneticProfile.getOtherMetaDataField("datatype"))
             ) {
                 Set<String> namespaces = GeneticProfileReader.getNamespaces(descriptorFile);
                 ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(
-                    dataFile, 
-                    geneticProfile.getGeneticProfileId(), 
+                    dataFile,
+                    geneticProfile.getGeneticProfileId(),
                     genePanel,
                     daoGene,
-                    daoGeneticAlteration,
-                    namespaces
+                    namespaces,
+                    overwriteExisting
                 );
                 importer.importData();
             } else {
@@ -157,7 +156,7 @@ public class ImportProfileData extends ConsoleRunnable {
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
                     overwriteExisting,
-                    daoGeneticAlteration, daoGene
+                    daoGene
                 );
                 String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
                 if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {

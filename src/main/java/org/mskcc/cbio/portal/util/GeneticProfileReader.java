@@ -48,6 +48,9 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfileLink;
 import org.mskcc.cbio.portal.scripts.TrimmedProperties;
 
+import static org.cbioportal.model.MolecularProfile.DataType.DISCRETE;
+import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
+
 /**
  * Prepare a GeneticProfile for having its data loaded.
  *
@@ -83,10 +86,18 @@ public class GeneticProfileReader {
                                           + existingGeneticProfile.getStableId() + ") but different genetic alteration type: "
                                           + existingGeneticProfile.getGeneticProfileId());
             }
-            if (!existingGeneticProfile.getDatatype().equals(geneticProfile.getDatatype())) {
-                throw new IllegalStateException("genetic_profile record found with same Stable ID ("
-                        + existingGeneticProfile.getStableId() + ") but different data type: "
-                        + existingGeneticProfile.getDatatype());
+            if (DISCRETE_LONG.name().equals(geneticProfile.getDatatype())) {
+                if (!Set.of(DISCRETE_LONG.name(), DISCRETE.name()).contains(existingGeneticProfile.getDatatype())) {
+                    throw new IllegalStateException("genetic_profile record found with same Stable ID ("
+                            + existingGeneticProfile.getStableId() + ") but unsupported data type: "
+                            + existingGeneticProfile.getDatatype());
+                }
+            } else {
+                if (!existingGeneticProfile.getDatatype().equals(geneticProfile.getDatatype())) {
+                    throw new IllegalStateException("genetic_profile record found with same Stable ID ("
+                            + existingGeneticProfile.getStableId() + ") but different data type: "
+                            + existingGeneticProfile.getDatatype());
+                }
             }
             if (geneticProfile.getCancerStudyId() != existingGeneticProfile.getCancerStudyId()) {
                 throw new IllegalStateException("genetic_profile record found with same Stable ID ("

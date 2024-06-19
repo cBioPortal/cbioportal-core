@@ -108,7 +108,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test new samples are added:
@@ -134,7 +133,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces
         ).importData();
 
@@ -188,7 +186,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alterations are added for all genes:
@@ -213,7 +210,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alteration are added of non-cna event:
@@ -241,7 +237,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test order of genetic alteration values:
@@ -268,7 +263,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test order of genetic alteration values:
@@ -291,7 +285,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test order of genetic alteration values:
@@ -314,7 +307,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alteration are added of non-cna event:
@@ -342,7 +334,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alteration are deduplicated:
@@ -364,7 +355,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces
         ).importData();
         List<Long> genes = newArrayList(3983L, 27334L, 2115L);
@@ -394,7 +384,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces
         ).importData();
 
@@ -418,7 +407,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespacesToImport
         ).importData();
 
@@ -458,7 +446,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespacesToImport
         ).importData();
 
@@ -507,7 +494,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespaces
         ).importData();
 
@@ -549,7 +535,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespaces
         ).importData();
 

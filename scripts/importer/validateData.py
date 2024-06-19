@@ -4718,7 +4718,7 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
             if stable_id in stable_ids:
                 # stable id already used in other meta file, give error:
                 logger.error(
-                    'stable_id repeated. It should be unique across all files in a study',
+                    'stable_id repeated. It should be unique across all files in a directory',
                     extra={'filename_': filename,
                            'cause': stable_id})
             else:
