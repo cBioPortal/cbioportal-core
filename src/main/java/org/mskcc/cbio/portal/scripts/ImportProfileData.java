@@ -32,14 +32,17 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
+import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
+import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.GeneticProfileReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+
+import java.io.File;
 import java.util.Set;
-
-import joptsimple.*;
-
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
 
 import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
@@ -70,7 +73,6 @@ public class ImportProfileData extends ConsoleRunnable {
                 updateInfo = true;
             }
             boolean overwriteExisting = options.has("overwrite-existing");
-            SpringUtil.initDataSource();
             ProgressMonitor.setCurrentMessage("Reading data from:  " + dataFile.getAbsolutePath());
             // Load genetic profile and gene panel
             GeneticProfile geneticProfile = null;

@@ -32,13 +32,30 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
+import joptsimple.OptionException;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoGenePanel;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.GenePanel;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
 
-import java.io.*;
-import joptsimple.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
 
 /**
  *
@@ -96,7 +113,6 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
             }
 
             setFile(genePanel_f);
-            SpringUtil.initDataSource();
             importData();
         } catch (RuntimeException e) {
             throw e;

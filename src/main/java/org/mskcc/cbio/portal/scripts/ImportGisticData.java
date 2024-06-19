@@ -32,15 +32,19 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.ArrayList;
-
+import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGistic;
 import org.mskcc.cbio.portal.model.Gistic;
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.GisticReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.validate.validationException;
 
-import joptsimple.OptionSet;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 
 
 /**
@@ -57,8 +61,6 @@ public class ImportGisticData extends ConsoleRunnable {
 		    String dataFile = (String) options.valueOf("data");
 		    String studyId = (String) options.valueOf("study");
 	
-			SpringUtil.initDataSource();
-	        
 	        File gistic_f = new File(dataFile);
 	        int cancerStudyInternalId = ValidationUtils.getInternalStudyId(studyId);
 	

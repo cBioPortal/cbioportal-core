@@ -32,14 +32,24 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.*;
-import joptsimple.*;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
+import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.ClinicalEvent;
+import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.SpringUtil;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * Imports timeline data for display in patient view
@@ -50,7 +60,6 @@ public class ImportTimelineData extends ConsoleRunnable {
 
 	private static void importData(String dataFile, int cancerStudyId) throws IOException, DaoException {
 		MySQLbulkLoader.bulkLoadOn();
-		SpringUtil.initDataSource();
 
 		ProgressMonitor.setCurrentMessage("Reading file " + dataFile);
 		FileReader reader = new FileReader(dataFile);

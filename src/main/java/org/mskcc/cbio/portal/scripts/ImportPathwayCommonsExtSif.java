@@ -32,11 +32,18 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 
 /**
  * Command Line to Import HPRD Interactions.
@@ -119,7 +126,6 @@ public class ImportPathwayCommonsExtSif {
             return;
         }
         ProgressMonitor.setConsoleMode(true);
-		SpringUtil.initDataSource();
 
         try {
             File sifFile = new File(args[0]);

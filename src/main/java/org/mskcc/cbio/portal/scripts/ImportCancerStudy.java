@@ -32,8 +32,11 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.portal.model.*;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.CancerStudyTags;
+import org.mskcc.cbio.portal.util.CancerStudyReader;
+import org.mskcc.cbio.portal.util.CancerStudyTagsReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.io.File;
 
@@ -53,7 +56,6 @@ public class ImportCancerStudy extends ConsoleRunnable {
             }
             
             File file = new File(args[0]);
-            SpringUtil.initDataSource();
             CancerStudy cancerStudy = CancerStudyReader.loadCancerStudy(file);
             CancerStudyTags cancerStudyTags = CancerStudyTagsReader.loadCancerStudyTags(file, cancerStudy);
             String message = "Loaded the following cancer study:" +

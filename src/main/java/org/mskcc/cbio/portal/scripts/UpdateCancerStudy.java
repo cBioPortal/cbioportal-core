@@ -23,10 +23,10 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.util.*;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.model.*;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 
 /**
@@ -58,7 +58,6 @@ public class UpdateCancerStudy extends ConsoleRunnable {
                       "Invalid study status parameter: " + cancerStudyStatus);
   	      }
 
-  	 	  SpringUtil.initDataSource();
   	      CancerStudy theCancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyIdentifier);
   	      if (theCancerStudy == null) {
   	          throw new IllegalArgumentException("cancer study identified by cancer_study_identifier '"

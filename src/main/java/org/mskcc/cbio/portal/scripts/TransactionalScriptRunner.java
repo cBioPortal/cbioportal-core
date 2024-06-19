@@ -1,13 +1,12 @@
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.File;
-
-import org.mskcc.cbio.portal.util.SpringUtil;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import java.io.File;
 
 /**
  * A high-level script runner than can be used to run a batch of scripts within a 
@@ -69,8 +68,7 @@ public class TransactionalScriptRunner extends ConsoleRunnable {
 			// Inject the context into SpringUtil, so we don't need to initialize again.
 			// This ensures that the XML files from the command line provide a complete
 			// context and we don't get data sources later from anywhere else. 
-			SpringUtil.initDataSource(context);
-			
+
 			// Set up the transaction template
 			transactionTemplate = (TransactionTemplate) context.getBean("scriptTransactionTemplate");
 			if (transactionTemplate == null) {

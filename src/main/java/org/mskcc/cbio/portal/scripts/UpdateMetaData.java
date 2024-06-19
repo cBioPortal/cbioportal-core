@@ -32,9 +32,11 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.*;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.GeneticProfileReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.io.File;
 
@@ -51,7 +53,6 @@ public class UpdateMetaData {
         }
 
         ProgressMonitor.setConsoleMode(true);
-		SpringUtil.initDataSource();
         File descriptorFile = new File(args[0]);
 
         GeneticProfile geneticProfile = GeneticProfileReader.loadGeneticProfileFromMeta(descriptorFile);

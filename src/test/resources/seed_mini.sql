@@ -199,6 +199,69 @@ INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYP
 INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
 SET @max_entity_id = (Select MAX(ID) from genetic_entity);
 INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,2261,'FGFR3','protein-coding');
+
+-- missing genes for study_es_0
+-- additional genes for CNA data
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,116983,'ACAP3','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,2073,'ERCC5','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,219293,'ATAD3C','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,375790,'AGRN','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,54998,'AURKAIP1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,55210,'ATAD3A','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,83858,'ATAD3B','protein-coding');
+-- genes for data_methylation_hm27.txt
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,24145,'PANX1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,283234,'CCDC88B','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,3232,'HOXD3','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,3613,'IMPA2','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,389,'RHOC','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,487,'ATP2A1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,7871,'SLMAP','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,8148,'TAF15','protein-coding');
+-- gene panels
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,55,'ACP3','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,81061,'OR11H1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,388946,'TMEM247','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,7157,'TP53','protein-coding');
+
 -- Generic genetic entities
 INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Erlotinib');
 INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Irinotecan');

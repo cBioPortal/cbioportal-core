@@ -16,9 +16,36 @@ Build docker image with:
 docker build -t cbioportal-core .
 ```
 
-Example of how to start loading of the whole study:
+### Example of how to load `study_es_0` study
+
+Import gene panels
+
 ```bash
-docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -s /data/study_es_0 -p /data/api_json -o
+docker run -it -v $(pwd)/tests/test_data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenePanel.pl --data /data/study_es_0/data_gene_panel_testpanel1.txt
+docker run -it -v $(pwd)/tests/test_data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenePanel.pl --data /data/study_es_0/data_gene_panel_testpanel2.txt
+```
+
+Import gene sets and supplementary data
+
+```bash
+docker run -it -v $(pwd)/src/test/resources/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenesetData.pl --data /data/genesets/study_es_0_genesets.gmt --new-version msigdb_7.5.1 --supp /data/genesets/study_es_0_supp-genesets.txt
+```
+
+Import gene set hierarchy data
+
+```bash
+docker run -it -v $(pwd)/src/test/resources/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenesetHierarchy.pl --data /data/genesets/study_es_0_tree.yaml
+```
+
+Import study
+
+```bash
+docker run -it -v $(pwd)/tests/test_data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+python importer/metaImport.py -s /data/study_es_0 -p /data/api_json_system_tests -o
 ```
 
 ### Incremental upload of data
