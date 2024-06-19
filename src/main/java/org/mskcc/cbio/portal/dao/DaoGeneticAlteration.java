@@ -236,8 +236,20 @@ public class DaoGeneticAlteration {
                 HashMap<Integer, String> mapSampleValue = new HashMap<Integer, String>();
                 int geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
                 String values = rs.getString("VALUES");
-                //hm.debug..
-                String valueParts[] = values.split(DELIM, -1);
+                String[] valueParts = values.split(DELIM, -1);
+                int valuesLength = valueParts.length;
+                boolean hasMeaninglessTrailingDelimiter = valuesLength - orderedSampleList.size() == 1 && valueParts[valuesLength - 1].isEmpty();
+                if (hasMeaninglessTrailingDelimiter) {
+                    // adjust value length to account for the trailing delimiter
+                    valuesLength -= 1;
+                }
+                if (valuesLength != orderedSampleList.size()) {
+                    throw new IllegalStateException(
+                            "Data inconsistency detected: The length of the values for genetic profile with Id = "
+                                    + geneticProfileId + " and genetic entity with ID = " + geneticEntityId
+                                    + " (" + valuesLength + " elements) does not match the expected length of the sample list ("
+                                    + orderedSampleList.size() + " elements).");
+                }
                 for (int i = 0; i < orderedSampleList.size(); i++) {
                     String value = valueParts[i];
                     Integer sampleId = orderedSampleList.get(i);
@@ -429,19 +441,17 @@ public class DaoGeneticAlteration {
      * Deletes all Genetic Alteration Records associated with the specified Genetic Profile ID.
      *
      * @param geneticProfileId Genetic Profile ID.
-     * @param geneticEntityId Genetic Entity ID.
      * @throws DaoException Database Error.
      */
-    public void deleteAllRecordsInGeneticProfile(long geneticProfileId, long geneticEntityId) throws DaoException {
+    public void deleteAllRecordsInGeneticProfile(long geneticProfileId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_alteration WHERE GENETIC_PROFILE_ID=? and GENETIC_ENTITY_ID=?");
+                    "genetic_alteration WHERE GENETIC_PROFILE_ID=?");
             pstmt.setLong(1, geneticProfileId);
-            pstmt.setLong(2, geneticEntityId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

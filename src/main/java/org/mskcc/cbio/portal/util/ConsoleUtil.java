@@ -139,7 +139,7 @@ public class ConsoleUtil {
 			          .withRequiredArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 		}
 		parser.accepts("overwrite-existing",
-				"Enables re-uploading molecular data that already exist for the given profile and sample.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+				"Enables overwriting data if it turns out it already exists in DB.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
 		String progName = "importScript";
 
 		OptionSet options = null;
@@ -250,7 +250,7 @@ public class ConsoleUtil {
 			          .withRequiredArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 		}
 		parser.accepts("overwrite-existing",
-				"Enables re-uploading molecular data that already exist for the given profile and sample.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+				"Enables overwriting data if it turns out it already exists in DB.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
 
 		String progName = "importScript";
 		

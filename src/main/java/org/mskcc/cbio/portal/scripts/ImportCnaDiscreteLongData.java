@@ -40,10 +40,10 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -71,11 +71,10 @@ public class ImportCnaDiscreteLongData {
     private int samplesSkipped = 0;
     private Set<String> namespaces;
 
-    private boolean updateMode;
+    private boolean isIncrementalUpdateMode;
 
     private GeneticProfile geneticProfile;
 
-    private final ArrayList<SampleIdGeneticProfileId> sampleIdGeneticProfileIds = new ArrayList<>();
     private ArrayList<Integer> orderedSampleList;
     private final Integer genePanelId;
 
@@ -85,7 +84,7 @@ public class ImportCnaDiscreteLongData {
             String genePanel,
             DaoGeneOptimized daoGene,
             Set<String> namespaces,
-            boolean updateMode
+            boolean isIncrementalUpdateMode
     ) {
         this.namespaces = namespaces;
         this.cnaFile = cnaFile;
@@ -99,7 +98,7 @@ public class ImportCnaDiscreteLongData {
         }
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.daoGene = daoGene;
-        this.updateMode = updateMode;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
     }
 
     public ImportCnaDiscreteLongData(
@@ -130,7 +129,7 @@ public class ImportCnaDiscreteLongData {
         // Pass first line with headers to util:
         String line = buf.readLine();
         int lineIndex = 1;
-        String[] headerParts = line.split("\t", -1);
+        String[] headerParts = TsvUtil.splitTsvLine(line);
         this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
 
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -152,8 +151,9 @@ public class ImportCnaDiscreteLongData {
         }
 
         orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
-        this.geneticAlterationGeneImporter = updateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
-                : new GeneticAlterationImporterImpl(geneticProfileId, orderedSampleList);
+        this.geneticAlterationGeneImporter = isIncrementalUpdateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
+                : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
+        DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelId);
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);
@@ -184,10 +184,10 @@ public class ImportCnaDiscreteLongData {
         int lineIndex,
         CnaImportData importContainer
     ) throws Exception {
-        if (!FileUtil.isInfoLine(line)) {
+        if (!TsvUtil.isDataLine(line)) {
             return;
         }
-        String[] lineParts = line.split("\t", -1);
+        String[] lineParts = TsvUtil.splitTsvLine(line);
         CanonicalGene gene = this.getGene(cnaUtil.getEntrezSymbol(lineParts), lineParts, cnaUtil);
         importContainer.genes.add(gene);
 
@@ -206,7 +206,6 @@ public class ImportCnaDiscreteLongData {
             }
             throw new RuntimeException("Sample with stable id " + sampleIdStr + " is not found in the database.");
         }
-        ensureSampleProfileExists(sample);
 
         long entrezId = gene.getEntrezGeneId();
         int sampleId = sample.getInternalId();
@@ -223,18 +222,6 @@ public class ImportCnaDiscreteLongData {
 
     }
 
-    private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (updateMode) {
-            upsertSampleProfile(sample);
-        } else {
-            createSampleProfileIfNotExists(sample);
-        }
-    }
-
-    private void upsertSampleProfile(Sample sample) throws DaoException {
-        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-    }
-
     /**
      * Store all cna events related to a single gene
      */
@@ -246,7 +233,7 @@ public class ImportCnaDiscreteLongData {
             .filter(v -> v.cnaEvent != null)
             .map(v -> v.cnaEvent)
             .collect(Collectors.toList());
-        if (updateMode) {
+        if (isIncrementalUpdateMode) {
             DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
         }
         CnaUtil.storeCnaEvents(existingCnaEvents, events);
@@ -343,48 +330,6 @@ public class ImportCnaDiscreteLongData {
         }
         ProgressMonitor.logWarning("Entrez_Id " + entrez + " not found. Record will be skipped for this gene.");
         return null;
-    }
-
-    /**
-     * Find sample and create sample profile when needed
-     *
-     * @return boolean created or not
-     */
-    public boolean createSampleProfileIfNotExists(
-        Sample sample
-    ) throws DaoException {
-        boolean inDatabase = DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId);
-        SampleIdGeneticProfileId toCreate = new SampleIdGeneticProfileId(sample.getInternalId(), geneticProfileId);
-        boolean isQueued = this.sampleIdGeneticProfileIds.contains(toCreate);
-        if (!inDatabase && !isQueued) {
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-            this.sampleIdGeneticProfileIds.add(toCreate);
-            return true;
-        }
-        return false;
-    }
-
-
-    private static class SampleIdGeneticProfileId {
-        public int sampleId;
-        public int geneticProfileId;
-
-        public SampleIdGeneticProfileId(int sampleId, int geneticProfileId) {
-            this.sampleId = sampleId;
-            this.geneticProfileId = geneticProfileId;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-
-            SampleIdGeneticProfileId that = (SampleIdGeneticProfileId) o;
-            return sampleId == that.sampleId
-                && geneticProfileId == that.geneticProfileId;
-        }
     }
 
     /**

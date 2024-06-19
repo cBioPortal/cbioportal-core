@@ -42,6 +42,7 @@ import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MutationKeywordUtils;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 import org.springframework.util.Assert;
 
 import java.io.BufferedReader;
@@ -80,7 +81,7 @@ public class ImportCosmicData {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
             if (!line.startsWith("#")) {
-                String parts[] = line.split("\t",-1);
+                String parts[] = TsvUtil.splitTsvLine(line);
                 if (parts.length<8) {
                     System.err.println("Wrong line in cosmic: "+line);
                     continue;

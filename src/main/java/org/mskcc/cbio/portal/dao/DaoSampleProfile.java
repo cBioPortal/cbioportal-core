@@ -32,12 +32,22 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.*;
-
 import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.Sample;
 
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * Data access object for sample_profile table
@@ -50,99 +60,48 @@ public final class DaoSampleProfile {
     private DaoSampleProfile() {}
 
     private static final int NO_SUCH_PROFILE_ID = -1;
-    private static final String TABLE_NAME = "sample_profile";
 
-    public static int addSampleProfile(Integer sampleId, Integer geneticProfileId, Integer panelId) throws DaoException {
-        if (MySQLbulkLoader.isBulkLoad()) {
-
-            // Add new record using bulk loader. Order of fields is:
-            // 1. sample ID
-            // 2. genetic Profile ID
-            // 3. gene panel ID
-            if (panelId != null) {
-                MySQLbulkLoader.getMySQLbulkLoader(TABLE_NAME).insertRecord(
-                    Integer.toString(sampleId),
-                    Integer.toString(geneticProfileId),
-                    Integer.toString(panelId));
-            } else {
-                MySQLbulkLoader.getMySQLbulkLoader(TABLE_NAME).insertRecord(
-                    Integer.toString(sampleId),
-                    Integer.toString(geneticProfileId),
-                    null);
-            }
-
-            return 1;
-        }
-
-        // Add new record without using bulk loader
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
-        try {
-            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            pstmt = con.prepareStatement
-                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`) VALUES (?,?,?)");
-            pstmt.setInt(1, sampleId);
-            pstmt.setInt(2, geneticProfileId);
-            if (panelId != null) {
-                pstmt.setInt(3, panelId);
-            }
-            else {
-                pstmt.setNull(3, java.sql.Types.INTEGER);
-            }
-            return pstmt.executeUpdate();
-        } catch (NullPointerException | SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, rs);
-        }
+    public static void upsertSampleProfiles(Collection<Integer> sampleIds, Integer geneticProfileId, Integer panelId) throws DaoException {
+        upsertSampleProfiles(
+                sampleIds.stream()
+                        .map(sampleId -> new SampleProfileTuple(geneticProfileId, sampleId, panelId)).toList());
     }
 
-    public static void updateSampleProfile(Integer sampleId, Integer geneticProfileId, Integer panelId) throws DaoException {
-        /**
-         * Update a record in the sample_profile table when adding gene panel field from the sample profile matrix. 
-         * Can not use the bulk loader, because the sample might already be added, which requires an UPDATE of the 
-         * record.
-         */
+    public record SampleProfileTuple(int geneticProfileId, int sampleId, Integer panelId) {}
+
+    public static void upsertSampleProfiles(Collection<SampleProfileTuple> idTuples) throws DaoException {
+        if (idTuples.isEmpty()) {
+            return;
+        }
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            if (!sampleExistsInGeneticProfile(sampleId, geneticProfileId)) {
-                
-                pstmt = con.prepareStatement
-                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`) VALUES (?,?,?)");
-                pstmt.setInt(1, sampleId);
-                pstmt.setInt(2, geneticProfileId);
-                if (panelId != null) {
-                    pstmt.setInt(3, panelId);
+
+            pstmt = con.prepareStatement
+                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
+                            " VALUES" +
+                            String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
+                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);");
+            int parameterIndex = 1;
+            for (SampleProfileTuple idTuple : idTuples) {
+                pstmt.setInt(parameterIndex++, idTuple.sampleId());
+                pstmt.setInt(parameterIndex++, idTuple.geneticProfileId());
+                if (idTuple.panelId() != null) {
+                    pstmt.setInt(parameterIndex, idTuple.panelId());
                 } else {
-                    pstmt.setNull(3, java.sql.Types.INTEGER);
+                    pstmt.setNull(parameterIndex, java.sql.Types.INTEGER);
                 }
-            } else {
-                pstmt = con.prepareStatement
-                    ("UPDATE `sample_profile` SET `PANEL_ID` = ? WHERE (`SAMPLE_ID` = ? AND `GENETIC_PROFILE_ID` = ?)");
-                if (panelId != null) {
-                    pstmt.setInt(1, panelId);
-                } else {
-                    pstmt.setNull(1, java.sql.Types.INTEGER);
-                }
-                pstmt.setInt(2, sampleId);
-                pstmt.setInt(3, geneticProfileId);
+                parameterIndex++;
             }
             pstmt.executeUpdate();
-        } catch (NullPointerException e) {
-            throw new DaoException(e);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, null);
         }
     }
-    
+
     public static boolean sampleExistsInGeneticProfile(int sampleId, int geneticProfileId)
             throws DaoException {
         Connection con = null;

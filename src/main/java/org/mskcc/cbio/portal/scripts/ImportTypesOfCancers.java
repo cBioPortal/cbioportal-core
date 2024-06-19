@@ -39,6 +39,7 @@ import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
 import org.mskcc.cbio.portal.model.TypeOfCancer;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
  * Load all the types of cancer and their names from a file.
@@ -89,7 +90,7 @@ public class ImportTypesOfCancers extends ConsoleRunnable {
         Scanner scanner = new Scanner(file);
         while (scanner.hasNextLine()) {
             String nextLine = scanner.nextLine();
-            String[] fields = nextLine.split("\t", -1);
+            String[] fields = TsvUtil.splitTsvLine(nextLine);
             throwExceptionIfColumnCountIsWrong(file, nextLine, fields, EXPECTED_DATAFILE_COLUMN_COUNT);
             TypeOfCancer typeOfCancer = new TypeOfCancer();
             String typeOfCancerId = fields[0].trim();

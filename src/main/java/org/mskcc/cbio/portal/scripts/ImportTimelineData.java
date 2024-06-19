@@ -136,7 +136,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 		    String description = "Import 'timeline' data";
 
 		    OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
-			if (options.has("loadMode") && !"bulkLoad".equals(options.valueOf("loadMode"))) {
+			if (options.has("loadMode") && !"bulkLoad".equalsIgnoreCase((String) options.valueOf("loadMode"))) {
 				throw new UnsupportedOperationException("This loader supports bulkLoad load mode only, but "
 						+ options.valueOf("loadMode")
 						+ " has been supplied.");

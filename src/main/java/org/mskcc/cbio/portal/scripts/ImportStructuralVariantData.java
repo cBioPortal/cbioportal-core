@@ -34,7 +34,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -51,20 +50,20 @@ public class ImportStructuralVariantData {
     private final Integer genePanelId;
     private final Set<String> namespaces;
 
-    private final boolean updateMode;
+    private final boolean isIncrementalUpdateMode;
 
     public ImportStructuralVariantData(
         File structuralVariantFile, 
         int geneticProfileId, 
         String genePanel, 
         Set<String> namespaces,
-        boolean updateMode
+        boolean isIncrementalUpdateMode
     ) throws DaoException {
         this.structuralVariantFile = structuralVariantFile;
         this.geneticProfileId = geneticProfileId;
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.namespaces = namespaces;
-        this.updateMode = updateMode;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
     }
 
     public void importData() throws IOException, DaoException {
@@ -84,9 +83,9 @@ public class ImportStructuralVariantData {
         while ((line = buf.readLine()) != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if( !line.startsWith("#") && line.trim().length() > 0) {
+            if(TsvUtil.isDataLine(line)) {
                 recordCount++;
-                String parts[] = line.split("\t", -1);
+                String parts[] = TsvUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
                 structuralVariant.setInternalId(++id);
                 structuralVariant.setGeneticProfileId(geneticProfileId);
@@ -183,29 +182,17 @@ public class ImportStructuralVariantData {
                 }
             }
         }
-        // TODO the dao methods could receive a set of sample ids (like the deletion does) instead of looping
-        if (updateMode) {
-            for (Integer sampleId : sampleIds) {
-                DaoSampleProfile.updateSampleProfile(sampleId, geneticProfileId, genePanelId);
-            }
+
+        DaoSampleProfile.upsertSampleProfiles(sampleIds, geneticProfileId, genePanelId);
+        if (isIncrementalUpdateMode) {
             DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
-        } else {
-            for (Integer sampleId : sampleIds) {
-                createSampleProfileIfNotExists(sampleId);
-            }
         }
 
         buf.close();
         MySQLbulkLoader.flushAll();
     }
 
-    private void createSampleProfileIfNotExists(int internalSampleId) throws DaoException {
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(internalSampleId, geneticProfileId)) {
-            DaoSampleProfile.addSampleProfile(internalSampleId, geneticProfileId, genePanelId);
-        }
-    }
-
-        private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {
+    private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {
         CanonicalGene siteCanonicalGene = null;
 
         // If the Entrez Gene Id is not "NA" set the canonical gene.

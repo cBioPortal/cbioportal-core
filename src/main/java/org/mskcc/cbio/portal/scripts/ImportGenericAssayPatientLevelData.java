@@ -116,18 +116,13 @@ public class ImportGenericAssayPatientLevelData {
                     throw new RuntimeException("Unknown patient id '" + StableIdUtil.getPatientId(patientIds[i]) + "' found in tab-delimited file: " + this.dataFile.getCanonicalPath());
                 } else {
                     List<Sample> samples = DaoSample.getSamplesByPatientId(patient.getInternalId());
-                    List<Integer> sampleInternalIds = samples.stream().map(sample -> sample.getInternalId()).collect(Collectors.toList());
-                    for (int j = 0; j < sampleInternalIds.size(); j++) {
-                        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sampleInternalIds.get(j), geneticProfileId)) {
-                            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-                            DaoSampleProfile.addSampleProfile(sampleInternalIds.get(j), geneticProfileId, genePanelID);
-                        }
-                        orderedSampleList.add(sampleInternalIds.get(j));
-                    }
+                    samples.forEach(sample -> orderedSampleList.add(sample.getInternalId()));
                     numSamplesInPatient[i][0] = samples.size();
                     sampleCount += samples.size();
                 }
             }
+            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
+            DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelID);
 
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines-1));
             
@@ -190,8 +185,8 @@ public class ImportGenericAssayPatientLevelData {
 
         boolean recordIsStored = false;
         
-        if (!line.startsWith("#") && line.trim().length() > 0) {
-            String[] parts = line.split("\t", -1);
+        if (TsvUtil.isDataLine(line)) {
+            String[] parts = TsvUtil.splitTsvLine(line);
 
             if (parts.length > nrColumns) {
                 if (line.split("\t").length > nrColumns) {

@@ -35,6 +35,7 @@ package org.mskcc.cbio.portal.scripts;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -68,7 +69,7 @@ public class ConvertCosmicVcfToMaf {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
             if (!line.startsWith("#")) {
-                String parts[] = line.split("\t",-1);
+                String parts[] = TsvUtil.splitTsvLine(line);
                 if (parts.length<8) {
                     System.err.println("Wrong line in cosmic: "+line);
                     continue;

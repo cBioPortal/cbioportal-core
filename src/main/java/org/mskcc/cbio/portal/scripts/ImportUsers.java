@@ -40,6 +40,7 @@ import org.mskcc.cbio.portal.model.User;
 import org.mskcc.cbio.portal.model.UserAuthorities;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -77,7 +78,7 @@ public class ImportUsers {
         while (line != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (!line.startsWith("#") && line.trim().length() > 0) {
+            if (TsvUtil.isDataLine(line)) {
                 try {
                     addUser(line);
                     count++;

@@ -50,11 +50,12 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.EntrezValidator;
+import org.mskcc.cbio.portal.util.DataValidator;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -101,7 +102,7 @@ public class ImportTabDelimData {
 
     private DaoGeneOptimized daoGene;
 
-    private boolean updateMode;
+    private boolean isIncrementalUpdateMode;
     private ArrayList<Integer> orderedSampleList;
     private final Integer genePanelId;
 
@@ -114,7 +115,7 @@ public class ImportTabDelimData {
      * @param geneticProfileId        GeneticProfile ID.
      * @param genePanel               GenePanel
      * @param genericEntityProperties Generic Assay Entities.
-     * @param updateMode if true, update/append data to the existing one
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
      *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
@@ -124,10 +125,10 @@ public class ImportTabDelimData {
         int geneticProfileId,
         String genePanel,
         String genericEntityProperties,
-        boolean updateMode,
+        boolean isIncrementalUpdateMode,
         DaoGeneOptimized daoGene
     ) {
-       this(dataFile, targetLine, geneticProfileId, genePanel, updateMode, daoGene);
+       this(dataFile, targetLine, geneticProfileId, genePanel, isIncrementalUpdateMode, daoGene);
        this.genericEntityProperties = genericEntityProperties;
     }
 
@@ -138,7 +139,7 @@ public class ImportTabDelimData {
      * @param targetLine       The line we want to import.
      *                         If null, all lines are imported.
      * @param geneticProfileId GeneticProfile ID.
-     * @param updateMode if true, update/append data to the existing one
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
      *
      * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
@@ -147,17 +148,17 @@ public class ImportTabDelimData {
         String targetLine,
         int geneticProfileId,
         String genePanel,
-        boolean updateMode,
+        boolean isIncrementalUpdateMode,
         DaoGeneOptimized daoGene
     ) {
-        this(dataFile, geneticProfileId, genePanel, updateMode, daoGene);
+        this(dataFile, geneticProfileId, genePanel, isIncrementalUpdateMode, daoGene);
         this.targetLine = targetLine;
     }
 
     /**
      * Constructor.
      *
-     * @param updateMode if true, update/append data to the existing one
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
      * @param dataFile         Data File containing Copy Number Alteration, MRNA Expression Data, or protein RPPA data
      * @param geneticProfileId GeneticProfile ID.
      */
@@ -165,16 +166,16 @@ public class ImportTabDelimData {
         File dataFile, 
         int geneticProfileId, 
         String genePanel,
-        boolean updateMode,
+        boolean isIncrementalUpdateMode,
         DaoGeneOptimized daoGene
     ) {
         this.dataFile = dataFile;
         this.geneticProfileId = geneticProfileId;
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-        this.updateMode = updateMode;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
         this.daoGene = daoGene;
         this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-        if (this.updateMode
+        if (this.isIncrementalUpdateMode
                 && geneticProfile != null
                 && this.geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE) {
             throw new UnsupportedOperationException("Incremental upload of geneset scores is not supported.");
@@ -206,7 +207,7 @@ public class ImportTabDelimData {
         FileReader reader = new FileReader(dataFile);
         BufferedReader buf = new BufferedReader(reader);
         String headerLine = buf.readLine();
-        String headerParts[] = headerLine.split("\t");
+        String[] headerParts = TsvUtil.splitTsvLine(headerLine);
 
         //Whether data regards CNA or RPPA:
         boolean isDiscretizedCnaProfile = geneticProfile != null
@@ -280,7 +281,6 @@ public class ImportTabDelimData {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(sampleIds[i]) + "' found in tab-delimited file: " + this.dataFile.getCanonicalPath());
                     }
                 }
-                ensureSampleProfileExists(sample);
                 orderedSampleList.add(sample.getInternalId());
                 if (pdAnnotationsForStableSampleIds != null) {
                     Set<Map.Entry<String, Long>> keys = new HashSet<>(pdAnnotationsForStableSampleIds.keySet());
@@ -302,8 +302,8 @@ public class ImportTabDelimData {
             }
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines - 1));
 
-            this.geneticAlterationImporter = updateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
-                    : new GeneticAlterationImporterImpl(geneticProfileId, orderedSampleList);
+            this.geneticAlterationImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
+                    : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
 
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
@@ -318,7 +318,6 @@ public class ImportTabDelimData {
                 genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             }
 
-            int headerColumns = headerParts.length;
 
             String line = buf.readLine();
             while (line != null) {
@@ -327,62 +326,54 @@ public class ImportTabDelimData {
                 ConsoleUtil.showProgress();
                 boolean recordAdded = false;
 
-                if (FileUtil.isInfoLine(line)) {
-                    String[] rowParts = line.split("\t", -1);
+                if (TsvUtil.isDataLine(line)) {
+                    String[] rowParts = TsvUtil.splitTsvLine(line);
 
-                    if (rowParts.length > headerColumns && line.split("\t").length > headerColumns) {
-                        ProgressMonitor.logWarning("Ignoring line with more fields (" + rowParts.length
-                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
-                    } else if (rowParts.length < headerColumns) {
-                        ProgressMonitor.logWarning("Ignoring line with less fields (" + rowParts.length
-                                + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
+                    TsvUtil.ensureHeaderAndRowMatch(headerParts, rowParts);
+                    String[] sampleValues = ArrayUtils.subarray(rowParts, sampleStartIndex, rowParts.length);
+
+                    // trim whitespace from values
+                    sampleValues = Stream.of(sampleValues).map(String::trim).toArray(String[]::new);
+                    sampleValues = filterOutNormalValues(filteredSampleIndices, sampleValues);
+
+                    // either parse line as geneset or gene for importing into 'genetic_alteration' table
+                    if (isGsvaProfile) {
+                        String genesetId = rowParts[genesetIdIndex];
+                        recordAdded = saveGenesetLine(sampleValues, genesetId);
+                    } else if (isGenericAssayProfile) {
+                        String genericAssayId = rowParts[genericAssayIdIndex];
+                        recordAdded = saveGenericAssayLine(sampleValues, genericAssayId, genericAssayStableIdToEntityIdMap);
                     } else {
-                        String sampleValues[] = ArrayUtils.subarray(rowParts, sampleStartIndex, rowParts.length > headerColumns ? headerColumns : rowParts.length);
-
-                        // trim whitespace from values
-                        sampleValues = Stream.of(sampleValues).map(String::trim).toArray(String[]::new);
-                        sampleValues = filterOutNormalValues(filteredSampleIndices, sampleValues);
-
-                        // either parse line as geneset or gene for importing into 'genetic_alteration' table
-                        if (isGsvaProfile) {
-                            String genesetId = rowParts[genesetIdIndex];
-                            recordAdded = saveGenesetLine(sampleValues, genesetId);
-                        } else if (isGenericAssayProfile) {
-                            String genericAssayId = rowParts[genericAssayIdIndex];
-                            recordAdded = saveGenericAssayLine(sampleValues, genericAssayId, genericAssayStableIdToEntityIdMap);
+                        String geneSymbol = null;
+                        if (hugoSymbolIndex != -1) {
+                            geneSymbol = rowParts[hugoSymbolIndex];
+                        }
+                        if (rppaGeneRefIndex != -1) {
+                            geneSymbol = rowParts[rppaGeneRefIndex];
+                        }
+                        if (geneSymbol != null && geneSymbol.isEmpty()) {
+                            geneSymbol = null;
+                        }
+                        //get entrez
+                        String entrez = null;
+                        if (entrezGeneIdIndex != -1) {
+                            entrez = rowParts[entrezGeneIdIndex];
+                        }
+                        if (entrez != null && entrez.isEmpty()) {
+                            entrez = null;
+                        }
+                        if (entrez != null && !DataValidator.isValidNumericSequence(entrez)) {
+                            ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
                         } else {
-                            String geneSymbol = null;
-                            if (hugoSymbolIndex != -1) {
-                                geneSymbol = rowParts[hugoSymbolIndex];
-                            }
-                            if (rppaGeneRefIndex != -1) {
-                                geneSymbol = rowParts[rppaGeneRefIndex];
-                            }
-                            if (geneSymbol != null && geneSymbol.isEmpty()) {
-                                geneSymbol = null;
-                            }
-                            //get entrez
-                            String entrez = null;
-                            if (entrezGeneIdIndex != -1) {
-                                entrez = rowParts[entrezGeneIdIndex];
-                            }
-                            if (entrez != null && entrez.isEmpty()) {
-                                entrez = null;
-                            }
-                            if (entrez != null && !EntrezValidator.isaValidEntrezId(entrez)) {
-                                ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrez);
-                            } else {
-                                String firstCellValue = rowParts[0];
-                                if (targetLine == null || firstCellValue.equals(targetLine)) {
-                                    recordAdded = saveLine(sampleValues,
-                                            entrez, geneSymbol,
-                                            isRppaProfile, isDiscretizedCnaProfile,
-                                            existingCnaEvents);
-                                }
+                            String firstCellValue = rowParts[0];
+                            if (targetLine == null || firstCellValue.equals(targetLine)) {
+                                recordAdded = saveLine(sampleValues,
+                                        entrez, geneSymbol,
+                                        isRppaProfile, isDiscretizedCnaProfile,
+                                        existingCnaEvents);
                             }
                         }
                     }
-
                 }
 
                 // increment number of records added or entries skipped
@@ -395,6 +386,7 @@ public class ImportTabDelimData {
 
                 line = buf.readLine();
             }
+            DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelId);
             geneticAlterationImporter.finalise();
             if (MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
@@ -414,24 +406,6 @@ public class ImportTabDelimData {
         }
         finally {
             buf.close();
-        }
-    }
-
-    private void ensureSampleProfileExists(Sample sample) throws DaoException {
-        if (updateMode) {
-            upsertSampleProfile(sample);
-        } else {
-            createSampleProfileIfNotExists(sample);
-        }
-    }
-
-    private void upsertSampleProfile(Sample sample) throws DaoException {
-        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
-    }
-
-    private void createSampleProfileIfNotExists(Sample sample) throws DaoException {
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
         }
     }
 
@@ -468,7 +442,7 @@ public class ImportTabDelimData {
             String line = reader.readLine();
 
             while (line != null) {
-                String[] row = line.split("\t", -1);
+                String[] row = TsvUtil.splitTsvLine(line);
                 if (row.length < 6) {
                     throw new RuntimeException("Mis-formatted row: " + String.join(", ", row));
                 }
@@ -685,7 +659,7 @@ public class ImportTabDelimData {
                 recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    if (updateMode) {
+                    if (isIncrementalUpdateMode) {
                         DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
                     }
                     long entrezGeneId = genes.get(0).getEntrezGeneId();
