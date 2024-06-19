@@ -8,3 +8,4 @@ profile_name: Putative copy-number alterations from GISTIC
 data_filename: data_cna_discrete.txt
 pd_annotations_filename: data_cna_pd_annotations.txt
 namespaces: CustomNamespace
+gene_panel: TSTGNPNLCNADS

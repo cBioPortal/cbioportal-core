@@ -22,9 +22,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGenePanel;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
 import org.springframework.test.annotation.Rollback;
@@ -36,9 +39,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -121,6 +126,13 @@ public class TestIncrementalGenericAssayImporter {
         assertEquals("0.1", afterResult.get(lbw242EntityId).get(newSampleId));
         assertEquals(">~8", afterResult.get(lbw242EntityId).get(updateSampleId));
         assertNotNull("New generic entity has to be added", DaoGeneticEntity.getGeneticEntityByStableId("LBW242"));
+        assertFalse("This sample should not get sample_profile", DaoSampleProfile.sampleExistsInGeneticProfile(noChangeSampleId, ic50Profile.getGeneticProfileId()));
+        GenePanel genePanel = DaoGenePanel.getGenePanelByStableId("TSTGNPNLGENASS");
+        for (int sampleId : Set.of(updateSampleId, newSampleId)) {
+            assertEquals("Sample profile has to point to TSTGNPNLGENASS panel",
+                    genePanel.getInternalId(),
+                    DaoSampleProfile.getPanelId(sampleId, ic50Profile.getGeneticProfileId()));
+        }
     }
 
     /**

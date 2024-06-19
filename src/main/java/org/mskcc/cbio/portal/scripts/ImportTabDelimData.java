@@ -92,7 +92,6 @@ public class ImportTabDelimData {
     private int entriesSkipped = 0;
     private int nrExtraRecords = 0;
     private Set<String> arrayIdSet = new HashSet<String>();
-    private String genePanel;
     private String genericEntityProperties;
     private File pdAnnotationsFile;
     private Map<Map.Entry<Integer, Long>, Map<String, String>> pdAnnotations;
@@ -104,6 +103,7 @@ public class ImportTabDelimData {
 
     private boolean updateMode;
     private ArrayList<Integer> orderedSampleList;
+    private final Integer genePanelId;
 
     /**
      * Constructor.
@@ -170,7 +170,7 @@ public class ImportTabDelimData {
     ) {
         this.dataFile = dataFile;
         this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
+        this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.updateMode = updateMode;
         this.daoGene = daoGene;
         this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
@@ -280,7 +280,7 @@ public class ImportTabDelimData {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(sampleIds[i]) + "' found in tab-delimited file: " + this.dataFile.getCanonicalPath());
                     }
                 }
-                ensureSampleGeneticProfile(sample);
+                ensureSampleProfileExists(sample);
                 orderedSampleList.add(sample.getInternalId());
                 if (pdAnnotationsForStableSampleIds != null) {
                     Set<Map.Entry<String, Long>> keys = new HashSet<>(pdAnnotationsForStableSampleIds.keySet());
@@ -417,13 +417,21 @@ public class ImportTabDelimData {
         }
     }
 
-    private void ensureSampleGeneticProfile(Sample sample) throws DaoException {
+    private void ensureSampleProfileExists(Sample sample) throws DaoException {
+        if (updateMode) {
+            upsertSampleProfile(sample);
+        } else {
+            createSampleProfileIfNotExists(sample);
+        }
+    }
+
+    private void upsertSampleProfile(Sample sample) throws DaoException {
+        DaoSampleProfile.updateSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
+    }
+
+    private void createSampleProfileIfNotExists(Sample sample) throws DaoException {
         if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-            if (updateMode) {
-                DaoSampleProfile.deleteRecords(List.of(sample.getInternalId()), List.of(geneticProfileId));
-            }
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
+            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelId);
         }
     }
 

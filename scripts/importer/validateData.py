@@ -3386,7 +3386,7 @@ class GenePanelMatrixValidator(Validator):
                 sample_ids_panel_dict[sample_id] = data[self.mutation_stable_id_index - 1]
                 # Sample ID has been removed from list, so subtract 1 position.
                 if data[self.mutation_stable_id_index - 1] != 'NA':
-                    if sample_id not in mutation_sample_ids:
+                    if mutation_sample_ids is not None and sample_id not in mutation_sample_ids:
                         self.logger.error('Sample ID has mutation gene panel, but is not in the sequenced case list',
                                           extra={'line_number': self.line_number,
                                                  'cause': sample_id})
