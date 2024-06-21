@@ -180,7 +180,7 @@ public class MySQLbulkLoader {
             tempFileWriter.write( "\t" );
             tempFileWriter.write( escapeValue(fieldValues[i]) );
          }
-         tempFileWriter.write("\n");;
+         tempFileWriter.write("\n");
 
          if( rows++ < numDebuggingRowsToPrint ){
             StringBuffer sb = new StringBuffer( escapeValue(fieldValues[0]) );
