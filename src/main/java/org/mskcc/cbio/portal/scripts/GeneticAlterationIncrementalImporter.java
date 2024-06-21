@@ -87,7 +87,7 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     }
 
     private Map<Integer, String> mapWithFileOrderedSampleList(String[] values) {
-        return ArrayUtil.zip(fileOrderedSampleList.toArray(new Integer[0]), values);
+        return ArrayUtil.zip(fileOrderedSampleList.toArray(Integer[]::new), values);
     }
 
     private void expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue() {
