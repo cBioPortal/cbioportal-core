@@ -386,7 +386,7 @@ public class ImportTabDelimData {
 
                 line = buf.readLine();
             }
-            DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelId);
+            DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
             geneticAlterationImporter.finalise();
             if (MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();

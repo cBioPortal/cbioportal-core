@@ -61,15 +61,15 @@ public final class DaoSampleProfile {
 
     private static final int NO_SUCH_PROFILE_ID = -1;
 
-    public static void upsertSampleProfiles(Collection<Integer> sampleIds, Integer geneticProfileId, Integer panelId) throws DaoException {
-        upsertSampleProfiles(
+    public static void upsertSampleToProfileMapping(Collection<Integer> sampleIds, Integer geneticProfileId, Integer panelId) throws DaoException {
+        upsertSampleToProfileMapping(
                 sampleIds.stream()
                         .map(sampleId -> new SampleProfileTuple(geneticProfileId, sampleId, panelId)).toList());
     }
 
     public record SampleProfileTuple(int geneticProfileId, int sampleId, Integer panelId) {}
 
-    public static void upsertSampleProfiles(Collection<SampleProfileTuple> idTuples) throws DaoException {
+    public static void upsertSampleToProfileMapping(Collection<SampleProfileTuple> idTuples) throws DaoException {
         if (idTuples.isEmpty()) {
             return;
         }

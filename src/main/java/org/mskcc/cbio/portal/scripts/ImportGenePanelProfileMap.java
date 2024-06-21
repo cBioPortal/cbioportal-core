@@ -196,7 +196,7 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
                 sampleProfileTuples.add(new DaoSampleProfile.SampleProfileTuple(geneticProfileId, sampleInternalId, genePanelId));
             }
 
-            DaoSampleProfile.upsertSampleProfiles(sampleProfileTuples);
+            DaoSampleProfile.upsertSampleToProfileMapping(sampleProfileTuples);
         }
     }
 

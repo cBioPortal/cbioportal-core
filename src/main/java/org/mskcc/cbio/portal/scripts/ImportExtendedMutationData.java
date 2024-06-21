@@ -474,7 +474,7 @@ public class ImportExtendedMutationData {
                 }
             }
         }
-        DaoSampleProfile.upsertSampleProfiles(internalSampleIds, geneticProfileId, genePanelId);
+        DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
 
         for (MutationEvent event : newEvents) {
             try {
@@ -611,7 +611,7 @@ public class ImportExtendedMutationData {
             }
             line = buffer.readLine().trim();
         }
-        DaoSampleProfile.upsertSampleProfiles(internalSampleIds, geneticProfileId, genePanelId);
+        DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
         return line;
     }
 

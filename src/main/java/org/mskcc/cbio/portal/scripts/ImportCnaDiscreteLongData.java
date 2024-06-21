@@ -153,7 +153,7 @@ public class ImportCnaDiscreteLongData {
         orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
         this.geneticAlterationGeneImporter = isIncrementalUpdateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                 : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
-        DaoSampleProfile.upsertSampleProfiles(orderedSampleList, geneticProfileId, genePanelId);
+        DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
             boolean added = storeGeneticAlterations(toImport, entrezId);

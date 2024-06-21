@@ -91,7 +91,7 @@ public class TestIncrementalStructuralVariantsImport {
         structuralVariant.setComments("This record has to be overwritten");
         DaoStructuralVariant.addStructuralVariantToBulkLoader(structuralVariant);
         MySQLbulkLoader.flushAll();
-        DaoSampleProfile.upsertSampleProfiles(List.of(
+        DaoSampleProfile.upsertSampleToProfileMapping(List.of(
                 new DaoSampleProfile.SampleProfileTuple(svGeneticProfile.getGeneticProfileId(), svDataSample.getInternalId(), null)));
 
         File singleTcgaSampleFolder = new File("src/test/resources/incremental/structural_variants/");
