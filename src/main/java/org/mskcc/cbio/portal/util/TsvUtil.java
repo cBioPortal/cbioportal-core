@@ -6,10 +6,10 @@ package org.mskcc.cbio.portal.util;
  */
 public class TsvUtil {
     /**
-     * is the line has some data
-     * e.g. blank line and comments do not
-     * @param line
-     * @return
+     * Detects if the line has some data
+     * e.g. blank line and comments are not considered as data rows
+     * @param line the line to evaluate
+     * @return true if the line contains data, false otherwise
      */
     public static boolean isDataLine(String line) {
         return !line.startsWith("#") && line.trim().length() > 0;
