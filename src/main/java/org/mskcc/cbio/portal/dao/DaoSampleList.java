@@ -50,7 +50,6 @@ public class DaoSampleList {
     public int addSampleList(SampleList sampleList) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         int rows;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
@@ -66,8 +65,7 @@ public class DaoSampleList {
             try (ResultSet generatedKey = pstmt.getGeneratedKeys()) {
                 if (generatedKey.next()) {
                     int listId = generatedKey.getInt(1);
-                    int listListRow = addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
-                    rows = (listListRow != -1) ? (rows + listListRow) : rows;
+                    rows += addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
                 } else {
                     throw new DaoException("Creating sample list failed, no ID obtained.");
                 }
@@ -75,7 +73,7 @@ public class DaoSampleList {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoSampleList.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoSampleList.class, con, pstmt, null);
         }
         
         return rows;
