@@ -70,7 +70,7 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         this.caseListSampleIdToSampleIds.put(cancerStudyStableId + "_all", this.allSampleIds);
         Map<String, Set<String>> readCaseListSampleIds = readCaseListFiles();
         this.caseListSampleIdToSampleIds.putAll(readCaseListSampleIds);
-        updateCaseLists(this.caseListSampleIdToSampleIds);
+        updateCaseListsForTheStudy(this.caseListSampleIdToSampleIds);
     }
 
     private Map<String, Set<String>> readCaseListFiles() {
@@ -96,7 +96,20 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
         return result;
     }
 
-    private void updateCaseLists(Map<String, Set<String>> caseListSampleIdToSampleIds) {
+    /**
+     * Updates the sample lists according to the steps below:
+     *
+     * 1. New sample IDs provided in the `caseListSampleIdToSampleIds` map are added to their corresponding case lists.
+     * 2. These sample IDs are removed from any other case lists within the same study.
+     *
+     * @param caseListSampleIdToSampleIds A map where the key is the case list stable ID and the value is a set of sample IDs
+     *                                    to be added to the corresponding case list.
+     *                                    Note: This map only includes the case lists that need to be updated with new sample IDs.
+     *                                    Existing case lists in the study that are not in the map will not be dropped,
+     *                                    but the provided sample IDs will be removed from these lists if present.
+     * @throws RuntimeException if any DAO operations fail or if a case list with a specified stable ID is not found.
+     */
+    private void updateCaseListsForTheStudy(Map<String, Set<String>> caseListSampleIdToSampleIds) {
         DaoCancerStudy.reCacheAll();
         try {
             for (Map.Entry<String, Set<String>> caseListStableIdToSampleIds : caseListSampleIdToSampleIds.entrySet()) {
