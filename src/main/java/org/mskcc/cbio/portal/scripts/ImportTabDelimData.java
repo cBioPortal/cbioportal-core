@@ -305,6 +305,8 @@ public class ImportTabDelimData {
             this.geneticAlterationImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                     : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
 
+            geneticAlterationImporter.initialise();
+
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
             if (isDiscretizedCnaProfile) {

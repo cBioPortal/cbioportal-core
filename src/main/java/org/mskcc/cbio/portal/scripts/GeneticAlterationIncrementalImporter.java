@@ -17,34 +17,15 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
 
     private final List<Integer> fileOrderedSampleList;
     private final DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-    private final HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
+    private HashMap<Integer, HashMap<Integer, String>> geneticAlterationMap;
 
     public GeneticAlterationIncrementalImporter(
             int geneticProfileId,
             List<Integer> fileOrderedSampleList
-    ) throws DaoException {
+    ) {
 
         this.geneticProfileId = geneticProfileId;
-        this.geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfileId, null);
         this.fileOrderedSampleList = fileOrderedSampleList;
-
-        ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(this.geneticProfileId);
-        int initialOrderSampleListSize = savedOrderedSampleList.size();
-        geneticAlterationMap.forEach((geneticEntityId, sampleToValue) -> {
-            if (sampleToValue.size() != initialOrderSampleListSize) {
-                throw new IllegalStateException("Number of samples ("
-                        + sampleToValue.size() + ") for genetic entity with id "
-                        + geneticEntityId + " does not match with the number in the preexisting sample list ("
-                        + initialOrderSampleListSize + ").");
-            }
-        });
-        // add all new sample ids at the end
-        this.orderedSampleList = new ArrayList<>(savedOrderedSampleList);
-        List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
-        this.orderedSampleList.addAll(newSampleIds);
-        DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(this.geneticProfileId);
-        this.storeOrderedSampleList();
-        daoGeneticAlteration.deleteAllRecordsInGeneticProfile(this.geneticProfileId);
     }
 
     @Override
@@ -58,6 +39,32 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     public boolean store(int geneticEntityId, String[] values) throws DaoException {
         String[] expandedValues = extendValues(geneticEntityId, values);
         return super.store(geneticEntityId, expandedValues);
+    }
+
+    @Override
+    public void initialise() {
+        try {
+            this.geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfileId, null);
+            ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(this.geneticProfileId);
+            int initialOrderSampleListSize = savedOrderedSampleList.size();
+            geneticAlterationMap.forEach((geneticEntityId, sampleToValue) -> {
+                if (sampleToValue.size() != initialOrderSampleListSize) {
+                    throw new IllegalStateException("Number of samples ("
+                            + sampleToValue.size() + ") for genetic entity with id "
+                            + geneticEntityId + " does not match with the number in the preexisting sample list ("
+                            + initialOrderSampleListSize + ").");
+                }
+            });
+            // add all new sample ids at the end
+            this.orderedSampleList = new ArrayList<>(savedOrderedSampleList);
+            List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
+            this.orderedSampleList.addAll(newSampleIds);
+            DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(this.geneticProfileId);
+            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(this.geneticProfileId);
+        } catch (DaoException e) {
+            throw new RuntimeException(e);
+        }
+        super.initialise();
     }
 
     @Override

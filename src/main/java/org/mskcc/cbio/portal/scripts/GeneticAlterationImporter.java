@@ -25,10 +25,9 @@ public class GeneticAlterationImporter {
     public GeneticAlterationImporter(
         int geneticProfileId,
         List<Integer> orderedSampleList
-    ) throws DaoException {
+    ) {
         this.geneticProfileId = geneticProfileId;
         this.orderedSampleList = orderedSampleList;
-        storeOrderedSampleList();
     }
 
     protected void storeOrderedSampleList() throws DaoException {
@@ -93,5 +92,13 @@ public class GeneticAlterationImporter {
         }
     }
 
+
+    public void initialise() {
+        try {
+            storeOrderedSampleList();
+        } catch (DaoException e) {
+            throw new RuntimeException(e);
+        }
+    }
     public void finalise() { }
 }
