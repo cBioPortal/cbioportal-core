@@ -67,6 +67,15 @@ public final class DaoCopyNumberSegment {
         }
     }
 
+    /**
+     * Ensures FRACTION_GENOME_ALTERED clinical sample attribute is created and up to date.
+     * @param cancerStudyId - id of the study to create the clinical attribute for
+     * @param sampleIds - specifies for which samples to calculate this attribute.
+     *                  if sampleIds=null, the calculation is done for all samples in the study
+     * @param updateMode -  if true, updates the attribute if it exists
+     * @throws DaoException
+     */
+
     public static void createFractionGenomeAlteredClinicalData(int cancerStudyId, Set<Integer> sampleIds, boolean updateMode) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
