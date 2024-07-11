@@ -34,7 +34,7 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
             if (sampleToValue.size() != initialOrderSampleListSize) {
                 throw new IllegalStateException("Number of samples ("
                         + sampleToValue.size() + ") for genetic entity with id "
-                        + geneticEntityId + " does not match with the number in the inital sample list ("
+                        + geneticEntityId + " does not match with the number in the preexisting sample list ("
                         + initialOrderSampleListSize + ").");
             }
         });
