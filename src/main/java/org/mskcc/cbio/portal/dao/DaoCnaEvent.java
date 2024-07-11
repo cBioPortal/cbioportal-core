@@ -135,9 +135,10 @@ public final class DaoCnaEvent {
                             " WHERE sample_cna_event.`GENETIC_PROFILE_ID` = ? AND sample_cna_event.`SAMPLE_ID` IN (" +
                             String.join(",", Collections.nCopies(sampleIds.size(), "?"))
                             + ")");
-            pstmt.setInt(1, cnaProfileId);
-            for (int i = 0; i < sampleIds.size(); i++) {
-                pstmt.setInt(i + 2, sampleIds.get(i));
+            int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, cnaProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
             }
             pstmt.executeUpdate();
         } catch (SQLException e) {
