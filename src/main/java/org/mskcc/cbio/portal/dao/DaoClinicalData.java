@@ -367,6 +367,12 @@ public final class DaoClinicalData {
         return getDataByInternalIds(cancerStudyId, SAMPLE_ATTRIBUTES_TABLE, sampleIdsInt, Collections.singletonList(attr.getAttrId()));
     }
 
+    /**
+     * Removes sample attributes associated with the sample with internal sample id.
+     * No error raised if you try to delete record for sample which does not exist.
+     * @param sampleInternalId - internal id of sample for which to remove attributes
+     * @throws DaoException
+     */
     public static void removeSampleAttributesData(int sampleInternalId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
@@ -384,6 +390,13 @@ public final class DaoClinicalData {
         }
     }
 
+    /**
+     * Deletes any matching sample attributes records if they exist.
+     * No error raised if you try to delete records which do not exist.
+     * @param sampleInternalIds - internal sample ids for which remove attributes
+     * @param attrId - attribute to delete
+     * @throws DaoException
+     */
     public static void removeSampleAttributesData(Set<Integer> sampleInternalIds, String attrId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
