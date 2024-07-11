@@ -65,7 +65,7 @@ public class DaoSampleList {
             try (ResultSet generatedKey = pstmt.getGeneratedKeys()) {
                 if (generatedKey.next()) {
                     int listId = generatedKey.getInt(1);
-                    rows += addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
+                    addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
                 } else {
                     throw new DaoException("Creating sample list failed, no ID obtained.");
                 }
