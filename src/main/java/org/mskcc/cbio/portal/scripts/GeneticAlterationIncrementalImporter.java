@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class GeneticAlterationIncrementalImporter extends GeneticAlterationImporter {
 
@@ -57,7 +58,8 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
             });
             // add all new sample ids at the end
             this.orderedSampleList = new ArrayList<>(savedOrderedSampleList);
-            List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedOrderedSampleList.contains(sampleId)).toList();
+            Set<Integer> savedSampleSet = new HashSet<>(savedOrderedSampleList);
+            List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedSampleSet.contains(sampleId)).toList();
             this.orderedSampleList.addAll(newSampleIds);
             DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(this.geneticProfileId);
             daoGeneticAlteration.deleteAllRecordsInGeneticProfile(this.geneticProfileId);
