@@ -93,10 +93,5 @@ public class GeneticAlterationImporter {
         }
     }
 
-    public boolean isImportedAlready(CanonicalGene gene) {
-        return importSetOfGenes.contains(gene.getEntrezGeneId());
-    }
-
-
     public void finalise() { }
 }
