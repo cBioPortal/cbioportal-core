@@ -2297,12 +2297,10 @@ class StudyCompositionTestCase(LogBufferTestCase):
     def setUp(self):
         """Store validateData globals changed by running validate_study()."""
         super(StudyCompositionTestCase, self).setUp()
-        self.orig_defined_cancer_types = validateData.DEFINED_CANCER_TYPES
         self.orig_defined_sample_ids = validateData.DEFINED_SAMPLE_IDS
 
     def tearDown(self):
         """Restore the environment to before setUp() was called."""
-        validateData.DEFINED_CANCER_TYPES = self.orig_defined_cancer_types
         validateData.DEFINED_SAMPLE_IDS = self.orig_defined_sample_ids
         super(StudyCompositionTestCase, self).tearDown()
 

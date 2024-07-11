@@ -70,7 +70,6 @@ from . import cbioportal_common
 DEFINED_SAMPLE_IDS = None
 DEFINED_SAMPLE_ATTRIBUTES = None
 PATIENTS_WITH_SAMPLES = None
-DEFINED_CANCER_TYPES = None
 mutation_sample_ids = None
 mutation_file_sample_ids = set()
 sample_ids_panel_dict = {}
@@ -5388,7 +5387,6 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             cancer_type_validators[0].validate()
             studydefined_cancer_types = (
                 cancer_type_validators[0].defined_cancer_types)
-    DEFINED_CANCER_TYPES = studydefined_cancer_types
 
     # next check the cancer type of the meta_study file
     if cbioportal_common.MetaFileTypes.STUDY not in validators_by_meta_type:
@@ -5396,7 +5394,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
         return
     if portal_instance.cancer_type_dict is not None and not (
                 study_cancer_type in portal_instance.cancer_type_dict or
-                study_cancer_type in DEFINED_CANCER_TYPES):
+                study_cancer_type in studydefined_cancer_types):
         logger.error(
             'Cancer type of study is neither known to the portal nor defined '
             'in a cancer_type file',
