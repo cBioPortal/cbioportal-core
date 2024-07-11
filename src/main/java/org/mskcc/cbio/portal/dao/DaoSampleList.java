@@ -42,7 +42,7 @@ import java.util.*;
  */
 public class DaoSampleList {
 
-    public static final String DELETE_SAMPLE_LIST_LIST = "DELETE FROM sample_list_list WHERE `LIST_ID` = ?";
+    private static final String DELETE_SAMPLE_LIST_LIST = "DELETE FROM sample_list_list WHERE `LIST_ID` = ?";
 
     /**
 	 * Adds record to sample_list table.

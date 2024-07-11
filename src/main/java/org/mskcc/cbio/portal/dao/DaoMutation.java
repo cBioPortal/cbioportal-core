@@ -67,8 +67,8 @@ import java.util.regex.Pattern;
 public final class DaoMutation {
     public static final String NAN = "NaN";
     private static final String MUTATION_COUNT_ATTR_ID = "MUTATION_COUNT";
-    public static final String DELETE_ALTERATION_DRIVER_ANNOTATION = "DELETE from alteration_driver_annotation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
-    public static final String DELETE_MUTATION = "DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
+    private static final String DELETE_ALTERATION_DRIVER_ANNOTATION = "DELETE from alteration_driver_annotation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
+    private static final String DELETE_MUTATION = "DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
 
     public static int addMutation(ExtendedMutation mutation, boolean newMutationEvent) throws DaoException {
         if (!MySQLbulkLoader.isBulkLoad()) {
