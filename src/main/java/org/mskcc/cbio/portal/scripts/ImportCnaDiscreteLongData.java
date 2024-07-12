@@ -153,7 +153,7 @@ public class ImportCnaDiscreteLongData {
         orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
         this.geneticAlterationGeneImporter = isIncrementalUpdateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                 : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
-        geneticAlterationGeneImporter.initialise();
+        geneticAlterationGeneImporter.initialize();
         DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
 
         for (Long entrezId : toImport.eventsTable.rowKeySet()) {
@@ -171,7 +171,7 @@ public class ImportCnaDiscreteLongData {
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
         buf.close();
-        geneticAlterationGeneImporter.finalise();
+        geneticAlterationGeneImporter.finalize();
         MySQLbulkLoader.flushAll();
     }
 

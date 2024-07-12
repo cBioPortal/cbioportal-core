@@ -93,12 +93,12 @@ public class GeneticAlterationImporter {
     }
 
 
-    public void initialise() {
+    public void initialize() {
         try {
             storeOrderedSampleList();
         } catch (DaoException e) {
             throw new RuntimeException(e);
         }
     }
-    public void finalise() { }
+    public void finalize() { }
 }

@@ -305,7 +305,7 @@ public class ImportTabDelimData {
             this.geneticAlterationImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
                     : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
 
-            geneticAlterationImporter.initialise();
+            geneticAlterationImporter.initialize();
 
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
@@ -389,7 +389,7 @@ public class ImportTabDelimData {
                 line = buf.readLine();
             }
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
-            geneticAlterationImporter.finalise();
+            geneticAlterationImporter.finalize();
             if (MySQLbulkLoader.isBulkLoad()) {
                 MySQLbulkLoader.flushAll();
             }

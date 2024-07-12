@@ -43,7 +43,7 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     }
 
     @Override
-    public void initialise() {
+    public void initialize() {
         try {
             this.geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfileId, null);
             ArrayList <Integer> savedOrderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(this.geneticProfileId);
@@ -66,13 +66,13 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
         } catch (DaoException e) {
             throw new RuntimeException(e);
         }
-        super.initialise();
+        super.initialize();
     }
 
     @Override
-    public void finalise() {
+    public void finalize() {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
-        super.finalise();
+        super.finalize();
     }
 
     private String[] extendValues(int geneticEntityId, String[] values) {
