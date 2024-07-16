@@ -65,7 +65,7 @@ public final class DaoCopyNumberSegmentFile {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoCopyNumberSegmentFile.class, con, pstmt, rs);
         }
     }
 
@@ -86,6 +86,9 @@ public final class DaoCopyNumberSegmentFile {
                 cnsf.referenceGenomeId = CopyNumberSegmentFile.ReferenceGenomeId.valueOf(rs.getString("REFERENCE_GENOME_ID"));
                 cnsf.description = rs.getString("DESCRIPTION");
                 cnsf.filename = rs.getString("FILENAME");
+                if (rs.next()) {
+                    throw new SQLException("More than one row was returned.");
+                }
                 return cnsf;
             }
             return null;

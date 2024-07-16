@@ -235,7 +235,7 @@ public class NullHttpServletResponse implements  HttpServletResponse {
 
     // properties ///////////////////////////////////////////////////////////////
 
-    private ServletOutputStream servletOutputStream =  null; // new NullServletOutputStream();;
+    private ServletOutputStream servletOutputStream =  null; // new NullServletOutputStream();
     private StringWriter myStringWriter = new StringWriter();
     
     public String getOutput(){

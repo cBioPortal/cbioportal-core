@@ -55,6 +55,7 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
 * Note; Imports genetic entities from generic assay files. Has been written for treatment response data
@@ -160,7 +161,6 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
     * @throws Exception
     */
     public static void importData(File dataFile, GeneticAlterationType geneticAlterationType, String additionalProperties, boolean updateInfo) throws Exception {
-        
         ProgressMonitor.setCurrentMessage("Reading data from: " + dataFile.getCanonicalPath());
         
         // read generic assay data file
@@ -186,6 +186,10 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         currentLine = buf.readLine();
         
         while (currentLine != null) {
+            if (!TsvUtil.isDataLine(currentLine)) {
+                currentLine = buf.readLine();
+                continue;
+            }
             
             String[] parts = currentLine.split("\t");
             

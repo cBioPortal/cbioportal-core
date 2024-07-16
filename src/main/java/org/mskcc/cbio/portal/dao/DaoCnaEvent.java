@@ -119,7 +119,35 @@ public final class DaoCnaEvent {
             JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, rs);
         }
 	}
-    
+
+    public static void removeSampleCnaEvents(int cnaProfileId, List<Integer> sampleIds) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
+            pstmt = con.prepareStatement
+                    ("DELETE sample_cna_event, alteration_driver_annotation" +
+                            " FROM sample_cna_event" +
+                            " LEFT JOIN alteration_driver_annotation ON alteration_driver_annotation.`ALTERATION_EVENT_ID` = sample_cna_event.`CNA_EVENT_ID`" +
+                            " AND alteration_driver_annotation.`SAMPLE_ID` = sample_cna_event.`SAMPLE_ID`" +
+                            " AND alteration_driver_annotation.`GENETIC_PROFILE_ID` = sample_cna_event.`GENETIC_PROFILE_ID`" +
+                            " WHERE sample_cna_event.`GENETIC_PROFILE_ID` = ? AND sample_cna_event.`SAMPLE_ID` IN (" +
+                            String.join(",", Collections.nCopies(sampleIds.size(), "?"))
+                            + ")");
+            int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, cnaProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, rs);
+        }
+    }
+
     public static Map<Sample, Set<Long>> getSamplesWithAlterations(
             Collection<Long> eventIds) throws DaoException {
         return getSamplesWithAlterations(StringUtils.join(eventIds, ","));

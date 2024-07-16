@@ -32,22 +32,49 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.maf.*;
-
 import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.maf.MafRecord;
+import org.mskcc.cbio.maf.MafUtil;
+import org.mskcc.cbio.portal.dao.DaoAlleleSpecificCopyNumber;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoMutation;
+import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.ExtendedMutation;
+import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
+import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.ExtendedMutationUtil;
+import org.mskcc.cbio.portal.util.GeneticProfileUtil;
+import org.mskcc.cbio.portal.util.GlobalProperties;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.*;
-import java.util.regex.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Import an extended mutation file.
@@ -59,7 +86,7 @@ import java.util.regex.*;
  * <br>
  * @author Selcuk Onur Sumer
  */
-public class ImportExtendedMutationData{
+public class ImportExtendedMutationData {
 
     private File mutationFile;
     private int geneticProfileId;
@@ -68,27 +95,37 @@ public class ImportExtendedMutationData{
     private int entriesSkipped = 0;
     private int samplesSkipped = 0;
     private Set<String> sampleSet = new HashSet<String>();
+    private Set<Integer> internalSampleIds = new HashSet<Integer>();
+
     private Set<String> geneSet = new HashSet<String>();
-    private String genePanel;
     private Set<String> filteredMutations = new HashSet<String>();
     private Set<String> namespaces = new HashSet<String>();
     private Pattern SEQUENCE_SAMPLES_REGEX = Pattern.compile("^.*sequenced_samples:(.*)$");
     private final String ASCN_NAMESPACE = "ASCN";
+
+    private final Integer genePanelId;
+
+    private final boolean overwriteExisting;
 
     /**
      * construct an ImportExtendedMutationData.
      * Filter mutations according to the no argument MutationFilter().
      */
     public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces) {
+        this(mutationFile, geneticProfileId, genePanel, filteredMutations, namespaces, false);
+    }
+
+    public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel, Set<String> filteredMutations, Set<String> namespaces, boolean overwriteExisting) {
         this.mutationFile = mutationFile;
         this.geneticProfileId = geneticProfileId;
         this.swissprotIsAccession = false;
-        this.genePanel = genePanel;
+        this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.filteredMutations = filteredMutations;
 
         // create default MutationFilter
         myMutationFilter = new MutationFilter( );
         this.namespaces = namespaces;
+        this.overwriteExisting = overwriteExisting;
     }
 
     public ImportExtendedMutationData(File mutationFile, int geneticProfileId, String genePanel) {
@@ -150,15 +187,15 @@ public class ImportExtendedMutationData{
             referenceGenome = GlobalProperties.getReferenceGenomeName();
         }
         String genomeBuildName = DaoReferenceGenome.getReferenceGenomeByGenomeName(referenceGenome).getBuildName();
-
+        Set<Integer> processedSamples = new HashSet<>();
         while((line=buf.readLine()) != null)
         {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
 
-            if( !line.startsWith("#") && line.trim().length() > 0)
+            if(TsvUtil.isDataLine(line))
             {
-                String[] parts = line.split("\t", -1 ); // the -1 keeps trailing empty strings; see JavaDoc for String
+                String[] parts = TsvUtil.splitTsvLine(line);
                 MafRecord record = mafUtil.parseRecord(line);
 
                 if (!record.getNcbiBuild().equalsIgnoreCase(genomeBuildName)) {
@@ -180,6 +217,9 @@ public class ImportExtendedMutationData{
                     else {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(barCode) + "' found in MAF file: " + this.mutationFile.getCanonicalPath());
                     }
+                } else if (overwriteExisting && !processedSamples.contains(sample.getInternalId())) {
+                    DaoMutation.deleteAllRecordsInGeneticProfileForSample(geneticProfileId, sample.getInternalId());
+                    processedSamples.add(sample.getInternalId());
                 }
 
                 String validationStatus = record.getValidationStatus();
@@ -417,9 +457,6 @@ public class ImportExtendedMutationData{
                         } else {
                             mutations.put(mutation,mutation);
                         }
-                        if(!sampleSet.contains(sample.getStableId())) {
-                            addSampleProfileRecord(sample);
-                        }
                         // update ascn object with mutation unique key details
                         if (ascn != null){
                             ascn.updateAscnUniqueKeyDetails(mutation);
@@ -428,6 +465,7 @@ public class ImportExtendedMutationData{
 
                         //keep track:
                         sampleSet.add(sample.getStableId());
+                        internalSampleIds.add(sample.getInternalId());
                         geneSet.add(mutation.getEntrezGeneId()+"");
                     }
                     else {
@@ -436,6 +474,7 @@ public class ImportExtendedMutationData{
                 }
             }
         }
+        DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
 
         for (MutationEvent event : newEvents) {
             try {
@@ -563,19 +602,21 @@ public class ImportExtendedMutationData{
     private String processMAFHeader(BufferedReader buffer) throws IOException, DaoException {
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
         String line = buffer.readLine().trim();
+        Set<Integer> internalSampleIds = new HashSet<>();
         while (line.startsWith("#")) {
             Matcher seqSamplesMatcher = SEQUENCE_SAMPLES_REGEX.matcher(line);
             // line is of format #sequenced_samples: STABLE_ID STABLE_ID STABLE_ID STABLE_ID
             if (seqSamplesMatcher.find()) {
-                addSampleProfileRecords(getSequencedSamples(seqSamplesMatcher.group(1), geneticProfile));
+                internalSampleIds.addAll(getSequencedInternalSampleId(seqSamplesMatcher.group(1), geneticProfile));
             }
             line = buffer.readLine().trim();
         }
+        DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
         return line;
     }
 
-    private List<Sample> getSequencedSamples(String sequencedSamplesIDList, GeneticProfile geneticProfile) {
-        ArrayList<Sample> toReturn = new ArrayList<Sample>();
+    private Set<Integer> getSequencedInternalSampleId(String sequencedSamplesIDList, GeneticProfile geneticProfile) {
+        Set<Integer> toReturn = new HashSet<>();
         for (String stableSampleID : sequencedSamplesIDList.trim().split("\\s")) {
             Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
                                                                         StableIdUtil.getSampleId(stableSampleID));
@@ -583,33 +624,13 @@ public class ImportExtendedMutationData{
             if (sample == null) {
                 missingSample(stableSampleID);
             }
-            toReturn.add(sample);
+            toReturn.add(sample.getInternalId());
         }
         return toReturn;
-    }
-
-    private void addSampleProfileRecords(List<Sample> sequencedSamples) throws DaoException {
-        for (Sample sample : sequencedSamples) {
-            addSampleProfileRecord(sample);
-        }
-        if( MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-        }
-    }
-
-    private void addSampleProfileRecord(Sample sample) throws DaoException {
-        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId)) {
-            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-            DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, genePanelID);
-        }
     }
 
     private void missingSample(String stableSampleID) {
         throw new NullPointerException("Sample is not found in database (is it missing from clinical data file?): " + stableSampleID);
     }
 
-    private String convertMapToJsonString(Map<String, Map<String, Object>> map) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.writeValueAsString(map);
-    }
 }

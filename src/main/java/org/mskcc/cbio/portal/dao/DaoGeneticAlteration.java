@@ -65,12 +65,10 @@ public class DaoGeneticAlteration {
      * Gets Instance of Dao Object. (Singleton pattern).
      *
      * @return DaoGeneticAlteration Object.
-     * @throws DaoException Dao Initialization Error.
      */
-    public static DaoGeneticAlteration getInstance() throws DaoException {
+    public static DaoGeneticAlteration getInstance() {
         if (daoGeneticAlteration == null) {
             daoGeneticAlteration = new DaoGeneticAlteration();
-            
         }
 
         return daoGeneticAlteration;
@@ -96,7 +94,7 @@ public class DaoGeneticAlteration {
             throws DaoException {
     	return addGeneticAlterationsForGeneticEntity(geneticProfileId, DaoGeneOptimized.getGeneticEntityId(entrezGeneId), values);
     }
-    
+
     public int addGeneticAlterationsForGeneticEntity(int geneticProfileId, int geneticEntityId, String[] values)
             throws DaoException {
     
@@ -238,9 +236,21 @@ public class DaoGeneticAlteration {
                 HashMap<Integer, String> mapSampleValue = new HashMap<Integer, String>();
                 int geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
                 String values = rs.getString("VALUES");
-                //hm.debug..
-                String valueParts[] = values.split(DELIM);
-                for (int i=0; i<valueParts.length; i++) {
+                String[] valueParts = values.split(DELIM, -1);
+                int valuesLength = valueParts.length;
+                boolean hasMeaninglessTrailingDelimiter = valuesLength - orderedSampleList.size() == 1 && valueParts[valuesLength - 1].isEmpty();
+                if (hasMeaninglessTrailingDelimiter) {
+                    // adjust value length to account for the trailing delimiter
+                    valuesLength -= 1;
+                }
+                if (valuesLength != orderedSampleList.size()) {
+                    throw new IllegalStateException(
+                            "Data inconsistency detected: The length of the values for genetic profile with Id = "
+                                    + geneticProfileId + " and genetic entity with ID = " + geneticEntityId
+                                    + " (" + valuesLength + " elements) does not match the expected length of the sample list ("
+                                    + orderedSampleList.size() + " elements).");
+                }
+                for (int i = 0; i < orderedSampleList.size(); i++) {
                     String value = valueParts[i];
                     Integer sampleId = orderedSampleList.get(i);
                     mapSampleValue.put(sampleId, value);
@@ -292,7 +302,11 @@ public class DaoGeneticAlteration {
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("GENETIC_ENTITY_ID"));
-                String[] values = rs.getString("VALUES").split(DELIM);
+                String valuesString = rs.getString("VALUES");
+                if (valuesString.endsWith(DELIM)) {
+                    valuesString = valuesString.substring(0, valuesString.length() - DELIM.length());
+                }
+                String[] values = valuesString.split(DELIM, -1);
                 ObjectNode datum = processor.process(
                         entrezGeneId,
                         values,

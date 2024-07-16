@@ -32,19 +32,37 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.CanonicalGene;
-import org.mskcc.cbio.portal.model.ReferenceGenome;
-import org.mskcc.cbio.portal.model.ReferenceGenomeGene;
-import org.mskcc.cbio.portal.util.*;
-
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
+import org.mskcc.cbio.portal.dao.DaoReferenceGenomeGene;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.ReferenceGenome;
+import org.mskcc.cbio.portal.model.ReferenceGenomeGene;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.DataValidator;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.GlobalProperties;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Command Line Tool to Import Background Gene Data.
@@ -187,8 +205,8 @@ public class ImportGeneData extends ConsoleRunnable {
             while ((line = buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
-                String parts[] = line.split("\t", -1); // include trailing empty strings
-                if (!parts[0].matches("[0-9]+")) {
+                String parts[] = TsvUtil.splitTsvLine(line); // include trailing empty strings
+                if (!DataValidator.isValidNumericSequence(parts[0])) {
                     ProgressMonitor.logWarning("Skipping gene with invalid entrez gene id '" + parts[1] + "'");
                     continue;
                 }
@@ -684,8 +702,6 @@ public class ImportGeneData extends ConsoleRunnable {
     @Override
     public void run() {
         try {
-            SpringUtil.initDataSource();
-
             String description = "Update gene / gene alias tables ";
 
             // using a real options parser, helps avoid bugs

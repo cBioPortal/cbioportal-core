@@ -67,7 +67,16 @@ public final class DaoCopyNumberSegment {
         }
     }
 
-    public static void createFractionGenomeAlteredClinicalData(int cancerStudyId) throws DaoException {
+    /**
+     * Ensures FRACTION_GENOME_ALTERED clinical sample attribute is created and up to date.
+     * @param cancerStudyId - id of the study to create the clinical attribute for
+     * @param sampleIds - specifies for which samples to calculate this attribute.
+     *                  if sampleIds=null, the calculation is done for all samples in the study
+     * @param updateMode -  if true, updates the attribute if it exists
+     * @throws DaoException
+     */
+
+    public static void createFractionGenomeAlteredClinicalData(int cancerStudyId, Set<Integer> sampleIds, boolean updateMode) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -80,8 +89,15 @@ public final class DaoCopyNumberSegment {
                     "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
                     "ABS(c2.`SEGMENT_MEAN`) >= 0.2) / SUM(`END`-`START`)) AS `VALUE` FROM `copy_number_seg` AS c1 , `cancer_study` " +
                     "WHERE c1.`CANCER_STUDY_ID` = cancer_study.`CANCER_STUDY_ID` AND cancer_study.`CANCER_STUDY_ID`=? " +
-                    "GROUP BY cancer_study.`CANCER_STUDY_ID` , `SAMPLE_ID` HAVING SUM(`END`-`START`) > 0;");
-            pstmt.setInt(1, cancerStudyId);
+                            (sampleIds == null ? "" : ("AND `SAMPLE_ID` IN ("+ String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") "))
+                    +"GROUP BY cancer_study.`CANCER_STUDY_ID` , `SAMPLE_ID` HAVING SUM(`END`-`START`) > 0;");
+            int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, cancerStudyId);
+            if (sampleIds != null) {
+                for (Integer sampleId : sampleIds) {
+                    pstmt.setInt(parameterIndex++, sampleId);
+                }
+            }
             Map<Integer, String> fractionGenomeAltereds = new HashMap<Integer, String>();
             rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -94,7 +110,10 @@ public final class DaoCopyNumberSegment {
                     false, "20", cancerStudyId);
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
-            
+
+            if (updateMode) {
+                DaoClinicalData.removeSampleAttributesData(fractionGenomeAltereds.keySet(), FRACTION_GENOME_ALTERED_ATTR_ID);
+            }
             for (Map.Entry<Integer, String> fractionGenomeAltered : fractionGenomeAltereds.entrySet()) {
                 DaoClinicalData.addSampleDatum(fractionGenomeAltered.getKey(), FRACTION_GENOME_ALTERED_ATTR_ID, fractionGenomeAltered.getValue());
             }
@@ -277,6 +296,29 @@ public final class DaoCopyNumberSegment {
             return rs.next() && rs.getInt(1)==1;
         } catch (NullPointerException e) {
             throw new DaoException(e);
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
+        }
+    }
+
+    public static void  deleteSegmentDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
+            pstmt = con.prepareStatement("DELETE FROM `copy_number_seg`" +
+                    " WHERE `CANCER_STUDY_ID`= ?" +
+                    " AND `SAMPLE_ID` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
+                    + ")");
+            int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, cancerStudyId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {

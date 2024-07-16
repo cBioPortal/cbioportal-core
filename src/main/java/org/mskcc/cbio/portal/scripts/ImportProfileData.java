@@ -32,14 +32,17 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
+import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
+import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.GeneticProfileReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+
+import java.io.File;
 import java.util.Set;
-
-import joptsimple.*;
-
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
 
 import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
@@ -54,12 +57,7 @@ public class ImportProfileData extends ConsoleRunnable {
     public void run() {
         DaoGeneOptimized daoGene;
         DaoGeneticAlteration daoGeneticAlteration;
-        try {
-            daoGene = DaoGeneOptimized.getInstance();
-            daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-        } catch (DaoException e) {
-            throw new RuntimeException("Could not create dao instances", e);
-        }
+        daoGene = DaoGeneOptimized.getInstance();
 
         try {
             // Parse arguments
@@ -73,7 +71,7 @@ public class ImportProfileData extends ConsoleRunnable {
             if (options.has("update-info") && (((String) options.valueOf("update-info")).equalsIgnoreCase("true") || options.valueOf("update-info").equals("1"))) {
                 updateInfo = true;
             }
-            SpringUtil.initDataSource();
+            boolean overwriteExisting = options.has("overwrite-existing");
             ProgressMonitor.setCurrentMessage("Reading data from:  " + dataFile.getAbsolutePath());
             // Load genetic profile and gene panel
             GeneticProfile geneticProfile = null;
@@ -86,19 +84,17 @@ public class ImportProfileData extends ConsoleRunnable {
             }
             
             // Print profile report
-            int numLines = FileUtil.getNumLines(dataFile);
             ProgressMonitor.setCurrentMessage(
                     " --> profile id:  " + geneticProfile.getGeneticProfileId() +
                     "\n --> profile name:  " + geneticProfile.getProfileName() +
                     "\n --> genetic alteration type:  " + geneticProfile.getGeneticAlterationType().name());
-            ProgressMonitor.setMaxValue(numLines);
-            
+
             // Check genetic alteration type 
             if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_EXTENDED || 
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_UNCALLED) {
                 Set<String> filteredMutations = GeneticProfileReader.getVariantClassificationFilter( descriptorFile );
                 Set<String> namespaces = GeneticProfileReader.getNamespaces( descriptorFile );
-                ImportExtendedMutationData importer = new ImportExtendedMutationData(dataFile, geneticProfile.getGeneticProfileId(), genePanel, filteredMutations, namespaces);
+                ImportExtendedMutationData importer = new ImportExtendedMutationData(dataFile, geneticProfile.getGeneticProfileId(), genePanel, filteredMutations, namespaces, overwriteExisting);
                 String swissprotIdType = geneticProfile.getOtherMetaDataField("swissprot_identifier");
                 if (swissprotIdType != null && swissprotIdType.equals("accession")) {
                     importer.setSwissprotIsAccession(true);
@@ -112,7 +108,8 @@ public class ImportProfileData extends ConsoleRunnable {
                     dataFile, 
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
-                    namespaces
+                    namespaces,
+                    overwriteExisting
                 );
                 importer.importData();
             } else if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY) {
@@ -121,8 +118,11 @@ public class ImportProfileData extends ConsoleRunnable {
                 // use a different importer for patient level data
                 String patientLevel = geneticProfile.getOtherMetaDataField("patient_level");
                 if (patientLevel != null && patientLevel.trim().toLowerCase().equals("true")) {
+                    if (overwriteExisting) {
+                        throw new UnsupportedOperationException("Incremental upload for generic assay patient_level data is not supported. Please use sample level instead.");
+                    }
                     ImportGenericAssayPatientLevelData genericAssayProfileImporter = new ImportGenericAssayPatientLevelData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel, geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"));
-                    genericAssayProfileImporter.importData(numLines);
+                    genericAssayProfileImporter.importData();
                 } else {
                     // use ImportTabDelimData importer for non-patient level data
                     ImportTabDelimData genericAssayProfileImporter = new ImportTabDelimData(
@@ -131,22 +131,23 @@ public class ImportProfileData extends ConsoleRunnable {
                         geneticProfile.getGeneticProfileId(), 
                         genePanel, 
                         geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"),
-                        daoGeneticAlteration
+                        overwriteExisting,
+                        daoGene
                     );
-                    genericAssayProfileImporter.importData(numLines);
+                    genericAssayProfileImporter.importData();
                 }
             } else if(
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
-                && DISCRETE_LONG.name().equals(geneticProfile.getDatatype())
+                && DISCRETE_LONG.name().equals(geneticProfile.getOtherMetaDataField("datatype"))
             ) {
                 Set<String> namespaces = GeneticProfileReader.getNamespaces(descriptorFile);
                 ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(
-                    dataFile, 
-                    geneticProfile.getGeneticProfileId(), 
+                    dataFile,
+                    geneticProfile.getGeneticProfileId(),
                     genePanel,
                     daoGene,
-                    daoGeneticAlteration,
-                    namespaces
+                    namespaces,
+                    overwriteExisting
                 );
                 importer.importData();
             } else {
@@ -155,13 +156,14 @@ public class ImportProfileData extends ConsoleRunnable {
                     geneticProfile.getTargetLine(), 
                     geneticProfile.getGeneticProfileId(), 
                     genePanel,
-                    daoGeneticAlteration                    
+                    overwriteExisting,
+                    daoGene
                 );
                 String pdAnnotationsFilename = geneticProfile.getOtherMetaDataField("pd_annotations_filename");
                 if (pdAnnotationsFilename != null && !"".equals(pdAnnotationsFilename)) {
                     importer.setPdAnnotationsFile(new File(dataFile.getParent(), pdAnnotationsFilename));
                 }
-                importer.importData(numLines);
+                importer.importData();
             }
        }
        catch (Exception e) {

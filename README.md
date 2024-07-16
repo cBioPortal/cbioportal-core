@@ -9,6 +9,59 @@ This repo contains:
 ## Inclusion in main codebase
 The `cbioportal-core` code is currently included in the final Docker image during the Docker build process: https://github.com/cBioPortal/cbioportal/blob/master/docker/web-and-data/Dockerfile#L48
 
+## Running in docker
+
+Build docker image with:
+```bash
+docker build -t cbioportal-core .
+```
+
+### Example of how to load `study_es_0` study
+
+Import gene panels
+
+```bash
+docker run -it -v $(pwd)/tests/test_data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenePanel.pl --data /data/study_es_0/data_gene_panel_testpanel1.txt
+docker run -it -v $(pwd)/tests/test_data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenePanel.pl --data /data/study_es_0/data_gene_panel_testpanel2.txt
+```
+
+Import gene sets and supplementary data
+
+```bash
+docker run -it -v $(pwd)/src/test/resources/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenesetData.pl --data /data/genesets/study_es_0_genesets.gmt --new-version msigdb_7.5.1 --supp /data/genesets/study_es_0_supp-genesets.txt
+```
+
+Import gene set hierarchy data
+
+```bash
+docker run -it -v $(pwd)/src/test/resources/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+perl importGenesetHierarchy.pl --data /data/genesets/study_es_0_tree.yaml
+```
+
+Import study
+
+```bash
+docker run -it -v $(pwd)/tests/test_data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core \
+python importer/metaImport.py -s /data/study_es_0 -p /data/api_json_system_tests -o
+```
+
+### Incremental upload of data
+
+To add or update specific patient, sample, or molecular data in an already loaded study, you can perform an incremental upload. This process is quicker than reloading the entire study.
+
+To execute an incremental upload, use the -d (or --data_directory) option instead of -s (or --study_directory). Here is an example command:
+```bash
+docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -d /data/study_es_0_inc -p /data/api_json -o
+```
+**Note:**
+While the directory should adhere to the standard cBioPortal file formats and study structure, incremental uploads are not supported for all data types though.
+For instance, uploading study metadata, resources, or GSVA data incrementally is currently unsupported.
+
+This method ensures efficient updates without the need for complete study reuploads, saving time and computational resources.
+
 ## How to run integration tests
 
 This section guides you through the process of running integration tests by setting up a cBioPortal MySQL database environment using Docker. Please follow these steps carefully to ensure your testing environment is configured correctly.
@@ -78,7 +131,7 @@ After you are done with the setup, you can build and test the project.
 
 1. Execute tests through the provided script:
 ```bash
-source test_scripts.sh
+./test_scripts.sh
 ```
 
 2. Build the loader jar using Maven (includes testing):
@@ -117,17 +170,5 @@ To run scripts that require the loader jar, ensure the jar file is in the projec
 The script will search for `core-*.jar` in the root of the project:
 ```bash
 python scripts/importer/metaImport.py -s tests/test_data/study_es_0 -p tests/test_data/api_json_unit_tests -o
-```
-
-## Running in docker
-
-Build docker image with:
-```bash
-docker build -t cbioportal-core .
-```
-
-Example of how to start the loading:
-```bash
-docker run -it -v $(pwd)/data/:/data/ -v $(pwd)/application.properties:/application.properties cbioportal-core python importer/metaImport.py -s /data/study_es_0 -p /data/api_json -o
 ```
 

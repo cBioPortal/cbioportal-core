@@ -32,12 +32,24 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import java.sql.*;
-import java.text.*;
-import java.util.*;
 import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.CancerStudyTags;
+import org.mskcc.cbio.portal.model.ReferenceGenome;
+import org.mskcc.cbio.portal.model.TypeOfCancer;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Analogous to and replaces the old DaoCancerType. A CancerStudy has a NAME and
@@ -61,7 +73,6 @@ public final class DaoCancerStudy {
     private static final Map<Integer,CancerStudy> byInternalId = new HashMap<Integer,CancerStudy>();
 
     static {
-        SpringUtil.initDataSource();
         reCacheAll();
     }
 

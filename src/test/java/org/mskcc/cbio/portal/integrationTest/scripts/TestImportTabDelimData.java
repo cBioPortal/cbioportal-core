@@ -38,7 +38,6 @@ import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.DaoGeneset;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoPatient;
@@ -48,15 +47,12 @@ import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CopyNumberStatus;
-import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
-import org.mskcc.cbio.portal.scripts.ImportGenesetData;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
-import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
@@ -171,9 +167,8 @@ public class TestImportTabDelimData {
         ProgressMonitor.setConsoleMode(false);
 		// TBD: change this to use getResourceAsStream()
         File file = new File("src/test/resources/cna_test.txt");
-        ImportTabDelimData parser = new ImportTabDelimData(file, "Barry", geneticProfileId, null, DaoGeneticAlteration.getInstance());
-        int numLines = FileUtil.getNumLines(file);
-        parser.importData(numLines);
+        ImportTabDelimData parser = new ImportTabDelimData(file, "Barry", geneticProfileId, null, false, DaoGeneOptimized.getInstance());
+        parser.importData();
 
         String value = dao.getGeneticAlteration(geneticProfileId, sample1, 999999207);
         assertEquals ("0", value);
@@ -236,9 +231,8 @@ public class TestImportTabDelimData {
         ProgressMonitor.setConsoleMode(false);
 		// TBD: change this to use getResourceAsStream()
         File file = new File("src/test/resources/cna_test2.txt");
-        ImportTabDelimData parser = new ImportTabDelimData(file, geneticProfileId, null, DaoGeneticAlteration.getInstance());
-        int numLines = FileUtil.getNumLines(file);
-        parser.importData(numLines);
+        ImportTabDelimData parser = new ImportTabDelimData(file, geneticProfileId, null, false, DaoGeneOptimized.getInstance());
+        parser.importData();
 
         String value = dao.getGeneticAlteration(geneticProfileId, sample1, 207);
         assertEquals (value, "0");
@@ -321,9 +315,8 @@ public class TestImportTabDelimData {
 		// TBD: change this to use getResourceAsStream()
         File file = new File("src/test/resources/mrna_test.txt");
         addTestPatientAndSampleRecords(file);
-        ImportTabDelimData parser = new ImportTabDelimData(file, newGeneticProfileId, null, DaoGeneticAlteration.getInstance());
-        int numLines = FileUtil.getNumLines(file);
-        parser.importData(numLines);
+        ImportTabDelimData parser = new ImportTabDelimData(file, newGeneticProfileId, null, false, DaoGeneOptimized.getInstance());
+        parser.importData();
         ConsoleUtil.showMessages();
         
         int sampleId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, "DD639").getInternalId();
@@ -375,9 +368,8 @@ public class TestImportTabDelimData {
 		// TBD: change this to use getResourceAsStream()
         File file = new File("src/test/resources/tabDelimitedData/data_expression2.txt");
         addTestPatientAndSampleRecords(file);
-        ImportTabDelimData parser = new ImportTabDelimData(file, newGeneticProfileId, null, DaoGeneticAlteration.getInstance());
-        int numLines = FileUtil.getNumLines(file);
-        parser.importData(numLines);
+        ImportTabDelimData parser = new ImportTabDelimData(file, newGeneticProfileId, null, false, DaoGeneOptimized.getInstance());
+        parser.importData();
         
         // check if expected warnings are given:
         ArrayList<String> warnings = ProgressMonitor.getWarnings();
@@ -468,9 +460,8 @@ public class TestImportTabDelimData {
 		// TBD: change this to use getResourceAsStream()
         File file = new File("src/test/resources/tabDelimitedData/data_rppa.txt");
         addTestPatientAndSampleRecords(file);
-        ImportTabDelimData parser = new ImportTabDelimData(file, newGeneticProfileId, null, DaoGeneticAlteration.getInstance());
-        int numLines = FileUtil.getNumLines(file);
-        parser.importData(numLines);
+        ImportTabDelimData parser = new ImportTabDelimData(file, newGeneticProfileId, null, false, DaoGeneOptimized.getInstance());
+        parser.importData();
         ConsoleUtil.showMessages();
         
         int sampleId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, "SAMPLE1").getInternalId();

@@ -90,6 +90,15 @@ INSERT INTO `reference_genome` VALUES (2,'human','hg38','GRCh38',3049315783,'htt
 INSERT INTO "cancer_study" ("CANCER_STUDY_ID","CANCER_STUDY_IDENTIFIER","TYPE_OF_CANCER_ID","NAME","DESCRIPTION","PUBLIC","PMID","CITATION","GROUPS","REFERENCE_GENOME_ID") 
 VALUES (1,'study_tcga_pub','brca','Breast Invasive Carcinoma (TCGA,Nature 2012)','<a href=\"http://cancergenome.nih.gov/\">The Cancer Genome Atlas (TCGA)</a> Breast Invasive Carcinoma project. 825 cases.<br><i>Nature 2012.</i> <a href=\"http://tcga-data.nci.nih.gov/tcga/\">Raw data via the TCGA Data Portal</a>.',1,'23000897,26451490','TCGA,Nature 2012,...','SU2C-PI3K;PUBLIC;GDAC',1);
 
+-- clinical_attribute_meta
+INSERT INTO "clinical_attribute_meta"
+VALUES ('DFS_MONTHS','Disease Free (Months)','Disease free in months since treatment','NUMBER',0,'1',1),
+('DFS_STATUS','Disease Free Status','Disease free status','STRING',0,'1',1),
+('OS_MONTHS','Overall Survival (Months)','Overall survival in months since diagnosis','NUMBER',0,'1',1),
+('OS_STATUS','Overall Survival Status','Overall survival status','STRING',0,'1',1),
+('SAMPLE_COUNT','Number of Samples Per Patient','Number of Samples Per Patient','STRING',1,'1',1),
+('SUBTYPE','Subtype','Subtype description','STRING',0,'1',1);
+
 -- gene as genetic_entity
 INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
 SET @max_entity_id = (Select MAX(ID) from genetic_entity);
@@ -190,6 +199,74 @@ INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYP
 INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
 SET @max_entity_id = (Select MAX(ID) from genetic_entity);
 INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,2261,'FGFR3','protein-coding');
+
+-- missing genes for study_es_0
+-- additional genes for CNA data
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,116983,'ACAP3','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,2073,'ERCC5','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,219293,'ATAD3C','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,375790,'AGRN','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,54998,'AURKAIP1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,55210,'ATAD3A','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,83858,'ATAD3B','protein-coding');
+-- genes for data_methylation_hm27.txt
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,24145,'PANX1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,283234,'CCDC88B','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,3232,'HOXD3','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,3613,'IMPA2','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,389,'RHOC','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,487,'ATP2A1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,7871,'SLMAP','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,8148,'TAF15','protein-coding');
+-- gene panels
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,55,'ACP3','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,81061,'OR11H1','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,388946,'TMEM247','protein-coding');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE") VALUES ('GENE');
+SET @max_entity_id = (Select MAX(ID) from genetic_entity);
+INSERT INTO "gene" ("GENETIC_ENTITY_ID","ENTREZ_GENE_ID","HUGO_GENE_SYMBOL","TYPE") VALUES (@max_entity_id,7157,'TP53','protein-coding');
+
+-- Generic genetic entities
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Erlotinib');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Irinotecan');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'L-685458');
+INSERT INTO "genetic_entity" ("ENTITY_TYPE", "STABLE_ID") VALUES ('GENERIC_ASSAY', 'Lapatinib');
 
 -- cna_event
 INSERT INTO "cna_event" ("CNA_EVENT_ID","ENTREZ_GENE_ID","ALTERATION") VALUES (20093,207,-2);
@@ -319,9 +396,15 @@ INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID
 INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (6,'study_tcga_pub_mutations',1,'MUTATION_EXTENDED','MAF','Mutations','Mutation data from whole exome sequencing.','1');
 INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (7,'study_tcga_pub_structural_variants',1,'STRUCTURAL_VARIANT','SV','Structural Variants','Structural Variants test data.','1');
 INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (8,'study_tcga_pub_cna_long',1,'COPY_NUMBER_ALTERATION','DISCRETE_LONG','CNA values','CNA values dummy data','1');
+INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (9,'study_tcga_pub_rppa',1,'PROTEIN_LEVEL','LOG2-VALUE','RPPA values','RPPA values dummy data','0');
+INSERT INTO "genetic_profile" ("GENETIC_PROFILE_ID","STABLE_ID","CANCER_STUDY_ID","GENETIC_ALTERATION_TYPE","DATATYPE","NAME","DESCRIPTION","SHOW_PROFILE_IN_ANALYSIS_TAB") VALUES (10,'study_tcga_pub_treatment_ic50',1,'GENERIC_ASSAY','LIMIT-VALUE','test treatment values','treatment values dummy data','0');
 
 -- gene_panel
 INSERT INTO gene_panel (INTERNAL_ID,STABLE_ID,DESCRIPTION) VALUES (1,'TESTPANEL_CNA_DISCRETE_LONG_FORMAT','Some test panel');
+INSERT INTO gene_panel (INTERNAL_ID,STABLE_ID,DESCRIPTION) VALUES (2,'TSTGNPNLCNADS','The CNA Discrete test panel');
+INSERT INTO gene_panel (INTERNAL_ID,STABLE_ID,DESCRIPTION) VALUES (3,'TSTGNPNLMUTEXT','The mutation extended test panel');
+INSERT INTO gene_panel (INTERNAL_ID,STABLE_ID,DESCRIPTION) VALUES (4,'TSTGNPNLGENASS','The generic assay test panel');
+INSERT INTO gene_panel (INTERNAL_ID,STABLE_ID,DESCRIPTION) VALUES (5,'TSTGNPNLSV','The structural variance test panel');
 
 -- genetic_alteration
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (2,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 10000),'0,0,1,2,0,1,1,1,0,1,1,1,0,1,');
@@ -366,12 +449,31 @@ INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALU
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (5,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 672),'0.066638638,');
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (5,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 673),'0.020369562,');
 INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (5,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 675),'0.793930197,');
+-- RPPA
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 10000),'-0.472,1.514,0.145,-0.183,0.913,-0.665,-1.700,0.976,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 207),'-1.102,-0.243,0.018,-0.154,0.330,1.005,0.681,-0.664,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 208),'-1.221,-0.592,-0.176,-0.310,-1.198,-0.670,0.077,-0.302,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 3265),'0.061,-0.055,-0.165,0.517,2.021,0.381,-0.728,0.944,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 369),'-1.129,-0.306,0.180,-0.601,0.166,0.402,0.243,-0.999,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 3845),'0.177,0.404,0.188,0.428,1.676,0.238,0.469,2.161,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 472),'-1.503,-1.925,-1.755,-1.576,-1.029,-1.401,-1.514,-2.074,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 4893),'-1.914,-2.059,-1.228,-1.322,-4.166,-1.187,0.284,-0.130,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 672),'-1.661,-1.392,-1.924,-1.656,-0.361,-1.998,-0.136,-0.709,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 673),'0.233,0.561,-0.106,-0.085,-0.012,0.143,0.141,0.609,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (9,(Select "GENETIC_ENTITY_ID" from "gene" where "ENTREZ_GENE_ID" = 675),'-0.570,-1.340,-1.544,-0.404,0.632,-1.231,0.771,-0.036,');
+-- Generic assay data
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'Erlotinib'),'5.2,>8,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'Irinotecan'),'>8,7.1,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'L-685458'),'>4.6,7.2,');
+INSERT INTO "genetic_alteration" ("GENETIC_PROFILE_ID","GENETIC_ENTITY_ID","VALUES") VALUES (10,(Select "ID" from "genetic_entity" where "STABLE_ID" = 'Lapatinib'),'6.9,>~8,');
 
 -- genetic_profile_samples
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (2,'1,2,3,4,5,6,7,8,9,10,11,12,13,14,');
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (3,'2,3,6,8,9,10,12,13,');
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (4,'1,2,3,4,5,6,7,8,9,10,11,12,13,14,');
 INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (5,'2,');
+INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (9,'2,3,6,8,9,10,12,13,');
+INSERT INTO "genetic_profile_samples" ("GENETIC_PROFILE_ID","ORDERED_SAMPLE_LIST") VALUES (10,'2,3,');
 
 -- patient
 INSERT INTO "patient" ("INTERNAL_ID","STABLE_ID","CANCER_STUDY_ID") VALUES (1,'TCGA-A1-A0SB',1);

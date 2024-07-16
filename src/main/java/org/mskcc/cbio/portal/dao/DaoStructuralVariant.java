@@ -29,7 +29,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 public class DaoStructuralVariant {
 
@@ -148,6 +150,33 @@ public class DaoStructuralVariant {
                 structuralVariant.getDriverTiersFilter(),
                 structuralVariant.getDriverTiersFilterAnn()
             );
+        }
+    }
+
+    public static void deleteStructuralVariants(int geneticProfileId, Set<Integer> sampleIds) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGene.class);
+            pstmt = con.prepareStatement("DELETE structural_variant, alteration_driver_annotation" +
+                    " FROM structural_variant" +
+                    " LEFT JOIN alteration_driver_annotation" +
+                    " ON alteration_driver_annotation.GENETIC_PROFILE_ID = structural_variant.GENETIC_PROFILE_ID" +
+                    " AND alteration_driver_annotation.SAMPLE_ID = structural_variant.SAMPLE_ID" +
+                    " WHERE structural_variant.GENETIC_PROFILE_ID=? AND structural_variant.SAMPLE_ID IN ("
+                    + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
+                    + ")");
+            int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, geneticProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGene.class, con, pstmt, rs);
         }
     }
 

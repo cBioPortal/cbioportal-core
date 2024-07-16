@@ -32,13 +32,32 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.*;
+import joptsimple.OptionException;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoGenePanel;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.GenePanel;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
 
-import java.io.*;
-import joptsimple.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 
 /**
  *
@@ -68,6 +87,10 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
                    "gene panel file" ).withRequiredArg().describedAs( "meta_file.txt" ).ofType( String.class );
             parser.accepts("noprogress", "this option can be given to avoid the messages regarding memory usage and % complete");
 
+            // supported by the uploader already. Added for uniformity, to do not cause error when upstream software uses this flag
+            parser.accepts("overwrite-existing",
+                    "Enables re-uploading gene panel profile map data that already exists.")
+                    .withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
             OptionSet options;
             try {
                 options = parser.parse( args );
@@ -96,7 +119,6 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
             }
 
             setFile(genePanel_f);
-            SpringUtil.initDataSource();
             importData();
         } catch (RuntimeException e) {
             throw e;
@@ -153,7 +175,9 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
             
             Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), sampleId);
             row_data.remove((int)sampleIdIndex);
-            
+
+
+            Set<DaoSampleProfile.SampleProfileTuple> sampleProfileTuples = new HashSet<>();
             // Loop over the values in the row
             for (int i = 0; i < row_data.size(); i++) {
                 String genePanelName = row_data.get(i);
@@ -166,12 +190,13 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
                 }
 
                 Integer genePanelId = determineGenePanelId(genePanelName);
-                // Add gene panel information to database
-                DaoSampleProfile.updateSampleProfile(
-                        sample.getInternalId(), 
-                        profileIds.get(i), 
-                        genePanelId);
+                Integer geneticProfileId = profileIds.get(i);
+                int sampleInternalId = sample.getInternalId();
+
+                sampleProfileTuples.add(new DaoSampleProfile.SampleProfileTuple(geneticProfileId, sampleInternalId, genePanelId));
             }
+
+            DaoSampleProfile.upsertSampleToProfileMapping(sampleProfileTuples);
         }
     }
 

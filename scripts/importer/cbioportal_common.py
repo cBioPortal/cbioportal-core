@@ -37,6 +37,7 @@ REMOVE_STUDY_CLASS = "org.mskcc.cbio.portal.scripts.RemoveCancerStudy"
 IMPORT_CANCER_TYPE_CLASS = "org.mskcc.cbio.portal.scripts.ImportTypesOfCancers"
 IMPORT_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.ImportSampleList"
 ADD_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.AddCaseList"
+UPDATE_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds"
 VERSION_UTIL_CLASS = "org.mskcc.cbio.portal.util.VersionUtil"
 
 PORTAL_PROPERTY_DATABASE_USER = 'db.user'
@@ -363,6 +364,27 @@ META_FIELD_MAP = {
         'data_filename': True
     },
 }
+
+# order is important! This is the order in which they should be loaded:
+INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
+    MetaFileTypes.PATIENT_ATTRIBUTES,
+    MetaFileTypes.SAMPLE_ATTRIBUTES,
+    MetaFileTypes.MUTATION,
+    MetaFileTypes.MUTATION_UNCALLED,
+    MetaFileTypes.EXPRESSION,
+    MetaFileTypes.CNA_DISCRETE,
+    MetaFileTypes.CNA_CONTINUOUS,
+    MetaFileTypes.CNA_LOG2,
+    MetaFileTypes.METHYLATION,
+    MetaFileTypes.PROTEIN,
+    MetaFileTypes.GENERIC_ASSAY_CONTINUOUS,
+    MetaFileTypes.GENERIC_ASSAY_BINARY,
+    MetaFileTypes.GENERIC_ASSAY_CATEGORICAL,
+    MetaFileTypes.TIMELINE,
+    MetaFileTypes.GENE_PANEL_MATRIX,
+    MetaFileTypes.STRUCTURAL_VARIANT,
+    MetaFileTypes.SEG,
+]
 
 IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.STUDY: IMPORT_STUDY_CLASS,

@@ -32,12 +32,26 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.*;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleList;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.Patient;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.model.SampleListCategory;
+import org.mskcc.cbio.portal.util.CaseList;
+import org.mskcc.cbio.portal.util.CaseListReader;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.validate.CaseListValidator;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Command Line tool to Import Sample Lists.
@@ -46,51 +60,25 @@ public class ImportSampleList extends ConsoleRunnable {
 
    public static void importSampleList(File dataFile) throws IOException, DaoException {
       ProgressMonitor.setCurrentMessage("Read data from:  " + dataFile.getAbsolutePath());
-      Properties properties = new TrimmedProperties();
-      properties.load(new FileInputStream(dataFile));
+      CaseList caseList = CaseListReader.readFile(dataFile);
+      CaseListValidator.validateAll(caseList);
 
-      String stableId = properties.getProperty("stable_id");
-
-      if (stableId.contains(" ")) {
-         throw new IllegalArgumentException("stable_id cannot contain spaces:  " + stableId);
-      }
-
-      if (stableId == null || stableId.length() == 0) {
-         throw new IllegalArgumentException("stable_id is not specified.");
-      }
-
-      String cancerStudyIdentifier = properties.getProperty("cancer_study_identifier");
-      if (cancerStudyIdentifier == null) {
-         throw new IllegalArgumentException("cancer_study_identifier is not specified.");
-      }
-	  SpringUtil.initDataSource();
-      CancerStudy theCancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyIdentifier);
+      CancerStudy theCancerStudy = DaoCancerStudy.getCancerStudyByStableId(caseList.getCancerStudyIdentifier());
       if (theCancerStudy == null) {
          throw new IllegalArgumentException("cancer study identified by cancer_study_identifier '"
-                  + cancerStudyIdentifier + "' not found in dbms or inaccessible to user.");
+                  + caseList.getCancerStudyIdentifier() + "' not found in dbms or inaccessible to user.");
       }
 
-      String sampleListName = properties.getProperty("case_list_name");
-       
-      String sampleListCategoryStr = properties.getProperty("case_list_category");
+      String sampleListCategoryStr = caseList.getCategory();
       if (sampleListCategoryStr  == null || sampleListCategoryStr.length() == 0) {
           sampleListCategoryStr = "other";
       }
       SampleListCategory sampleListCategory = SampleListCategory.get(sampleListCategoryStr); 
        
-      String sampleListDescription = properties.getProperty("case_list_description");
-      String sampleListStr = properties.getProperty("case_list_ids");
-      if (sampleListName == null) {
-         throw new IllegalArgumentException("case_list_name is not specified.");
-      } else if (sampleListDescription == null) {
-         throw new IllegalArgumentException("case_list_description is not specified.");
-      }
-
       boolean itemsAddedViaPatientLink = false;
       // construct sample id list
       ArrayList<String> sampleIDsList = new ArrayList<String>();
-      String[] sampleIds = sampleListStr.split("\t");
-      for (String sampleId : sampleIds) {
+      for (String sampleId : caseList.getSampleIds()) {
          sampleId = StableIdUtil.getSampleId(sampleId);
          Sample s = DaoSample.getSampleByCancerStudyAndSampleId(theCancerStudy.getInternalId(), sampleId);
          if (s==null) {
@@ -110,31 +98,31 @@ public class ImportSampleList extends ConsoleRunnable {
          } else if (!sampleIDsList.contains(s.getStableId())) {
             sampleIDsList.add(s.getStableId());
          } else {
-             ProgressMonitor.logWarning("Warning: duplicated sample ID "+s.getStableId()+" in case list "+stableId);
+             ProgressMonitor.logWarning("Warning: duplicated sample ID " + s.getStableId() + " in case list " + caseList.getStableId());
          }
       }
 
       DaoSampleList daoSampleList = new DaoSampleList();
-      SampleList sampleList = daoSampleList.getSampleListByStableId(stableId);
+      SampleList sampleList = daoSampleList.getSampleListByStableId(caseList.getStableId());
       if (sampleList != null) {
-         throw new IllegalArgumentException("Patient list with this stable Id already exists:  " + stableId);
+         throw new IllegalArgumentException("Patient list with this stable Id already exists:  " + caseList.getStableId());
       }
 
       sampleList = new SampleList();
-      sampleList.setStableId(stableId);
+      sampleList.setStableId(caseList.getStableId());
       int cancerStudyId = theCancerStudy.getInternalId();
       sampleList.setCancerStudyId(cancerStudyId);
       sampleList.setSampleListCategory(sampleListCategory);
-      sampleList.setName(sampleListName);
-      sampleList.setDescription(sampleListDescription);
+      sampleList.setName(caseList.getName());
+      sampleList.setDescription(caseList.getDescription());
       sampleList.setSampleList(sampleIDsList);
       daoSampleList.addSampleList(sampleList);
 
-      sampleList = daoSampleList.getSampleListByStableId(stableId);
+      sampleList = daoSampleList.getSampleListByStableId(caseList.getStableId());
 
       ProgressMonitor.setCurrentMessage(" --> stable ID:  " + sampleList.getStableId());
       ProgressMonitor.setCurrentMessage(" --> sample list name:  " + sampleList.getName());
-      ProgressMonitor.setCurrentMessage(" --> number of samples in file:  " + sampleIds.length);
+      ProgressMonitor.setCurrentMessage(" --> number of samples in file:  " + caseList.getSampleIds().size());
       String warningSamplesViaPatientLink = (itemsAddedViaPatientLink? "(nb: can be higher if samples were added via patient link)" : "");
       ProgressMonitor.setCurrentMessage(" --> number of samples stored in final sample list " + warningSamplesViaPatientLink + ":  " + sampleIDsList.size());
    }

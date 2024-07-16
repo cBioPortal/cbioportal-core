@@ -32,14 +32,26 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.*;
-import joptsimple.*;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
+import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.ClinicalEvent;
+import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.SpringUtil;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 /**
  * Imports timeline data for display in patient view
@@ -48,9 +60,8 @@ import org.mskcc.cbio.portal.util.SpringUtil;
  */
 public class ImportTimelineData extends ConsoleRunnable {
 
-	private static void importData(String dataFile, int cancerStudyId) throws IOException, DaoException {
+	private static void importData(String dataFile, int cancerStudyId, boolean overwriteExisting) throws IOException, DaoException {
 		MySQLbulkLoader.bulkLoadOn();
-		SpringUtil.initDataSource();
 
 		ProgressMonitor.setCurrentMessage("Reading file " + dataFile);
 		FileReader reader = new FileReader(dataFile);
@@ -72,9 +83,10 @@ public class ImportTimelineData extends ConsoleRunnable {
 				throw new RuntimeException("The first line must start with\n'PATIENT_ID\tSTART_DATE\tEVENT_TYPE'\nor\n"
 					+ "PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE");
 			}
-	
+
 			long clinicalEventId = DaoClinicalEvent.getLargestClinicalEventId();
-	
+			Set<Integer> processedPatientIds = new HashSet<>();
+
 			while ((line = buff.readLine()) != null) {
 				line = line.trim();
 	
@@ -89,6 +101,9 @@ public class ImportTimelineData extends ConsoleRunnable {
 				if (patient == null) {
 					ProgressMonitor.logWarning("Patient " + patientId + " not found in study " + cancerStudyId + ". Skipping entry.");
 					continue;
+				}
+				if (overwriteExisting && processedPatientIds.add(patient.getInternalId())) {
+					DaoClinicalEvent.deleteByPatientId(patient.getInternalId());
 				}
 				ClinicalEvent event = new ClinicalEvent();
 				event.setClinicalEventId(++clinicalEventId);
@@ -119,17 +134,23 @@ public class ImportTimelineData extends ConsoleRunnable {
     public void run() {
         try {
 		    String description = "Import 'timeline' data";
-            
+
 		    OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
-		    String dataFile = (String) options.valueOf("data");
+			if (options.has("loadMode") && !"bulkLoad".equalsIgnoreCase((String) options.valueOf("loadMode"))) {
+				throw new UnsupportedOperationException("This loader supports bulkLoad load mode only, but "
+						+ options.valueOf("loadMode")
+						+ " has been supplied.");
+			}
+			String dataFile = (String) options.valueOf("data");
 		    File descriptorFile = new File((String) options.valueOf("meta"));
+			boolean overwriteExisting = options.has("overwrite-existing");
             
 			Properties properties = new TrimmedProperties();
 			properties.load(new FileInputStream(descriptorFile));
             
 			int cancerStudyInternalId = ValidationUtils.getInternalStudyId(properties.getProperty("cancer_study_identifier"));
             
-			importData(dataFile, cancerStudyInternalId);
+			importData(dataFile, cancerStudyInternalId, overwriteExisting);
         } catch (RuntimeException e) {
             throw e;
         } catch (IOException|DaoException e) {

@@ -48,6 +48,9 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfileLink;
 import org.mskcc.cbio.portal.scripts.TrimmedProperties;
 
+import static org.cbioportal.model.MolecularProfile.DataType.DISCRETE;
+import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
+
 /**
  * Prepare a GeneticProfile for having its data loaded.
  *
@@ -76,22 +79,33 @@ public class GeneticProfileReader {
         GeneticProfile geneticProfile = loadGeneticProfileFromMeta(file);
         GeneticProfile existingGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
         if (existingGeneticProfile != null) {
-            if (!existingGeneticProfile.getDatatype().equals("MAF")) {
-               // the dbms already contains a GeneticProfile with the file's stable_id. This scenario is not supported
-               // anymore, so throw error telling user to remove existing profile first:
-               throw new RuntimeException("Error: genetic_profile record found with same Stable ID as the one used in your data:  "
-                       + existingGeneticProfile.getStableId() + ". Remove the existing genetic_profile record first.");
-            } else {
-                // For mutation data only we can have multiple files with the same genetic_profile.
-                // There is a constraint in the mutation database table to prevent duplicated data
-                // If this constraint is hit (mistakenly importing the same maf twice) MySqlBulkLoader will throw an exception
-                //
-                // make an object combining the pre-existing profile with the file-specific properties of the current file
-                GeneticProfile gp = new GeneticProfile(existingGeneticProfile);
-                gp.setTargetLine(gp.getTargetLine());
-                gp.setOtherMetadataFields(gp.getAllOtherMetadataFields());
-                return gp;
+            ProgressMonitor.setCurrentMessage("genetic_profile record found with same Stable ID (" + geneticProfile.getStableId()
+                    + "). Using it instead.");
+            if (geneticProfile.getGeneticAlterationType() != existingGeneticProfile.getGeneticAlterationType()) {
+                throw new IllegalStateException("genetic_profile record found with same Stable ID ("
+                                          + existingGeneticProfile.getStableId() + ") but different genetic alteration type: "
+                                          + existingGeneticProfile.getGeneticProfileId());
             }
+            if (DISCRETE_LONG.name().equals(geneticProfile.getDatatype())) {
+                if (!Set.of(DISCRETE_LONG.name(), DISCRETE.name()).contains(existingGeneticProfile.getDatatype())) {
+                    throw new IllegalStateException("genetic_profile record found with same Stable ID ("
+                            + existingGeneticProfile.getStableId() + ") but unsupported data type: "
+                            + existingGeneticProfile.getDatatype());
+                }
+            } else {
+                if (!existingGeneticProfile.getDatatype().equals(geneticProfile.getDatatype())) {
+                    throw new IllegalStateException("genetic_profile record found with same Stable ID ("
+                            + existingGeneticProfile.getStableId() + ") but different data type: "
+                            + existingGeneticProfile.getDatatype());
+                }
+            }
+            if (geneticProfile.getCancerStudyId() != existingGeneticProfile.getCancerStudyId()) {
+                throw new IllegalStateException("genetic_profile record found with same Stable ID ("
+                        + existingGeneticProfile.getStableId() + ") but different cancer study (id="
+                        + existingGeneticProfile.getCancerStudyId() + ")");
+            }
+            existingGeneticProfile.setOtherMetadataFields(geneticProfile.getAllOtherMetadataFields());
+            return existingGeneticProfile;
         }
 
         // For GSVA profiles, we want to create a geneticProfileLink from source_stable_id for:

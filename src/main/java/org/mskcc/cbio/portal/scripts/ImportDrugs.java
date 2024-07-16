@@ -32,11 +32,18 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.util.*;
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 
 /**
  * Command Line tool to import background drug information.
@@ -58,7 +65,7 @@ public class ImportDrugs {
         while (line != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if (!line.startsWith("#") && line.trim().length() > 0) {
+            if (TsvUtil.isDataLine(line)) {
                 line = line.trim();
                 String parts[] = line.split("\t");
                 String geneSymbol = parts[0];
@@ -79,7 +86,6 @@ public class ImportDrugs {
             return;
         }
         ProgressMonitor.setConsoleMode(true);
-		SpringUtil.initDataSource();
 
         File file = new File(args[0]);
         System.out.println("Reading drug data from:  " + file.getAbsolutePath());

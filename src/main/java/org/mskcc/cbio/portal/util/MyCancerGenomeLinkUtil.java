@@ -33,23 +33,12 @@ package org.mskcc.cbio.portal.util;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import javax.net.ssl.HttpsURLConnection;
-import org.apache.commons.text.StringEscapeUtils;
+
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 
@@ -107,7 +96,7 @@ public final class MyCancerGenomeLinkUtil {
             while ((line=in.readLine())!=null && line.startsWith("#")) {}
             
             for (; line!=null; line=in.readLine()) {
-                String[] parts = line.trim().split("\t",-1);
+                String[] parts = TsvUtil.splitTsvLine(line);
                 if (parts.length<4) {
                     continue;
                 }

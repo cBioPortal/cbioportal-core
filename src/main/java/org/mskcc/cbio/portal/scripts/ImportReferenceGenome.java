@@ -17,20 +17,27 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.ReferenceGenome;
-import org.mskcc.cbio.portal.util.*;
-
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.model.ReferenceGenome;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
-import java.io.*;
-import java.util.*;
-import java.text.SimpleDateFormat;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Command Line Tool to Import Reference Genome Used by Molecular Profiling.
@@ -108,8 +115,6 @@ public class ImportReferenceGenome extends ConsoleRunnable {
     @Override
     public void run() {
         try {
-            SpringUtil.initDataSource();
-
             String description = "Update reference_genome table ";
 
             // using a real options parser, helps avoid bugs

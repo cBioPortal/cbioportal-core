@@ -2297,12 +2297,10 @@ class StudyCompositionTestCase(LogBufferTestCase):
     def setUp(self):
         """Store validateData globals changed by running validate_study()."""
         super(StudyCompositionTestCase, self).setUp()
-        self.orig_defined_cancer_types = validateData.DEFINED_CANCER_TYPES
         self.orig_defined_sample_ids = validateData.DEFINED_SAMPLE_IDS
 
     def tearDown(self):
         """Restore the environment to before setUp() was called."""
-        validateData.DEFINED_CANCER_TYPES = self.orig_defined_cancer_types
         validateData.DEFINED_SAMPLE_IDS = self.orig_defined_sample_ids
         super(StudyCompositionTestCase, self).tearDown()
 
@@ -3086,6 +3084,14 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
         record = record_list[2]
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('This line has no value for cbp_driver_tiers and a value for cbp_driver_tiers_annotation. Please, fill the cbp_driver_tiers column.', record.getMessage())
+
+    def test_incremental_data_validation(self):
+        validateData.validate_data_dir('test_data/study_es_0_inc',
+                                       PORTAL_INSTANCE,
+                                       self.logger, False, False)
+        record_list = self.get_log_records()
+        self.assertEqual('Validation complete', record_list[-1].getMessage())
+
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

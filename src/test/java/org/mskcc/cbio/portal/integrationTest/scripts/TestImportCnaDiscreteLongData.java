@@ -108,7 +108,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test new samples are added:
@@ -134,7 +133,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces
         ).importData();
 
@@ -180,7 +178,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterations() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -188,7 +186,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alterations are added for all genes:
@@ -205,7 +202,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsMissingGeneticAlterations() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test_with_cna_events_missing.txt");
         new ImportCnaDiscreteLongData(
@@ -213,7 +210,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alteration are added of non-cna event:
@@ -233,7 +229,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterationsAndProfileSamplesInCorrectOrder() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -241,7 +237,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test order of genetic alteration values:
@@ -260,7 +255,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataHandlesEntriesWithoutEntrezButWithHugo() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test_without_entrez_with_hugo.txt");
         new ImportCnaDiscreteLongData(
@@ -268,7 +263,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test order of genetic alteration values:
@@ -283,7 +277,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataHandlesEntriesWithWrongEntrezAndCorrectHugo() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test_with_wrong_entrez_and_correct_hugo.txt");
         new ImportCnaDiscreteLongData(
@@ -291,7 +285,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test order of genetic alteration values:
@@ -306,7 +299,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterationsFromNonCnaEvents() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -314,7 +307,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alteration are added of non-cna event:
@@ -334,7 +326,7 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataIgnoresLineWithDuplicateGene() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(beforeGeneticAlterations.size(), 42);
+        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -342,7 +334,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces).importData();
 
         // Test genetic alteration are deduplicated:
@@ -364,7 +355,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces
         ).importData();
         List<Long> genes = newArrayList(3983L, 27334L, 2115L);
@@ -394,7 +384,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             noNamespaces
         ).importData();
 
@@ -418,7 +407,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespacesToImport
         ).importData();
 
@@ -458,7 +446,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespacesToImport
         ).importData();
 
@@ -507,7 +494,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespaces
         ).importData();
 
@@ -549,7 +535,6 @@ public class TestImportCnaDiscreteLongData {
             geneticProfile.getGeneticProfileId(),
             genePanel,
             DaoGeneOptimized.getInstance(),
-            DaoGeneticAlteration.getInstance(),
             namespaces
         ).importData();
 

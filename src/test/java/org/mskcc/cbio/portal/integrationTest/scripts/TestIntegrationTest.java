@@ -28,16 +28,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.cbioportal.model.GenericAssayData;
-import org.cbioportal.model.GenesetMolecularData;
-import org.cbioportal.model.StructuralVariant;
-import org.cbioportal.model.StructuralVariantQuery;
-import org.cbioportal.persistence.PersistenceConstants;
-import org.cbioportal.service.GenericAssayService;
-import org.cbioportal.service.GenesetDataService;
-import org.cbioportal.service.StructuralVariantService;
+import org.cbioportal.model.GeneticEntity;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -51,7 +43,9 @@ import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoGistic;
 import org.mskcc.cbio.portal.dao.DaoMutation;
+import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
+import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
 import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
@@ -59,9 +53,12 @@ import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.ClinicalData;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
+import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Gistic;
+import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.model.StructuralVariant;
 import org.mskcc.cbio.portal.model.TypeOfCancer;
 import org.mskcc.cbio.portal.scripts.ImportGenePanel;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
@@ -81,12 +78,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -129,16 +126,14 @@ public class TestIntegrationTest {
      * 
      * @throws Throwable
      */
-    @Ignore("Skip TestIntegrationTest.testLoadStudyEs0 due to NullPointerException")
     @Test
     public void testLoadStudyEs0() throws Throwable {
         try {
             // === assumptions that we rely upon in the checks later on: ====
-            // assumption 1: there are no clinical attributes at the start of the test:
-            assertEquals(0, DaoClinicalAttributeMeta.getAllMap().size());
-
             // use this to get progress info/troubleshoot:
             // ProgressMonitor.setConsoleMode(true);
+
+            int numberOfMutationsInDb = DaoMutation.getAllMutations().size();
 
             // ==== Load the data ====
             TransactionalScripts scripts = applicationContext.getBean(TransactionalScripts.class);
@@ -167,29 +162,25 @@ public class TestIntegrationTest {
             List<ExtendedMutation> mutations = DaoMutation.getAllMutations();
             // check number of mutation records in the database
             // 3 in seed_mini.sql + 33 study_es_0/data_mutations_extended.maf (2 silent ignored)) 
-            // so we expect 34 records in DB:
-            assertEquals(34, mutations.size());
+            // so we expect +34 records in DB:
+            assertEquals(numberOfMutationsInDb + 34, mutations.size());
 
             //===== Check STRUCTURAL VARIANT data ========
-            // 45 structural variant events are imported, using 31 unique genes, using 39 samples
-            // Not all 31 genes have to be queried. BRAF is fused to many of the test genes.
-            List<Integer> entrezGeneIds = new ArrayList<Integer>(Arrays.asList(57670, 673, 8031, 5979, 27436, 238, 7113, 2078, 1956, 238, 5774, 2115, 7273));
-
             // Add samples and molecular profile IDs
-            List<String> sampleIds = new ArrayList<String>(Arrays.asList("TCGA-A2-A04P-01", "TCGA-A1-A0SB-01", "TCGA-A1-A0SB-01", "TCGA-A2-A04P-01", "TCGA-A2-A04P-01", "TCGA-A1-A0SK-01", "TCGA-A2-A0CM-01", "TCGA-AR-A1AR-01", "TCGA-B6-A0WX-01", "TCGA-BH-A1F0-01", "TCGA-B6-A0I6-01", "TCGA-BH-A18V-01", "TCGA-BH-A18Q-01", "TCGA-BH-A18K-01", "TCGA-BH-A0HL-01", "TCGA-BH-A0E0-01", "TCGA-BH-A0RX-01", "TCGA-A7-A13D-01", "TCGA-BH-A0E6-01", "TCGA-AO-A0J4-01", "TCGA-A7-A0CE-01", "TCGA-A7-A13E-01", "TCGA-A7-A0DA-01", "TCGA-D8-A142-01", "TCGA-D8-A143-01", "TCGA-AQ-A04J-01", "TCGA-BH-A0HN-01", "TCGA-A2-A0T0-01", "TCGA-A2-A0YE-01", "TCGA-A2-A0YJ-01", "TCGA-A2-A0D0-01", "TCGA-A2-A04U-01", "TCGA-AO-A0J6-01", "TCGA-A2-A0YM-01", "TCGA-A2-A0D2-01", "TCGA-BH-A0B3-01", "TCGA-A2-A04Q-01", "TCGA-A2-A0SX-01", "TCGA-AO-A0JL-01"));
-            List<String> geneticProfileStableIds = new ArrayList<String>();
-            geneticProfileStableIds = Collections.nCopies(sampleIds.size(), "study_es_0_structural_variants");
+            GeneticProfile svGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_es_0_structural_variants");
 
-            StructuralVariantService structuralVariantService = applicationContext.getBean(StructuralVariantService.class);
-            List<StructuralVariantQuery> noStructVars = Collections.emptyList();
-            List<StructuralVariant> structuralVariants = structuralVariantService.fetchStructuralVariants(geneticProfileStableIds, sampleIds, entrezGeneIds, noStructVars);
+            List<StructuralVariant> structuralVariants = DaoStructuralVariant.getAllStructuralVariants()
+                    .stream()
+                    .filter(sv ->
+                            sv.getGeneticProfileId() == svGeneticProfile.getGeneticProfileId()
+                    )
+                    .collect(Collectors.toList());
 
-            // Check if all 45 structural variants are imported
-            assertEquals(45, structuralVariants.size());
+            // Check if all 48 structural variants are imported
+            assertEquals(48, structuralVariants.size());
 
             //===== Check CNA data ========
             DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-            ArrayList<String> hugoGeneSymbols = new ArrayList<String>(Arrays.asList("ACAP3","AGRN","ATAD3A","ATAD3B","ATAD3C","AURKAIP1","ERCC5"));
             ArrayList<Long> entrezIds = new ArrayList<Long>(Arrays.asList(116983L, 375790L, 55210L, 83858L, 219293L, 54998L, 2073L));
             GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_es_0_gistic");
             int countAMP_DEL = 0;
@@ -286,7 +277,7 @@ public class TestIntegrationTest {
             // ===== check gistic data
             // servlet uses this query:
             ArrayList<Gistic> gistics = DaoGistic.getAllGisticByCancerStudyId(cancerStudy.getInternalId());
-            assertEquals(12, gistics.size());
+            assertEquals(11, gistics.size());
             Gistic gisticChr10 = null, gisticChr20 = null;
             for (Gistic gistic : gistics) {
                 if (gistic.getChromosome() == 20) {
@@ -340,53 +331,70 @@ public class TestIntegrationTest {
 
             // ===== check mutational signature
             String testMutationalSignatureStableIds = "mean_1";
+            GeneticEntity mutationSignatureGeneticEntity = DaoGeneticEntity.getGeneticEntityByStableId(testMutationalSignatureStableIds);
+            assertNotNull(mutationSignatureGeneticEntity);
+
             String testMutationalSignatureMolecularProfileIds = "study_es_0_mutational_signature";
-            assertNotNull(DaoGeneticEntity.getGeneticEntityByStableId(testMutationalSignatureStableIds));
+            GeneticProfile mutationSignatureProfile = DaoGeneticProfile.getGeneticProfileByStableId(testMutationalSignatureMolecularProfileIds);
+            assertNotNull(mutationSignatureProfile);
             // ENTITY_STABLE_ID name description TCGA-A1-A0SB-01 TCGA-A1-A0SD-01
             // TCGA-A1-A0SE-01 TCGA-A1-A0SH-01 TCGA-A2-A04U-01 TCGA-B6-A0RS-01
             // TCGA-BH-A0HP-01 TCGA-BH-A18P-01
             // mean_1 ... ... ... 0.370266873	0.010373016	0.005419294	0.022753384	0.037687823	0.016708976	0.100042446	0.104214723
-            GenericAssayService genericAssayService = applicationContext.getBean(GenericAssayService.class);
-            List<GenericAssayData> mutationalSignatureData = genericAssayService.fetchGenericAssayData(Arrays.asList(testMutationalSignatureMolecularProfileIds),
-                    Arrays.asList("TCGA-A1-A0SB-01", "TCGA-A1-A0SH-01"), Arrays.asList(testMutationalSignatureStableIds), PersistenceConstants.SUMMARY_PROJECTION);
-            assertEquals(2, mutationalSignatureData.size());
-            assertEquals("0.370266873", mutationalSignatureData.get(0).getValue());
-            assertEquals("0.022753384", mutationalSignatureData.get(1).getValue());
+            HashMap<Integer, String> mutationalSignatureData = DaoGeneticAlteration
+                    .getInstance()
+                    .getGeneticAlterationMapForEntityIds(
+                            mutationSignatureProfile.getGeneticProfileId(),
+                            List.of(mutationSignatureGeneticEntity.getId())).get(mutationSignatureGeneticEntity.getId());
+            Sample sbSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), "TCGA-A1-A0SB-01");
+            Sample shSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), "TCGA-A1-A0SH-01");
+            assertEquals("0.370266873", mutationalSignatureData.get(sbSample.getInternalId()));
+            assertEquals("0.022753384", mutationalSignatureData.get(shSample.getInternalId()));
 
             // ===== check GSVA data
             // ...
-            String testGeneset = "GO_ATP_DEPENDENT_CHROMATIN_REMODELING";
-            assertEquals(4, DaoGeneset.getGenesetByExternalId(testGeneset).getGenesetGeneIds().size());
+            String testGenesetExternalId = "GO_ATP_DEPENDENT_CHROMATIN_REMODELING";
+            Geneset testGeneset = DaoGeneset.getGenesetByExternalId(testGenesetExternalId);
+            assertEquals(4, testGeneset.getGenesetGeneIds().size());
             // scores: TCGA-A1-A0SB-01 TCGA-A1-A0SD-01 TCGA-A1-A0SE-01 TCGA-A1-A0SH-01
             // TCGA-A2-A04U-01
             // GO_ATP_DEPENDENT_CHROMATIN_REMODELING -0.293861251463613 -0.226227563676626
             // -0.546556962547473 -0.0811115513543749 0.56919171543422
             // using new api:
-            GenesetDataService genesetDataService = applicationContext.getBean(GenesetDataService.class);
-            List<GenesetMolecularData> genesetData = genesetDataService.fetchGenesetData("study_es_0_gsva_scores",
-                    "study_es_0_all", Arrays.asList(testGeneset));
+            GeneticProfile gsvaScoresProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_es_0_gsva_scores");
+            HashMap<Integer, String> genesetData = DaoGeneticAlteration
+                    .getInstance()
+                    .getGeneticAlterationMapForEntityIds(
+                            gsvaScoresProfile.getGeneticProfileId(),
+                            List.of(testGeneset.getGeneticEntityId())).get(testGeneset.getGeneticEntityId());
             assertEquals(5, genesetData.size());
 
-            genesetData = genesetDataService.fetchGenesetData("study_es_0_gsva_scores",
-                    Arrays.asList("TCGA-A1-A0SB-01", "TCGA-A1-A0SH-01"), Arrays.asList(testGeneset));
-            assertEquals(2, genesetData.size());
-            assertEquals(-0.293861251463613, Double.parseDouble(genesetData.get(0).getValue()), 0.00001);
-            assertEquals(-0.0811115513543749, Double.parseDouble(genesetData.get(1).getValue()), 0.00001);
+            String sbSampleGenesetValueString = genesetData.get(sbSample.getInternalId());
+            String shSampleGenesetValuesString = genesetData.get(shSample.getInternalId());
+            assertEquals(-0.293861251463613, Double.parseDouble(sbSampleGenesetValueString), 0.00001);
+            assertEquals(-0.0811115513543749, Double.parseDouble(shSampleGenesetValuesString), 0.00001);
 
             // ===== check treatment (profile) data
             // ...
-            String testTreatment = "Irinotecan";
-            assertNotNull(DaoGeneticEntity.getGeneticEntityByStableId(testTreatment));
+            String testTreatmentStableId = "Irinotecan";
+            GeneticEntity testTreatmentGeneticEntity = DaoGeneticEntity.getGeneticEntityByStableId(testTreatmentStableId);
+            assertNotNull(testTreatmentGeneticEntity);
             // ENTITY_STABLE_ID NAME DESCRIPTION URL TCGA-A1-A0SB-01 TCGA-A1-A0SD-01
             // TCGA-A1-A0SE-01 TCGA-A1-A0SH-01 TCGA-A2-A04U-01 TCGA-B6-A0RS-01
             // TCGA-BH-A0HP-01 TCGA-BH-A18P-01
             // Irinotecan ... ... ... NA 0.080764666 NA 0.06704437 0.069568723 0.034992039
             // 0.740817904 0.209220141
-            GenericAssayService treatmentDataService = applicationContext.getBean(GenericAssayService.class);
-            List<GenericAssayData> treatmentData = treatmentDataService.getGenericAssayData("study_es_0_treatment_ic50", "study_es_0_all", Arrays.asList(testTreatment), PersistenceConstants.SUMMARY_PROJECTION);
+            GeneticProfile treatmentIc50Profile = DaoGeneticProfile.getGeneticProfileByStableId("study_es_0_treatment_ic50");
+            HashMap<Integer, String> treatmentData = DaoGeneticAlteration
+                    .getInstance()
+                    .getGeneticAlterationMapForEntityIds(
+                            treatmentIc50Profile.getGeneticProfileId(),
+                            List.of(testTreatmentGeneticEntity.getId())).get(testTreatmentGeneticEntity.getId());
             assertEquals(8, treatmentData.size());
-            assertEquals("NA", treatmentData.get(0).getValue());
-            assertEquals(0.080764666, Double.parseDouble(treatmentData.get(1).getValue()), 0.00001);
+            String sbSampleIrinotecanTraetmentValuesString = treatmentData.get(sbSample.getInternalId());
+            assertEquals("NA", sbSampleIrinotecanTraetmentValuesString);
+            String shSampleIrinotecanTraetmentValuesString = treatmentData.get(shSample.getInternalId());
+            assertEquals(0.06704437, Double.parseDouble(shSampleIrinotecanTraetmentValuesString), 0.00001);
 
             // ===== check study status
             assertEquals(DaoCancerStudy.Status.AVAILABLE, DaoCancerStudy.getStatus("study_es_0"));
@@ -419,7 +427,7 @@ public class TestIntegrationTest {
 
         Map<Integer, Set<String>> aliasesMap = new HashMap<Integer, Set<String>>();
         InputStream inputStream = new FileInputStream(
-                "src/test/scripts/test_data/api_json_system_tests/genesaliases.json");
+                "tests/test_data/api_json_system_tests/genesaliases.json");
         // parse json file:
         ObjectMapper mapper = new ObjectMapper();
         TestGeneAlias[] genesAliases = mapper.readValue(inputStream, TestGeneAlias[].class);
@@ -434,7 +442,7 @@ public class TestIntegrationTest {
             aliases.add(testGeneAlias.geneAlias);
         }
 
-        inputStream = new FileInputStream("src/test/scripts/test_data/api_json_system_tests/genes.json");
+        inputStream = new FileInputStream("tests/test_data/api_json_system_tests/genes.json");
         // parse json file:
         mapper = new ObjectMapper();
         TestGene[] genes = mapper.readValue(inputStream, TestGene[].class);
@@ -457,9 +465,9 @@ public class TestIntegrationTest {
      */
     private void loadGenePanel() throws Exception {
         ImportGenePanel gp = new ImportGenePanel(null);
-        gp.setFile(new File("src/test/scripts/test_data/study_es_0/data_gene_panel_testpanel1.txt"));
+        gp.setFile(new File("tests/test_data/study_es_0/data_gene_panel_testpanel1.txt"));
         gp.importData();
-        gp.setFile(new File("src/test/scripts/test_data/study_es_0/data_gene_panel_testpanel2.txt"));
+        gp.setFile(new File("tests/test_data/study_es_0/data_gene_panel_testpanel2.txt"));
         gp.importData();
     }
 
@@ -473,7 +481,7 @@ public class TestIntegrationTest {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class TestGeneAlias {
-        @JsonProperty("gene_alias")
+        @JsonProperty("alias")
         String geneAlias;
         @JsonProperty("entrezGeneId")
         int entrezGeneId;

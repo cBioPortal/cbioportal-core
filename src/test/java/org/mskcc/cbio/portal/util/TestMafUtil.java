@@ -34,20 +34,17 @@ package org.mskcc.cbio.portal.util;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.IOException;
+
 import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
 
 import java.util.*;
-import java.util.regex.Matcher;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
-import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
-import org.mskcc.cbio.portal.model.GeneticProfile;
 
 /**
  *
@@ -273,7 +270,7 @@ public class TestMafUtil {
 
         List<AlleleSpecificCopyNumber> ascnRecords = new ArrayList<>();
         while((line=buf.readLine()) != null) {
-            if (!line.startsWith("#") && line.trim().length() > 0) {
+            if (TsvUtil.isDataLine(line)) {
                 MafRecord record = mafUtil.parseRecord(line);
                 // every record in test MAF should have ASCN data
                 Assert.assertTrue(record.getNamespacesMap().containsKey(ASCN_NAMESPACE));

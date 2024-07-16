@@ -138,8 +138,10 @@ public class ConsoleUtil {
 			parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
 			          .withRequiredArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 		}
+		parser.accepts("overwrite-existing",
+				"Enables overwriting data if it turns out it already exists in DB.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
 		String progName = "importScript";
-		
+
 		OptionSet options = null;
 		try {
 			options = parser.parse( args );
@@ -175,10 +177,6 @@ public class ConsoleUtil {
 					throw new UsageException(progName, description, parser,
 							"Error: unknown loadMode action:  " + actionArg);
 				}
-			}
-			else {
-				throw new UsageException(progName, description, parser,
-						"Error: 'loadMode' argument required.");
 			}
 		}
 		return options;
@@ -251,6 +249,9 @@ public class ConsoleUtil {
 			parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
 			          .withRequiredArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
 		}
+		parser.accepts("overwrite-existing",
+				"Enables overwriting data if it turns out it already exists in DB.").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+
 		String progName = "importScript";
 		
 		OptionSet options = null;

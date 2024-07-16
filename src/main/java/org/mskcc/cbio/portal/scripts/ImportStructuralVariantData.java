@@ -34,7 +34,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -46,22 +45,25 @@ import java.util.Set;
 public class ImportStructuralVariantData {
 
     // Initialize variables
-    private File structuralVariantFile;
-    private int geneticProfileId;
-    private String genePanel;
-    private Set<String> namespaces;
-    private Set<String> sampleSet  = new HashSet<>();
+    private final File structuralVariantFile;
+    private final int geneticProfileId;
+    private final Integer genePanelId;
+    private final Set<String> namespaces;
+
+    private final boolean isIncrementalUpdateMode;
 
     public ImportStructuralVariantData(
         File structuralVariantFile, 
         int geneticProfileId, 
         String genePanel, 
-        Set<String> namespaces
+        Set<String> namespaces,
+        boolean isIncrementalUpdateMode
     ) throws DaoException {
         this.structuralVariantFile = structuralVariantFile;
         this.geneticProfileId = geneticProfileId;
-        this.genePanel = genePanel;
+        this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.namespaces = namespaces;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
     }
 
     public void importData() throws IOException, DaoException {
@@ -75,15 +77,15 @@ public class ImportStructuralVariantData {
         int recordCount = 0;
         // Genetic profile is read in first
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-        ArrayList <Integer> orderedSampleList = new ArrayList<Integer>();
+        Set<Integer> sampleIds = new HashSet<>();
         long id = DaoStructuralVariant.getLargestInternalId();
         Set<String> uniqueSVs = new HashSet<>();
         while ((line = buf.readLine()) != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-            if( !line.startsWith("#") && line.trim().length() > 0) {
+            if(TsvUtil.isDataLine(line)) {
                 recordCount++;
-                String parts[] = line.split("\t", -1);
+                String parts[] = TsvUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
                 structuralVariant.setInternalId(++id);
                 structuralVariant.setGeneticProfileId(geneticProfileId);
@@ -175,21 +177,16 @@ public class ImportStructuralVariantData {
                         // Add structural variant
                         DaoStructuralVariant.addStructuralVariantToBulkLoader(structuralVariant);
 
-                        // Add sample to sample profile list, which is important for gene panels
-                        if (!DaoSampleProfile.sampleExistsInGeneticProfile(sample.getInternalId(), geneticProfileId) && !sampleSet.contains(sample.getStableId())) {
-                            if (genePanel != null) {
-                                DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, GeneticProfileUtil.getGenePanelId(genePanel));
-                            } else {
-                                DaoSampleProfile.addSampleProfile(sample.getInternalId(), geneticProfileId, null);
-                            }
-                        }
-                        sampleSet.add(sample.getStableId());
-                        orderedSampleList.add(sample.getInternalId());
+                        sampleIds.add(sample.getInternalId());
                     }
                 }
             }
         }
-        DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
+
+        DaoSampleProfile.upsertSampleToProfileMapping(sampleIds, geneticProfileId, genePanelId);
+        if (isIncrementalUpdateMode) {
+            DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
+        }
 
         buf.close();
         MySQLbulkLoader.flushAll();

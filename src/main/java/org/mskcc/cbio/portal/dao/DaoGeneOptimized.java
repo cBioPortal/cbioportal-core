@@ -46,7 +46,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.util.DataValidator;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
  * A Utility Class that speeds access to Gene Info.
@@ -90,7 +92,7 @@ public class DaoGeneOptimized {
                 if (line.startsWith("#")) {
                     continue;
                 }
-                String[] parts = line.trim().split("\t",-1);
+                String[] parts = TsvUtil.splitTsvLine(line);
                 CanonicalGene gene = getGene(Long.parseLong(parts[1]));
                 if (gene==null) {
                     ProgressMonitor.logWarning(line+" in config file [resources" + GENE_SYMBOL_DISAMBIGUATION_FILE +
@@ -322,7 +324,7 @@ public class DaoGeneOptimized {
         }
 
         CanonicalGene gene;
-        if (geneId.matches("[0-9]+")) { // likely to be a entrez gene id
+        if (DataValidator.isValidNumericSequence(geneId)) { // likely to be a entrez gene id
             gene = getGene(Integer.parseInt(geneId));
             if (gene!=null) {
                 return Collections.singletonList(gene);
