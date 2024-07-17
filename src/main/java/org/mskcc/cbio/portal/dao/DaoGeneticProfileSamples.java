@@ -64,7 +64,7 @@ public final class DaoGeneticProfileSamples
         StringBuffer orderedSampleListBuf = new StringBuffer();
         //  Created Joined String, based on DELIM token
         for (Integer sampleId :  orderedSampleList) {
-            orderedSampleListBuf.append(Integer.toString(sampleId)).append(DELIM);
+            orderedSampleListBuf.append(sampleId).append(DELIM);
         }
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfileSamples.class);
@@ -126,7 +126,11 @@ public final class DaoGeneticProfileSamples
                 String orderedSampleList = rs.getString("ORDERED_SAMPLE_LIST");
 
                 //  Split, based on DELIM token
-                String parts[] = orderedSampleList.split(DELIM);
+                String[] parts = orderedSampleList.split(DELIM);
+                if (parts.length == 1 && parts[0].isBlank()) {
+                    throw new IllegalStateException("genetic_profile_samples row for geneticProfileId="
+                            + geneticProfileId + " has blank ORDERED_SAMPLE_LIST. Consider removing it.");
+                }
                 ArrayList <Integer> sampleList = new ArrayList <Integer>();
                 for (String internalSampleId : parts) {
                     sampleList.add(Integer.parseInt(internalSampleId));

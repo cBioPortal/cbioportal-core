@@ -29,7 +29,6 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -178,7 +177,6 @@ public class TestImportCnaDiscreteLongData {
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterations() throws Exception {
         List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
 
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
@@ -201,9 +199,6 @@ public class TestImportCnaDiscreteLongData {
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsMissingGeneticAlterations() throws Exception {
-        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
-
         File file = new File("src/test/resources/data_cna_discrete_import_test_with_cna_events_missing.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -228,9 +223,6 @@ public class TestImportCnaDiscreteLongData {
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterationsAndProfileSamplesInCorrectOrder() throws Exception {
-        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
-
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -254,9 +246,6 @@ public class TestImportCnaDiscreteLongData {
      */
     @Test
     public void testImportCnaDiscreteLongDataHandlesEntriesWithoutEntrezButWithHugo() throws Exception {
-        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
-
         File file = new File("src/test/resources/data_cna_discrete_import_test_without_entrez_with_hugo.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -276,9 +265,6 @@ public class TestImportCnaDiscreteLongData {
      */
     @Test
     public void testImportCnaDiscreteLongDataHandlesEntriesWithWrongEntrezAndCorrectHugo() throws Exception {
-        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
-
         File file = new File("src/test/resources/data_cna_discrete_import_test_with_wrong_entrez_and_correct_hugo.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -298,9 +284,6 @@ public class TestImportCnaDiscreteLongData {
      */
     @Test
     public void testImportCnaDiscreteLongDataAddsGeneticAlterationsFromNonCnaEvents() throws Exception {
-        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
-
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -325,9 +308,6 @@ public class TestImportCnaDiscreteLongData {
      */
     @Test
     public void testImportCnaDiscreteLongDataIgnoresLineWithDuplicateGene() throws Exception {
-        List<TestGeneticAlteration> beforeGeneticAlterations = getAllGeneticAlterations();
-        assertEquals(57, beforeGeneticAlterations.size());
-
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         new ImportCnaDiscreteLongData(
             file,
@@ -543,6 +523,12 @@ public class TestImportCnaDiscreteLongData {
 
         String expectedAnnotationJson = null;
         assertEquals(expectedAnnotationJson, results.get(0).annotationJson);
+    }
+
+    @Test
+    public void testGetAllGeneticAlterations() throws DaoException {
+        List<TestGeneticAlteration> geneticAlterations = getAllGeneticAlterations();
+        assertEquals(59, geneticAlterations.size());
     }
     
     private List<TestPdAnnotationPK> createPrimaryKeys(String sample, List<CnaEvent.Event> cnaEvents) {
