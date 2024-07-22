@@ -82,6 +82,9 @@ public class JdbcUtil {
     }
 
     public static TransactionTemplate getTransactionTemplate() {
+        if (transactionTemplate == null) {
+            getDataSource();
+        }
         return transactionTemplate;
     }
 
