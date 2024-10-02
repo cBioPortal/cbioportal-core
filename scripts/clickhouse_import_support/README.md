@@ -25,3 +25,9 @@ exist in a mysql database. This will occur at the end of an import process in or
 clear the data from the prior production database (or the backup copy database) in order
 to make the database empty and available for reuse during the next cycle of cancer study
 import.
+
+## copy\_mysql\_database\_tables\_to\_clickhouse.sh
+This bash script uses the *sling* command line interface tool to copy data from all tables
+present in the selected mysql database (green or blue) into the corresponding sling
+database. Multiple retries are attempted on individual attempt failures. Copy results are
+validated by record counts.
