@@ -14,17 +14,16 @@ FROM maven:3-eclipse-temurin-21
 
 # download system dependencies first to take advantage of docker caching
 RUN apt-get update; apt-get install -y --no-install-recommends \
-        build-essential \
-        default-mysql-client \
-        default-libmysqlclient-dev \
-        python3 \
-        python3-setuptools \
-        python3-dev \
-        python3-pip \
-        unzip \
-        perl \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip3 install wheel
+    build-essential \
+    default-mysql-client \
+    default-libmysqlclient-dev \
+    python3 \
+    python3-setuptools \
+    python3-dev \
+    python3-pip \
+    unzip \
+    perl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install any needed packages specified in requirements.txt
 COPY requirements.txt ./
