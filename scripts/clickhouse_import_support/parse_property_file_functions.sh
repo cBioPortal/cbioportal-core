@@ -177,3 +177,15 @@ function parse_property_file() {
     done < $property_file_path
     return 0
 }
+
+function remove_credentials_from_properties() {
+    associative_array_name=$1 # array names must be proper identifiers (no spaces)
+    if ! variable_name_refers_to_an_associative_array $associative_array_name ; then
+        echo "error: variable name '$associative_array_name' was passed to function parse_property_file() but was not available in the environment, or did not refer to a created associative array." >&2
+        return 1
+    fi
+    for key_name in "mysql_server_username" "mysql_server_password" "clickhouse_server_username"  "clickhouse_server_password" ; do
+        unset_command="unset $associative_array_name['$key_name']"
+        eval $unset_command
+    done
+}

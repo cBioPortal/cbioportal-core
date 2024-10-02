@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 
-# bash declaration dependencies
-source parse_property_file_functions.sh
-source mysql_command_line_functions.sh
+# load dependencies
+unset this_script_dir
+this_script_dir="$(dirname "$(readlink -f $0)")"
+if ! source "$this_script_dir/parse_property_file_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/parse_property_file_functions.sh" >&2
+    exit 1
+fi
+if ! source "$this_script_dir/mysql_command_line_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/mysql_command_line_functions.sh" >&2
+    exit 1
+fi
+unset this_script_dir
 
-# non-local environment variables in use
+# other non-local environment variables in use
 unset my_properties
 unset database_table_list
 unset source_database_name
@@ -32,15 +41,16 @@ function initialize_main() {
         usage
         return 1
     fi
-    if ! initialize_mysql_command_line_functions ; then # this also purges the mysql credentials from the environment for security
+    if ! initialize_mysql_command_line_functions ; then
         usage
         return 1
     fi
+    remove_credentials_from_properties my_properties # no longer needed - remove for security
     if [ "$database_to_clone_tables_from" == "blue" ] ; then
-        source_database_name="${my_properties['blue_database_name']}"
+        source_database_name="${my_properties['mysql_blue_database_name']}"
     else
         if [ "$database_to_clone_tables_from" == "green" ] ; then
-            source_database_name="${my_properties['green_database_name']}"
+            source_database_name="${my_properties['mysql_green_database_name']}"
         else
             echo "Error : database_to_clone_tables_from must be one of {blue, green}" >&2
             usage
@@ -48,10 +58,10 @@ function initialize_main() {
         fi
     fi
     if [ "$database_to_clone_tables_to" == "blue" ] ; then
-        destination_database_name="${my_properties['blue_database_name']}"
+        destination_database_name="${my_properties['mysql_blue_database_name']}"
     else
         if [ "$database_to_clone_tables_to" == "green" ] ; then
-            destination_database_name="${my_properties['green_database_name']}"
+            destination_database_name="${my_properties['mysql_green_database_name']}"
         else
             echo "Error : database_to_clone_tables_to must be one of {blue, green}" >&2
             usage

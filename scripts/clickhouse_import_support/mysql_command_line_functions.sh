@@ -74,7 +74,7 @@ function set_sql_data_field_value_from_record() {
     while [ $pos -lt $record_string_length ] ; do
         local character_at_position="${record_string:$pos:1}"
         # a newline should occur at the end of the read line, and only there. Embedded newlines are encoded with '\n'
-        if [ "$character_at_position" == "$NL" ] ; then
+        if [ "$character_at_position" == "$LF" ] ; then
             field_index=$((field_index+1))
             if [ "$field_index" -gt "$column_number" ] ; then
                 # field has been completely parsed
