@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 
-# bash declaration dependencies
-source parse_property_file_functions.sh
-source mysql_command_line_functions.sh
+# load dependencies
+unset this_script_dir
+this_script_dir="$(dirname "$(readlink -f $0)")"
+if ! source "$this_script_dir/parse_property_file_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/parse_property_file_functions.sh" >&2
+    exit 1
+fi
+if ! source "$this_script_dir/mysql_command_line_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/mysql_command_line_functions.sh" >&2
+    exit 1
+fi
+unset this_script_dir
 
 # non-local environment variables in use
 unset my_properties
@@ -30,11 +39,12 @@ function initialize_main() {
         usage
         return 1
     fi
+    remove_credentials_from_properties my_properties # no longer needed - remove for security
     if [ "$database_to_drop_tables_from" == "blue" ] ; then
-        database_name="${my_properties['blue_database_name']}"
+        database_name="${my_properties['mysql_blue_database_name']}"
     else
         if [ "$database_to_drop_tables_from" == "green" ] ; then
-            database_name="${my_properties['green_database_name']}"
+            database_name="${my_properties['mysql_green_database_name']}"
         else
             if [ "$database_to_drop_tables_from" == "shelved" ] ; then
                 database_name="${my_properties['shelved_database_name']}"

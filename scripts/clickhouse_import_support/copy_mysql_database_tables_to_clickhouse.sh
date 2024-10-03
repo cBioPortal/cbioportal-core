@@ -14,7 +14,7 @@ fi
 unset this_script_dir
 
 function usage() {
-    echo "usage: copy_mysql_database_tables_to_clickhouse.sh properties_file database"
+    echo "usage:"
 }
 
 # other non-local environment variables in use
@@ -101,6 +101,10 @@ function successful_copy_verified_flag_has_been_set() {
 function set_successful_copy_verified_flag() {
     local table_name=$1
     table_has_been_copied_and_verified[$table_name]="true"
+}
+
+function destination_table_matches_source_table() {
+    return 0
 }
 
 function copy_all_database_tables_with_sling() {
