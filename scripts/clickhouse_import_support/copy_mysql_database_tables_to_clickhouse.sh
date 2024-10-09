@@ -79,9 +79,13 @@ function set_database_table_list() {
     return 0
 }
 
+function delete_output_stream_files() {
+    return 0
+}
+
 function shutdown_main_and_clean_up() {
     #TODO restore
-    #shutdown_sling_command_line_functions
+    shutdown_sling_command_line_functions
     delete_output_stream_files
     unset my_properties
     unset database_table_list
@@ -161,5 +165,3 @@ function main() {
 }
 
 main "$1" "$2"
-
-exit 0

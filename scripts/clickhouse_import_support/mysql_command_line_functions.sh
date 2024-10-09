@@ -7,6 +7,7 @@ configured_mysql_defaults_config_file_path=""
 sql_data_field_value=""
 declare -a sql_data_array
 database_exists_filepath="$(pwd)/mclf_database_exists.txt"
+table_exists_filepath="$(pwd)/mclf_table_exists.txt"
 database_table_list_filepath="$(pwd)/mclf_database_table_list.txt"
 
 function purge_mysql_credentials_from_environment_variables() {
@@ -37,11 +38,13 @@ function initialize_mysql_command_line_functions() {
 function shutdown_mysql_command_line_functions() {
     rm -f "$configured_mysql_defaults_config_file_path"
     rm -f "$database_exists_filepath"
+    rm -f "$table_exists_filepath"
     rm -f "$database_table_list_filepath"
     unset configured_mysql_defaults_config_file_path
     unset sql_data_field_value
     unset sql_data_array
     unset database_exists_filepath
+    unset table_exists_filepath
     unset database_table_list_filepath
 }
 
@@ -166,6 +169,17 @@ function database_exists() {
     if [[ "${#sql_data_array[@]}" -ne 1 ]] ; then
         echo "Warning : database $database_name not present on database server, or there are multiple listings for that name" >&2
         return 2
+    fi
+    return 0
+}
+
+function table_exists() {
+    local database_name=$1
+    local table_name=$2
+    local statement="DESCRIBE TABLE \`$database_name\`.\`$table_name\`"
+    if ! execute_sql_statement_via_mysql "$statement" "$table_exists_filepath" ; then
+        echo "Warning : unable to find table $table_name in  $database_name using : $statement" >&2
+        return 1
     fi
     return 0
 }
