@@ -1,5 +1,59 @@
 #!/usr/bin/env bash
 
+# load dependencies
+unset this_script_dir
+this_script_dir="$(dirname "$(readlink -f $0)")"
+if ! source "$this_script_dir/parse_property_file_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/parse_property_file_functions.sh" >&2
+    exit 1
+fi
+if ! source "$this_script_dir/clickhouse_client_command_line_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/clickhouse_client_command_line_functions.sh" >&2
+    exit 1
+fi
+unset this_script_dir
+
+# non-local environment variables in use
+unset my_properties
+unset database_table_list
+unset database_name
+declare -A my_properties
+declare -a database_table_list
+database_name=""
+database_table_list_filepath="$(pwd)/dtcd_database_table_list.txt"
+drop_table_result_filepath="$(pwd)/dtcd_drop_table_result.txt"
+
+function usage() {
+    echo "usage: drop_tables_in_clickhouse_database.sh properties_filepath database" >&2
+    echo "         database must be in {blue, green}" >&2
+}
+
+function initialize_main() {
+    local properties_filepath=$1
+    local database_to_drop_tables_from=$2
+    if ! parse_property_file "$properties_filepath" my_properties ; then
+        usage
+        return 1
+    fi
+    if ! initialize_clickhouse_client_command_line_functions ; then
+        usage
+        return 1
+    fi
+    remove_credentials_from_properties my_properties # no longer needed - remove for security
+    if [ "$database_to_drop_tables_from" == "blue" ] ; then
+        database_name="${my_properties['clickhouse_blue_database_name']}"
+    else
+        if [ "$database_to_drop_tables_from" == "green" ] ; then
+            database_name="${my_properties['clickhouse_green_database_name']}"
+        else
+            echo "Error : database must be one of {blue, green}" >&2
+            usage
+            return 1
+        fi
+    fi
+    return 0
+}
+
 DESTINATION_DATABASE="name_of_clickhouse_blue_database"
 read -p 'enter clickhouse password: ' password
 echo "password was $password"
@@ -80,3 +134,21 @@ while [ $pos -lt 1 ] ; do
     clickhouse client --host clickhouse_hostname_goes_here --port clickhouse_port_goes_here --user username_goes_here --password="$password" <<< "DROP MATERIALIZED VIEW $DESTINATION_DATABASE.${view_name[$pos]}" 
     pos=$(($pos+1))
 done
+
+
+function main() {
+    local properties_filepath=$1
+    local database_to_drop_tables_from=$2
+    local exit_status=0
+    if ! initialize_main "$properties_filepath" "$database_to_drop_tables_from" ||
+            ! selected_database_exists ||
+            ! set_database_table_list ||
+            ! drop_all_database_tables ||
+            ! selected_database_is_empty ; then
+        exit_status=1
+    fi
+    shutdown_main_and_clean_up
+    return $exit_status
+}
+
+main "$1" "$2"

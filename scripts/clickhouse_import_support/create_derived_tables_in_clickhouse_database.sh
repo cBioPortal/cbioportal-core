@@ -7,7 +7,6 @@ properties_arg=$1
 database_arg=$2
 chosen_database_name=""
 
-#TODO : generalize this code and add proper error handling
 
 if [ "$database_arg" == "blue" ] ; then
     chosen_database_name="$DESTINATION_DATABASE_BLUE"
@@ -31,8 +30,7 @@ done < "$DERIVED_TABLE_STATEMENT_FILE"
 statement_list_length=${#statement_list[@]}
 pos=0
 while [ $pos -lt $statement_list_length ] ; do
-    #TODO do not pass password on the command line like this. Use a configuration file instead
-    clickhouse client --host clickhouse_service_hostname_goes_here --port clickhouse_service_port_goes_here --database="$chosen_database_name" --user clickhouse_username_goes_here --password="$password" <<< "${statement_list[$pos]}"
+    ~/rob/setting_up_clickhouse/clickhouse client --host ip-10-0-7-23.ec2.internal --port 9000 --database="$chosen_database_name" --user cgds_admin --password="$password" <<< "${statement_list[$pos]}"
     pos=$(($pos+1))
 done
 
