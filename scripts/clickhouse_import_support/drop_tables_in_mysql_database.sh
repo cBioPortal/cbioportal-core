@@ -25,7 +25,7 @@ drop_table_result_filepath="$(pwd)/dtmd_drop_table_result.txt"
 
 function usage() {
     echo "usage: drop_tables_in_mysql_database.sh properties_filepath database" >&2
-    echo "         database must be in {blue, green, shelved}" >&2
+    echo "         database must be in {blue, green}" >&2
 }
 
 function initialize_main() {
@@ -46,14 +46,9 @@ function initialize_main() {
         if [ "$database_to_drop_tables_from" == "green" ] ; then
             database_name="${my_properties['mysql_green_database_name']}"
         else
-            if [ "$database_to_drop_tables_from" == "shelved" ] ; then
-                database_name="${my_properties['shelved_database_name']}"
-            else
-                echo "Error : database must be one of {blue, green, shelved}" >&2
-                usage
-                return 1
-                
-            fi
+            echo "Error : database must be one of {blue, green}" >&2
+            usage
+            return 1
         fi
     fi
     return 0
@@ -127,7 +122,6 @@ function drop_all_database_tables() {
         fi
         pos=$(($pos+1))
     done
-    # TODO : add check that database has no tables
     return 0
 }
 

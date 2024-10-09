@@ -51,7 +51,6 @@ function write_selected_clickhouse_connection_to_env_file() {
     echo "    password: ${my_properties['clickhouse_server_password']}" >> "$env_file"
     echo "    port: \"${my_properties['clickhouse_server_port']}\"" >> "$env_file"
     echo "    user: ${my_properties['clickhouse_server_username']}" >> "$env_file"
-#    echo "    http_url: https://$uname:$pw@$clickhost:${clickport}/${db_name}$additional_args" >> "$env_file"
     echo >> "$env_file"
 }
 
@@ -75,7 +74,8 @@ function write_sling_env_file() {
     write_selected_mysql_connection_to_env_file "$env_file" "$database_to_transfer"
     write_selected_clickhouse_connection_to_env_file "$env_file" "$database_to_transfer"
     echo "variables: {}" >> "$env_file"
-    if ! [ "$(cat $env_file | wc -l)" == "22" ] ; then
+### TODO: ADJUST LINECOUNT
+    if ! [ "$(cat $env_file | wc -l)" == "23" ] ; then
         echo "Error : could not successfully write default mysql properties to file $env_file" >&2
         return 1
     fi
