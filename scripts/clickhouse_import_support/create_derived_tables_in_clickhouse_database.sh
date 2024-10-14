@@ -15,40 +15,34 @@ unset this_script_dir
 
 # non-local environment variables in use
 unset my_properties
-unset database_table_list
 unset database_name
 declare -A my_properties
-declare -a database_table_list
 database_name=""
-database_table_list_filepath="$(pwd)/cdtcd_database_table_list.txt"
-drop_table_result_filepath="$(pwd)/cdtcd_drop_table_result.txt"
+create_derived_table_result_filepath="$(pwd)/cdtcd_create_derived_tables_result.txt"
 clickhouse_is_responsive_filepath="$(pwd)/cdtcd_cmd_clickhouse_is_responsive.txt"
 SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
-#TODO : capture files to be executed from this file
-${my_properties['clickhouse_derived_table_construction_filenames_list_file']}
-
 function usage() {
-    echo "usage: drop_tables_in_clickhouse_database.sh properties_filepath database" >&2
+    echo "usage: create_derived_tables_in_clickhouse_database.sh properties_filepath database" >&2
     echo "         database must be in {blue, green}" >&2
 }
 
 function initialize_main() {
     local properties_filepath=$1
-    local database_to_drop_tables_from=$2
+    local database_to_create_derived_tables_in=$2
     if ! parse_property_file "$properties_filepath" my_properties ; then
         usage
         return 1
     fi
-    if ! initialize_clickhouse_client_command_line_functions "$database_to_drop_tables_from" ; then
+    if ! initialize_clickhouse_client_command_line_functions "$database_to_create_derived_tables_in" ; then
         usage
         return 1
     fi
     remove_credentials_from_properties my_properties # no longer needed - remove for security
-    if [ "$database_to_drop_tables_from" == "blue" ] ; then
+    if [ "$database_to_create_derived_tables_in" == "blue" ] ; then
         database_name="${my_properties['clickhouse_blue_database_name']}"
     else
-        if [ "$database_to_drop_tables_from" == "green" ] ; then
+        if [ "$database_to_create_derived_tables_in" == "green" ] ; then
             database_name="${my_properties['clickhouse_green_database_name']}"
         else
             echo "Error : database must be one of {blue, green}" >&2
@@ -82,39 +76,53 @@ function clickhouse_is_responding() {
 
 function selected_database_exists() {
     if ! clickhouse_database_exists "$database_name" ; then
-        echo "Error : could not proceed with dropping of tables because database does not exist: $database_name" >&2
+        echo "Error : could not proceed with creation of derived tables because database does not exist: $database_name" >&2
         return 1
     fi
     return 0
 }
 
-#TODO : put loop of calling clickhouse on each file here
+function create_all_derived_tables() {
+    local return_status=0
+    local sql_filename_list_filepath="${my_properties['clickhouse_derived_table_construction_filenames_list_file']}"
+    if ! [ -r "$sql_filename_list_filepath" ] ; then
+        echo "Error : unable to read sql filename list from file \"$sql_filename_list_filepath\"" >&2
+        return 1
+    fi
+    while read line ; do
+        echo -n "."
+        if ! execute_sql_statement_from_file_via_clickhouse_client "$line" "create_derived_table_result_filepath" ; then
+            echo "Warning : failure occurred during execution of sql statements in file $line" >&2
+            return_status=1
+        fi
+    done < "$sql_filename_list_filepath"
+    echo
+    return $return_status
+}
 
 function delete_output_stream_files() {
-    rm -f "$database_table_list_filepath"
-    rm -f "$drop_table_result_filepath"
+    rm -f "$create_derived_table_result_filepath"
     rm -f "$clickhouse_is_responsive_filepath"
 }
 
 function shutdown_main_and_clean_up() {
-#    shutdown_clickhouse_client_command_line_functions
+    shutdown_clickhouse_client_command_line_functions
     delete_output_stream_files
     unset my_properties
-    unset database_table_list
     unset database_name
-    unset database_table_list_filepath
-    unset drop_table_result_filepath
+    unset create_derived_table_result_filepath
     unset clickhouse_is_responsive_filepath
     unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
 }
 
 function main() {
     local properties_filepath=$1
-    local database_to_drop_tables_from=$2
+    local database_to_create_derived_tables_in=$2
     local exit_status=0
-    if ! initialize_main "$properties_filepath" "$database_to_drop_tables_from" ||
+    if ! initialize_main "$properties_filepath" "$database_to_create_derived_tables_in" ||
             ! clickhouse_is_responding ||
-            ! selected_database_exists ; then
+            ! selected_database_exists ||
+            ! create_all_derived_tables ; then
         exit_status=1
     fi
     shutdown_main_and_clean_up
