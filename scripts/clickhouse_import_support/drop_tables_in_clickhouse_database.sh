@@ -22,6 +22,8 @@ declare -a database_table_list
 database_name=""
 database_table_list_filepath="$(pwd)/dtcd_database_table_list.txt"
 drop_table_result_filepath="$(pwd)/dtcd_drop_table_result.txt"
+clickhouse_is_responsive_filepath="$(pwd)/cmd_clickhouse_is_responsive.txt"
+SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
 function usage() {
     echo "usage: drop_tables_in_clickhouse_database.sh properties_filepath database" >&2
@@ -35,7 +37,7 @@ function initialize_main() {
         usage
         return 1
     fi
-    if ! initialize_clickhouse_client_command_line_functions ; then
+    if ! initialize_clickhouse_client_command_line_functions "$database_to_drop_tables_from" ; then
         usage
         return 1
     fi
@@ -54,93 +56,109 @@ function initialize_main() {
     return 0
 }
 
-DESTINATION_DATABASE="name_of_clickhouse_blue_database"
-read -p 'enter clickhouse password: ' password
-echo "password was $password"
+function clickhouse_is_responding() {
+    local remaining_try_count=3
+    local statement="SELECT 1"
+    while [ $remaining_try_count -ne 0 ] ; do
+        if execute_sql_statement_via_clickhouse_client "$statement" "$clickhouse_is_responsive_filepath" ; then
+            unset sql_data_array
+            if set_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
+                local clickhouse_response=${sql_data_array[0]}
+                if [ "$clickhouse_response" == "1" ] ; then
+                    return 0
+                fi
+            fi
+        fi
+        remaining_try_count=$((remaining_try_count-1))
+        if [ $remaining_try_count -gt 0 ] ; then
+            sleep $SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+        fi
+    done
+    return 1
+}
 
-#TODO : read the table name list out of clickhouse and include any constructed views
-table_name=()
-table_name+=('allele_specific_copy_number')
-table_name+=('alteration_driver_annotation')
-table_name+=('authorities')
-table_name+=('cancer_study')
-table_name+=('cancer_study_tags')
-table_name+=('clinical_attribute_meta')
-table_name+=('clinical_event')
-table_name+=('clinical_event_data')
-table_name+=('clinical_patient')
-table_name+=('clinical_sample')
-table_name+=('cna_event')
-table_name+=('copy_number_seg')
-table_name+=('copy_number_seg_file')
-table_name+=('cosmic_mutation')
-table_name+=('data_access_tokens')
-table_name+=('fraction_genome_altered')
-table_name+=('gene')
-table_name+=('gene_alias')
-table_name+=('gene_panel')
-table_name+=('gene_panel_list')
-table_name+=('generic_entity_properties')
-table_name+=('geneset')
-table_name+=('geneset_gene')
-table_name+=('geneset_hierarchy_leaf')
-table_name+=('geneset_hierarchy_node')
-table_name+=('genetic_alteration')
-table_name+=('genetic_entity')
-table_name+=('genetic_profile')
-table_name+=('genetic_profile_link')
-table_name+=('genetic_profile_samples')
-table_name+=('gistic')
-table_name+=('gistic_to_gene')
-table_name+=('info')
-table_name+=('mut_sig')
-table_name+=('mutation')
-table_name+=('mutation_count')
-table_name+=('mutation_count_by_keyword')
-table_name+=('mutation_event')
-table_name+=('patient')
-table_name+=('reference_genome')
-table_name+=('reference_genome_gene')
-table_name+=('resource_definition')
-table_name+=('resource_patient')
-table_name+=('resource_sample')
-table_name+=('resource_study')
-table_name+=('sample')
-table_name+=('sample_cna_event')
-table_name+=('sample_list')
-table_name+=('sample_list_list')
-table_name+=('sample_profile')
-table_name+=('structural_variant')
-table_name+=('type_of_cancer')
-table_name+=('users')
-table_name+=('sample_to_gene_panel_derived')
-table_name+=('gene_panel_to_gene_derived')
-table_name+=('sample_derived')
-table_name+=('genomic_event_derived')
-table_name+=('clinical_data_derived')
-table_name+=('clinical_event_derived')
-table_name+=('genetic_alteration_cna_derived')
-table_name+=('genetic_alteration_numerical_derived')
-table_name+=('generic_assay_data_derived')
-table_name+=('sample_list_columnstore')
-#TODO a separate command is needed for dropping views, so make sure to keep the table list and the view list distinct (read both out of the clickhouse service)
-#view_name+=('sample_list_columnstore_mv")
-pos=0
-while [ $pos -lt 63 ] ; do
-    clickhouse client --host clickhouse_hostname_goes_here --port clickhouse_port_goes_here --user username_goes_here --password="$password" <<< "DROP TABLE $DESTINATION_DATABASE.${table_name[$pos]}" 
-    pos=$(($pos+1))
-done
-while [ $pos -lt 1 ] ; do
-    clickhouse client --host clickhouse_hostname_goes_here --port clickhouse_port_goes_here --user username_goes_here --password="$password" <<< "DROP MATERIALIZED VIEW $DESTINATION_DATABASE.${view_name[$pos]}" 
-    pos=$(($pos+1))
-done
+function selected_database_exists() {
+    if ! clickhouse_database_exists "$database_name" ; then
+        echo "Error : could not proceed with dropping of tables because database does not exist: $database_name" >&2
+        return 1
+    fi
+    return 0
+}
 
+function set_database_table_list() {
+    local statement="SELECT name FROM system.tables WHERE database = '$database_name'"
+    rm -f "$database_table_list_filepath"
+    if ! execute_sql_statement_via_clickhouse_client "$statement" "$database_table_list_filepath" ; then
+        echo "Warning : failed to execute clickhouse statement : $statement" >&2
+        return 1
+    fi
+    unset sql_data_array
+    if ! set_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
+        return 1
+    fi
+    database_table_list=(${sql_data_array[@]})
+    return 0
+}
+
+function drop_all_database_tables() {
+    local pos=0
+    local table_count=${#database_table_list[@]}
+    if [ $table_count -eq 0 ] ; then
+        return 0
+    fi
+    while [ $pos -lt $table_count ] ; do
+        local statement="DROP TABLE \`$database_name\`.\`${database_table_list[$pos]}\`"
+        rm -f "$drop_table_result_filepath"
+        if ! execute_sql_statement_via_clickhouse_client "$statement" "$drop_table_result_filepath" ; then
+            echo "Warning : failed to execute clickhouse statement : $statement" >&2
+            return 1
+        fi
+        pos=$(($pos+1))
+    done
+    return 0
+}
+
+function selected_database_is_empty() {
+    local table_count=${#database_table_list[@]}
+    if [ $table_count -eq 0 ] ; then
+        # no tables were present from the beginning .. so no need to check
+        echo "Database is already empty (no tables)" >&2
+        return 0
+    fi
+    set_database_table_list
+    table_count=${#database_table_list[@]}
+    if [ $table_count -ne 0 ] ; then
+        echo "Error : after attempts to drop all tables in database $database_name there are still tables present" >&2
+        return 1
+    fi
+    echo "All tables have been dropped" >&2
+    return 0
+}
+
+function delete_output_stream_files() {
+    rm -f "$database_table_list_filepath"
+    rm -f "$drop_table_result_filepath"
+    rm -f "$clickhouse_is_responsive_filepath"
+}
+
+function shutdown_main_and_clean_up() {
+#    shutdown_clickhouse_client_command_line_functions
+    delete_output_stream_files
+    unset my_properties
+    unset database_table_list
+    unset database_name
+    unset database_table_list_filepath
+    unset drop_table_result_filepath
+    unset clickhouse_is_responsive_filepath
+    unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+}
 
 function main() {
     local properties_filepath=$1
     local database_to_drop_tables_from=$2
     local exit_status=0
     if ! initialize_main "$properties_filepath" "$database_to_drop_tables_from" ||
+            ! clickhouse_is_responding ||
             ! selected_database_exists ||
             ! set_database_table_list ||
             ! drop_all_database_tables ||

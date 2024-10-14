@@ -1,36 +1,124 @@
 #!/usr/bin/env bash
 
-DESTINATION_DATABASE_BLUE="cgds_genie_blue"
-DESTINATION_DATABASE_GREEN="cgds_genie_green"
-DERIVED_TABLE_STATEMENT_FILE='derived_table_construction_commands.sql'
-properties_arg=$1
-database_arg=$2
-chosen_database_name=""
-
-
-if [ "$database_arg" == "blue" ] ; then
-    chosen_database_name="$DESTINATION_DATABASE_BLUE"
-else
-    if [ "$database_arg" == "green" ] ; then
-        chosen_database_name="$DESTINATION_DATABASE_GREEN"
-    else
-        echo "Error : database argument must be either 'blue' or 'green'"
-        exit 1
-    fi
+# load dependencies
+unset this_script_dir
+this_script_dir="$(dirname "$(readlink -f $0)")"
+if ! source "$this_script_dir/parse_property_file_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/parse_property_file_functions.sh" >&2
+    exit 1
 fi
+if ! source "$this_script_dir/clickhouse_client_command_line_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/clickhouse_client_command_line_functions.sh" >&2
+    exit 1
+fi
+unset this_script_dir
 
-read -p 'enter clickhouse password: ' password
+# non-local environment variables in use
+unset my_properties
+unset database_table_list
+unset database_name
+declare -A my_properties
+declare -a database_table_list
+database_name=""
+database_table_list_filepath="$(pwd)/cdtcd_database_table_list.txt"
+drop_table_result_filepath="$(pwd)/cdtcd_drop_table_result.txt"
+clickhouse_is_responsive_filepath="$(pwd)/cdtcd_cmd_clickhouse_is_responsive.txt"
+SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
-#TODO read file
-statement_list=()
-while IFS='' read -r line ; do
-    statement_list+=( "$line" )
-done < "$DERIVED_TABLE_STATEMENT_FILE"
+#TODO : capture files to be executed from this file
+${my_properties['clickhouse_derived_table_construction_filenames_list_file']}
 
-statement_list_length=${#statement_list[@]}
-pos=0
-while [ $pos -lt $statement_list_length ] ; do
-    ~/rob/setting_up_clickhouse/clickhouse client --host ip-10-0-7-23.ec2.internal --port 9000 --database="$chosen_database_name" --user cgds_admin --password="$password" <<< "${statement_list[$pos]}"
-    pos=$(($pos+1))
-done
+function usage() {
+    echo "usage: drop_tables_in_clickhouse_database.sh properties_filepath database" >&2
+    echo "         database must be in {blue, green}" >&2
+}
 
+function initialize_main() {
+    local properties_filepath=$1
+    local database_to_drop_tables_from=$2
+    if ! parse_property_file "$properties_filepath" my_properties ; then
+        usage
+        return 1
+    fi
+    if ! initialize_clickhouse_client_command_line_functions "$database_to_drop_tables_from" ; then
+        usage
+        return 1
+    fi
+    remove_credentials_from_properties my_properties # no longer needed - remove for security
+    if [ "$database_to_drop_tables_from" == "blue" ] ; then
+        database_name="${my_properties['clickhouse_blue_database_name']}"
+    else
+        if [ "$database_to_drop_tables_from" == "green" ] ; then
+            database_name="${my_properties['clickhouse_green_database_name']}"
+        else
+            echo "Error : database must be one of {blue, green}" >&2
+            usage
+            return 1
+        fi
+    fi
+    return 0
+}
+
+function clickhouse_is_responding() {
+    local remaining_try_count=3
+    local statement="SELECT 1"
+    while [ $remaining_try_count -ne 0 ] ; do
+        if execute_sql_statement_via_clickhouse_client "$statement" "$clickhouse_is_responsive_filepath" ; then
+            unset sql_data_array
+            if set_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
+                local clickhouse_response=${sql_data_array[0]}
+                if [ "$clickhouse_response" == "1" ] ; then
+                    return 0
+                fi
+            fi
+        fi
+        remaining_try_count=$((remaining_try_count-1))
+        if [ $remaining_try_count -gt 0 ] ; then
+            sleep $SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+        fi
+    done
+    return 1
+}
+
+function selected_database_exists() {
+    if ! clickhouse_database_exists "$database_name" ; then
+        echo "Error : could not proceed with dropping of tables because database does not exist: $database_name" >&2
+        return 1
+    fi
+    return 0
+}
+
+#TODO : put loop of calling clickhouse on each file here
+
+function delete_output_stream_files() {
+    rm -f "$database_table_list_filepath"
+    rm -f "$drop_table_result_filepath"
+    rm -f "$clickhouse_is_responsive_filepath"
+}
+
+function shutdown_main_and_clean_up() {
+#    shutdown_clickhouse_client_command_line_functions
+    delete_output_stream_files
+    unset my_properties
+    unset database_table_list
+    unset database_name
+    unset database_table_list_filepath
+    unset drop_table_result_filepath
+    unset clickhouse_is_responsive_filepath
+    unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+}
+
+function main() {
+    local properties_filepath=$1
+    local database_to_drop_tables_from=$2
+    local exit_status=0
+    if ! initialize_main "$properties_filepath" "$database_to_drop_tables_from" ||
+            ! clickhouse_is_responding ||
+            ! selected_database_exists ; then
+        exit_status=1
+    fi
+    shutdown_main_and_clean_up
+    return $exit_status
+}
+
+main "$1" "$2"
