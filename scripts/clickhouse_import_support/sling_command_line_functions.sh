@@ -46,7 +46,7 @@ function write_selected_clickhouse_connection_to_env_file() {
     local additional_args="${my_properties['clickhouse_server_additional_args']}"
     echo "  CLICKHOUSE_DATABASE_CONNECTION:" >> "$env_file"
     echo "    type: clickhouse" >> "$env_file"
-    echo "    database: $db_name" >> "$env_file"
+    echo "    database: $db_name$additional_args" >> "$env_file"
     echo "    host: ${my_properties['clickhouse_server_host_name']}" >> "$env_file"
     echo "    password: ${my_properties['clickhouse_server_password']}" >> "$env_file"
     echo "    port: \"${my_properties['clickhouse_server_port']}\"" >> "$env_file"
@@ -74,8 +74,7 @@ function write_sling_env_file() {
     write_selected_mysql_connection_to_env_file "$env_file" "$database_to_transfer"
     write_selected_clickhouse_connection_to_env_file "$env_file" "$database_to_transfer"
     echo "variables: {}" >> "$env_file"
-### TODO: ADJUST LINECOUNT
-    if ! [ "$(cat $env_file | wc -l)" == "23" ] ; then
+    if ! [ "$(cat $env_file | wc -l)" == "22" ] ; then
         echo "Error : could not successfully write default mysql properties to file $env_file" >&2
         return 1
     fi
@@ -89,6 +88,7 @@ function initialize_sling_command_line_functions() {
 
 function shutdown_sling_command_line_functions() {
     rm -f "$configured_sling_env_file_path"
+    rm -f "$configured_sling_env_dir_path/.sling"*
     rmdir "$configured_sling_env_dir_path"
     rm -f "$sling_database_exists_filepath"
     rm -f "$sling_database_table_list_filepath"
@@ -237,7 +237,8 @@ function clickhouse_database_exists() {
 
 function clickhouse_database_is_empty() {
     local database_name=$1
-    local statement="SELECT COUNT(*) FROM INFORMATION_SCHEMA.tables WHERE table_schema='$database_name'"
+    #local statement="SELECT COUNT(*) FROM INFORMATION_SCHEMA.tables WHERE table_schema='$database_name'"
+    local statement="SELECT COUNT(*) FROM system.tables WHERE database = '$database_name'"
     if ! execute_sql_statement_via_sling "$statement" "clickhouse" "$sling_database_table_list_filepath" ; then
         echo "Warning : unable to retrieve table/view list from database $database_name using : $statement" >&2
         return 1

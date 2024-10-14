@@ -25,9 +25,17 @@ unset mysql_source_database_name
 declare -A my_properties
 declare -a database_table_list
 declare -A table_has_been_copied_and_verified
+declare -A mysql_database_table_record_count
+mysql_table_record_count=""
 clickhouse_destination_database_name=""
 mysql_source_database_name=""
 database_table_list_filepath="$(pwd)/cmd_database_table_list.txt"
+mysql_table_record_count_filepath="$(pwd)/cmd_mysql_table_record_count.txt"
+clickhouse_table_record_count_filepath="$(pwd)/cmd_clickhouse_table_record_count.txt"
+copy_table_contents_with_sling_filepath="$(pwd)/cmd_copy_table_contents_with_sling.txt"
+clickhouse_is_responsive_filepath="$(pwd)/cmd_clickhouse_is_responsive.txt"
+SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
+SECONDS_BETWEEN_COPY_RETRY=$((15*60))
 
 function initialize_main() {
     if ! [ "$database_to_transfer" == "blue" ] && ! [ "$database_to_transfer" == "green" ] ; then
@@ -50,6 +58,27 @@ function initialize_main() {
         return 1
     fi
     remove_credentials_from_properties my_properties
+}
+
+function clickhouse_is_responding() {
+    local remaining_try_count=3
+    local statement="SELECT 1"
+    while [ $remaining_try_count -ne 0 ] ; do
+        if execute_sql_statement_via_sling "$statement" "clickhouse" "$clickhouse_is_responsive_filepath" ; then
+            unset sql_data_array
+            if set_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
+                local clickhouse_response=${sql_data_array[0]}
+                if [ "$clickhouse_response" == "1" ] ; then
+                    return 0
+                fi
+            fi
+        fi
+        remaining_try_count=$((remaining_try_count-1))
+        if [ $remaining_try_count -gt 0 ] ; then
+            sleep $SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+        fi
+    done
+    return 1
 }
 
 function destination_database_exists_and_is_empty() {
@@ -79,19 +108,66 @@ function set_database_table_list() {
     return 0
 }
 
+function set_mysql_table_record_count() {
+    local table_name=$1
+    local statement="SELECT count(*) FROM \`$table_name\`"
+    rm -f "$mysql_table_record_count_filepath"
+    if ! execute_sql_statement_via_sling "$statement" "mysql" "$mysql_table_record_count_filepath" ; then
+        echo "Warning : failed to execute mysql statement : $statement" >&2
+        return 1
+    fi
+    unset sql_data_array
+    if ! set_sql_data_array_from_file "$mysql_table_record_count_filepath" 0 ; then
+        return 1
+    fi
+    mysql_table_record_count=${sql_data_array[0]}
+    return 0
+    
+}
+
+function set_database_table_record_counts() {
+    local pos=0
+    while [ $pos -lt ${#database_table_list[@]} ] ; do
+        table_name="${database_table_list[$pos]}"
+        if ! set_mysql_table_record_count "$table_name" ; then
+            echo "Error : could not determine the record count for table $table_name, so validation is not possible."
+            return 1
+        fi
+        mysql_database_table_record_count[$table_name]=$mysql_table_record_count
+        pos=$(($pos+1))
+    done
+    return 0
+}
+
+function set_database_table_list_and_record_counts() {
+    set_database_table_list &&
+    set_database_table_record_counts
+}
+
 function delete_output_stream_files() {
+    #TODO : implement
+    rm -f "$mysql_table_record_count_filepath"
+    rm -f "$clickhouse_table_record_count_filepath"
+    rm -f "$copy_table_contents_with_sling_filepath"
+    rm -f "$clickhouse_is_responsive_filepath"
     return 0
 }
 
 function shutdown_main_and_clean_up() {
-    #TODO restore
     shutdown_sling_command_line_functions
     delete_output_stream_files
     unset my_properties
     unset database_table_list
     unset table_has_been_copied_and_verified
+    unset mysql_database_table_record_count
+    unset mysql_table_record_count
     unset database_table_list_filepath
-    unset record_count_comparison_filepath
+    unset mysql_table_record_count_filepath
+    unset clickhouse_table_record_count_filepath
+    unset copy_table_contents_with_sling_filepath
+    unset clickhouse_is_responsive_filepath
+    unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+    unset SECONDS_BETWEEN_COPY_RETRY
 }
 
 function successful_copy_verified_flag_has_been_set() {
@@ -108,6 +184,23 @@ function set_successful_copy_verified_flag() {
 }
 
 function destination_table_matches_source_table() {
+    local table_name=$1
+    local statement="SELECT COUNT(*) FROM \`$table_name\`"
+    rm -f "$database_table_list_filepath"
+    if ! execute_sql_statement_via_sling "$statement" "clickhouse" "$clickhouse_table_record_count_filepath" ; then
+        echo "Warning : failed to execute mysql statement : $statement" >&2
+        return 1
+    fi
+    unset sql_data_array
+    if ! set_sql_data_array_from_file "$clickhouse_table_record_count_filepath" 0 ; then
+        return 1
+    fi
+    local clickhouse_table_record_count=${sql_data_array[0]}
+    local mysql_table_record_count=${mysql_database_table_record_count[$table_name]}
+echo "comparing record counts for table $table_name : mysql=$mysql_table_record_count clickhouse=$clickhouse_table_record_count"
+    if [ "$clickhouse_table_record_count" != "$mysql_table_record_count" ] ; then
+        return 1
+    fi
     return 0
 }
 
@@ -118,10 +211,11 @@ function copy_all_database_tables_with_sling() {
         table_name="${database_table_list[$pos]}"
         if successful_copy_verified_flag_has_been_set "$table_name" ; then
             # table successfully copied on a previous pass
+            pos=$(($pos+1))
             continue
         fi
         echo "attempting to copy data in table $table_name using sling"
-        if ! transfer_table_data_via_sling "$mysql_source_database_name" "$clickhouse_destination_database_name" "$table_name" "TODOdeletefile" ; then
+        if ! transfer_table_data_via_sling "$mysql_source_database_name" "$clickhouse_destination_database_name" "$table_name" "$copy_table_contents_with_sling_filepath" ; then
             echo "Warning : failure to copy table $table_name" >&2
             exit_status=1 # any failed table copies cause an eventual failure status to be returned
         else
@@ -140,12 +234,13 @@ function copy_all_database_tables_with_sling() {
 function copy_all_database_tables_with_sling_allow_retry() {
     local remaining_try_count=3
     while [ $remaining_try_count -ne 0 ] ; do
-        #TODO record iteration start timestamp
         if copy_all_database_tables_with_sling ; then
             return 0
         fi
-        #TODO pause for the minimum try duration (5 minutes?)
         remaining_try_count=$((remaining_try_count-1))
+        if [ $remaining_try_count -gt 0 ] ; then
+            sleep $SECONDS_BETWEEN_COPY_RETRY
+        fi
     done
     return 1
 }
@@ -155,8 +250,9 @@ function main() {
     local database_to_transfer=$2
     local exit_status=0
     if ! initialize_main "$properties_filepath" "$database_to_transfer" ||
+            ! clickhouse_is_responding ||
             ! destination_database_exists_and_is_empty ||
-            ! set_database_table_list ||
+            ! set_database_table_list_and_record_counts ||
             ! copy_all_database_tables_with_sling_allow_retry ; then
         exit_status=1
     fi
