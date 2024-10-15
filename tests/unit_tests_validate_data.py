@@ -1897,14 +1897,23 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('mutations/data_mutations_ms.maf',
                                     validateData.MutationsExtendedValidator,
                                     extra_meta_fields={'swissprot_identifier': 'name'})
-        # we expect 1 warning
-        self.assertEqual(1, len(record_list))
+        # we expect 2 warnings
+        self.assertEqual(2, len(record_list))
 
         # Check warning message
-        self.assertEqual(logging.WARNING, record_list[0].levelno)
-        self.assertEqual(2, record_list[0].line_number)
-        self.assertEqual('test', record_list[0].cause)
-        self.assertEqual("Mutation_Status value is not in MAF format", record_list[0].getMessage())
+        record_iterator = iter(record_list)
+        record = next(record_iterator)
+        # Expected warning message due to value "test" in Mutation_Status
+        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(2, record.line_number)
+        self.assertEqual('test', record.cause)
+        self.assertEqual("Mutation_Status value is not in MAF format", record.getMessage())
+        # Expected warning message due to value "Germine" in Mutation_Status
+        record = next(record_iterator)
+        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(4, record.line_number)
+        self.assertEqual('Germline', record.cause)
+        self.assertEqual("GERMLINE variant identified from the Mutation_Status value. If this variant is not meant for public release, please remove it.", record.getMessage())
 
     def test_mutation_not_loaded_ms(self):
 
@@ -1916,7 +1925,8 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
                                     extra_meta_fields={'swissprot_identifier': 'name'})
 
         # We expect 5 info messages, 3 from not loaded mutations and 2 general lines
-        self.assertEqual(5, len(record_list))
+        # We expect 1 warning message for the germline variant 
+        self.assertEqual(6, len(record_list))
         record_iterator = iter(record_list)
         # Expected info message due to value "None" in Mutation_Status
         record = next(record_iterator)
@@ -1930,6 +1940,12 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(5, record.line_number)
         self.assertEqual('loh', record.cause)
         self.assertEqual("Mutation will not be loaded due to value in Mutation_Status", record.getMessage())
+        # Expected warning message due to value "Germline" in Mutation_Status
+        record = next(record_iterator)
+        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(7, record.line_number)
+        self.assertEqual('Germline', record.cause)
+        self.assertEqual("GERMLINE variant identified from the Mutation_Status value. If this variant is not meant for public release, please remove it.", record.getMessage())
         # Expected info message due to value "Wildtype" in Mutation_Status
         record = next(record_iterator)
         self.assertEqual(logging.INFO, record.levelno)
