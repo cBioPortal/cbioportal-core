@@ -17,12 +17,9 @@ unset this_script_dir
 unset my_properties
 unset update_management_database_name
 update_management_database_name=""
-unset database_currently_in_production
-database_currently_in_production=""
 declare -A my_properties
 record_count_filepath="$(pwd)/update_status_record_count.txt"
 update_status_filepath="$(pwd)/update_status.txt"
-current_production_database_filepath="$(pwd)/current_production_database.txt"
 
 function usage() {
     echo "usage: set_update_process_state.sh properties_filepath state" >&2
@@ -54,7 +51,6 @@ function initialize_main() {
 function delete_output_stream_files() {
     rm -f "$record_count_filepath"
     rm -f "$update_status_filepath"
-    rm -f "$current_production_database_filepath"
 }
 
 function shutdown_main_and_clean_up() {
@@ -63,7 +59,6 @@ function shutdown_main_and_clean_up() {
     unset my_properties
     unset record_count_filepath
     unset update_status_filepath
-    unset current_production_database_filepath
 }
 
 function process_state_table_is_valid() {
@@ -127,35 +122,15 @@ function set_state_in_status_table() {
     return 0
 }
  
-function set_database_currently_in_production() {
-    local get_current_database_statement="SELECT current_database_in_production FROM \`$update_management_database_name\`.update_status;"
-    if ! execute_sql_statement_via_mysql "$get_current_database_statement" "$current_production_database_filepath" ; then
-        echo "Error : could not retrieve the current database in production. Mysql statement failed to execute properly : $get_current_database_statement" >&2
-        return 1
-    fi
-    set_sql_data_array_from_file "$current_production_database_filepath" 0
-    database_currently_in_production="${sql_data_array[0]}"
-    return 0
-}
-
-function output_database_currently_in_production() {
-    local state=$1
-    if [ "$state" == "running" ] ; then
-        echo "$database_currently_in_production : current production database"
-    fi
-}
-
 function main() {
     local properties_filepath=$1
     local state=$2
     local exit_status=0
     if ! initialize_main "$properties_filepath" "$state" ||
             ! process_state_table_is_valid ||
-            ! set_database_currently_in_production ||
             ! set_state_in_status_table "$state" ; then
         exit_status=1
     fi
-    output_database_currently_in_production "$state"
     shutdown_main_and_clean_up
     return $exit_status
 }
