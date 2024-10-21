@@ -2397,6 +2397,9 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
         if value.lower() not in ['none', 'germline', 'somatic', 'loh', 'post-transcriptional modification', 'unknown', 'wildtype'] and value != '':
             self.logger.warning('Mutation_Status value is not in MAF format',
                                 extra={'line_number': self.line_number, 'cause': value})
+        if value.lower() == 'germline':
+            self.logger.warning('GERMLINE variant identified from the Mutation_Status value. If this variant is not meant for public release, please remove it.',
+                                extra={'line_number': self.line_number, 'cause': value})
         return True
 
 class ClinicalValidator(Validator):
@@ -3216,6 +3219,10 @@ class StructuralVariantValidator(CustomNamespacesValidator):
             if sv_status is None:
                 self.logger.warning('No value in SV_Status, assuming the variant is SOMATIC',
                                   extra={'line_number': self.line_number})
+            elif sv_status.lower() == 'germline':
+                self.logger.warning('GERMLINE variant identified from the SV_Status value. If this variant is not meant for public release, please remove it.',
+                                  extra={'line_number': self.line_number,
+                                         'cause': sv_status})
             else:
                 if not sv_status.lower() in ['somatic', 'germline']:
                     self.logger.error('Invalid SV_Status value: possible values are [SOMATIC, GERMLINE]',
