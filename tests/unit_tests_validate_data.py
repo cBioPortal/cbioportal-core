@@ -2023,8 +2023,14 @@ class StructuralVariantValidationTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_structural_variants_missing_values.txt',
                                     validateData.StructuralVariantValidator)
-        self.assertEqual(2, len(record_list))
+        self.assertEqual(3, len(record_list))
         record_iterator = iter(record_list)
+
+        # Expected first error due to a SV_Status being empty
+        record = next(record_iterator)
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual(3, record.line_number)
+        self.assertIn("Invalid SV_Status value: possible values are [SOMATIC, GERMLINE]", record.message)
 
         # Expected ERROR message due to missing Entrez gene id and/or gene symbol at site 1 and site 2
         record = next(record_iterator)
