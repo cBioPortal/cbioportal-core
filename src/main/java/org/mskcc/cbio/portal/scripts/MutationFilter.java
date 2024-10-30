@@ -32,7 +32,6 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -55,11 +54,26 @@ public class MutationFilter {
    private int unknownAccepts=0;
    public int decisions=0;
    private int mutationStatusNoneRejects=0;
+   private int invalidChromosome=0;
    private int lohOrWildTypeRejects=0;
    private int emptyAnnotationRejects=0;
    private int missenseGermlineRejects=0;
    private int redactedRejects=0;
    public Map<String,Integer> rejectionMap = new HashMap<String, Integer>();
+
+   private static final Map<String,String> VALID_CHR_VALUES = new HashMap<>();
+   static {
+       for (int lc = 1; lc<=24; lc++) {
+           VALID_CHR_VALUES.put(Integer.toString(lc),Integer.toString(lc));
+           VALID_CHR_VALUES.put("CHR" + Integer.toString(lc),Integer.toString(lc));
+       }
+       VALID_CHR_VALUES.put("X","23");
+       VALID_CHR_VALUES.put("CHRX","23");
+       VALID_CHR_VALUES.put("Y","24");
+       VALID_CHR_VALUES.put("CHRY","24");
+       VALID_CHR_VALUES.put("NA","NA");
+       VALID_CHR_VALUES.put("MT","MT"); // mitochondria
+   }
 
    /**
     * Construct a MutationFilter with no white lists. 
@@ -104,7 +118,11 @@ public class MutationFilter {
          | Translation_Start_Site | 
          +------------------------+
        */
-      
+      // Do not accept mutations with invalid chromosome symbol
+      if (normalizeChr(mutation.getChr()) ==  null) {
+          invalidChromosome++;
+          return false;
+      }
       // Do not accept mutations with Mutation_Status of None
       if (safeStringTest( mutation.getMutationStatus(), "None" )) {
           mutationStatusNoneRejects++;
@@ -160,7 +178,14 @@ public class MutationFilter {
          return true;
       }
    }
-   
+
+   public static String normalizeChr(String strChr) {
+       if (strChr == null) {
+           return null;
+       }
+       return VALID_CHR_VALUES.get(strChr.toUpperCase());
+   }
+
    /**
     * Provide number of decisions made by this MutationFilter.
     * @return the number of decisions made by this MutationFilter
@@ -221,7 +246,11 @@ public class MutationFilter {
       return this.somaticWhitelistAccepts;
    }
 
-   /**
+   public int getInvalidChromosome() {
+       return invalidChromosome;
+   }
+
+    /**
     * Provide number of unknown whitelist ACCEPT (return true) decisions made by this MutationFilter.
     * @return the number of unknown ACCEPT (return true) decisions made by this MutationFilter
     */

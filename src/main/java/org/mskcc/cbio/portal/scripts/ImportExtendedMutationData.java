@@ -222,14 +222,6 @@ public class ImportExtendedMutationData {
                     processedSamples.add(sample.getInternalId());
                 }
 
-                String chr = DaoGeneOptimized.normalizeChr(record.getChr().toUpperCase());
-                if (chr==null) {
-                    ProgressMonitor.logWarning("Skipping entry with chromosome value: " + record.getChr());
-                    entriesSkipped++;
-                    continue;
-                }
-                record.setChr(chr);
-
                 if (record.getStartPosition() < 0)
                     record.setStartPosition(0);
 
