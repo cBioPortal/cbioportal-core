@@ -222,16 +222,6 @@ public class ImportExtendedMutationData {
                     processedSamples.add(sample.getInternalId());
                 }
 
-                String validationStatus = record.getValidationStatus();
-
-                if (validationStatus == null ||
-                    validationStatus.equalsIgnoreCase("Wildtype"))
-                {
-                    ProgressMonitor.logWarning("Skipping entry with Validation_Status: Wildtype");
-                    entriesSkipped++;
-                    continue;
-                }
-
                 String chr = DaoGeneOptimized.normalizeChr(record.getChr().toUpperCase());
                 if (chr==null) {
                     ProgressMonitor.logWarning("Skipping entry with chromosome value: " + record.getChr());
