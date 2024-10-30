@@ -154,13 +154,14 @@ public class MutationFilter {
               return true;
           }
       } else {
-          // Do not accept Silent, Intronic, 3'UTR, 5'UTR or IGR Mutations
+          // Do not accept Silent, Intronic, 3'UTR, 5'UTR, IGR or RNA Mutations
           if( safeStringTest( mutation.getMutationType(), "Silent" ) ||
                    safeStringTest( mutation.getMutationType(), "Intron" ) ||
                    safeStringTest( mutation.getMutationType(), "3'UTR" ) ||
                    safeStringTest( mutation.getMutationType(), "3'Flank" ) ||
                    safeStringTest( mutation.getMutationType(), "5'UTR" ) ||
-                   safeStringTest( mutation.getMutationType(), "IGR") ){
+                   safeStringTest( mutation.getMutationType(), "IGR" ) ||
+                   safeStringTest( mutation.getMutationType(), "RNA")){
               addRejectedVariant(rejectionMap, mutation.getMutationType());
               return false;
           }

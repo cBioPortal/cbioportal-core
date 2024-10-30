@@ -172,39 +172,15 @@ public class ExtendedMutationUtil {
         return !invalid;
     }
 
-    public static boolean isAcceptableMutation(String mutationType) {
-        // check for null or NA values
-        if (mutationType == null ||
-                mutationType.length() == 0 ||
-                mutationType.equals("NULL") ||
-                mutationType.equals(TabDelimitedFileUtil.NA_STRING)) {
-            return false;
-        }
-
-        // check for the type
-        boolean silent = mutationType.toLowerCase().startsWith("silent");
-        boolean loh = mutationType.toLowerCase().startsWith("loh");
-        boolean wildtype = mutationType.toLowerCase().startsWith("wildtype");
-        boolean utr3 = mutationType.toLowerCase().startsWith("3'utr");
-        boolean utr5 = mutationType.toLowerCase().startsWith("5'utr");
-        boolean flank5 = mutationType.toLowerCase().startsWith("5'flank");
-        boolean igr = mutationType.toLowerCase().startsWith("igr");
-        boolean rna = mutationType.equalsIgnoreCase("rna");
-
-        return !(silent || loh || wildtype || utr3 || utr5 || flank5 || igr || rna);
+    public static String getMutationType(MafRecord record) {
+        return isBlank(record.getVariantClassification()) ? record.getMafVariantClassification() : record.getVariantClassification();
     }
 
-    public static String getMutationType(MafRecord record) {
-        String mutationType = record.getMafVariantClassification();
-
-        if (mutationType == null ||
-                mutationType.length() == 0 ||
-                mutationType.equals("NULL") ||
-                mutationType.equals(TabDelimitedFileUtil.NA_STRING)) {
-            mutationType = record.getVariantClassification();
-        }
-
-        return mutationType;
+    private static boolean isBlank(String value) {
+        return value == null ||
+                value.length() == 0 ||
+                value.equals("NULL") ||
+                value.equals(TabDelimitedFileUtil.NA_STRING);
     }
 
     public static Integer getTumorAltCount(MafRecord record) {

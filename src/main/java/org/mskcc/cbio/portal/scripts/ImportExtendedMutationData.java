@@ -228,48 +228,17 @@ public class ImportExtendedMutationData {
                 if (record.getEndPosition() < 0)
                     record.setEndPosition(0);
 
-                String mutationType,
-                    proteinChange,
-                    aaChange,
-                    codonChange,
-                    refseqMrnaId,
-                    uniprotAccession;
-
-                int proteinPosStart,
-                    proteinPosEnd;
-
-                // determine whether to use canonical or best effect transcript
-
-                // try canonical first
-                if (ExtendedMutationUtil.isAcceptableMutation(record.getVariantClassification()))
-                {
-                    mutationType = record.getVariantClassification();
-                }
-                // if not acceptable either, use the default value
-                else
-                {
-                    mutationType = ExtendedMutationUtil.getMutationType(record);
-                }
-
-                // skip RNA mutations
-                if (mutationType != null && mutationType.equalsIgnoreCase("rna"))
-                {
-                    ProgressMonitor.logWarning("Skipping entry with mutation type: RNA");
-                    entriesSkipped++;
-                    continue;
-                }
-
-                proteinChange = ExtendedMutationUtil.getProteinChange(parts, record);
+                String proteinChange = ExtendedMutationUtil.getProteinChange(parts, record);
                 //proteinChange = record.getProteinChange();
-                aaChange = record.getAminoAcidChange();
-                codonChange = record.getCodons();
-                refseqMrnaId = record.getRefSeq();
+                String aaChange = record.getAminoAcidChange();
+                String codonChange = record.getCodons();
+                String refseqMrnaId = record.getRefSeq();
                 //always uniprot accession
-                uniprotAccession = record.getSwissprot();
+                String uniprotAccession = record.getSwissprot();
                 
-                proteinPosStart = ExtendedMutationUtil.getProteinPosStart(
+                int proteinPosStart = ExtendedMutationUtil.getProteinPosStart(
                         record.getProteinPosition(), proteinChange);
-                proteinPosEnd = ExtendedMutationUtil.getProteinPosEnd(
+                int proteinPosEnd = ExtendedMutationUtil.getProteinPosEnd(
                         record.getProteinPosition(), proteinChange);
 
                 //  Assume we are dealing with Entrez Gene Ids (this is the best / most stable option)
@@ -313,13 +282,13 @@ public class ImportExtendedMutationData {
                     gene = daoGene.getNonAmbiguousGene(geneSymbol, true);
                 }
 
+                String mutationType = ExtendedMutationUtil.getMutationType(record);
                 // assume symbol=Unknown and entrez=0 (or missing Entrez column) to imply an
                 // intergenic, irrespective of what the column Variant_Classification says
                 if (geneSymbol.equals("Unknown") &&
                         (entrezIdString.equals("0") || mafUtil.getEntrezGeneIdIndex() == -1)) {
                     // give extra warning if mutationType is something different from IGR:
-                    if (mutationType != null &&
-                            !mutationType.equalsIgnoreCase("IGR")) {
+                    if (!"IRG".equalsIgnoreCase(mutationType)) {
                         ProgressMonitor.logWarning(
                             "Treating mutation with gene symbol 'Unknown' " +
                             (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene ID 0") + " as intergenic ('IGR') " +
