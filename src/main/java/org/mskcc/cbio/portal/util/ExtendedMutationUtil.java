@@ -173,14 +173,7 @@ public class ExtendedMutationUtil {
     }
 
     public static String getMutationType(MafRecord record) {
-        return isBlank(record.getVariantClassification()) ? record.getMafVariantClassification() : record.getVariantClassification();
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null ||
-                value.length() == 0 ||
-                value.equals("NULL") ||
-                value.equals(TabDelimitedFileUtil.NA_STRING);
+        return TsvUtil.isBlank(record.getVariantClassification()) ? record.getMafVariantClassification() : record.getVariantClassification();
     }
 
     public static Integer getTumorAltCount(MafRecord record) {

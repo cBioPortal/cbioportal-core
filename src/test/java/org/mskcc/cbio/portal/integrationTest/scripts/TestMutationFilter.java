@@ -35,6 +35,7 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -77,7 +78,7 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                true, 
-               4L, 
+               "2",
                "Unknown",        // validationStatus,
                "Unknown",        // mutationStatus,
                "Unknown"         // mutationType
@@ -87,7 +88,7 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                true, 
-               4L, 
+               "3",
                "Valid",        // validationStatus,
                "Unknown",        // mutationStatus,
                "Unknown"         // mutationType
@@ -97,28 +98,28 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                true, 
-               4L, 
+               "4",
                "Unknown",        // validationStatus,
                "Somatic",        // mutationStatus,
                "Unknown"         // mutationType
             );
 
       // valid && somatic
-      nowTestAcceptMutation( 
+       nowTestAcceptMutation(
                myMutationFilter,
-               true, 
-               4L, 
+               true,
+               "5",
                "Valid",        // validationStatus,
                "Somatic",        // mutationStatus,
                "Unknown"         // mutationType
-            );
+       );
 
       // valid && somatic
       // testing safeStringTest()
       nowTestAcceptMutation( 
                myMutationFilter,
                true, 
-               4L, 
+               "6",
                "vALid_as_hell",        // validationStatus,
                "SOMatic_for_sure",        // mutationStatus,
                "Unknown"         // mutationType
@@ -130,22 +131,20 @@ public class TestMutationFilter {
     private void nowTestAcceptMutation(
             MutationFilter myMutationFilter,
             boolean expectedResult,
-            long entrezGeneId,
+            String chr,
             String validationStatus,
             String mutationStatus,
             String mutationType
     ) {
-        CanonicalGene gene = new CanonicalGene(entrezGeneId, "XXX");
-        ExtendedMutation anExtendedMutation = new ExtendedMutation(
-                gene,                   // gene,
-                validationStatus,       // validationStatus,
-                mutationStatus,         // mutationStatus,
-                mutationType            // mutationType
-        );
+        MafRecord mafRecord = new MafRecord();
+        mafRecord.setChr(chr);
+        mafRecord.setValidationStatus(validationStatus);
+        mafRecord.setMutationStatus(mutationStatus);
+        mafRecord.setVariantClassification(mutationType);
         if (expectedResult) {
-            assertTrue(myMutationFilter.acceptMutation(anExtendedMutation, null));
+            assertTrue(myMutationFilter.acceptMutation(mafRecord, null));
         } else {
-            assertFalse(myMutationFilter.acceptMutation(anExtendedMutation, null));
+            assertFalse(myMutationFilter.acceptMutation(mafRecord, null));
         }
     }
    
@@ -155,7 +154,7 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                false, 
-               1L, 
+               "1",
                "Unknown",
                "Unknown",
                "Silent"
@@ -163,7 +162,7 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                false, 
-               1L, 
+               "2",
                "Unknown",
                "Unknown",
                "Intron"
@@ -171,7 +170,7 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                false, 
-               1L, 
+               "3",
                "Unknown",
                "LOH",
                "Unknown"
@@ -179,11 +178,19 @@ public class TestMutationFilter {
       nowTestAcceptMutation( 
                myMutationFilter,
                false, 
-               1L, 
+               "4",
                "Unknown",
                "Wildtype",
                "Unknown"
             );
+      nowTestAcceptMutation(
+              myMutationFilter,
+              false,
+              "28",
+              "Valid",
+              "Somatic",
+              "Unknown"
+      );
       
    }
    

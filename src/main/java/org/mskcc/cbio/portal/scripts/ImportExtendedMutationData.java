@@ -197,6 +197,10 @@ public class ImportExtendedMutationData {
             {
                 String[] parts = TsvUtil.splitTsvLine(line);
                 MafRecord record = mafUtil.parseRecord(line);
+                if (!myMutationFilter.acceptMutation(record, this.filteredMutations)) {
+                    entriesSkipped++;
+                    continue;
+                }
 
                 if (!record.getNcbiBuild().equalsIgnoreCase(genomeBuildName)) {
                     ProgressMonitor.logWarning("Genome Build Name does not match, expecting " + genomeBuildName);
@@ -311,118 +315,111 @@ public class ImportExtendedMutationData {
                             "and all mutation data associated with it!");
                     entriesSkipped++;
                     continue;
-                } else {
-                    ExtendedMutation mutation = new ExtendedMutation();
-
-                    mutation.setGeneticProfileId(geneticProfileId);
-                    mutation.setSampleId(sample.getInternalId());
-                    mutation.setGene(gene);
-                    mutation.setSequencingCenter(record.getCenter());
-                    mutation.setSequencer(record.getSequencer());
-                    mutation.setProteinChange(proteinChange);
-                    mutation.setAminoAcidChange(aaChange);
-                    mutation.setMutationType(mutationType);
-                    mutation.setChr(record.getChr());
-                    mutation.setStartPosition(record.getStartPosition());
-                    mutation.setEndPosition(record.getEndPosition());
-                    mutation.setValidationStatus(record.getValidationStatus());
-                    mutation.setMutationStatus(record.getMutationStatus());
-                    mutation.setNcbiBuild(record.getNcbiBuild());
-                    mutation.setStrand(record.getStrand());
-                    mutation.setVariantType(record.getVariantType());
-                    mutation.setAllele(record.getTumorSeqAllele1(), record.getTumorSeqAllele2(), record.getReferenceAllele());
-                    // log whether tumor seq allele is empty (failed to resolve tumor seq allele because of invalid data values)
-                    if (mutation.getTumorSeqAllele().isEmpty()) {
-                        ProgressMonitor.logWarning("Tumor allele could not be resolved for sample '" + sample.getStableId() +
-                            "' (chr,start,end,ref,tum1,tum2) = (" + record.getChr() + "," + record.getStartPosition() + "," +
-                            record.getEndPosition() + "," + record.getReferenceAllele() + "," + record.getTumorSeqAllele1() +
-                            "," + record.getTumorSeqAllele2() + ")");
-                    }
-                    mutation.setDbSnpRs(record.getDbSNP_RS());
-                    mutation.setDbSnpValStatus(record.getDbSnpValStatus());
-                    mutation.setMatchedNormSampleBarcode(record.getMatchedNormSampleBarcode());
-                    mutation.setMatchNormSeqAllele1(record.getMatchNormSeqAllele1());
-                    mutation.setMatchNormSeqAllele2(record.getMatchNormSeqAllele2());
-                    mutation.setTumorValidationAllele1(record.getTumorValidationAllele1());
-                    mutation.setTumorValidationAllele2(record.getTumorValidationAllele2());
-                    mutation.setMatchNormValidationAllele1(record.getMatchNormValidationAllele1());
-                    mutation.setMatchNormValidationAllele2(record.getMatchNormValidationAllele2());
-                    mutation.setVerificationStatus(record.getVerificationStatus());
-                    mutation.setSequencingPhase(record.getSequencingPhase());
-                    mutation.setSequenceSource(record.getSequenceSource());
-                    mutation.setValidationMethod(record.getValidationMethod());
-                    mutation.setScore(record.getScore());
-                    mutation.setBamFile(record.getBamFile());
-                    mutation.setTumorAltCount(ExtendedMutationUtil.getTumorAltCount(record));
-                    mutation.setTumorRefCount(ExtendedMutationUtil.getTumorRefCount(record));
-                    mutation.setNormalAltCount(ExtendedMutationUtil.getNormalAltCount(record));
-                    mutation.setNormalRefCount(ExtendedMutationUtil.getNormalRefCount(record));
-
-                    //  renamed the oncotator column names to mutation
-                    mutation.setCodonChange(codonChange);
-                    mutation.setRefseqMrnaId(refseqMrnaId);
-                    mutation.setUniprotAccession(uniprotAccession);
-                    mutation.setProteinPosStart(proteinPosStart);
-                    mutation.setProteinPosEnd(proteinPosEnd);
-
-                    mutation.setDriverFilter(record.getDriverFilter());
-                    mutation.setDriverFilterAnn(record.getDriverFilterAnn());
-                    mutation.setDriverTiersFilter(record.getDriverTiersFilter());
-                    mutation.setDriverTiersFilterAnn(record.getDriverTiersFilterAnn());
-
-                    // TODO we don't use this info right now...
-                    mutation.setCanonicalTranscript(true);
-
-                    AlleleSpecificCopyNumber ascn = null;
-                    if (namespaces != null && namespaces.contains(ASCN_NAMESPACE)) {
-                        Map<String, Object> ascnData = record.getNamespacesMap().remove(ASCN_NAMESPACE);
-                        // The AlleleSpecificCopyNumber constructor will construct the record from
-                        // the ascnData hashmap and the ascnData will simultaneously be removed from
-                        // the record's namespaces map since it is going into its own table
-                        ascn = new AlleleSpecificCopyNumber(ascnData);
-                    }
-                    mutation.setAnnotationJson(
-                        mafUtil.getNamespaceColumnParser().writeValueAsString(record.getNamespacesMap())
-                    );
-
-                    sequencedCaseSet.add(sample.getStableId());
-
-                    //  Filter out Mutations
-                    if( myMutationFilter.acceptMutation( mutation, this.filteredMutations )) {
-                        MutationEvent event =
-                            existingEvents.containsKey(mutation.getEvent()) ?
-                            existingEvents.get(mutation.getEvent()) :
-                            DaoMutation.getMutationEvent(mutation.getEvent());
-                        if (event!=null) {
-                            mutation.setEvent(event);
-                        } else {
-                            mutation.setMutationEventId(++mutationEventId);
-                            existingEvents.put(mutation.getEvent(), mutation.getEvent());
-                            newEvents.add(mutation.getEvent());
-                        }
-
-                        ExtendedMutation exist = mutations.get(mutation);
-                        if (exist!=null) {
-                            ExtendedMutation merged = mergeMutationData(exist, mutation);
-                            mutations.put(merged, merged);
-                        } else {
-                            mutations.put(mutation,mutation);
-                        }
-                        // update ascn object with mutation unique key details
-                        if (ascn != null){
-                            ascn.updateAscnUniqueKeyDetails(mutation);
-                            ascnRecords.add(ascn);
-                        }
-
-                        //keep track:
-                        sampleSet.add(sample.getStableId());
-                        internalSampleIds.add(sample.getInternalId());
-                        geneSet.add(mutation.getEntrezGeneId()+"");
-                    }
-                    else {
-                        entriesSkipped++;
-                    }
                 }
+                ExtendedMutation mutation = new ExtendedMutation();
+
+                mutation.setGeneticProfileId(geneticProfileId);
+                mutation.setSampleId(sample.getInternalId());
+                mutation.setGene(gene);
+                mutation.setSequencingCenter(record.getCenter());
+                mutation.setSequencer(record.getSequencer());
+                mutation.setProteinChange(proteinChange);
+                mutation.setAminoAcidChange(aaChange);
+                mutation.setMutationType(mutationType);
+                mutation.setChr(record.getChr());
+                mutation.setStartPosition(record.getStartPosition());
+                mutation.setEndPosition(record.getEndPosition());
+                mutation.setValidationStatus(record.getValidationStatus());
+                mutation.setMutationStatus(record.getMutationStatus());
+                mutation.setNcbiBuild(record.getNcbiBuild());
+                mutation.setStrand(record.getStrand());
+                mutation.setVariantType(record.getVariantType());
+                mutation.setAllele(record.getTumorSeqAllele1(), record.getTumorSeqAllele2(), record.getReferenceAllele());
+                // log whether tumor seq allele is empty (failed to resolve tumor seq allele because of invalid data values)
+                if (mutation.getTumorSeqAllele().isEmpty()) {
+                    ProgressMonitor.logWarning("Tumor allele could not be resolved for sample '" + sample.getStableId() +
+                        "' (chr,start,end,ref,tum1,tum2) = (" + record.getChr() + "," + record.getStartPosition() + "," +
+                        record.getEndPosition() + "," + record.getReferenceAllele() + "," + record.getTumorSeqAllele1() +
+                        "," + record.getTumorSeqAllele2() + ")");
+                }
+                mutation.setDbSnpRs(record.getDbSNP_RS());
+                mutation.setDbSnpValStatus(record.getDbSnpValStatus());
+                mutation.setMatchedNormSampleBarcode(record.getMatchedNormSampleBarcode());
+                mutation.setMatchNormSeqAllele1(record.getMatchNormSeqAllele1());
+                mutation.setMatchNormSeqAllele2(record.getMatchNormSeqAllele2());
+                mutation.setTumorValidationAllele1(record.getTumorValidationAllele1());
+                mutation.setTumorValidationAllele2(record.getTumorValidationAllele2());
+                mutation.setMatchNormValidationAllele1(record.getMatchNormValidationAllele1());
+                mutation.setMatchNormValidationAllele2(record.getMatchNormValidationAllele2());
+                mutation.setVerificationStatus(record.getVerificationStatus());
+                mutation.setSequencingPhase(record.getSequencingPhase());
+                mutation.setSequenceSource(record.getSequenceSource());
+                mutation.setValidationMethod(record.getValidationMethod());
+                mutation.setScore(record.getScore());
+                mutation.setBamFile(record.getBamFile());
+                mutation.setTumorAltCount(ExtendedMutationUtil.getTumorAltCount(record));
+                mutation.setTumorRefCount(ExtendedMutationUtil.getTumorRefCount(record));
+                mutation.setNormalAltCount(ExtendedMutationUtil.getNormalAltCount(record));
+                mutation.setNormalRefCount(ExtendedMutationUtil.getNormalRefCount(record));
+
+                //  renamed the oncotator column names to mutation
+                mutation.setCodonChange(codonChange);
+                mutation.setRefseqMrnaId(refseqMrnaId);
+                mutation.setUniprotAccession(uniprotAccession);
+                mutation.setProteinPosStart(proteinPosStart);
+                mutation.setProteinPosEnd(proteinPosEnd);
+
+                mutation.setDriverFilter(record.getDriverFilter());
+                mutation.setDriverFilterAnn(record.getDriverFilterAnn());
+                mutation.setDriverTiersFilter(record.getDriverTiersFilter());
+                mutation.setDriverTiersFilterAnn(record.getDriverTiersFilterAnn());
+
+                // TODO we don't use this info right now...
+                mutation.setCanonicalTranscript(true);
+
+                AlleleSpecificCopyNumber ascn = null;
+                if (namespaces != null && namespaces.contains(ASCN_NAMESPACE)) {
+                    Map<String, Object> ascnData = record.getNamespacesMap().remove(ASCN_NAMESPACE);
+                    // The AlleleSpecificCopyNumber constructor will construct the record from
+                    // the ascnData hashmap and the ascnData will simultaneously be removed from
+                    // the record's namespaces map since it is going into its own table
+                    ascn = new AlleleSpecificCopyNumber(ascnData);
+                }
+                mutation.setAnnotationJson(
+                    mafUtil.getNamespaceColumnParser().writeValueAsString(record.getNamespacesMap())
+                );
+
+                sequencedCaseSet.add(sample.getStableId());
+
+                MutationEvent event =
+                    existingEvents.containsKey(mutation.getEvent()) ?
+                    existingEvents.get(mutation.getEvent()) :
+                    DaoMutation.getMutationEvent(mutation.getEvent());
+                if (event!=null) {
+                    mutation.setEvent(event);
+                } else {
+                    mutation.setMutationEventId(++mutationEventId);
+                    existingEvents.put(mutation.getEvent(), mutation.getEvent());
+                    newEvents.add(mutation.getEvent());
+                }
+
+                ExtendedMutation exist = mutations.get(mutation);
+                if (exist!=null) {
+                    ExtendedMutation merged = mergeMutationData(exist, mutation);
+                    mutations.put(merged, merged);
+                } else {
+                    mutations.put(mutation,mutation);
+                }
+                // update ascn object with mutation unique key details
+                if (ascn != null){
+                    ascn.updateAscnUniqueKeyDetails(mutation);
+                    ascnRecords.add(ascn);
+                }
+
+                //keep track:
+                sampleSet.add(sample.getStableId());
+                internalSampleIds.add(sample.getInternalId());
+                geneSet.add(mutation.getEntrezGeneId()+"");
             }
         }
         DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);

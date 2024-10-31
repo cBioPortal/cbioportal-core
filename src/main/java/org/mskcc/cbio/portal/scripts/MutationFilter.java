@@ -37,7 +37,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.mskcc.cbio.maf.MafRecord;
+import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
+import org.mskcc.cbio.portal.util.ExtendedMutationUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
  * Filter mutations as they're imported into the CGDS dbms.
@@ -89,15 +93,15 @@ public class MutationFilter {
    }
    
    /**
-    * Indicate whether the specified mutation should be accepted as input to
+    * Indicate whether the specified mafRecord should be accepted as input to
     * the CGDS Database.
     * <p>
-    * @param mutation
-    *           an ExtendedMutation.
+    * @param mafRecord
+    *           a MAF line/record.
     * <br>
-    * @return true if the mutation should be imported into the dbms
+    * @return true if the mafRecord should be imported into the dbms
     */
-   public boolean acceptMutation(ExtendedMutation mutation, Set<String> filteredMutations) {
+   public boolean acceptMutation(MafRecord mafRecord, Set<String> filteredMutations) {
       this.decisions++;
       
       /*
@@ -119,58 +123,59 @@ public class MutationFilter {
          +------------------------+
        */
       // Do not accept mutations with invalid chromosome symbol
-      if (normalizeChr(mutation.getChr()) ==  null) {
+      if (normalizeChr(mafRecord.getChr()) ==  null) {
           invalidChromosome++;
           return false;
       }
       // Do not accept mutations with Mutation_Status of None
-      if (safeStringTest( mutation.getMutationStatus(), "None" )) {
+      if (safeStringTest( mafRecord.getMutationStatus(), "None" )) {
           mutationStatusNoneRejects++;
           return false;
       }
       
       // Do not accept LOH or Wildtype Mutations
-      if( safeStringTest( mutation.getMutationStatus(), "LOH" ) ||
-               safeStringTest( mutation.getMutationStatus(), "Wildtype" ) ){
+      if( safeStringTest( mafRecord.getMutationStatus(), "LOH" ) ||
+               safeStringTest( mafRecord.getMutationStatus(), "Wildtype" ) ){
          lohOrWildTypeRejects++;
          return false;
       }
       
       // Do not accept Redacted mutations
-      if (safeStringTest(mutation.getValidationStatus(), "Redacted")) {
+      if (safeStringTest(mafRecord.getValidationStatus(), "Redacted")) {
           redactedRejects++;
           return false;
       }
       
       //Filter by types if specified in the meta file, else filter for the default types
+      String mutationType = ExtendedMutationUtil.getMutationType(mafRecord);
       if (filteredMutations != null) {
-          if (filteredMutations.contains(mutation.getMutationType())) {
-              addRejectedVariant(rejectionMap, mutation.getMutationType());
+          if (filteredMutations.contains(mutationType)) {
+              addRejectedVariant(rejectionMap, mutationType);
               return false;
           } else {
-              if( safeStringTest( mutation.getMutationType(), "5'Flank" ) ) {
-                  mutation.setProteinChange("Promoter");
+              if( safeStringTest( mutationType, "5'Flank" ) ) {
+                  mafRecord.setProteinChange("Promoter");
               }
               return true;
           }
       } else {
           // Do not accept Silent, Intronic, 3'UTR, 5'UTR, IGR or RNA Mutations
-          if( safeStringTest( mutation.getMutationType(), "Silent" ) ||
-                   safeStringTest( mutation.getMutationType(), "Intron" ) ||
-                   safeStringTest( mutation.getMutationType(), "3'UTR" ) ||
-                   safeStringTest( mutation.getMutationType(), "3'Flank" ) ||
-                   safeStringTest( mutation.getMutationType(), "5'UTR" ) ||
-                   safeStringTest( mutation.getMutationType(), "IGR" ) ||
-                   safeStringTest( mutation.getMutationType(), "RNA")){
-              addRejectedVariant(rejectionMap, mutation.getMutationType());
+          if( safeStringTest( mutationType, "Silent" ) ||
+                   safeStringTest( mutationType, "Intron" ) ||
+                   safeStringTest( mutationType, "3'UTR" ) ||
+                   safeStringTest( mutationType, "3'Flank" ) ||
+                   safeStringTest( mutationType, "5'UTR" ) ||
+                   safeStringTest( mutationType, "IGR" ) ||
+                   safeStringTest( mutationType, "RNA")){
+              addRejectedVariant(rejectionMap, mutationType);
               return false;
           }
           
-          if( safeStringTest( mutation.getMutationType(), "5'Flank" ) ) { 
-                if (whiteListGenesForPromoterMutations.contains(mutation.getEntrezGeneId())){
-                      mutation.setProteinChange("Promoter");
+          if( safeStringTest( mutationType, "5'Flank" ) ) {
+                if (whiteListGenesForPromoterMutations.contains(mafRecord.getGivenEntrezGeneId())){
+                      mafRecord.setProteinChange("Promoter");
                 } else {
-                    addRejectedVariant(rejectionMap, mutation.getMutationType());
+                    addRejectedVariant(rejectionMap, mutationType);
                     return false;
                 }
           }
