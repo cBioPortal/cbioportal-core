@@ -394,4 +394,26 @@ public class ExtendedMutationUtil {
         annotation.put("end", end);
         return annotation;
     }
+
+    public static Long parseEntrezGeneId(String givenEntrezGeneId) {
+        if (isBlankEntrezGeneId(givenEntrezGeneId)) {
+            return null;
+        }
+        return Long.parseLong(givenEntrezGeneId);
+    }
+
+    public static boolean isBlankEntrezGeneId(String givenEntrezGeneId) {
+        return givenEntrezGeneId == null || givenEntrezGeneId.trim().isEmpty() || "0".equals(givenEntrezGeneId);
+    }
+
+    public static String normalizeGeneSymbol(String hugoGeneSymbol) {
+        if (isBlankHugoGeneSymbol(hugoGeneSymbol)) {
+            return null;
+        }
+        return hugoGeneSymbol.trim();
+    }
+
+    public static boolean isBlankHugoGeneSymbol(String hugoGeneSymbol) {
+        return hugoGeneSymbol == null || hugoGeneSymbol.trim().isEmpty() || "Unknown".equals(hugoGeneSymbol);
+    }
 }

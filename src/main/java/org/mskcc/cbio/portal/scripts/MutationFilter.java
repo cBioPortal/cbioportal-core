@@ -38,10 +38,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.mskcc.cbio.maf.MafRecord;
-import org.mskcc.cbio.maf.TabDelimitedFileUtil;
-import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.util.ExtendedMutationUtil;
-import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
  * Filter mutations as they're imported into the CGDS dbms.
@@ -50,19 +47,15 @@ import org.mskcc.cbio.portal.util.TsvUtil;
  */
 public class MutationFilter {
    
-   private Set<Long> whiteListGenesForPromoterMutations;
+   private final Set<Long> whiteListGenesForPromoterMutations;
 
    private int accepts=0;
-   private int germlineWhitelistAccepts=0;
-   private int somaticWhitelistAccepts=0;
-   private int unknownAccepts=0;
-   public int decisions=0;
+    public int decisions=0;
    private int mutationStatusNoneRejects=0;
    private int invalidChromosome=0;
+   private int invalidGeneInfo=0;
    private int lohOrWildTypeRejects=0;
-   private int emptyAnnotationRejects=0;
-   private int missenseGermlineRejects=0;
-   private int redactedRejects=0;
+    private int redactedOrWildTypeRejects =0;
    public Map<String,Integer> rejectionMap = new HashMap<String, Integer>();
 
    private static final Map<String,String> VALID_CHR_VALUES = new HashMap<>();
@@ -89,7 +82,7 @@ public class MutationFilter {
     */
    public MutationFilter() throws IllegalArgumentException{
       whiteListGenesForPromoterMutations = new HashSet<Long>();
-      whiteListGenesForPromoterMutations.add(Long.valueOf(7015)); // TERT
+      whiteListGenesForPromoterMutations.add(7015L); // TERT
    }
    
    /**
@@ -122,6 +115,22 @@ public class MutationFilter {
          | Translation_Start_Site | 
          +------------------------+
        */
+      if (ExtendedMutationUtil.isBlankEntrezGeneId(mafRecord.getGivenEntrezGeneId())
+              && ExtendedMutationUtil.isBlankHugoGeneSymbol(mafRecord.getHugoGeneSymbol())) {
+          invalidGeneInfo++;
+          return false;
+      }
+      long entrezGeneId;
+      try {
+         entrezGeneId = Long.parseLong(mafRecord.getGivenEntrezGeneId());
+         if (entrezGeneId < 0) {
+             invalidGeneInfo++;
+             return false;
+         }
+      } catch (NumberFormatException e) {
+          invalidGeneInfo++;
+          return false;
+      }
       // Do not accept mutations with invalid chromosome symbol
       if (normalizeChr(mafRecord.getChr()) ==  null) {
           invalidChromosome++;
@@ -140,9 +149,10 @@ public class MutationFilter {
          return false;
       }
       
-      // Do not accept Redacted mutations
-      if (safeStringTest(mafRecord.getValidationStatus(), "Redacted")) {
-          redactedRejects++;
+      // Do not accept Redacted or Wildtype mutations
+      if (safeStringTest(mafRecord.getValidationStatus(), "Redacted") ||
+              safeStringTest( mafRecord.getValidationStatus(), "Wildtype" )) {
+          redactedOrWildTypeRejects++;
           return false;
       }
       
@@ -150,7 +160,7 @@ public class MutationFilter {
       String mutationType = ExtendedMutationUtil.getMutationType(mafRecord);
       if (filteredMutations != null) {
           if (filteredMutations.contains(mutationType)) {
-              addRejectedVariant(rejectionMap, mutationType);
+              addRejectedVariant(mutationType);
               return false;
           } else {
               if( safeStringTest( mutationType, "5'Flank" ) ) {
@@ -167,15 +177,15 @@ public class MutationFilter {
                    safeStringTest( mutationType, "5'UTR" ) ||
                    safeStringTest( mutationType, "IGR" ) ||
                    safeStringTest( mutationType, "RNA")){
-              addRejectedVariant(rejectionMap, mutationType);
+              addRejectedVariant(mutationType);
               return false;
           }
           
           if( safeStringTest( mutationType, "5'Flank" ) ) {
-                if (whiteListGenesForPromoterMutations.contains(mafRecord.getGivenEntrezGeneId())){
+                if (whiteListGenesForPromoterMutations.contains(entrezGeneId)){
                       mafRecord.setProteinChange("Promoter");
                 } else {
-                    addRejectedVariant(rejectionMap, mutationType);
+                    addRejectedVariant(mutationType);
                     return false;
                 }
           }
@@ -220,61 +230,25 @@ public class MutationFilter {
        return this.lohOrWildTypeRejects;
    }
 
-    /**
-     * Provide number of REJECT decisions for Emtpy Annotation Mutations.
-     * @return number of REJECT decisions for Empty Annotation Mutations.
-     */
-   public int getEmptyAnnotationRejects() {
-       return this.emptyAnnotationRejects;
-   }
-
-    /**
-     * Provide number of REJECT decisions for Missense Germline Mutations.
-     * @return number of REJECT decisions for Missense Germline Mutations.
-     */
-   public int getMissenseGermlineRejects() {
-       return this.missenseGermlineRejects;
-   }
-
-   /**
-    * Provide number of germline whitelist ACCEPT (return true) decisions made by this MutationFilter.
-    * @return the number of germline whitelist ACCEPT (return true) decisions made by this MutationFilter
-    */
-   public int getGermlineWhitelistAccepts(){
-      return this.germlineWhitelistAccepts;
-   }
-
-   /**
-    * Provide number of somatic whitelist ACCEPT (return true) decisions made by this MutationFilter.
-    * @return the number of somatic whitelist ACCEPT (return true) decisions made by this MutationFilter
-    */
-   public int getSomaticWhitelistAccepts(){
-      return this.somaticWhitelistAccepts;
-   }
-
    public int getInvalidChromosome() {
        return invalidChromosome;
    }
 
-    /**
-    * Provide number of unknown whitelist ACCEPT (return true) decisions made by this MutationFilter.
-    * @return the number of unknown ACCEPT (return true) decisions made by this MutationFilter
-    */
-   public int getUnknownAccepts(){
-      return this.unknownAccepts;
+   public int getInvalidGeneInfo() {
+       return invalidGeneInfo;
    }
 
-	public int getRedactedRejects()
+   public int getRedactedOrWildTypeRejects()
 	{
-		return this.redactedRejects;
+		return this.redactedOrWildTypeRejects;
 	}
 	
    public Map<String, Integer> getRejectionMap() {
        return this.rejectionMap;
    }
    
-   public void addRejectedVariant(Map<String, Integer> rejectionMap, String mutation) {
-       this.rejectionMap.computeIfAbsent(mutation, (k) -> 0);
+   public void addRejectedVariant(String mutation) {
+       this.rejectionMap.putIfAbsent(mutation, 0);
        this.rejectionMap.computeIfPresent(mutation, (k, v) -> v + 1);
    }
 
@@ -290,10 +264,11 @@ public class MutationFilter {
       String statistics = "Mutation filter decisions: " + this.getDecisions() +
             "\nRejects: " + this.getRejects() +
             "\nMutation Status 'None' Rejects:  " + this.getMutationStatusNoneRejects() +
-            "\nLOH or Wild Type Rejects:  " + this.getLohOrWildTypeRejects() +
-            "\nEmpty Annotation Rejects:  " + this.getEmptyAnnotationRejects() +
-            "\nMissense Germline Rejects:  " + this.getMissenseGermlineRejects();
-      
+            "\nLOH or Wild Type Mutation Status Rejects:  " + this.getLohOrWildTypeRejects() +
+            "\nRedacted or Wild Type Validation Status Rejects:  " + this.getRedactedOrWildTypeRejects() +
+            "\nInvalid Choromosome Rejects:  " + this.getInvalidChromosome() +
+            "\nInvalid Gene Info Rejects:  " + this.getInvalidGeneInfo();
+
       Map<String, Integer> variantsRejected = this.getRejectionMap();
       for (Map.Entry<String, Integer> variant : variantsRejected.entrySet()) {
           statistics = statistics + "\n" + variant.getKey() + " Rejects: " + variant.getValue();

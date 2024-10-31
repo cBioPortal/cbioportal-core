@@ -245,67 +245,15 @@ public class ImportExtendedMutationData {
                 int proteinPosEnd = ExtendedMutationUtil.getProteinPosEnd(
                         record.getProteinPosition(), proteinChange);
 
-                //  Assume we are dealing with Entrez Gene Ids (this is the best / most stable option)
-                String geneSymbol = record.getHugoGeneSymbol();
-                String entrezIdString = record.getGivenEntrezGeneId();
-
+                String geneSymbol = ExtendedMutationUtil.normalizeGeneSymbol(record.getHugoGeneSymbol());
+                Long entrezGeneId = ExtendedMutationUtil.parseEntrezGeneId(record.getGivenEntrezGeneId());
                 CanonicalGene gene = null;
-                // try to parse entrez if it is not empty nor 0:
-                if (!(entrezIdString.isEmpty() ||
-                      entrezIdString.equals("0"))) {
-                    Long entrezGeneId;
-                    try {
-                        entrezGeneId = Long.parseLong(entrezIdString);
-                    } catch (NumberFormatException e) {
-                        entrezGeneId = null;
-                    }
-                    //non numeric values or negative values should not be allowed:
-                    if (entrezGeneId == null || entrezGeneId < 0) {
-                        ProgressMonitor.logWarning(
-                                "Ignoring line with invalid Entrez_Id " +
-                                entrezIdString);
-                        entriesSkipped++;
-                        continue;
-                    } else {
-                        gene = daoGene.getGene(entrezGeneId);
-                        if (gene == null) {
-                            //skip if not in DB:
-                            ProgressMonitor.logWarning(
-                                    "Entrez gene ID " + entrezGeneId +
-                                    " not found. Record will be skipped.");
-                            entriesSkipped++;
-                            continue;
-                        }
-                    }
-                }
-
-                // If Entrez Gene ID Fails, try Symbol.
-                if (gene == null &&
-                        !(geneSymbol.equals("") ||
-                          geneSymbol.equals("Unknown"))) {
+                //  Assume we are dealing with Entrez Gene Ids (this is the best / most stable option)
+                if (entrezGeneId != null) {
+                    gene = daoGene.getGene(entrezGeneId);
+                } else if (geneSymbol != null) {
                     gene = daoGene.getNonAmbiguousGene(geneSymbol, true);
                 }
-
-                String mutationType = ExtendedMutationUtil.getMutationType(record);
-                // assume symbol=Unknown and entrez=0 (or missing Entrez column) to imply an
-                // intergenic, irrespective of what the column Variant_Classification says
-                if (geneSymbol.equals("Unknown") &&
-                        (entrezIdString.equals("0") || mafUtil.getEntrezGeneIdIndex() == -1)) {
-                    // give extra warning if mutationType is something different from IGR:
-                    if (!"IRG".equalsIgnoreCase(mutationType)) {
-                        ProgressMonitor.logWarning(
-                            "Treating mutation with gene symbol 'Unknown' " +
-                            (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene ID 0") + " as intergenic ('IGR') " +
-                            "instead of '" + mutationType + "'. Entry filtered/skipped.");
-                    }
-                    // treat as IGR:
-                    myMutationFilter.decisions++;
-                    myMutationFilter.addRejectedVariant(myMutationFilter.rejectionMap, "IGR");
-                    // skip entry:
-                    entriesSkipped++;
-                    continue;
-                }
-
                 // skip the record if a gene was expected but not identified
                 if (gene == null) {
                     ProgressMonitor.logWarning(
@@ -316,8 +264,8 @@ public class ImportExtendedMutationData {
                     entriesSkipped++;
                     continue;
                 }
-                ExtendedMutation mutation = new ExtendedMutation();
 
+                ExtendedMutation mutation = new ExtendedMutation();
                 mutation.setGeneticProfileId(geneticProfileId);
                 mutation.setSampleId(sample.getInternalId());
                 mutation.setGene(gene);
@@ -325,7 +273,7 @@ public class ImportExtendedMutationData {
                 mutation.setSequencer(record.getSequencer());
                 mutation.setProteinChange(proteinChange);
                 mutation.setAminoAcidChange(aaChange);
-                mutation.setMutationType(mutationType);
+                mutation.setMutationType(ExtendedMutationUtil.getMutationType(record));
                 mutation.setChr(record.getChr());
                 mutation.setStartPosition(record.getStartPosition());
                 mutation.setEndPosition(record.getEndPosition());
