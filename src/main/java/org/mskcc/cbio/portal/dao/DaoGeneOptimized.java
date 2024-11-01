@@ -343,30 +343,6 @@ public class DaoGeneOptimized {
         return Collections.emptyList();
     }
 
-
-    private static Map<String,String> validChrValues = null;
-    public static String normalizeChr(String strChr) {
-        if (strChr==null) {
-            return null;
-        }
-
-        if (validChrValues==null) {
-            validChrValues = new HashMap<String,String>();
-            for (int lc = 1; lc<=24; lc++) {
-                    validChrValues.put(Integer.toString(lc),Integer.toString(lc));
-                    validChrValues.put("CHR" + Integer.toString(lc),Integer.toString(lc));
-            }
-            validChrValues.put("X","23");
-            validChrValues.put("CHRX","23");
-            validChrValues.put("Y","24");
-            validChrValues.put("CHRY","24");
-            validChrValues.put("NA","NA");
-            validChrValues.put("MT","MT"); // mitochondria
-        }
-
-        return validChrValues.get(strChr);
-    }
-
     private static String getChrFromCytoband(String cytoband) {
         if (cytoband==null) {
             return null;
