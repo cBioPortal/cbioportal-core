@@ -134,4 +134,9 @@ public class FilterMutationData extends ConsoleRunnable {
         }
         ProgressMonitor.setCurrentMessage(mutationFilter.getStatistics());
     }
+
+    public static void main(String[] args) {
+        ConsoleRunnable runner = new FilterMutationData(args);
+        runner.runInConsole();
+    }
 }
