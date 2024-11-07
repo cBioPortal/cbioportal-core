@@ -59,7 +59,7 @@ function clickhouse_is_responding() {
     while [ $remaining_try_count -ne 0 ] ; do
         if execute_sql_statement_via_clickhouse_client "$statement" "$clickhouse_is_responsive_filepath" ; then
             unset sql_data_array
-            if set_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
+            if set_clickhouse_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
                 local clickhouse_response=${sql_data_array[0]}
                 if [ "$clickhouse_response" == "1" ] ; then
                     return 0

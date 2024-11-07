@@ -118,7 +118,7 @@ function set_database_table_list() {
         return 1
     fi
     unset sql_data_array
-    if ! set_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
+    if ! set_mysql_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
         return 1
     fi
     database_table_list=(${sql_data_array[@]})
@@ -146,7 +146,7 @@ function set_source_database_create_table_statement_list() {
             echo "Warning : failed to execute mysql statement : $statement" >&2
             return 1
         fi
-        if ! set_sql_data_array_from_file "$create_table_statement_filepath" 1 ; then
+        if ! set_mysql_sql_data_array_from_file "$create_table_statement_filepath" 1 ; then
             return 1
         fi
         source_database_create_table_statement_list+=("${sql_data_array[0]}")
@@ -192,7 +192,7 @@ function destination_table_matches_source_table() {
     local get_record_counts_statement="SELECT count(*) AS record_count from $destination_table_full_name UNION DISTINCT SELECT count(*) as record_count from $source_table_full_name;"
     execute_sql_statement_via_mysql "$get_record_counts_statement" "$record_count_comparison_filepath"
     # if recourd_counts match, only one distinct value will be returned. If they differ, there will be 2 values
-    set_sql_data_array_from_file "$record_count_comparison_filepath" 0
+    set_mysql_sql_data_array_from_file "$record_count_comparison_filepath" 0
     if [[ "${#sql_data_array[@]}" -ne 1 ]] ; then
         local record_count_0="${sql_data_array[0]}"
         local record_count_1="${sql_data_array[1]}"

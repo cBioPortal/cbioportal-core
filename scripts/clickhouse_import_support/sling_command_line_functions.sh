@@ -143,7 +143,7 @@ function transfer_table_data_via_sling() {
     )
 }
 
-# set_sql_data_field_value_from_record
+# set_sling_sql_data_field_value_from_record
 # This function currently assumes that all queries are going to produce simple results
 # which do not cause the quotation of value fields. Output from sling is in comma separated
 # value format, so any value which contains a comma, or which contains a quotation mark or
@@ -152,7 +152,7 @@ function transfer_table_data_via_sling() {
 # or record counts from tables. If use of this function expands to more general value retrieval
 # it may be necessary to add proper parsing of quoted values. The presence of quotation marks
 # on the line currently cuases a failure to parse.
-function set_sql_data_field_value_from_record() {
+function set_sling_sql_data_field_value_from_record() {
     local record_string=$1
     local column_number=$2
     unset sql_data_field_value
@@ -200,7 +200,7 @@ function set_sql_data_field_value_from_record() {
     sql_data_field_value="$parsed_value"
 }
 
-function set_sql_data_array_from_file() {
+function set_sling_sql_data_array_from_file() {
     local filepath=$1
     local column_number=$2
     unset sql_data_array
@@ -214,7 +214,7 @@ function set_sql_data_array_from_file() {
         if [ "$headers_have_been_parsed" -eq 0 ] ; then
             headers_have_been_parsed=1
         else
-            set_sql_data_field_value_from_record "$line" "$column_number"
+            set_sling_sql_data_field_value_from_record "$line" "$column_number"
             sql_data_array+=("$sql_data_field_value")
         fi
     done < "$filepath"
@@ -227,7 +227,7 @@ function clickhouse_database_exists() {
         echo "Warning : unable to determine if database $database_name exists using : $statement" >&2
         return 1
     fi
-    set_sql_data_array_from_file "$sling_database_exists_filepath" 0
+    set_sling_sql_data_array_from_file "$sling_database_exists_filepath" 0
     if [[ "${sql_data_array[0]}" -ne 1 ]] ; then
         echo "Warning : database $database_name not present on database server, or there are multiple listings for that name" >&2
         return 2
@@ -243,7 +243,7 @@ function clickhouse_database_is_empty() {
         echo "Warning : unable to retrieve table/view list from database $database_name using : $statement" >&2
         return 1
     fi
-    set_sql_data_array_from_file "$sling_database_table_list_filepath" 0
+    set_sling_sql_data_array_from_file "$sling_database_table_list_filepath" 0
     if [[ "${sql_data_array[0]}" -ne 0 ]] ; then
         echo "Warning : database $database_name has tables or views (is not empty as required)" >&2
         return 2
