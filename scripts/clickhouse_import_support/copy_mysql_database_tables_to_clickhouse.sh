@@ -14,6 +14,7 @@ fi
 unset this_script_dir
 
 function usage() {
+    # TODO!
     echo "usage:"
 }
 
@@ -66,7 +67,7 @@ function clickhouse_is_responding() {
     while [ $remaining_try_count -ne 0 ] ; do
         if execute_sql_statement_via_sling "$statement" "clickhouse" "$clickhouse_is_responsive_filepath" ; then
             unset sql_data_array
-            if set_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
+            if set_sling_sql_data_array_from_file "$clickhouse_is_responsive_filepath" 0 ; then
                 local clickhouse_response=${sql_data_array[0]}
                 if [ "$clickhouse_response" == "1" ] ; then
                     return 0
@@ -101,7 +102,7 @@ function set_database_table_list() {
         return 1
     fi
     unset sql_data_array
-    if ! set_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
+    if ! set_sling_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
         return 1
     fi
     database_table_list=(${sql_data_array[@]})
@@ -117,7 +118,7 @@ function set_mysql_table_record_count() {
         return 1
     fi
     unset sql_data_array
-    if ! set_sql_data_array_from_file "$mysql_table_record_count_filepath" 0 ; then
+    if ! set_sling_sql_data_array_from_file "$mysql_table_record_count_filepath" 0 ; then
         return 1
     fi
     mysql_table_record_count=${sql_data_array[0]}
@@ -192,7 +193,7 @@ function destination_table_matches_source_table() {
         return 1
     fi
     unset sql_data_array
-    if ! set_sql_data_array_from_file "$clickhouse_table_record_count_filepath" 0 ; then
+    if ! set_sling_sql_data_array_from_file "$clickhouse_table_record_count_filepath" 0 ; then
         return 1
     fi
     local clickhouse_table_record_count=${sql_data_array[0]}
