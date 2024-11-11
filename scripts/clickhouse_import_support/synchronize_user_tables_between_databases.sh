@@ -93,6 +93,7 @@ function delete_output_stream_files() {
 
 function shutdown_main_and_clean_up() {
     shutdown_mysql_command_line_functions
+    shutdown_clickhouse_client_command_line_functions
     delete_output_stream_files
     unset my_properties
     unset mysql_source_database_name
