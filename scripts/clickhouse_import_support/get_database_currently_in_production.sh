@@ -64,13 +64,14 @@ function process_state_table_is_valid() {
     fi
     if ! table_exists "$update_management_database_name" "update_status" ; then
         echo "Error : could not proceed with getting production database because table 'update_status' does not exist in database : $update_management_database_name" >&2
+        return 1
     fi
     local get_record_count_statement="SELECT count(*) AS record_count from \`$update_management_database_name\`.update_status;"
     if ! execute_sql_statement_via_mysql "$get_record_count_statement" "$record_count_filepath" ; then
         echo "Error : could not validate process_state table. Mysql statement failed to execute properly : $get_record_count_statement" >&2
         return 1
     fi
-    set_sql_data_array_from_file "$record_count_filepath" 0
+    set_mysql_sql_data_array_from_file "$record_count_filepath" 0
     local rowcount="${sql_data_array[0]}"
     if [[ "$rowcount" -ne 1 ]] ; then
         echo "Error : database $update_management_database_name contains $rowcount rows instead of exactly 1 row as expected." >&2
@@ -79,13 +80,13 @@ function process_state_table_is_valid() {
     return 0
 }
 
-function set_database_currently_in_production() {
+function get_database_currently_in_production() {
     local get_current_database_statement="SELECT current_database_in_production FROM \`$update_management_database_name\`.update_status;"
     if ! execute_sql_statement_via_mysql "$get_current_database_statement" "$current_production_database_filepath" ; then
         echo "Error : could not retrieve the current database in production. Mysql statement failed to execute properly : $get_current_database_statement" >&2
         return 1
     fi
-    set_sql_data_array_from_file "$current_production_database_filepath" 0
+    set_mysql_sql_data_array_from_file "$current_production_database_filepath" 0
     database_currently_in_production="${sql_data_array[0]}"
     return 0
 }
@@ -99,7 +100,7 @@ function main() {
     local exit_status=0
     if ! initialize_main "$properties_filepath" ||
             ! process_state_table_is_valid ||
-            ! set_database_currently_in_production ; then
+            ! get_database_currently_in_production ; then
         exit_status=1
     fi
     output_database_currently_in_production

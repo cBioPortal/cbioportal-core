@@ -74,7 +74,7 @@ function process_state_table_is_valid() {
         echo "Error : could not validate process_state table. Mysql statement failed to execute properly : $get_record_count_statement" >&2
         return 1
     fi
-    set_sql_data_array_from_file "$record_count_filepath" 0
+    set_mysql_sql_data_array_from_file "$record_count_filepath" 0
     local rowcount="${sql_data_array[0]}"
     if [[ "$rowcount" -ne 1 ]] ; then
         echo "Error : database $update_management_database_name contains $rowcount rows instead of exactly 1 row as expected." >&2
@@ -100,7 +100,7 @@ function set_state_in_status_table() {
         echo "Error : failed to execute SQL statement \"$update_status_statement\"" >&2
         return 1
     fi
-    set_sql_data_array_from_file "$update_status_filepath" 0
+    set_mysql_sql_data_array_from_file "$update_status_filepath" 0
     local rowcount="${sql_data_array[0]}"
     if [ "$rowcount" -eq 1 ] ; then
         echo "Status table updated"
