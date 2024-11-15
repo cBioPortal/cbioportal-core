@@ -85,7 +85,7 @@ function set_database_table_list() {
         return 1
     fi
     unset sql_data_array
-    if ! set_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
+    if ! set_mysql_sql_data_array_from_file "$database_table_list_filepath" 0 ; then
         return 1
     fi
     database_table_list=(${sql_data_array[@]})
