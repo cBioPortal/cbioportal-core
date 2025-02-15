@@ -411,4 +411,18 @@ public class TestImportExtendedMutationData {
 
         assertNull(mutations.get(0).getAnnotationJson());
     }
+    /**
+     * Check that filtering works
+     */
+    @Test
+    public void testImportExtendedMutationFiltering() throws IOException, DaoException {
+        File file = new File("src/test/resources/data_mutations_filtering.txt");
+        ImportExtendedMutationData parser = new ImportExtendedMutationData(file, geneticProfileId, null);
+        parser.importData();
+        MySQLbulkLoader.flushAll();
+
+        ArrayList<ExtendedMutation> mutationList = DaoMutation.getAllMutations(geneticProfileId);
+
+        assertEquals(1, mutationList.size());
+    }
 }
