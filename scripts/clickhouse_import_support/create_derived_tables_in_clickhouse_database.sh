@@ -11,6 +11,11 @@ if ! source "$this_script_dir/clickhouse_client_command_line_functions.sh" ; the
     echo "Error : unable to load dependency : $this_script_dir/clickhouse_client_command_line_functions.sh" >&2
     exit 1
 fi
+create_derived_tables_by_profile_script_filepath="${this_script_dir}/create_derived_tables_in_clickhouse_database_by_profile.py"
+if ! [ -r ${create_derived_tables_by_profile_script_filepath} ] ; then
+    echo "Error : unable to read/find required python script at this location: $create_derived_tables_by_profile_script_filepath" >&2
+    exit 1
+fi
 unset this_script_dir
 
 # non-local environment variables in use
@@ -18,6 +23,7 @@ unset my_properties
 unset database_name
 unset properties_filepath
 unset database_to_create_derived_tables_in
+unset clickhouse_max_memory_use_target
 unset derived_table_composite_sql_filepaths
 unset derived_table_simple_sql_filepaths
 unset sql_tmpdir_path
@@ -25,6 +31,7 @@ declare -A my_properties
 database_name=""
 properties_filepath=""
 database_to_create_derived_tables_in=""
+clickhouse_max_memory_use_target=""
 declare -a derived_table_composite_sql_filepaths
 declare -a derived_table_simple_sql_filepaths
 DERIVED_TABLE_SIMPLE_FILENAME_PREFIX="derived_table_sql_statement"
@@ -52,6 +59,7 @@ function initialize_main() {
         return 1
     fi
     remove_credentials_from_properties my_properties # no longer needed - remove for security
+    clickhouse_max_memory_use_target="${my_properties['clickhouse_max_memory_use_target']}"
     if [ "$database_to_create_derived_tables_in" == "blue" ] ; then
         database_name="${my_properties['clickhouse_blue_database_name']}"
     else
@@ -203,14 +211,14 @@ function simple_sql_file_inserts_into_generic_assay_data_derived() {
 function process_genetic_alteration_insertion_per_profile() {
     sql_filepath="$1"
     (
-        ./create_derived_tables_in_clickhouse_database_by_profile.py genetic_alteration_derived "$configured_clickhouse_config_file_path" "$sql_filepath"
-    )
+        ${create_derived_tables_by_profile_script_filepath} genetic_alteration_derived "$configured_clickhouse_config_file_path" "$sql_filepath" "--max-memory-target=$clickhouse_max_memory_use_target"
+    ) 
 }
 
 function process_generic_assay_data_insertion_per_profile() {
     sql_filepath="$1"
     (
-        ./create_derived_tables_in_clickhouse_database_by_profile.py generic_assay_data_derived "$configured_clickhouse_config_file_path" "$sql_filepath"
+        ${create_derived_tables_by_profile_script_filepath} generic_assay_data_derived "$configured_clickhouse_config_file_path" "$sql_filepath" "--max-memory-target=$clickhouse_max_memory_use_target"
     )
 }
 
@@ -263,6 +271,7 @@ function shutdown_main_and_clean_up() {
     unset my_properties
     unset database_name
     unset create_derived_table_result_filepath
+    unset clickhouse_max_memory_use_target
     unset clickhouse_is_responsive_filepath
     unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
     unset properties_filepath
@@ -271,6 +280,7 @@ function shutdown_main_and_clean_up() {
     unset derived_table_simple_sql_filepaths
     unset DERIVED_TABLE_SIMPLE_FILENAME_PREFIX
     unset zero_padded_string
+    unset create_derived_tables_by_profile_script_filepath
 }
 
 function main() {
