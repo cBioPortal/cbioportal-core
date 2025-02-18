@@ -31,6 +31,7 @@ record_count_comparison_filepath="$(pwd)/cmd_table_record_count.txt"
 function usage() {
     echo "usage: clone_mysql_database.sh properties_filepath database_to_clone_tables_from database_to_clone_tables_to" >&2
     echo "         databases (from/to) must be in {blue, green}" >&2
+    echo "         This tool is used to clone one mysql database to another mysql database on the same server for dual-database installations." >&2
 }
 
 function initialize_main() {

@@ -18,14 +18,18 @@ function write_clickhouse_config_file() {
     fi
     chmod 600 "$configured_clickhouse_config_file_path"
     local db_name
-    if [ "$selected_database" == "blue" ] ; then
-        db_name="${my_properties['clickhouse_blue_database_name']}"
+    if [ -z "$selected_database" ] ; then
+        db_name="${my_properties['clickhouse_database_name']}"
     else
-        if [ "$selected_database" == "green" ] ; then
-            db_name="${my_properties['clickhouse_green_database_name']}"
+        if [ "$selected_database" == "blue" ] ; then
+            db_name="${my_properties['clickhouse_blue_database_name']}"
         else
-            echo "Error : selected_database must be passed as either 'blue' or 'green'. The argument passed was : '$selected_database'" >&2
-            return 1
+            if [ "$selected_database" == "green" ] ; then
+                db_name="${my_properties['clickhouse_green_database_name']}"
+            else
+                echo "Error : selected_database (when specified) must be passed as either 'blue' or 'green'. The argument passed was : '$selected_database'" >&2
+                return 1
+            fi
         fi
     fi
     echo "user: ${my_properties['clickhouse_server_username']}" >> "$configured_clickhouse_config_file_path"

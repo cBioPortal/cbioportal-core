@@ -44,8 +44,8 @@ EXPECTED_GENETIC_ALTERATION_INSERT_STATEMENT_START="INSERT INTO TABLE genetic_al
 EXPECTED_GENERIC_ASSAY_INSERT_STATEMENT_START="INSERT INTO TABLE generic_assay_data_derived"
 
 function usage() {
-    echo "usage: create_derived_tables_in_clickhouse_database.sh properties_filepath database create_derived_sql_filepath_1..." >&2
-    echo "         database must be in {blue, green}" >&2
+    echo "usage: create_derived_tables_in_clickhouse_database.sh properties_filepath [database] create_derived_sql_filepath_1..." >&2
+    echo "         database should be omitted for single-database installations, or else must be in {blue, green} for dual-database installations" >&2
     echo "         create_derived_sql_filepath_1... is one or more file paths to composite sql files for creating derived tables in clickhouse" >&2
 }
 
@@ -60,15 +60,19 @@ function initialize_main() {
     fi
     remove_credentials_from_properties my_properties # no longer needed - remove for security
     clickhouse_max_memory_use_target="${my_properties['clickhouse_max_memory_use_target']}"
-    if [ "$database_to_create_derived_tables_in" == "blue" ] ; then
-        database_name="${my_properties['clickhouse_blue_database_name']}"
+    if [ -z "$database_to_create_derived_tables_in" ] ; then
+        database_name="${my_properties['clickhouse_database_name']}"
     else
-        if [ "$database_to_create_derived_tables_in" == "green" ] ; then
-            database_name="${my_properties['clickhouse_green_database_name']}"
+        if [ "$database_to_create_derived_tables_in" == "blue" ] ; then
+            database_name="${my_properties['clickhouse_blue_database_name']}"
         else
-            echo "Error : database must be one of {blue, green}" >&2
-            usage
-            return 1
+            if [ "$database_to_create_derived_tables_in" == "green" ] ; then
+                database_name="${my_properties['clickhouse_green_database_name']}"
+            else
+                echo "Error : when provided, database must be one of {blue, green}" >&2
+                usage
+                return 1
+            fi
         fi
     fi
     return 0

@@ -32,7 +32,8 @@ SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
 function usage() {
     echo "usage: synchronize_user_tables_between_databases.sh properties_filepath database_to_synchronize_from database_to_synchronize_to" >&2
-    echo "         databases (from/to) must be in {blue, green}" >&2
+    echo "         database_to_synchronize_from and database_to_synchronize_to must be in {blue, green}" >&2
+    echo "         This tool copies over any user records added to the active/production database during the time it took to update the non-production database." >&2
 }
 
 function initialize_main() {

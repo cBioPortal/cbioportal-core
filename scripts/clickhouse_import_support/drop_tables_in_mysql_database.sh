@@ -24,8 +24,8 @@ database_table_list_filepath="$(pwd)/dtmd_database_table_list.txt"
 drop_table_result_filepath="$(pwd)/dtmd_drop_table_result.txt"
 
 function usage() {
-    echo "usage: drop_tables_in_mysql_database.sh properties_filepath database" >&2
-    echo "         database must be in {blue, green}" >&2
+    echo "usage: drop_tables_in_mysql_database.sh properties_filepath [database]" >&2
+    echo "         database is optional, but must be in {blue, green} if provided." >&2
 }
 
 function initialize_main() {
@@ -40,15 +40,19 @@ function initialize_main() {
         return 1
     fi
     remove_credentials_from_properties my_properties # no longer needed - remove for security
-    if [ "$database_to_drop_tables_from" == "blue" ] ; then
-        database_name="${my_properties['mysql_blue_database_name']}"
+    if [ -z "$database_to_drop_tables_from" ] ; then
+        database_name="${my_properties['mysql_database_name']}"
     else
-        if [ "$database_to_drop_tables_from" == "green" ] ; then
-            database_name="${my_properties['mysql_green_database_name']}"
+        if [ "$database_to_drop_tables_from" == "blue" ] ; then
+            database_name="${my_properties['mysql_blue_database_name']}"
         else
-            echo "Error : database must be one of {blue, green}" >&2
-            usage
-            return 1
+            if [ "$database_to_drop_tables_from" == "green" ] ; then
+                database_name="${my_properties['mysql_green_database_name']}"
+            else
+                echo "Error : if specified, database must be one of {blue, green}" >&2
+                usage
+                return 1
+            fi
         fi
     fi
     return 0

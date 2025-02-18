@@ -15,11 +15,15 @@ function write_selected_mysql_connection_to_env_file() {
     local env_file=$1
     local database_to_transfer=$2
     local db_name=""
-    if [ "$database_to_transfer" == "blue" ] ; then
-        db_name="${my_properties['mysql_blue_database_name']}"
+    if [ -z "$database_to_transfer" ] ; then
+        db_name="${my_properties['mysql_database_name']}"
     else
-        db_name="${my_properties['mysql_green_database_name']}"
-    fi 
+        if [ "$database_to_transfer" == "blue" ] ; then
+            db_name="${my_properties['mysql_blue_database_name']}"
+        else
+            db_name="${my_properties['mysql_green_database_name']}"
+        fi 
+    fi
     echo "  MYSQL_DATABASE_CONNECTION:" >> "$env_file"
     echo "    type: mysql" >> "$env_file"
     echo "    database: $db_name" >> "$env_file"
@@ -34,11 +38,15 @@ function write_selected_clickhouse_connection_to_env_file() {
     local env_file=$1
     local database_to_transfer=$2
     local db_name=""
-    if [ "$database_to_transfer" == "blue" ] ; then
-        db_name="${my_properties['clickhouse_blue_database_name']}"
+    if [ -z "$database_to_transfer" ] ; then
+        db_name="${my_properties['mysql_database_name']}"
     else
-        db_name="${my_properties['clickhouse_green_database_name']}"
-    fi 
+        if [ "$database_to_transfer" == "blue" ] ; then
+            db_name="${my_properties['mysql_blue_database_name']}"
+        else
+            db_name="${my_properties['mysql_green_database_name']}"
+        fi 
+    fi
     local uname="${my_properties['clickhouse_server_username']}"
     local pw="${my_properties['clickhouse_server_password']}"
     local clickhost="${my_properties['clickhouse_server_host_name']}"

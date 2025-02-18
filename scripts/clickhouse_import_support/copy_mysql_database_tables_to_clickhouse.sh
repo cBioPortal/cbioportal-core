@@ -14,8 +14,8 @@ fi
 unset this_script_dir
 
 function usage() {
-    # TODO!
-    echo "usage:"
+    echo "usage: copy_mysql_database_tables_to_clickhouse.sh properties_filepath [database_to_transfer] " >&2
+    echo "         database_to_transfer is optional, but must be in {blue, green} if provided." >&2
 }
 
 # other non-local environment variables in use
@@ -39,20 +39,25 @@ SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 SECONDS_BETWEEN_COPY_RETRY=$((15*60))
 
 function initialize_main() {
-    if ! [ "$database_to_transfer" == "blue" ] && ! [ "$database_to_transfer" == "green" ] ; then
-        echo "Error : argument for database_to_transfer must be either 'blue' or 'green'" >&2
+    if ! [ -z "$database_to_transfer" ] && ! [ "$database_to_transfer" == "blue" ] && ! [ "$database_to_transfer" == "green" ] ; then
+        echo "Error : if specified, argument for database_to_transfer must be either 'blue' or 'green'" >&2
         return 1
     fi
     if ! parse_property_file "$properties_filepath" my_properties ; then
         usage
         return 1
     fi
-    if [ "$database_to_transfer" == "blue" ] ; then
-        clickhouse_destination_database_name="${my_properties['clickhouse_blue_database_name']}"
-        mysql_source_database_name="${my_properties['mysql_blue_database_name']}"
+    if [ -z "$database_to_transfer" ] ; then
+        clickhouse_destination_database_name="${my_properties['clickhouse_database_name']}"
+        mysql_source_database_name="${my_properties['mysql_database_name']}"
     else
-        clickhouse_destination_database_name="${my_properties['clickhouse_green_database_name']}"
-        mysql_source_database_name="${my_properties['mysql_green_database_name']}"
+        if [ "$database_to_transfer" == "blue" ] ; then
+            clickhouse_destination_database_name="${my_properties['clickhouse_blue_database_name']}"
+            mysql_source_database_name="${my_properties['mysql_blue_database_name']}"
+        else
+            clickhouse_destination_database_name="${my_properties['clickhouse_green_database_name']}"
+            mysql_source_database_name="${my_properties['mysql_green_database_name']}"
+        fi
     fi
     if ! initialize_sling_command_line_functions "$database_to_transfer" ; then
         usage

@@ -29,7 +29,10 @@ function usage() {
 
 function initialize_main() {
     local properties_filepath=$1
-    local state=$2
+    if [ -z "$properties_filepath" ] ; then
+        usage
+        return 1
+    fi
     if ! parse_property_file "$properties_filepath" my_properties ; then
         usage
         return 1
@@ -39,8 +42,7 @@ function initialize_main() {
         return 1
     fi
     update_management_database_name="${my_properties['mysql_update_management_database']}"
-    ### TODO : fix this
-    ###  remove_credentials_from_properties my_properties # no longer needed - remove for security
+    remove_credentials_from_properties my_properties # no longer needed - remove for security
     return 0
 }
 
@@ -102,8 +104,9 @@ function main() {
             ! process_state_table_is_valid ||
             ! get_database_currently_in_production ; then
         exit_status=1
+    else
+        output_database_currently_in_production
     fi
-    output_database_currently_in_production
     shutdown_main_and_clean_up
     return $exit_status
 }

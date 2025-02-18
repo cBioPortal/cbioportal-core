@@ -2,6 +2,7 @@
 
 import argparse
 import datetime
+import time
 import math
 import os
 import re
@@ -52,6 +53,9 @@ def convert_insert_to_be_by_genetic_profile(original_insert_sql_statement, expec
 
 def insert_event_records_for_profile_into_derived_table(yaml_config_filename, insert_query_by_profile_template, genetic_profile_id, batch_count):
     for batch in range(batch_count):
+        print(time.asctime() + " : starting batch " + str(batch) + " of " + str(batch_count) + " of profile " + str(genetic_profile_id))
+        if batch > 0:
+            print('b', end='')
         insert_events_query = insert_query_by_profile_template.format(genetic_profile_id, batch_count, batch)
         query_argument = f"--query={insert_events_query}"
         config_filename_argument = f"--config-file={yaml_config_filename}" 
@@ -109,6 +113,7 @@ def create_sql_insert_statement_template_from_clickhouse(sql_filepath, expected_
             print(f"\tExpected query contains '{expected_where_for_profile_type}'", file=sys.stderr)
             sys.exit(1)
     insert_by_profile_statement_template = convert_insert_to_be_by_genetic_profile(original_insert_sql_statement, expected_where_for_profile_type)
+    print("executing : insert_by_profile_statement_template ")
     return insert_by_profile_statement_template
 
 def compute_batch_count(genetic_profile_id, profile_id_to_study_id, profile_id_to_entity_count, profile_id_to_sample_list_count, max_memory_target):
@@ -203,22 +208,27 @@ def main():
     parser = create_arg_parser()
     args = parser.parse_args()
     exit_if_args_are_invalid(args)
+    print(time.asctime() + " : program start")
     profile_id_list, returncode = get_list_of_profile_ids(args.derived_table_name, args.yaml_config_filename)
     if not process_was_successful(returncode):
         print(f"ERROR: Failed to get list of profile ids.  Return code was '{returncode}'. Please check the properties file containing your database credentials.", file=sys.stderr)
         sys.exit(1)
+    print(time.asctime() + " : profile ids fetched")
     profile_id_to_study_id, returncode = get_profile_id_to_study_id(args.yaml_config_filename)
     if not process_was_successful(returncode):
         print(f"ERROR: Failed to get a stable_id for all genetic_alteration profiles.  Return code was '{returncode}'.", file=sys.stderr)
         sys.exit(1)
+    print(time.asctime() + " : profile id to study id fetched")
     profile_id_to_entity_count, returncode = get_profile_id_to_entity_count(args.yaml_config_filename)
     if not process_was_successful(returncode):
         print(f"ERROR: Failed to get a count of entity profiles for all genetic_alteration profiles.  Return code was '{returncode}'.", file=sys.stderr)
         sys.exit(1)
+    print(time.asctime() + " : profile id to entity count fetched")
     profile_id_to_sample_list_count, returncode = get_profile_id_to_sample_list(args.yaml_config_filename)
     if not process_was_successful(returncode):
         print(f"ERROR: Failed to get a count of profile samples for all genetic_alteration profiles.  Return code was '{returncode}'.", file=sys.stderr)
         sys.exit(1)
+    print(time.asctime() + " : profile id to sample count fetched")
     sql_insert_statement_template = create_sql_insert_statement_template(args.derived_table_name, args.sql_filepath)
     insert_event_records_for_all_profiles(
             args.yaml_config_filename,
