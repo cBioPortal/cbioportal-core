@@ -33,6 +33,10 @@ function initialize_main() {
         usage
         return 1
     fi
+    if ! [ -r "$properties_filepath" ] ; then
+        echo "Error: cannot read specified properties file '$properties_filepath'" >&2
+        return 1
+    fi
     if ! parse_property_file "$properties_filepath" my_properties ; then
         usage
         return 1
