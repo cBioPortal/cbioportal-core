@@ -289,19 +289,24 @@ function shutdown_main_and_clean_up() {
 
 function main() {
     local exit_status=0
-    if [ $# -lt 3 ] ; then
-        usage
-        exit 1
-    fi
     properties_filepath=$1
-    database_to_create_derived_tables_in=$2
-    shift 2 # shift the first 2 arguments off the argument list
-    # all remaining arguments are sql files that need to be processed
+    shift 1 # remove the properties_filepath argument from the argument list
+    database_to_create_derived_tables_in=$1
+    if [ "$database_to_create_derived_tables_in" == "blue" ] || [ "$database_to_create_derived_tables_in" == "green" ] ; then
+        shift 1 # recognized value selecting between blue and green databases, remove it from the argument list
+    else
+        database_to_create_derived_tables_in="" # not recognized, so blank out the color selection and do not remove the arguemnt from the list
+    fi
     derived_table_composite_sql_filepaths=()
     while [ $# -gt 0 ] ; do
         derived_table_composite_sql_filepaths+=($1)
         shift 1
     done
+    if [ ${#derived_table_composite_sql_filepaths[@]} -lt 1 ] ; then
+        # at least 1 sql file must have been provided (in addition to the other arguments)
+        usage
+        exit 1
+    fi
     if ! initialize_main ||
             ! clickhouse_is_responding ||
             ! selected_database_exists ||
