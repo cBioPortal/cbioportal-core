@@ -128,7 +128,7 @@ function parse_property_line() {
     local key_name=""
     local value=""
     if property_line_is_commented "$line" ; then
-        continue
+        return 0
     fi
     find_and_set_index_of_property_line_delimiter "$line"
     if [ $index_of_property_line_delimiter -eq 0 ] ; then
