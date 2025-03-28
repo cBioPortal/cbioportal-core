@@ -172,39 +172,8 @@ public class ExtendedMutationUtil {
         return !invalid;
     }
 
-    public static boolean isAcceptableMutation(String mutationType) {
-        // check for null or NA values
-        if (mutationType == null ||
-                mutationType.length() == 0 ||
-                mutationType.equals("NULL") ||
-                mutationType.equals(TabDelimitedFileUtil.NA_STRING)) {
-            return false;
-        }
-
-        // check for the type
-        boolean silent = mutationType.toLowerCase().startsWith("silent");
-        boolean loh = mutationType.toLowerCase().startsWith("loh");
-        boolean wildtype = mutationType.toLowerCase().startsWith("wildtype");
-        boolean utr3 = mutationType.toLowerCase().startsWith("3'utr");
-        boolean utr5 = mutationType.toLowerCase().startsWith("5'utr");
-        boolean flank5 = mutationType.toLowerCase().startsWith("5'flank");
-        boolean igr = mutationType.toLowerCase().startsWith("igr");
-        boolean rna = mutationType.equalsIgnoreCase("rna");
-
-        return !(silent || loh || wildtype || utr3 || utr5 || flank5 || igr || rna);
-    }
-
     public static String getMutationType(MafRecord record) {
-        String mutationType = record.getMafVariantClassification();
-
-        if (mutationType == null ||
-                mutationType.length() == 0 ||
-                mutationType.equals("NULL") ||
-                mutationType.equals(TabDelimitedFileUtil.NA_STRING)) {
-            mutationType = record.getVariantClassification();
-        }
-
-        return mutationType;
+        return TsvUtil.isBlank(record.getVariantClassification()) ? record.getMafVariantClassification() : record.getVariantClassification();
     }
 
     public static Integer getTumorAltCount(MafRecord record) {
@@ -424,5 +393,27 @@ public class ExtendedMutationUtil {
         annotation.put("start", start);
         annotation.put("end", end);
         return annotation;
+    }
+
+    public static Long parseEntrezGeneId(String givenEntrezGeneId) {
+        if (isBlankEntrezGeneId(givenEntrezGeneId)) {
+            return null;
+        }
+        return Long.parseLong(givenEntrezGeneId);
+    }
+
+    public static boolean isBlankEntrezGeneId(String givenEntrezGeneId) {
+        return givenEntrezGeneId == null || givenEntrezGeneId.trim().isEmpty() || "0".equals(givenEntrezGeneId);
+    }
+
+    public static String normalizeGeneSymbol(String hugoGeneSymbol) {
+        if (isBlankHugoGeneSymbol(hugoGeneSymbol)) {
+            return null;
+        }
+        return hugoGeneSymbol.trim();
+    }
+
+    public static boolean isBlankHugoGeneSymbol(String hugoGeneSymbol) {
+        return hugoGeneSymbol == null || hugoGeneSymbol.trim().isEmpty() || "Unknown".equals(hugoGeneSymbol);
     }
 }

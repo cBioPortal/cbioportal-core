@@ -1,5 +1,7 @@
 package org.mskcc.cbio.portal.util;
 
+import org.mskcc.cbio.maf.TabDelimitedFileUtil;
+
 /**
  * Utils to parse and validate TSV lines
  * @author Ruslan Forostianov
@@ -40,4 +42,12 @@ public class TsvUtil {
                     + ") than specified in the headers(" + headerColumns + "): \n" + rowParts[0]);
         }
     }
+
+    public static boolean isBlank(String value) {
+        return value == null ||
+                value.isEmpty() ||
+                value.equals("NULL") ||
+                value.equals(TabDelimitedFileUtil.NA_STRING);
+    }
 }
+
