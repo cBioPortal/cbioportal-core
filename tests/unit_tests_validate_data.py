@@ -361,12 +361,12 @@ class ClinicalValuesTestCase(DataFileTestCase):
         record = next(record_iterator)
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
-        self.assertIn('can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
+        self.assertIn('can only contain letters, numbers, points, underscores, parentheses, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
         # last one:
         record = record_list.pop()
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(record.line_number, 12)
-        self.assertIn('can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
+        self.assertIn('can only contain letters, numbers, points, underscores, parentheses, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
 
 
 
@@ -455,7 +455,7 @@ class PatientAttrFileTestCase(PostClinicalDataFileTestCase):
         record = next(record_iterator)
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
-        self.assertIn('can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
+        self.assertIn('can only contain letters, numbers, points, underscores, parentheses, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
 
     def test_date_in_nondate_column(self):
         """Test when a sample is defined twice in the same file."""
