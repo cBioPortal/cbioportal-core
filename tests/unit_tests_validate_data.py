@@ -361,12 +361,12 @@ class ClinicalValuesTestCase(DataFileTestCase):
         record = next(record_iterator)
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
-        self.assertIn('can only contain letters, numbers, points, underscores, parentheses, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
+        self.assertIn('SAMPLE_ID can only contain letters, numbers, points, underscores, parentheses, brackets, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
         # last one:
         record = record_list.pop()
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(record.line_number, 12)
-        self.assertIn('can only contain letters, numbers, points, underscores, parentheses, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
+        self.assertIn('SAMPLE_ID can only contain letters, numbers, points, underscores, parentheses, brackets, commas, colons, semicolons, plus and/or hyphens', record.getMessage())
 
 
 
@@ -450,7 +450,7 @@ class PatientAttrFileTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_clin_wrong_patient_id.txt',
                                     validateData.PatientClinicalValidator)
-        self.assertEqual(len(record_list), 24)
+        self.assertEqual(len(record_list), 6)
         record_iterator = iter(record_list)
         record = next(record_iterator)
         self.assertEqual(logging.ERROR, record.levelno)
