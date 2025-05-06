@@ -799,7 +799,7 @@ def validate_types_and_id(meta_dictionary, logger, filename):
         ("METHYLATION", "CONTINUOUS", "methylation_hm27"),
         ("METHYLATION", "CONTINUOUS", "methylation_hm450"),
         ("METHYLATION", "CONTINUOUS", "methylation_epic"),
-        ("METHYLATION", "CONTINUOUS", "methylation_promoters_rrbs")
+        ("METHYLATION", "CONTINUOUS", "methylation_promoters_rrbs"),
         ("PROTEIN_LEVEL", "LOG2-VALUE", "rppa"),
         ("PROTEIN_LEVEL", "Z-SCORE", "rppa_Zscores"),
         ("PROTEIN_LEVEL", "CONTINUOUS", "protein_quantification"),
