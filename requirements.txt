@@ -4,3 +4,4 @@ Jinja2==2.11.3
 mysqlclient==2.1.0
 PyYAML==6.0.1
 dsnparse==0.1.15
+PyMySQL==1.0.2

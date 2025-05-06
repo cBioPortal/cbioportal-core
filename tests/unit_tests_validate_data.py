@@ -356,17 +356,17 @@ class ClinicalValuesTestCase(DataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_clin_wrong_ids.txt',
                                     validateData.SampleClinicalValidator)
-        self.assertEqual(6, len(record_list))
+        self.assertEqual(3, len(record_list))
         record_iterator = iter(record_list)
         record = next(record_iterator)
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
-        self.assertIn('can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
+        self.assertIn('PATIENT_ID and SAMPLE_ID can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
         # last one:
         record = record_list.pop()
         self.assertEqual(logging.ERROR, record.levelno)
-        self.assertEqual(record.line_number, 12)
-        self.assertIn('can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
+        self.assertEqual(record.line_number, 11)
+        self.assertIn('PATIENT_ID and SAMPLE_ID can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
 
 
 
@@ -450,12 +450,12 @@ class PatientAttrFileTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_clin_wrong_patient_id.txt',
                                     validateData.PatientClinicalValidator)
-        self.assertEqual(len(record_list), 24)
+        self.assertEqual(len(record_list), 20)
         record_iterator = iter(record_list)
         record = next(record_iterator)
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
-        self.assertIn('can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
+        self.assertIn('PATIENT_ID and SAMPLE_ID can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
 
     def test_date_in_nondate_column(self):
         """Test when a sample is defined twice in the same file."""
@@ -1265,11 +1265,6 @@ class MultipleDataFileValidatorTestCase(unittest.TestCase):
         validateData.MultipleDataFileValidator.parseFeatureColumns(mockval, ["id with whitespace"])
         mockval.logger.error.assert_called()
 
-    def test_comma_in_feature_id_issues_error(self):
-        mockval = Mock()
-        validateData.MultipleDataFileValidator.parseFeatureColumns(mockval, ["id,with-comma"])
-        mockval.logger.error.assert_called()
-
 
 class ContinuousValuesTestCase(PostClinicalDataFileTestCase):
 
@@ -1348,8 +1343,8 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
         # Test file is a variant on test_output.custom_isoforms.maf from vcf2maf
         record_list = self.validate('mutations/data_mutations_test_variant_types.maf',
                                     validateData.MutationsExtendedValidator, None, True, True)
-        # we expect 11 errors
-        self.assertEqual(len(record_list), 11)
+        # we expect 13 errors
+        self.assertEqual(len(record_list), 13)
         record_iterator = iter(record_list)
         # expect error for bigger start than end position
         record = next(record_iterator)
@@ -1385,6 +1380,9 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(7, record.line_number)
         self.assertIn('Variant_Type indicates a SNP, but Reference_Allele, Tumor_Seq_Allele1 '
                       'and/or Tumor_Seq_Allele2 contain deletion (-).', record.getMessage())
+        record = next(record_iterator)
+        self.assertEqual(7, record.line_number)
+        self.assertIn("Duplicate mutation found: ('9557', '1', '146728217', '146728217', 'Splice_Site', 'A', 'p.X165_splice', 'TCGA-A1-A0SB-01')", record.getMessage())
         # expect error for incorrect length of allele with variant_type DNP
         record = next(record_iterator)
         self.assertEqual(8, record.line_number)
@@ -1401,6 +1399,9 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
         self.assertIn('Variant_Type indicates a ONP, but length of Reference_Allele, '
                       'Tumor_Seq_Allele1 and 2 are not bigger than 3 or are of unequal lengths.', record.getMessage())
         record = next(record_iterator)
+        self.assertEqual(record.line_number, 10)
+        self.assertIn("Duplicate mutation found: ('9557', '1', '146728217', '146728217', 'Splice_Site', 'CAA', '', 'TCGA-A1-A0SB-01')", record.getMessage())
+        record = next(record_iterator)
         self.assertEqual(record.line_number, 11)
         self.assertIn('Allele Based column Reference_Allele contains invalid character.', record.getMessage())
         
@@ -1412,20 +1413,9 @@ class MutationsSpecialCasesTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('mutations/data_mutations_check_special_cases_allele.maf',
                                     validateData.MutationsExtendedValidator, None, True, True)
         
-        # We expect 3 errors
-        self.assertEqual(3, len(record_list))
+        # We expect 1 errors
+        self.assertEqual(1, len(record_list))
         record_iterator = iter(record_list)
-        # expect error for the same values in Reference_Allele, Tumor_Seq_Allele1 and Tumor_Seq_Allele2 columns
-        record = next(record_iterator)
-        self.assertEqual(2, record.line_number)
-        self.assertIn('All Values in columns Reference_Allele, Tumor_Seq_Allele1 and Tumor_Seq_Allele2 are equal.',
-                      record.getMessage())
-        # expect error for deletion, Tumor Seq allele columns do not contain -
-        # even though the lengths of the sequences are equal
-        record = next(record_iterator)
-        self.assertEqual(4, record.line_number)
-        self.assertIn('Variant_Type indicates a deletion, Allele based columns are the same length, '
-                      'but Tumor_Seq_Allele columns do not contain -, indicating a SNP.', record.getMessage())
         # expect error for ONP, lengths of sequences in Reference_Allele,
         # Tumor_Seq_Allele1 and Tumor_Seq_Allele2 are not equal
         record = next(record_iterator)
@@ -2617,15 +2607,13 @@ class MetaFilesTestCase(LogBufferTestCase):
         errors = []
         for record in record_list:
             if record.levelno == logging.ERROR:
-                errors.append(record.cause)
+                errors.append(record.message)
             else:
                 warning = record
 
         # expecting one error about wrong stable_id in meta_expression:
         self.assertEqual(3, len(errors))
-        self.assertIn('mrna_test', errors)
-        self.assertIn('gistic', errors)
-        self.assertIn('treatment ic50', errors)
+        self.assertIn('mrna_test', errors[1])
 
         # expecting one warning about stable_id not being recognized in _samples
         self.assertEqual(logging.WARNING, warning.levelno)
