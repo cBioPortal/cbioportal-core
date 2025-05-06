@@ -823,7 +823,8 @@ def validate_types_and_id(meta_dictionary, logger, filename):
                 "Invalid genetic_alteration_type, datatype, and stable_id combination: (%s, %s, %s). "
                 "Please check your meta files.",
                 genetic_alteration_type, data_type, stable_id,
-                extra={'filename_': filename}
+                extra={'filename_': filename,
+                       'cause': stable_id}
             )
             result = False
 
