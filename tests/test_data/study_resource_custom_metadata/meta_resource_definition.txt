@@ -1,0 +1,4 @@
+cancer_study_identifier: test_resource_study
+genetic_alteration_type: RESOURCE_DEFINITION
+datatype: RESOURCE_DEFINITION
+data_filename: data_resource_definition_custom_metadata.txt

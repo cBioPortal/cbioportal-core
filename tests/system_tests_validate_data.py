@@ -246,6 +246,38 @@ class ValidateDataSystemTester(unittest.TestCase):
         self.assertFileGenerated(out_file_name,
                                  'test_data/study_quotes/result_report.html')
 
+    def test_resource_definition_custom_metadata(self):
+        '''Test validation of CUSTOM_METADATA in resource definition files.'''
+        study_dir = 'tests/test_data/study_resource_custom_metadata/'
+        
+        # Test case 1: File with valid and invalid JSON metadata
+        # Expecting errors due to invalid JSON, so exit_status = 1
+        print("=== test_resource_definition_custom_metadata")
+        args = ['--study_directory', study_dir,
+                '--portal_info_dir', PORTAL_INFO_DIR, '-v'] # PORTAL_INFO_DIR is a global in the test file
+        parsed_args = validateData.interface(args)
+        exit_status = validateData.main_validate(parsed_args)
+        
+        # Assert that there's an error (exit_status 1) because of the invalid JSON entries
+        self.assertEqual(exit_status, 1, 
+                         "Expected exit_status 1 for resource definition with invalid JSON, but got " + str(exit_status))
+
+        # Optional: Add more specific assertions if the validator logs errors to a file that can be checked.
+        # For instance, if errors are logged to an error file:
+        error_file_path = os.path.join(study_dir, 'errors.txt') # Assuming errors are logged here by the validator
+        args_with_error_file = args + ['--error_file', error_file_path]
+        parsed_args_with_error_file = validateData.interface(args_with_error_file)
+        validateData.main_validate(parsed_args_with_error_file)
+        self.assertTrue(os.path.exists(error_file_path))
+        with open(error_file_path, 'r') as f:
+            errors = f.read()
+            self.assertIn("RES_INVALID_JSON", errors) # Check if specific error messages are present
+            self.assertIn("Invalid JSON in CUSTOM_METADATA column", errors)
+            self.assertIn("RES_INVALID_JSON_UNQUOTED_KEY", errors)
+            self.assertIn("RES_INVALID_JSON_TRAILING_COMMA_IN_ARRAY", errors)
+        if os.path.exists(error_file_path):
+           os.remove(error_file_path)
+
 def _resetClassVars():
     """Reset the state of classes that check mulitple files of the same type.
     
