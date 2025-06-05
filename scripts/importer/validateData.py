@@ -3692,6 +3692,7 @@ class ResourceDefinitionValidator(Validator):
     # 'RESOURCE_ID', 'RESOURCE_TYPE', 'DISPLAY_NAME' are required
     REQUIRE_COLUMN_ORDER = False
     REQUIRED_HEADERS = ['RESOURCE_ID', 'RESOURCE_TYPE', 'DISPLAY_NAME']
+    OPTIONAL_HEADERS = ['DESCRIPTION', 'OPEN_BY_DEFAULT', 'PRIORITY', 'CUSTOM_METADATA']
     NULL_VALUES = ["[not applicable]", "[not available]", "[pending]", "[discrepancy]", "[completed]", "[null]", "", "na"]
     RESOURCE_TYPES = ["SAMPLE", "PATIENT", "STUDY"]
     ALLOW_BLANKS = True
@@ -3772,6 +3773,23 @@ class ResourceDefinitionValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
+            if col_name == 'CUSTOM_METADATA':
+                custom_metadata_value = value.strip()
+                if custom_metadata_value and custom_metadata_value.lower() not in self.NULL_VALUES:
+                    try:
+                        json.loads(custom_metadata_value)
+                    except json.JSONDecodeError as e:
+                        self.logger.error(
+                            'Invalid JSON in CUSTOM_METADATA column.',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value})
+                    except Exception as e:
+                        self.logger.error(
+                            'Error processing CUSTOM_METADATA column.',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value})
         # add resource_id into dictionary
         self.resource_definition_dictionary.setdefault(resource_id, []).append(resource_type)
 

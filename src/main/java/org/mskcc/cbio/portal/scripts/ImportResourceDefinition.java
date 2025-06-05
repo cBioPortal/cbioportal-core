@@ -33,6 +33,7 @@ public class ImportResourceDefinition extends ConsoleRunnable {
     public static final String RESOURCE_TYPE_COLUMN_NAME = "RESOURCE_TYPE";
     public static final String OPEN_BY_DEFAULT_COLUMN_NAME = "OPEN_BY_DEFAULT";
     public static final String PRIORITY_COLUMN_NAME = "PRIORITY";
+    public static final String CUSTOM_METADATA_COLUMN_NAME = "CUSTOM_METADATA";
     public static final int MISSING_COLUMN_INDEX = -1;
     private int numResourceDefinitionsAdded = 0;
 
@@ -73,6 +74,7 @@ public class ImportResourceDefinition extends ConsoleRunnable {
         int resourceTypeIndex = findAndValidateResourceTypeColumn(headerIndexMap);
         int openByDefaultIndex = findAndValidateOpenByDefaultColumn(headerIndexMap);
         int priorityIndex = findAndValidatePriorityColumn(headerIndexMap);
+        int customMetadataIndex = findAndValidateOptionalColumnIndexInHeaders(CUSTOM_METADATA_COLUMN_NAME, headerIndexMap);
 
         while ((line = buff.readLine()) != null) {
             if (skipLine(line.trim())) {
@@ -88,6 +90,7 @@ public class ImportResourceDefinition extends ConsoleRunnable {
             ResourceType resourceType = null;
             Boolean openByDefault = false;
             int priority = 1;
+            String customMetadata = null;
             // get resource definitions from columns
             // get resourceId
             if (isValueNotMissing(fieldValues[resourceIdIndex].toUpperCase())) {
@@ -125,11 +128,15 @@ public class ImportResourceDefinition extends ConsoleRunnable {
                         "priority cannot be parsed as an integer, all priority should be an integer.");
                 }
             }
+            // get customMetadata (optional)
+            if (customMetadataIndex != MISSING_COLUMN_INDEX && isValueNotMissing(fieldValues[customMetadataIndex])) {
+                customMetadata = fieldValues[customMetadataIndex];
+            }
 
             // add resource definitions into database
             ResourceDefinition resource = new ResourceDefinition(resourceId, displayName,
                     description, resourceType, openByDefault,
-                    priority, cancerStudy.getInternalId());
+                    priority, cancerStudy.getInternalId(), customMetadata);
 
             ResourceDefinition resourceInDb = DaoResourceDefinition.getDatum(resource.getResourceId(),
                     cancerStudy.getInternalId());
