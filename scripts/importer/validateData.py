@@ -3783,13 +3783,13 @@ class ResourceDefinitionValidator(Validator):
                             'Invalid JSON in CUSTOM_METADATA column.',
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
-                                   'cause': str(e)})
+                                   'cause': value})
                     except Exception as e:
                         self.logger.error(
                             'Error processing CUSTOM_METADATA column.',
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
-                                   'cause': str(e)})
+                                   'cause': value})
         # add resource_id into dictionary
         self.resource_definition_dictionary.setdefault(resource_id, []).append(resource_type)
 
