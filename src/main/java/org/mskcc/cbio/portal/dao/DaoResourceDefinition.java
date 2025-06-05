@@ -20,8 +20,8 @@ public class DaoResourceDefinition {
         try {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
             pstmt = con.prepareStatement("INSERT INTO resource_definition(" + "`RESOURCE_ID`," + "`DISPLAY_NAME`,"
-                    + "`DESCRIPTION`," + "`RESOURCE_TYPE`," + "`OPEN_BY_DEFAULT`," + "`PRIORITY`," + "`CANCER_STUDY_ID`)"
-                    + " VALUES(?,?,?,?,?,?,?)");
+                    + "`DESCRIPTION`," + "`RESOURCE_TYPE`," + "`OPEN_BY_DEFAULT`," + "`PRIORITY`," + "`CANCER_STUDY_ID`," + "`CUSTOM_METADATA`)"
+                    + " VALUES(?,?,?,?,?,?,?,?)");
             pstmt.setString(1, resource.getResourceId());
             pstmt.setString(2, resource.getDisplayName());
             pstmt.setString(3, resource.getDescription());
@@ -29,6 +29,7 @@ public class DaoResourceDefinition {
             pstmt.setBoolean(5, resource.isOpenByDefault());
             pstmt.setInt(6, resource.getPriority());
             pstmt.setInt(7, resource.getCancerStudyId());
+            pstmt.setString(8, resource.getCustomMetadata());
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
@@ -40,7 +41,7 @@ public class DaoResourceDefinition {
     private static ResourceDefinition unpack(ResultSet rs) throws SQLException {
         return new ResourceDefinition(rs.getString("RESOURCE_ID"), rs.getString("DISPLAY_NAME"), rs.getString("DESCRIPTION"),
                 ResourceType.valueOf(rs.getString("RESOURCE_TYPE")), rs.getBoolean("OPEN_BY_DEFAULT"), rs.getInt("PRIORITY"),
-                rs.getInt("CANCER_STUDY_ID"));
+                rs.getInt("CANCER_STUDY_ID"), rs.getString("CUSTOM_METADATA"));
     }
 
     public static ResourceDefinition getDatum(String resourceId, Integer cancerStudyId) throws DaoException {
