@@ -20,7 +20,7 @@
 
 		<!-- THIS SHOULD BE KEPT IN SYNC TO VERSION IN CGDS.SQL -->
 		<db.version>2.14.2</db.version>
-		<cbioportal.version>v6.0.3</cbioportal.version>
+		<cbioportal.version>v6.3.5</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
 
 
@@ -55,7 +55,7 @@
 	<dependencies>
 		<!-- cBioPortal Projects -->
 		<dependency>
-			<groupId>org.cbioportal</groupId>
+			<groupId>io.github.cbioportal</groupId>
 			<artifactId>cbioportal</artifactId>
 			<version>${cbioportal.version}</version>
 		</dependency>
