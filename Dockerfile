@@ -1,46 +1,55 @@
-FROM maven:3-eclipse-temurin-21 as jar_builder
-
-# Set the working directory in the Maven image
+# -------- Build the JAR --------
+FROM maven:3-eclipse-temurin-21 AS jar_builder
 WORKDIR /app
 
-# Copy the java source files and the pom.xml file into the image
-COPY src ./src
+# Copy only pom first to leverage cache if deps don't change
 COPY pom.xml .
 
-# Build the application
+# Now copy sources and build
+COPY src ./src
 RUN mvn clean package -DskipTests
 
+# -------- Runtime image --------
 FROM maven:3-eclipse-temurin-21
 
-# download system dependencies first to take advantage of docker caching
-RUN apt-get update; apt-get install -y --no-install-recommends \
-        build-essential \
-        default-mysql-client \
-        default-libmysqlclient-dev \
-        python3 \
-        python3-setuptools \
-        python3-dev \
-        python3-pip \
-        unzip \
-        perl \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip3 install wheel
+# System deps first (single layer), then clean apt cache
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential \
+      default-mysql-client \
+      default-libmysqlclient-dev \
+      python3 \
+      python3-dev \
+      python3-venv \
+      python3-setuptools \
+      python3-pip \
+      unzip \
+      perl \
+  && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Create and use a virtualenv to avoid PEP 668 issues
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv "$VIRTUAL_ENV" && "$VIRTUAL_ENV/bin/pip" install --upgrade pip
 
+# Install Python deps into the venv
+COPY requirements.txt /tmp/requirements.txt
+RUN "$VIRTUAL_ENV/bin/pip" install --no-cache-dir wheel \
+ && "$VIRTUAL_ENV/bin/pip" install --no-cache-dir -r /tmp/requirements.txt
 
-RUN ln -s $(which python3) /usr/local/bin/python || true
+# Make venv first on PATH (so `python`, `pip` refer to venv)
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-COPY --from=jar_builder /app/core-*.jar /
-COPY scripts/ scripts/
+# Optional convenience symlink; safe now that venv is first in PATH
+RUN ln -s "$(which python3)" /usr/local/bin/python || true
+
+# Copy the built JAR (note the /target path)
+COPY --from=jar_builder /app/target/core-*.jar /core.jar
+
+# Scripts
+COPY scripts/ /scripts/
 RUN chmod -R a+x /scripts/
 
-# Set the working directory in the container
 WORKDIR /scripts/
-
 ENV PORTAL_HOME=/
 
-# This file is empty. It has to be overriden by bind mounting the actual application.properties
+# Placeholder that will be bind-mounted in runtime
 RUN touch /application.properties
