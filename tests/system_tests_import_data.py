@@ -148,6 +148,27 @@ class DataImporterTests(unittest.TestCase):
         self.assertTrue(run_java.call_args_list.index(clinical_sample_call) < run_java.call_args_list.index(mutation_call))
         self.assertTrue(run_java.call_args_list.index(clinical_sample_call) < run_java.call_args_list.index(case_list_call))
 
+
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_incremental_load_cna_discrete_long(self, run_java, locate_jar):
+        '''
+        Tests java commands incremental load produces
+        '''
+        locate_jar.return_value = "test.jar"
+        data_directory = 'test_data/study_es_0_inc_cna_long/cna_long/'
+        args = ['--data_directory', data_directory]
+        parsed_args = cbioportalImporter.interface(args)
+        cbioportalImporter.main(parsed_args)
+        cna_discrete_long_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
+                '--meta', f'{data_directory}/meta_cna_discrete_long.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete_long.txt', '--noprogress')
+
+            # Assert all expected calls are present, with the new call replacing the old one
+        self.assertCountEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
+            cna_discrete_long_call,
+            ])
+
     @mock.patch('importer.cbioportalImporter.locate_jar')
     @mock.patch('importer.cbioportalImporter.run_java')
     def test_remove_samples(self, run_java, locate_jar):

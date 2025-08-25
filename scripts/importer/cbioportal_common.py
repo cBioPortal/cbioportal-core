@@ -380,6 +380,7 @@ INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
     MetaFileTypes.MUTATION_UNCALLED,
     MetaFileTypes.EXPRESSION,
     MetaFileTypes.CNA_DISCRETE,
+    MetaFileTypes.CNA_DISCRETE_LONG,
     MetaFileTypes.CNA_CONTINUOUS,
     MetaFileTypes.CNA_LOG2,
     MetaFileTypes.METHYLATION,
