@@ -44,7 +44,7 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import java.io.File;
 import java.util.Set;
 
-import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
+import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 /**
  * Import 'profile' files that contain data matrices indexed by gene, case.

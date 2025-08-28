@@ -6,7 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-import org.cbioportal.model.GeneticEntity;
+import org.cbioportal.legacy.model.GeneticEntity;
 
 public class DaoGeneticEntity {
 

@@ -524,7 +524,7 @@ public class GlobalProperties {
 	}
 
     // This method is the equivalent of @portalSecurityConfig.userAuthorizationEnabled()
-    // method in the org.cbioportal.utils package. Update both when changes are needed.
+    // method in the org.cbioportal.legacy.utils package. Update both when changes are needed.
     public static boolean usersMustAuthenticate()
     {
         // authentication for social_auth/social_auth_google/social_auth_microsoft is optional

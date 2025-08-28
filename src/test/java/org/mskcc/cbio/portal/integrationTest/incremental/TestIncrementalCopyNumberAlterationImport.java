@@ -17,7 +17,7 @@
 
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
-import org.cbioportal.model.CNA;
+import org.cbioportal.legacy.model.CNA;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

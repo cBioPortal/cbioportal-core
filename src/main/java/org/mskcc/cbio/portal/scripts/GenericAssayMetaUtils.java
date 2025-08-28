@@ -1,7 +1,7 @@
 package org.mskcc.cbio.portal.scripts;
 
-import org.cbioportal.model.EntityType;
-import org.cbioportal.model.GeneticEntity;
+import org.cbioportal.legacy.model.EntityType;
+import org.cbioportal.legacy.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 
