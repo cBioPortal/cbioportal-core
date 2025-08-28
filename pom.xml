@@ -55,7 +55,7 @@
 	<dependencies>
 		<!-- cBioPortal Projects -->
 		<dependency>
-			<groupId>org.cbioportal</groupId>
+			<groupId>com.github.cbioportal</groupId>
 			<artifactId>cbioportal</artifactId>
 			<version>${cbioportal.version}</version>
 		</dependency>
