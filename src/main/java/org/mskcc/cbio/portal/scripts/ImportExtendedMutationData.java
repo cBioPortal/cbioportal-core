@@ -474,10 +474,6 @@ public class ImportExtendedMutationData {
                 }
             }
         }
-        // samples already upserted from gene panel matrix
-        ArrayList<Integer> allSampleIdsInProfile = DaoSampleProfile.getAllSampleIdsInProfile(geneticProfileId);
-        // upsert samples not already upserted from gene panel matrix
-        internalSampleIds.removeAll(allSampleIdsInProfile);
         DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
 
         for (MutationEvent event : newEvents) {
