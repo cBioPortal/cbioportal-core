@@ -651,7 +651,7 @@ def get_meta_file_type(meta_dictionary, logger, filename):
      Returns one of the metatypes found in MetaFileTypes
 
      NB: a subset of these types (combined with allowed_data_types.txt)
-     is also tracked in org.cbioportal.model.GeneticProfile.java. If you add
+     is also tracked in org.cbioportal.legacy.model.GeneticProfile.java. If you add
      things here, please make sure to update there as well if it regards a
      genetic profile data type.
     """

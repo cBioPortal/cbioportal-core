@@ -24,16 +24,16 @@
 
         <!-- scan for mappers and let them be autowired -->
         <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
-            <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.persistence.mybatis" />
+            <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.legacy.persistence.mybatis" />
         </bean>
 
 
-        <bean id="cacheMapUtil" class="org.cbioportal.persistence.cachemaputil.InactiveCacheMapUtil" />
+        <bean id="cacheMapUtil" class="org.cbioportal.legacy.persistence.cachemaputil.InactiveCacheMapUtil" />
 
         <!-- enable component scanning (beware that this does not enable mapper scanning!) -->
         <context:component-scan base-package="org.mskcc.cbio.portal.util"/> <!-- - mainly to inject into global properties -->
-        <context:component-scan base-package="org.cbioportal.persistence" />
-        <context:component-scan base-package="org.cbioportal.service" />
+        <context:component-scan base-package="org.cbioportal.legacy.persistence" />
+        <context:component-scan base-package="org.cbioportal.legacy.service" />
 
         <!-- enable autowire -->
         <context:annotation-config />
@@ -47,7 +47,7 @@
             <property name="dataSource" ref="businessDataSource" />
         </bean>
 
-        <bean id="customObjectFactory" class="org.cbioportal.persistence.mybatis.util.CustomMyBatisObjectFactory" />
+        <bean id="customObjectFactory" class="org.cbioportal.legacy.persistence.mybatis.util.CustomMyBatisObjectFactory" />
 
         <bean id="databaseIdProvider" class="org.apache.ibatis.mapping.VendorDatabaseIdProvider">
             <property name="properties">
@@ -61,7 +61,7 @@
         <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
             <property name="dataSource" ref="businessDataSource" />
             <property name="typeAliasesPackage" value="org.mskcc.cbio.portal.model" />
-            <property name="typeHandlersPackage" value="org.cbioportal.persistence.mybatis.typehandler" />
+            <property name="typeHandlersPackage" value="org.cbioportal.legacy.persistence.mybatis.typehandler" />
             <property name="objectFactory" ref="customObjectFactory" />
             <property name="configuration">
                 <bean class="org.apache.ibatis.session.Configuration">

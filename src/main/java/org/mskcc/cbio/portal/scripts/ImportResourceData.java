@@ -5,7 +5,7 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.collections4.map.MultiKeyMap;
-import org.cbioportal.model.ResourceType;
+import org.cbioportal.legacy.model.ResourceType;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoResourceData;

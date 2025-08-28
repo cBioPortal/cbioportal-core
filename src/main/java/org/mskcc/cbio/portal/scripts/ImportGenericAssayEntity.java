@@ -44,9 +44,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.cbioportal.model.EntityType;
-import org.cbioportal.model.GenericEntityProperty;
-import org.cbioportal.model.GeneticEntity;
+import org.cbioportal.legacy.model.EntityType;
+import org.cbioportal.legacy.model.GenericEntityProperty;
+import org.cbioportal.legacy.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;

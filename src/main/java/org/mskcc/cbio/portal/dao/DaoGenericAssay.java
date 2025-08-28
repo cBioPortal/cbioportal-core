@@ -5,9 +5,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.cbioportal.model.GenericEntityProperty;
-import org.cbioportal.model.GeneticEntity;
-import org.cbioportal.model.meta.GenericAssayMeta;
+import org.cbioportal.legacy.model.GenericEntityProperty;
+import org.cbioportal.legacy.model.GeneticEntity;
+import org.cbioportal.legacy.model.meta.GenericAssayMeta;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 

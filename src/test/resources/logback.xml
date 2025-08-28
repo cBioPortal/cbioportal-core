@@ -12,7 +12,7 @@
             <appender-ref ref="STDOUT" />
         </logger>
     
-        <logger name="org.cbioportal.security" level="debug">
+        <logger name="org.cbioportal.legacy.security" level="debug">
             <appender-ref ref="STDOUT" />
         </logger>
     -->

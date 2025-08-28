@@ -3,7 +3,7 @@ package org.mskcc.cbio.portal.dao;
 import org.mskcc.cbio.portal.model.*;
 
 import org.apache.commons.lang3.StringUtils;
-import org.cbioportal.model.ResourceType;
+import org.cbioportal.legacy.model.ResourceType;
 
 import java.sql.*;
 import java.util.*;

@@ -32,7 +32,7 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
-import org.cbioportal.model.GeneticEntity;
+import org.cbioportal.legacy.model.GeneticEntity;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

@@ -32,7 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-import org.cbioportal.model.CNA;
+import org.cbioportal.legacy.model.CNA;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 
 /**

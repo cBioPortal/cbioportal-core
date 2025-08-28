@@ -1,7 +1,7 @@
 package org.mskcc.cbio.portal.util;
 
 import com.fasterxml.jackson.core.*;
-import org.cbioportal.model.*;
+import org.cbioportal.legacy.model.*;
 import org.mskcc.cbio.maf.NamespaceColumnParser;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.dao.*;

@@ -1,4 +1,4 @@
-package org.cbioportal.model.util;
+package org.cbioportal.legacy.model.util;
 
 import org.junit.Assert;
 import org.junit.Test;

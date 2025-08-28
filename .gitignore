@@ -42,3 +42,6 @@ __pycache__/
 
 # app properties that contains credentials
 /application.properties
+
+# ignore maven properties
+maven.properties

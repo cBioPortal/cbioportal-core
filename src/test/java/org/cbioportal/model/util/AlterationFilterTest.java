@@ -1,8 +1,8 @@
-package org.cbioportal.model.util;
+package org.cbioportal.legacy.model.util;
 
-import org.cbioportal.model.AlterationFilter;
-import org.cbioportal.model.CNA;
-import org.cbioportal.model.MutationEventType;
+import org.cbioportal.legacy.model.AlterationFilter;
+import org.cbioportal.legacy.model.CNA;
+import org.cbioportal.legacy.model.MutationEventType;
 import org.junit.Assert;
 import org.junit.Test;
 

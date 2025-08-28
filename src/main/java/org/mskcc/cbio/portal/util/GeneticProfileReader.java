@@ -48,8 +48,8 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfileLink;
 import org.mskcc.cbio.portal.scripts.TrimmedProperties;
 
-import static org.cbioportal.model.MolecularProfile.DataType.DISCRETE;
-import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
+import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
+import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 /**
  * Prepare a GeneticProfile for having its data loaded.

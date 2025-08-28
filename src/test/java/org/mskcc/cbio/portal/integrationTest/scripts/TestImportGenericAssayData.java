@@ -27,7 +27,7 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
-import org.cbioportal.model.meta.GenericAssayMeta;
+import org.cbioportal.legacy.model.meta.GenericAssayMeta;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
