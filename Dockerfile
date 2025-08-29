@@ -42,7 +42,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN ln -s "$(which python3)" /usr/local/bin/python || true
 
 # Copy the built JAR
-COPY --from=jar_builder /app/core-*.jar /core.jar
+COPY --from=jar_builder /app/core-*.jar /
 
 # Scripts
 COPY scripts/ /scripts/
