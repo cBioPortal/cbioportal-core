@@ -41,8 +41,8 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Optional convenience symlink; safe now that venv is first in PATH
 RUN ln -s "$(which python3)" /usr/local/bin/python || true
 
-# Copy the built JAR (note the /target path)
-COPY --from=jar_builder /app/target/core-*.jar /core.jar
+# Copy the built JAR
+COPY --from=jar_builder /app/core-*.jar /core.jar
 
 # Scripts
 COPY scripts/ /scripts/
