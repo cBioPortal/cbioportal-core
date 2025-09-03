@@ -82,7 +82,7 @@ public final class DaoSampleProfile {
                     ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
                             " VALUES" +
                             String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
-                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = IF(VALUES(`PANEL_ID`) IS NOT NULL, VALUES(`PANEL_ID`), `PANEL_ID`);");
+                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);");
             int parameterIndex = 1;
             for (SampleProfileTuple idTuple : idTuples) {
                 pstmt.setInt(parameterIndex++, idTuple.sampleId());

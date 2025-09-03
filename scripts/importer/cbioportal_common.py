@@ -373,11 +373,9 @@ META_FIELD_MAP = {
 }
 
 # order is important! This is the order in which they should be loaded:
-# mutation is dependent on gene panel matrix
 INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
     MetaFileTypes.PATIENT_ATTRIBUTES,
     MetaFileTypes.SAMPLE_ATTRIBUTES,
-    MetaFileTypes.GENE_PANEL_MATRIX,
     MetaFileTypes.MUTATION,
     MetaFileTypes.MUTATION_UNCALLED,
     MetaFileTypes.EXPRESSION,
@@ -390,6 +388,7 @@ INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
     MetaFileTypes.GENERIC_ASSAY_BINARY,
     MetaFileTypes.GENERIC_ASSAY_CATEGORICAL,
     MetaFileTypes.TIMELINE,
+    MetaFileTypes.GENE_PANEL_MATRIX,
     MetaFileTypes.STRUCTURAL_VARIANT,
     MetaFileTypes.SEG,
 ]

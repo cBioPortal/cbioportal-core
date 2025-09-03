@@ -411,11 +411,7 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         meta_filename, data_filename = sample_resource_filepair
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
-    if gene_panel_matrix_filepair is not None:
-        meta_filename, data_filename = gene_panel_matrix_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
-
-    # Next, import everything else except structural variant data, GSVA and
+    # Next, import everything else except gene panel, structural variant data, GSVA and
     # z-score expression. If in the future more types refer to each other, (like
     # in a tree structure) this could be programmed in a recursive fashion.
     for meta_filename, data_filename in regular_filepairs:
@@ -445,6 +441,10 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
 
         # Second import the GSVA p-value data
         meta_filename, data_filename = gsva_pvalue_filepair
+        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+
+    if gene_panel_matrix_filepair is not None:
+        meta_filename, data_filename = gene_panel_matrix_filepair
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Import the case lists
