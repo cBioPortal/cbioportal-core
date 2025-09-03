@@ -509,6 +509,14 @@ public class ImportExtendedMutationData {
             throw new DaoException("Duplicate mutation events were detected during this import. Aborting...");
         }
 
+        /*
+         * At MSKCC there are some MUTATION_UNCALLED
+         * profiles that shouldn't be included when determining the number of
+         * mutations for a sample
+         */
+        if (geneticProfile.getGeneticAlterationType().equals(GeneticAlterationType.MUTATION_EXTENDED)) {
+            DaoMutation.createMutationCountClinicalData(geneticProfile);
+        }
         // the mutation count by keyword is on a per genetic profile basis so
         // fine to calculate for any genetic profile
         ProgressMonitor.setCurrentMessage("Calculating mutation counts by keyword...");
