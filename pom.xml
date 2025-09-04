@@ -43,7 +43,7 @@
 		<fop.version>2.6</fop.version>
 		<opencsv.version>2.4</opencsv.version>
 		<dom4j.version>1.6.1</dom4j.version>
-		<spring_starter_test.version>3.1.4</spring_starter_test.version>
+		<spring_starter_test.version>3.5.0</spring_starter_test.version>
 		<junit.version>4.13.2</junit.version>
 		<jakarta_ws_rs.version>3.1.0</jakarta_ws_rs.version>
 		<easymock.version>4.3</easymock.version>
