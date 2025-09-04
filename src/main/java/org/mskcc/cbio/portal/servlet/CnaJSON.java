@@ -38,7 +38,7 @@ import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.cbioportal.model.CNA;
+import org.cbioportal.legacy.model.CNA;
 
 import java.io.*;
 import java.util.*;

@@ -70,7 +70,7 @@
     <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
         <property name="dataSource" ref="businessDataSource" />
         <property name="typeAliasesPackage" value="org.mskcc.cbio.portal.model" />
-        <property name="typeHandlersPackage" value="org.cbioportal.persistence.mybatis.typehandler" /><!-- this can prob. be multiple , separated items like other package config below -->
+        <property name="typeHandlersPackage" value="org.cbioportal.legacy.persistence.mybatis.typehandler" /><!-- this can prob. be multiple , separated items like other package config below -->
         <!-- mapper locations is set here to support interdependency between mappers without -->
         <!-- having to autowire repositories into java classes that do not make direct uses of them -->
         <property name="mapperLocations" value="classpath*:org/cbioportal/persistence/mybatis/**/*.xml"/>
@@ -91,7 +91,7 @@
 
     <!-- scan for mappers and let them be autowired -->
     <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
-        <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.persistence.mybatis" />
+        <property name="basePackage" value="org.mskcc.cbio.portal.persistence,org.cbioportal.legacy.persistence.mybatis" />
     </bean>
 
     <!-- enable autowire -->

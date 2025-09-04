@@ -37,8 +37,8 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.cbioportal.model.EntityType;
-import org.cbioportal.model.GeneticEntity;
+import org.cbioportal.legacy.model.EntityType;
+import org.cbioportal.legacy.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyNode;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Geneset;

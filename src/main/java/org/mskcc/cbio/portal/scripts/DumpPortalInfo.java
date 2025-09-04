@@ -24,9 +24,9 @@ package org.mskcc.cbio.portal.scripts;
 
 import org.mskcc.cbio.portal.util.SpringUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.cbioportal.service.GenesetService;
-import org.cbioportal.service.GenePanelService;
-import org.cbioportal.web.config.CustomObjectMapper;
+import org.cbioportal.legacy.service.GenesetService;
+import org.cbioportal.legacy.service.GenePanelService;
+import org.cbioportal.legacy.web.config.CustomObjectMapper;
 
 import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.model.*;

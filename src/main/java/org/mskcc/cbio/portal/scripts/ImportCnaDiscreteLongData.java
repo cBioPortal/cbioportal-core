@@ -57,8 +57,8 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
-import static org.cbioportal.model.MolecularProfile.DataType.DISCRETE;
-import static org.cbioportal.model.MolecularProfile.ImportType.DISCRETE_LONG;
+import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
+import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 public class ImportCnaDiscreteLongData {
 

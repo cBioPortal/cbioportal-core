@@ -17,7 +17,6 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
-import io.swagger.models.auth.In;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
