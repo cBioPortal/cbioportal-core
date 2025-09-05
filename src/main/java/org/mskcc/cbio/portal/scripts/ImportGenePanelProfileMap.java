@@ -39,10 +39,12 @@ import joptsimple.OptionSpec;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoGenePanel;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GenePanel;
+import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -197,6 +199,17 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
             }
 
             DaoSampleProfile.upsertSampleToProfileMapping(sampleProfileTuples);
+        }
+
+        // update mutation counts with the latest sequencing information after the sample profile upsert
+        // deals with issue where mutation counts are missing due to sample profile not yet updated at the time of
+        // the first mutation count calculation during the mutation import
+        ProgressMonitor.setCurrentMessage("Updating mutation counts in database..");
+        for (int i = 0; i < profileIds.size(); i++) {
+            GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(profileIds.get(i));
+            if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_EXTENDED) {
+                DaoMutation.createMutationCountClinicalData(geneticProfile);
+            }
         }
     }
 
