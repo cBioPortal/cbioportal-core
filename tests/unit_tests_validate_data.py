@@ -2754,6 +2754,24 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('Missing RESOURCE_ID', record.getMessage())
 
+    def test_resource_definition_custom_metadata(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_definition_invalid_custom_metadata.txt',
+                            validateData.ResourceDefinitionValidator)
+        self.assertEqual(3, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('Invalid JSON in CUSTOM_METADATA column', record.getMessage())
+        self.assertEqual(record.cause, '["item1", "item2",]')
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('Invalid JSON in CUSTOM_METADATA column', record.getMessage())
+        self.assertEqual(record.cause, '{key: "value"}')
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('Invalid JSON in CUSTOM_METADATA column', record.getMessage())
+        self.assertEqual(record.cause, '{"key": "value", "number": 123,}')
+
 class ResourceWiseTestCase(PostClinicalDataFileTestCase):
     def test_resource_is_not_url(self):
         # set RESOURCE_DEFINITION_DICTIONARY (which should be initialized before validate resource data)

@@ -11,9 +11,10 @@ public class ResourceDefinition {
     private boolean openByDefault;
     private Integer priority;
     private Integer cancerStudyId;
+    private String customMetadata;
 
     public ResourceDefinition(String resourceId, String displayName,
-            String description, ResourceType resourceType, boolean openByDefault, Integer priority, Integer cancerStudyId) {
+            String description, ResourceType resourceType, boolean openByDefault, Integer priority, Integer cancerStudyId, String customMetadata) {
         this.resourceId = resourceId;
         this.displayName = displayName;
         this.description = description;
@@ -21,6 +22,7 @@ public class ResourceDefinition {
         this.openByDefault = openByDefault;
         this.priority = priority;
         this.cancerStudyId = cancerStudyId;
+        this.customMetadata = customMetadata;
     }
 
     public String getResourceId() {
@@ -75,5 +77,13 @@ public class ResourceDefinition {
     }
     public void setCancerStudyId(Integer cancerStudyId) {
         this.cancerStudyId = cancerStudyId;
+    }
+
+    public String getCustomMetadata() {
+        return customMetadata;
+    }
+
+    public void setCustomMetadata(String customMetadata) {
+        this.customMetadata = customMetadata;
     }
 }
