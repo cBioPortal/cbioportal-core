@@ -95,7 +95,7 @@ MAX_SAMPLE_STABLE_ID_LENGTH = 63
 INVALID_ID_CHARACTERS = r"[^A-Za-z0-9._()\[\]',+\-:;]"
 
 # global variable that defines valid study identifier characters
-VALID_STUDY_ID_REGEX = re.compile(r"^[A-Za-z0-9_-]+$")
+VALID_STUDY_ID_REGEX = re.compile(r"^[a-z0-9_]+$")
 
 # ----------------------------------------------------------------------------
 
@@ -4785,10 +4785,10 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         if study_id is None and 'cancer_study_identifier' in meta_dictionary:
             study_id = meta_dictionary['cancer_study_identifier']
             
-            # Validate that study_id contains only alphanumeric characters, underscores, and hyphens
+            # Validate that study_id contains only lowercase alphanumeric characters and underscores
             if study_id and not VALID_STUDY_ID_REGEX.match(study_id):
                 logger.error(
-                    'cancer_study_identifier is not valid. It should only contain alphanumeric characters, underscores, and hyphens',
+                    'cancer_study_identifier is not valid. It should only contain lowercase letters, numbers, and underscores',
                     extra={'filename_': filename,
                            'cause': study_id})
         

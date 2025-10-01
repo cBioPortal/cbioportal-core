@@ -2492,12 +2492,12 @@ class StudyCompositionTestCase(LogBufferTestCase):
             # Filter for the study identifier error
             study_id_errors = [r for r in record_list if 'cancer_study_identifier' in r.getMessage()]
             self.assertGreater(len(study_id_errors), 0, "Expected at least one error for invalid cancer_study_identifier")
-            self.assertIn('alphanumeric', study_id_errors[0].getMessage().lower())
+            self.assertIn('lowercase', study_id_errors[0].getMessage().lower())
             self.assertEqual('study+test', study_id_errors[0].cause)
     
     def test_invalid_study_identifier_with_special_chars(self):
         """Test if an error is reported when cancer_study_identifier contains various special characters."""
-        invalid_ids = ['study@test', 'study test', 'study.test', 'study:test', 'study;test']
+        invalid_ids = ['study@test', 'study test', 'study.test', 'study:test', 'study;test', 'study-test', 'StudyTest']
         for invalid_id in invalid_ids:
             with temp_inputfolder({
                 'meta_study.txt': textwrap.dedent(f'''\
@@ -2539,7 +2539,7 @@ class StudyCompositionTestCase(LogBufferTestCase):
     
     def test_valid_study_identifier(self):
         """Test that valid study identifiers are accepted."""
-        valid_ids = ['study_test', 'study-test', 'StudyTest123', 'study_test_123', 'study-test-123']
+        valid_ids = ['study_test', 'studytest123', 'study_test_123', 'test123']
         for valid_id in valid_ids:
             with temp_inputfolder({
                 'meta_study.txt': textwrap.dedent(f'''\
