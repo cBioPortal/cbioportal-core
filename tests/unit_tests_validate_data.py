@@ -2456,6 +2456,127 @@ class StudyCompositionTestCase(LogBufferTestCase):
             self.assertEqual(0, len(record_list))
             for record in record_list:
                 self.assertEqual(logging.ERROR, record.levelno)
+    
+    def test_invalid_study_identifier_with_plus(self):
+        """Test if an error is reported when cancer_study_identifier contains a plus sign."""
+        with temp_inputfolder({
+            'meta_study.txt': textwrap.dedent('''\
+                cancer_study_identifier: study+test
+                type_of_cancer: brca
+                name: Test Study
+                description: Test study with plus in identifier
+                '''),
+            'meta_samples.txt': textwrap.dedent('''\
+                cancer_study_identifier: study+test
+                genetic_alteration_type: CLINICAL
+                datatype: SAMPLE_ATTRIBUTES
+                data_filename: data_samples.txt
+                '''),
+            'data_samples.txt': textwrap.dedent('''\
+                #Patient Identifier\tSample Identifier
+                #PatID\tSampId
+                #STRING\tSTRING
+                #1\t1
+                PATIENT_ID\tSAMPLE_ID
+                Patient1\tPatient1-Sample1
+                ''')
+        }) as study_dir:
+            self.logger.setLevel(logging.ERROR)
+            validateData.validate_study(
+                study_dir,
+                PORTAL_INSTANCE,
+                self.logger,
+                relaxed_mode=False,
+                strict_maf_checks=False)
+            record_list = self.get_log_records()
+            # Filter for the study identifier error
+            study_id_errors = [r for r in record_list if 'cancer_study_identifier' in r.getMessage()]
+            self.assertGreater(len(study_id_errors), 0, "Expected at least one error for invalid cancer_study_identifier")
+            self.assertIn('alphanumeric', study_id_errors[0].getMessage().lower())
+            self.assertEqual('study+test', study_id_errors[0].cause)
+    
+    def test_invalid_study_identifier_with_special_chars(self):
+        """Test if an error is reported when cancer_study_identifier contains various special characters."""
+        invalid_ids = ['study@test', 'study test', 'study.test', 'study:test', 'study;test']
+        for invalid_id in invalid_ids:
+            with temp_inputfolder({
+                'meta_study.txt': textwrap.dedent(f'''\
+                    cancer_study_identifier: {invalid_id}
+                    type_of_cancer: brca
+                    name: Test Study
+                    description: Test study
+                    '''),
+                'meta_samples.txt': textwrap.dedent(f'''\
+                    cancer_study_identifier: {invalid_id}
+                    genetic_alteration_type: CLINICAL
+                    datatype: SAMPLE_ATTRIBUTES
+                    data_filename: data_samples.txt
+                    '''),
+                'data_samples.txt': textwrap.dedent('''\
+                    #Patient Identifier\tSample Identifier
+                    #PatID\tSampId
+                    #STRING\tSTRING
+                    #1\t1
+                    PATIENT_ID\tSAMPLE_ID
+                    Patient1\tPatient1-Sample1
+                    ''')
+            }) as study_dir:
+                self.logger.setLevel(logging.ERROR)
+                validateData.validate_study(
+                    study_dir,
+                    PORTAL_INSTANCE,
+                    self.logger,
+                    relaxed_mode=False,
+                    strict_maf_checks=False)
+                record_list = self.get_log_records()
+                # Filter for the study identifier error
+                study_id_errors = [r for r in record_list if 'cancer_study_identifier' in r.getMessage()]
+                self.assertGreater(len(study_id_errors), 0, 
+                                   f"Expected at least one error for invalid cancer_study_identifier: {invalid_id}")
+                self.assertEqual(invalid_id, study_id_errors[0].cause)
+                # Clear the buffer for next iteration
+                self.buffer_handler.flush()
+    
+    def test_valid_study_identifier(self):
+        """Test that valid study identifiers are accepted."""
+        valid_ids = ['study_test', 'study-test', 'StudyTest123', 'study_test_123', 'study-test-123']
+        for valid_id in valid_ids:
+            with temp_inputfolder({
+                'meta_study.txt': textwrap.dedent(f'''\
+                    cancer_study_identifier: {valid_id}
+                    type_of_cancer: brca
+                    name: Test Study
+                    description: Test study
+                    '''),
+                'meta_samples.txt': textwrap.dedent(f'''\
+                    cancer_study_identifier: {valid_id}
+                    genetic_alteration_type: CLINICAL
+                    datatype: SAMPLE_ATTRIBUTES
+                    data_filename: data_samples.txt
+                    '''),
+                'data_samples.txt': textwrap.dedent('''\
+                    #Patient Identifier\tSample Identifier
+                    #PatID\tSampId
+                    #STRING\tSTRING
+                    #1\t1
+                    PATIENT_ID\tSAMPLE_ID
+                    Patient1\tPatient1-Sample1
+                    ''')
+            }) as study_dir:
+                self.logger.setLevel(logging.ERROR)
+                validateData.validate_study(
+                    study_dir,
+                    PORTAL_INSTANCE,
+                    self.logger,
+                    relaxed_mode=False,
+                    strict_maf_checks=False)
+                record_list = self.get_log_records()
+                # Filter for the study identifier error - there should be none
+                study_id_errors = [r for r in record_list if 'cancer_study_identifier' in r.getMessage()]
+                self.assertEqual(0, len(study_id_errors), 
+                                 f"Expected no errors for valid cancer_study_identifier: {valid_id}")
+                # Clear the buffer for next iteration
+                self.buffer_handler.flush()
 
 class CaseListDirTestCase(PostClinicalDataFileTestCase):
 
