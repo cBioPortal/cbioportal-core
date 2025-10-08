@@ -156,14 +156,13 @@ class DataImporterTests(unittest.TestCase):
         Tests java commands incremental load produces
         '''
         locate_jar.return_value = "test.jar"
-        data_directory = 'test_data/study_es_0_inc_cna_long/cna_long/'
+        data_directory = 'test_data/study_es_0_inc/cna_long'
         args = ['--data_directory', data_directory]
         parsed_args = cbioportalImporter.interface(args)
         cbioportalImporter.main(parsed_args)
         cna_discrete_long_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
                 '--meta', f'{data_directory}/meta_cna_discrete_long.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete_long.txt', '--noprogress')
 
-            # Assert all expected calls are present, with the new call replacing the old one
         self.assertCountEqual(run_java.call_args_list, [
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
             cna_discrete_long_call,
