@@ -267,7 +267,7 @@ def check_and_remove_type_of_cancer_id_foreign_key(cursor):
 
 
 def strip_trailing_comment_from_line(line):
-    line_parts = re.split("--\s", line)
+    line_parts = re.split(r"--\s", line)
     return line_parts[0]
 
 
