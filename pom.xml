@@ -9,7 +9,7 @@
 
 	<groupId>org.mskcc.cbio</groupId>
 	<artifactId>core</artifactId>
-	<version>1.0.12</version>
+	<version>1.0.13</version>
 
 	<name>Portal Core</name>
 	<description>Core libraries shared among other modules</description>
@@ -20,7 +20,7 @@
 
 		<!-- THIS SHOULD BE KEPT IN SYNC TO VERSION IN CGDS.SQL -->
 		<db.version>2.14.5</db.version>
-		<cbioportal.version>v6.3.6</cbioportal.version>
+		<cbioportal.version>v6.4.1</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
 
 
