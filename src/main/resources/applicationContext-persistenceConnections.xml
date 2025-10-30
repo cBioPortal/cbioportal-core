@@ -34,7 +34,9 @@
         <context:component-scan base-package="org.mskcc.cbio.portal.util"/> <!-- - mainly to inject into global properties -->
         <context:component-scan base-package="org.cbioportal.legacy.persistence" />
         <context:component-scan base-package="org.cbioportal.legacy.service" />
-        <context:component-scan base-package="org.cbioportal.legacy.web" />
+        <context:component-scan base-package="org.cbioportal.legacy.web.util">
+            <context:exclude-filter type="regex" expression="org\.cbioportal\.legacy\.web\.util\.RequestBodyGZipFilter"/>
+        </context:component-scan>
 
         <!-- enable autowire -->
         <context:annotation-config />
