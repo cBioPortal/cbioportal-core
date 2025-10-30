@@ -9,7 +9,7 @@
 
 	<groupId>org.mskcc.cbio</groupId>
 	<artifactId>core</artifactId>
-	<version>1.0.13</version>
+	<version>1.0.14</version>
 
 	<name>Portal Core</name>
 	<description>Core libraries shared among other modules</description>
