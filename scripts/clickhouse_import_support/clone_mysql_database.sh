@@ -191,6 +191,9 @@ function destination_table_matches_source_table() {
     local source_table_full_name="\`$source_database_name\`.\`$table_name\`"
     local destination_table_full_name="\`$destination_database_name\`.\`$table_name\`"
     local get_record_counts_statement="SELECT count(*) AS record_count from $destination_table_full_name UNION DISTINCT SELECT count(*) as record_count from $source_table_full_name;"
+    if [ "$table_name" == "genetic_alteration" ] && [ "$SKIP_VERIFICATION_OF_GENETIC_ALTERATION_COPIES" == "yes" ] ; then
+        return 0
+    fi
     execute_sql_statement_via_mysql "$get_record_counts_statement" "$record_count_comparison_filepath"
     # if recourd_counts match, only one distinct value will be returned. If they differ, there will be 2 values
     set_mysql_sql_data_array_from_file "$record_count_comparison_filepath" 0

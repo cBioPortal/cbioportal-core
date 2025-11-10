@@ -116,6 +116,10 @@ function set_database_table_list() {
 
 function set_mysql_table_record_count() {
     local table_name=$1
+    if [ "$table_name" == "genetic_alteration" ] && [ "$SKIP_VERIFICATION_OF_GENETIC_ALTERATION_COPIES" == "yes" ] ; then
+        mysql_database_table_record_count=0
+        return 0
+    fi
     local statement="SELECT count(*) FROM \`$table_name\`"
     rm -f "$mysql_table_record_count_filepath"
     if ! execute_sql_statement_via_sling "$statement" "mysql" "$mysql_table_record_count_filepath" ; then
@@ -151,7 +155,6 @@ function set_database_table_list_and_record_counts() {
 }
 
 function delete_output_stream_files() {
-    #TODO : implement
     rm -f "$mysql_table_record_count_filepath"
     rm -f "$clickhouse_table_record_count_filepath"
     rm -f "$copy_table_contents_with_sling_filepath"
@@ -192,6 +195,9 @@ function set_successful_copy_verified_flag() {
 function destination_table_matches_source_table() {
     local table_name=$1
     local statement="SELECT COUNT(*) FROM \`$table_name\`"
+    if [ "$table_name" == "genetic_alteration" ] && [ "$SKIP_VERIFICATION_OF_GENETIC_ALTERATION_COPIES" == "yes" ] ; then
+        return 0
+    fi
     rm -f "$database_table_list_filepath"
     if ! execute_sql_statement_via_sling "$statement" "clickhouse" "$clickhouse_table_record_count_filepath" ; then
         echo "Warning : failed to execute mysql statement : $statement" >&2

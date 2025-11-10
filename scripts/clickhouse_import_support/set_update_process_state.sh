@@ -38,8 +38,6 @@ function initialize_main() {
         return 1
     fi
     update_management_database_name="${my_properties['mysql_update_management_database']}"
-    ### TODO : fix this
-    ###  remove_credentials_from_properties my_properties # no longer needed - remove for security
     if ! [ "$state" == "running" ] && ! [ "$state" == "complete" ] && ! [ "$state" == "abandoned" ] ; then
         echo "Error : state must be one of {running, complete, abandoned}" >&2
         usage

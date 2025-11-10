@@ -137,6 +137,9 @@ function transfer_table_data_via_sling() {
     local clickhouse_destination_database_name=$2
     local table_name=$3
     local output_filepath=$4
+    if [ "$table_name" == "genetic_alteration" ] && [ "$SLING_GENETIC_ALTERATION_DATA_IN_CHUNKS" == "yes" ] ; then
+        transfer_table_data_via_sling_chunks "$mysql_source_database_name" "$clickhouse_destination_database_name" "$table_name" "$output_filepath"
+    else
     (
         export DBUS_SESSION_BUS_ADDRESS=/dev/null ;
         export SLING_HOME_DIR="$configured_sling_env_dir_path" ;
@@ -148,6 +151,57 @@ function transfer_table_data_via_sling() {
             --tgt-object "$clickhouse_destination_database_name.$table_name" \
             --stdout \
             > "$output_filepath"
+    )
+    fi
+}
+
+function transfer_table_data_via_sling_chunks() {
+    local mysql_source_database_name=$1
+    local clickhouse_destination_database_name=$2
+    local table_name=$3
+    local output_filepath=$4
+    (
+        export DBUS_SESSION_BUS_ADDRESS=/dev/null ;
+        export SLING_HOME_DIR="$configured_sling_env_dir_path" ;
+        export SLING_ALLOW_EMPTY="TRUE" ;
+        sling run \
+            --src-conn MYSQL_DATABASE_CONNECTION \
+            --src-stream "$mysql_source_database_name.$table_name" \
+            --tgt-conn CLICKHOUSE_DATABASE_CONNECTION \
+            --tgt-object "$clickhouse_destination_database_name.$table_name" \
+            --mode backfill \
+            --primary-key "genetic_profile_id,genetic_entity_id" \
+            --update-key genetic_entity_id \
+            --range '-9999999999,15000' \
+            > "$output_filepath"
+        status=$?
+        if [ $status -eq 0 ] ; then
+            sling run \
+                --src-conn MYSQL_DATABASE_CONNECTION \
+                --src-stream "$mysql_source_database_name.$table_name" \
+                --tgt-conn CLICKHOUSE_DATABASE_CONNECTION \
+                --tgt-object "$clickhouse_destination_database_name.$table_name" \
+                --mode backfill \
+                --primary-key "genetic_profile_id,genetic_entity_id" \
+                --update-key genetic_entity_id \
+                --range '15001,30000' \
+                >> "$output_filepath"
+            status=$?
+        fi
+        if [ $status -eq 0 ] ; then
+            sling run \
+                --src-conn MYSQL_DATABASE_CONNECTION \
+                --src-stream "$mysql_source_database_name.$table_name" \
+                --tgt-conn CLICKHOUSE_DATABASE_CONNECTION \
+                --tgt-object "$clickhouse_destination_database_name.$table_name" \
+                --mode backfill \
+                --primary-key "genetic_profile_id,genetic_entity_id" \
+                --update-key genetic_entity_id \
+                --range '30001,9999999999' \
+                >> "$output_filepath"
+            status=$?
+        fi
+        return $status
     )
 }
 

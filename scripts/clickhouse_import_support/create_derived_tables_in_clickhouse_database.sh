@@ -11,9 +11,9 @@ if ! source "$this_script_dir/clickhouse_client_command_line_functions.sh" ; the
     echo "Error : unable to load dependency : $this_script_dir/clickhouse_client_command_line_functions.sh" >&2
     exit 1
 fi
-create_derived_tables_by_profile_script_filepath="${this_script_dir}/create_derived_tables_in_clickhouse_database_by_profile.py"
-if ! [ -r ${create_derived_tables_by_profile_script_filepath} ] ; then
-    echo "Error : unable to read/find required python script at this location: $create_derived_tables_by_profile_script_filepath" >&2
+create_derived_tables_async_script_filepath="${this_script_dir}/create_derived_tables_in_clickhouse_database_async.py"
+if ! [ -r ${create_derived_tables_async_script_filepath} ] ; then
+    echo "Error : unable to read/find required python script at this location: $create_derived_tables_async_script_filepath" >&2
     exit 1
 fi
 unset this_script_dir
@@ -60,6 +60,7 @@ function initialize_main() {
     fi
     remove_credentials_from_properties my_properties # no longer needed - remove for security
     clickhouse_max_memory_use_target="${my_properties['clickhouse_max_memory_use_target']}"
+    echo "clickhouse_max_memory_use_target is set to $clickhouse_max_memory_use_target"
     if [ -z "$database_to_create_derived_tables_in" ] ; then
         database_name="${my_properties['clickhouse_database_name']}"
     else
@@ -212,18 +213,40 @@ function simple_sql_file_inserts_into_generic_assay_data_derived() {
     return 1
 }
 
-function process_genetic_alteration_insertion_per_profile() {
+function process_genetic_alteration_insertion_async() {
     sql_filepath="$1"
     (
-        ${create_derived_tables_by_profile_script_filepath} genetic_alteration_derived "$configured_clickhouse_config_file_path" "$sql_filepath" "--max-memory-target=$clickhouse_max_memory_use_target"
+        ${create_derived_tables_async_script_filepath} genetic_alteration_derived "$configured_clickhouse_config_file_path" "$sql_filepath" "--max-memory-target=$clickhouse_max_memory_use_target"
     ) 
 }
 
-function process_generic_assay_data_insertion_per_profile() {
+function process_generic_assay_data_insertion_async() {
     sql_filepath="$1"
     (
-        ${create_derived_tables_by_profile_script_filepath} generic_assay_data_derived "$configured_clickhouse_config_file_path" "$sql_filepath" "--max-memory-target=$clickhouse_max_memory_use_target"
+        ${create_derived_tables_async_script_filepath} generic_assay_data_derived "$configured_clickhouse_config_file_path" "$sql_filepath" "--max-memory-target=$clickhouse_max_memory_use_target"
     )
+}
+
+function sql_statement_includes_insert_into() {
+    local sql_filepath="$1"
+    if grep -i -E "INSERT[[:space:]][[:space:]]*INTO" $sql_filepath ; then
+        return 0
+    fi
+    return 1
+}
+
+function append_async_settings_suffix() {
+    local sql_filepath="$1"
+    local sql_filepath_amended="$sql_filepath.amended"
+    local async_settings_suffix=" SETTINGS async_insert=1, wait_for_async_insert=1, async_insert_busy_timeout_ms=300000, async_insert_max_data_size=$clickhouse_max_memory_use_target, async_insert_max_query_number=10000;"
+    local linecount=$(cat $sql_filepath | wc -l)
+    local linecount_minus_one=$(($linecount-1))
+    head -n $linecount_minus_one $sql_filepath > $sql_filepath_amended
+    local last_line_from_file="$(tail -n 1 $sql_filepath)"
+    local line_without_semicolon="${last_line_from_file%;*}"
+    echo "$line_without_semicolon" >> $sql_filepath_amended
+    echo "$async_settings_suffix" >> $sql_filepath_amended
+    mv $sql_filepath_amended $sql_filepath
 }
 
 function create_all_derived_tables() {
@@ -231,7 +254,7 @@ function create_all_derived_tables() {
     while [ $pos -lt ${#derived_table_simple_sql_filepaths[@]} ] ; do
         sql_filepath="${derived_table_simple_sql_filepaths[$pos]}"
         if simple_sql_file_inserts_into_genetic_alteration_derived "$sql_filepath" ; then
-            if ! process_genetic_alteration_insertion_per_profile "$sql_filepath" ; then
+            if ! process_genetic_alteration_insertion_async "$sql_filepath" ; then
                 echo "Error : could not process genetic alteration insertions per profile" >&2
                 return 1
             fi
@@ -239,12 +262,15 @@ function create_all_derived_tables() {
             continue
         fi
         if simple_sql_file_inserts_into_generic_assay_data_derived "$sql_filepath" ; then
-            if ! process_generic_assay_data_insertion_per_profile "$sql_filepath" ; then
+            if ! process_generic_assay_data_insertion_async "$sql_filepath" ; then
                 echo "Error : could not process generic assay data insertions per profile" >&2
                 return 1
             fi
             pos=$(($pos+1))
             continue
+        fi
+        if sql_statement_includes_insert_into $sql_filepath ; then
+            append_async_settings_suffix $sql_filepath
         fi
         if ! execute_sql_statement_from_file_via_clickhouse_client "$sql_filepath" "create_derived_table_result_filepath" ; then
             echo "Error : failure occurred during execution of sql statements in file $sql_filepath" >&2
@@ -284,7 +310,7 @@ function shutdown_main_and_clean_up() {
     unset derived_table_simple_sql_filepaths
     unset DERIVED_TABLE_SIMPLE_FILENAME_PREFIX
     unset zero_padded_string
-    unset create_derived_tables_by_profile_script_filepath
+    unset create_derived_tables_async_script_filepath
 }
 
 function main() {
