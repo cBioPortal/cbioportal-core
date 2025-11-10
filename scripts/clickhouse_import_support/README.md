@@ -168,12 +168,34 @@ INSERT INTO `update_status` VALUES ('blue', 'complete', '2000-01-01 01:01:01')
 
 ## Details
 
+#### clone\_mysql\_database.sh
+For large databases, verification of the success of the clone (in mysql) of table genetic_alteration by comparing record counts takes excessive time. The verification for this specific table can be turned off by exporting shell environment variable:
+```
+export SKIP_VERIFICATION_OF_GENETIC_ALTERATION_COPIES="yes"
+```
+In the future, we aim to find a faster way to verify table clone operations.
+
 #### copy\_mysql\_database\_tables\_to\_clickhouse.sh
 Multiple retries are attempted on individual attempt failures. Copy results are
 validated by record counts.
 
+For large databases, verification of the success of the copy (via sling) of table genetic_alteration by comparing record counts takes excessive time. The verification for this specific table can be turned off by exporting shell environment variable:
+```
+export SKIP_VERIFICATION_OF_GENETIC_ALTERATION_COPIES="yes"
+```
+In the future, we aim to find a faster way to verify table copy operations.
+
 #### create\_derived\_tables\_in\_clickhouse\_database.sh
 This takes in an ordered list of SQL files. It iterates through the SQL statements
-sequentially. It calls *create_derived_tables_in_clickhouse_database_by_profile.py*
+sequentially. It calls *create_derived_tables_in_clickhouse_database_async.py*
 when processing the profiles for *genetic_alteration_derived* and
-*generic_assay_data_derived*
+*generic_assay_data_derived*.
+
+The underlying Python script currently filters inconsistent length lists for the genetic alteration event data to enable the derived table construction. In the future, we'd like to change this approach so that there is stricter validation of the input data.
+
+#### sling\_command\_line\_functions.sh
+For large databases, transfer of the entire content of the genetic_alteration table frequently fails due to connection timeout. To avoid this, the table can be transferred in a few chunks by exporting shell environment variable:
+```
+export SLING_GENETIC_ALTERATION_DATA_IN_CHUNKS="yes"
+```
+If you use this feature, you may need to adjust genetic entitiy ranges to suit your database content.
