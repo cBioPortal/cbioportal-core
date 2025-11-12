@@ -45,3 +45,6 @@ __pycache__/
 
 # ignore maven properties
 maven.properties
+
+# ignore local git clone settings
+settings.xml
