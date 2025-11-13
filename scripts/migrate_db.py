@@ -9,7 +9,7 @@ from collections import OrderedDict
 
 from importer.cbioportal_common import get_database_properties, get_db_cursor
 
-import MySQLdb
+from clickhouse_connect.driver.exceptions import ClickHouseError
 from pathlib import Path
 
 # globals
@@ -43,7 +43,7 @@ def get_db_version(cursor):
         for row in cursor.fetchall():
             if VERSION_TABLE == row[0].lower().strip():
                 version_table_exists = True
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         return None
     if not version_table_exists:
@@ -53,7 +53,7 @@ def get_db_version(cursor):
         cursor.execute('select ' + VERSION_FIELD + ' from ' + VERSION_TABLE)
         for row in cursor.fetchall():
             version = tuple(map(int, row[0].strip().split('.')))
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         return None
     return version
@@ -135,7 +135,7 @@ def check_reference_genome(portal_properties, cursor, force_migration):
                 study_to_ncbi_to_count[study] = {retrieved_ncbi_build: ref_count}
         for study in study_to_ncbi_to_count:
             validate_reference_genome_values_for_study(warnings, study_to_ncbi_to_count[study], study)
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         sys.exit(1)
     if warnings:
@@ -177,12 +177,12 @@ def check_and_exit_if_fusions(cursor):
                 print("\t%s" % (row[0]), file=ERROR_FILE)
             sys.exit(1)
 
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         sys.exit(1)
 
 
-# TODO: remove this after we update mysql version
+# TODO: remove this after we update ClickHouse schema version
 def check_and_remove_invalid_foreign_keys(cursor):
     try:
         # if genetic_alteration_ibfk_2 exists
@@ -213,7 +213,7 @@ def check_and_remove_invalid_foreign_keys(cursor):
                         ALTER TABLE `genetic_alteration` DROP FOREIGN KEY genetic_alteration_fk_2;
                     """)
                 print('Invalid foreign key has been deleted.', file=OUTPUT_FILE)
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         sys.exit(1)
 
@@ -261,7 +261,7 @@ def check_and_remove_type_of_cancer_id_foreign_key(cursor):
                     ALTER TABLE `sample` DROP FOREIGN KEY sample_ibfk_2;
                 """)
             print('sample_ibfk_2 foreign key has been deleted.', file=OUTPUT_FILE)
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         sys.exit(1)
 
@@ -327,7 +327,7 @@ def run_statements(statements, connection, cursor, no_transaction):
             cursor.execute('SET autocommit=1;')
         else:
             cursor.execute('SET autocommit=0;')
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         sys.exit(1)
     for version, statement_list in statements.items():
@@ -340,7 +340,7 @@ def run_statements(statements, connection, cursor, no_transaction):
                 file=OUTPUT_FILE)
             try:
                 cursor.execute(statement.strip())
-            except MySQLdb.Error as msg:
+            except ClickHouseError as msg:
                 print(msg, file=ERROR_FILE)
                 sys.exit(1)
         connection.commit()
@@ -367,7 +367,7 @@ def usage():
 
 
 def main():
-    """ main function to run mysql migration """
+    """ main function to run ClickHouse migration """
     parser = argparse.ArgumentParser(description='cBioPortal DB migration script')
     parser.add_argument('-y', '--suppress_confirmation', default=False, action='store_true')
     parser.add_argument('-p', '--properties-file', type=str, required=False,
@@ -441,7 +441,7 @@ def main():
             check_and_exit_if_fusions(cursor)
             db_version = get_db_version(cursor)
         run_migration(db_version, sql_filename, connection, cursor, parser.no_transaction)
-        # TODO: remove this after we update mysql version
+        # TODO: remove this after we update ClickHouse schema version
         # check invalid foreign key only when current db version larger or qeuals to GENERIC_ASSAY_MIGRATION_STEP
         if not is_version_larger(GENERIC_ASSAY_MIGRATION_STEP, db_version):
             check_and_remove_invalid_foreign_keys(cursor)

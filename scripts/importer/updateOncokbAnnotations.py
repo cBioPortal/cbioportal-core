@@ -30,8 +30,10 @@ import argparse
 import importlib
 import logging.handlers
 import sys
-import MySQLdb
 from pathlib import Path
+
+from clickhouse_connect.driver.exceptions import ClickHouseError
+
 from cbioportal_common import get_database_properties, get_db_cursor
 import libImportOncokb
 
@@ -76,7 +78,7 @@ def get_current_mutation_data(study_id, cursor):
         for row in cursor.fetchall():
             mutations += [{ "id": "_".join([str(row[4]), str(row[0]), str(row[5])]), "geneticProfileId": row[0], "entrezGeneId": row[1],
                             "alteration": row[2], "consequence": row[3]}]
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         return None
     return mutations
@@ -99,7 +101,7 @@ def get_current_cna_data(study_id, cursor):
                 list(cna_alteration_types.values()).index(row[2])]
             cna += [{"id": "_".join([str(row[3]), str(row[0]), str(row[4])]), "geneticProfileId": row[0], "entrezGeneId": row[1],
                     "alteration": alteration}]
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         return None
     return cna
@@ -120,7 +122,7 @@ def get_current_sv_data(study_id, cursor):
         for row in cursor.fetchall():
             sv += [{"id": "_".join([str(row[4]), str(row[0]), str(row[5])]), "geneticProfileId": row[0], "entrezGeneIdA": row[1],
                     "entrezGeneIdB": row[2], "structuralVariantType": row[3]}]
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         return None
     return sv
@@ -138,7 +140,7 @@ def get_reference_genome(study_id, cursor):
             return REFERENCE_GENOME[ref_genome[0]]
         else:
             raise ValueError("There is an error when retrieving the reference genome, as multiple values have been retrieved: "+ref_genome)
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
 
 def fetch_oncokb_mutation_annotations(mutation_data, ref_genome):
@@ -194,7 +196,7 @@ def get_current_annotation_data(connection, cursor, study_id):
             ' WHERE cancer_study.CANCER_STUDY_IDENTIFIER = "'+study_id+'"')
         for row in cursor.fetchall():
             annotation_data += ["_".join([str(row[0]), str(row[1]), str(row[2])])]
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
     return annotation_data
 
@@ -213,13 +215,13 @@ def update_annotations(result, connection, cursor, study_id):
                 ' SET DRIVER_FILTER = "' + oncogenic + '"' +
                 ' WHERE ALTERATION_EVENT_ID = ' + event_id + ' AND GENETIC_PROFILE_ID = '+ genetic_profile_id + 
                 ' AND SAMPLE_ID = '+ sample_id)
-            except MySQLdb.Error as msg:
+            except ClickHouseError as msg:
                 print(msg, file=ERROR_FILE)
         else:
             try:
                 cursor.execute('INSERT INTO cbioportal.alteration_driver_annotation'+
                 ' VALUES (' + event_id + ', '+ genetic_profile_id + ', '+ sample_id + ', "'+ oncogenic + '", "", "", "")')
-            except MySQLdb.Error as msg:
+            except ClickHouseError as msg:
                 print(msg, file=ERROR_FILE)
         
 def main_import(study_id, properties_filename):
@@ -256,7 +258,7 @@ def main_import(study_id, properties_filename):
         connection.commit()
         print('Update complete')
         return 0
-    except MySQLdb.Error as msg:
+    except ClickHouseError as msg:
         print(msg, file=ERROR_FILE)
         connection.rollback()
         return 1

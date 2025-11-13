@@ -40,32 +40,30 @@ import java.sql.*;
 import java.util.*;
 
 public final class DaoCopyNumberSegmentFile {
+    private static final String COPY_NUMBER_SEG_FILE_SEQUENCE = "seq_copy_number_seg_file";
     private DaoCopyNumberSegmentFile() {}
     
     public static int addCopyNumberSegmentFile(CopyNumberSegmentFile copySegFile) throws DaoException
     {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegmentFile.class);
+            long fileId = ClickHouseAutoIncrement.nextId(COPY_NUMBER_SEG_FILE_SEQUENCE);
             pstmt = con.prepareStatement
-                    ("INSERT INTO copy_number_seg_file (`CANCER_STUDY_ID`, `REFERENCE_GENOME_ID`, `DESCRIPTION`,`FILENAME`)"
-                     + " VALUES (?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
-            pstmt.setInt(1, copySegFile.cancerStudyId);
-            pstmt.setString(2, copySegFile.referenceGenomeId.toString());
-            pstmt.setString(3, copySegFile.description);
-            pstmt.setString(4, copySegFile.filename);
+                    ("INSERT INTO copy_number_seg_file (`SEG_FILE_ID`, `CANCER_STUDY_ID`, `REFERENCE_GENOME_ID`, `DESCRIPTION`,`FILENAME`)"
+                     + " VALUES (?,?,?,?,?)");
+            pstmt.setLong(1, fileId);
+            pstmt.setInt(2, copySegFile.cancerStudyId);
+            pstmt.setString(3, copySegFile.referenceGenomeId.toString());
+            pstmt.setString(4, copySegFile.description);
+            pstmt.setString(5, copySegFile.filename);
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return -1;
+            return (int) fileId;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegmentFile.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoCopyNumberSegmentFile.class, con, pstmt, null);
         }
     }
 

@@ -146,7 +146,7 @@ public class JdbcUtil {
                 }
             }
         } catch (Exception e) {
-            logMessage("Problem Closed a MySQL connection from " + requester + ": " + activeConnectionCount.toString());
+            logMessage("Problem closing a database connection from " + requester + ": " + activeConnectionCount.toString());
             e.printStackTrace();
         }
     }

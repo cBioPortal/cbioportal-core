@@ -55,7 +55,7 @@
         <bean id="databaseIdProvider" class="org.apache.ibatis.mapping.VendorDatabaseIdProvider">
             <property name="properties">
                 <props>
-                    <prop key="MySQL">mysql</prop>
+                    <prop key="ClickHouse">clickhouse</prop>
                     <prop key="H2">h2</prop>
                 </props>
             </property>
@@ -76,17 +76,6 @@
             <!-- having to autowire repositories into java classes that do not make direct use of them -->
             <property name="mapperLocations" value="classpath*:org/cbioportal/persistence/mybatis/**/*.xml" />
             <property name="databaseIdProvider" ref="databaseIdProvider"/>
-        </bean>
-        <!-- configure the data source to allow LOAD DATA LOCAL INFILE ... -->
-        <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
-            <property name="targetObject" ref="businessDataSource"/>
-            <property name="targetMethod" value="addConnectionProperty"/>
-            <property name="arguments">
-                <list>
-                    <value>allowLoadLocalInfile</value>
-                    <value>true</value>
-                </list>
-            </property>
         </bean>
     </beans>
 

@@ -112,9 +112,9 @@ public class DaoGeneticAlteration {
             valueBuffer.append(value).append(DELIM);
         }
         
-       if (MySQLbulkLoader.isBulkLoad() ) {
-          //  write to the temp file maintained by the MySQLbulkLoader
-          MySQLbulkLoader.getMySQLbulkLoader("genetic_alteration").insertRecord(Integer.toString( geneticProfileId ),
+       if (ClickHouseBulkLoader.isBulkLoad() ) {
+          //  write to the temp file maintained by the ClickHouseBulkLoader
+          ClickHouseBulkLoader.getClickHouseBulkLoader("genetic_alteration").insertRecord(Integer.toString( geneticProfileId ),
         		  Integer.toString( geneticEntityId ), valueBuffer.toString());
           // return 1 because normal insert will return 1 if no error occurs
           return 1;

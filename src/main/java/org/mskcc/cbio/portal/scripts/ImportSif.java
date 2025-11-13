@@ -34,7 +34,7 @@ package org.mskcc.cbio.portal.scripts;
 
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
@@ -79,7 +79,7 @@ public class ImportSif {
         int numRedundantInteractionsSkipped = 0;
         Set<String> interactionSet = new HashSet<String>();
 
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         FileReader reader = new FileReader(sifFile);
         BufferedReader buf = new BufferedReader(reader);
         String line = buf.readLine();
@@ -123,8 +123,8 @@ public class ImportSif {
         }
 
         //  Flush database
-        if (MySQLbulkLoader.isBulkLoad()) {
-           MySQLbulkLoader.flushAll();
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+           ClickHouseBulkLoader.flushAll();
         }
         ProgressMonitor.setCurrentMessage("Total number of interactions saved:  " + numInteractionsSaved);
         ProgressMonitor.setCurrentMessage("Total number of interactions not saved, due to " +

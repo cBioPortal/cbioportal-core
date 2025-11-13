@@ -32,7 +32,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
@@ -138,7 +138,7 @@ public class ImportCnaDiscreteLongData {
 
         if (isDiscretizedCnaProfile) {
             existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
-            MySQLbulkLoader.bulkLoadOn();
+            ClickHouseBulkLoader.bulkLoadOn();
         }
 
         CnaImportData toImport = new CnaImportData();
@@ -172,7 +172,7 @@ public class ImportCnaDiscreteLongData {
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
         buf.close();
         geneticAlterationGeneImporter.finalize();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 
     /**

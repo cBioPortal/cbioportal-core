@@ -44,7 +44,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -146,34 +145,32 @@ public class DaoSample {
         samples.put(sample.getStableId(), sample);
     }
 
+    private static final String SAMPLE_SEQUENCE = "seq_sample";
+
     public static int addSample(Sample sample) throws DaoException
     {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSample.class);
+            long internalId = ClickHouseAutoIncrement.nextId(SAMPLE_SEQUENCE);
             pstmt = con.prepareStatement("INSERT INTO sample " +
-                                         "( `STABLE_ID`, `SAMPLE_TYPE`, `PATIENT_ID` ) " +
-                                         "VALUES (?,?,?)",
-                                         Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, sample.getStableId());
-            pstmt.setString(2, sample.getType().toString());
-            pstmt.setInt(3, sample.getInternalPatientId());
+                                         "( `INTERNAL_ID`, `STABLE_ID`, `SAMPLE_TYPE`, `PATIENT_ID` ) " +
+                                         "VALUES (?,?,?,?)");
+            pstmt.setLong(1, internalId);
+            pstmt.setString(2, sample.getStableId());
+            pstmt.setString(3, sample.getType().toString());
+            pstmt.setInt(4, sample.getInternalPatientId());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                cacheSample(new Sample(rs.getInt(1), sample.getStableId(),
-                                       sample.getInternalPatientId()));
-                return rs.getInt(1);
-            }
-            return -1;
+            cacheSample(new Sample((int) internalId, sample.getStableId(),
+                    sample.getInternalPatientId()));
+            return (int) internalId;
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoSample.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoSample.class, con, pstmt, null);
         }
     }
 

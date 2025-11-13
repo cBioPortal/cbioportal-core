@@ -15,8 +15,6 @@ FROM maven:3-eclipse-temurin-21
 # System deps first (single layer), then clean apt cache
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential \
-      default-mysql-client \
-      default-libmysqlclient-dev \
       python3 \
       python3-dev \
       python3-venv \
@@ -47,6 +45,9 @@ COPY --from=jar_builder /app/core-*.jar /
 # Scripts
 COPY scripts/ /scripts/
 RUN chmod -R a+x /scripts/
+
+# SQL assets
+COPY db/ /db/
 
 WORKDIR /scripts/
 ENV PORTAL_HOME=/

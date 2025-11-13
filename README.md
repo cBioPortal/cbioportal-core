@@ -64,29 +64,25 @@ This method ensures efficient updates without the need for complete study reuplo
 
 ## How to run integration tests
 
-This section guides you through the process of running integration tests by setting up a cBioPortal MySQL database environment using Docker. Please follow these steps carefully to ensure your testing environment is configured correctly.
+This section guides you through the process of running integration tests by setting up a cBioPortal ClickHouse database environment using Docker. Please follow these steps carefully to ensure your testing environment is configured correctly.
 
 ### Preparing the cbioportal test database
 
-1. **Download the cBioPortal Database Schema**: To begin, you need to download the database schema for the version of cBioPortal you are interested in testing.
-Locate the pom.xml file in your project directory and check the values of `<db.version>` and `<cbioportal.version>` to determine the correct version.
-Replace `v6.0.3` in the command below with your desired cBioPortal version:
-```
-curl -o cgds.sql https://raw.githubusercontent.com/cBioPortal/cbioportal/v6.0.3/src/main/resources/db-scripts/cgds.sql
-```
+1. **Prepare a ClickHouse Schema**: The loader now targets ClickHouse directly, so you need a ClickHouse-compatible schema that mirrors your portal version. Convert the upstream schema or export one from an existing installation and save it as `cgds.clickhouse.sql`.
 
-2. **Launch the MySQL Server Container**: Use Docker to start a MySQL server pre-loaded with the cBioPortal schema. Execute the following command from the root of your project directory.
-It is recommended to open a separate terminal tab or window for this operation as it will occupy the console until stopped:
+2. **Launch the ClickHouse Server Container**: Use Docker to start a ClickHouse server and load the bundled schema. Run this command from the project root:
 
 ```
-docker run -p 3306:3306 \
--v $(pwd)/src/test/resources/seed_mini.sql:/docker-entrypoint-initdb.d/seed.sql:ro \
--v $(pwd)/cgds.sql:/docker-entrypoint-initdb.d/cgds.sql:ro \
--e MYSQL_ROOT_PASSWORD=root \
--e MYSQL_USER=cbio_user \
--e MYSQL_PASSWORD=somepassword \
--e MYSQL_DATABASE=cgds_test \
-mysql:5.7
+docker run -d --name cbio-clickhouse \
+  -p 8123:8123 -p 9000:9000 \
+  -v $(pwd)/db/clickhouse/cgds.clickhouse.sql:/docker-entrypoint-initdb.d/init.sql:ro \
+  clickhouse/clickhouse-server:24.3
+```
+
+3. **Seed Reference Data (optional)**: If you need seed data such as the mini dataset used in integration tests, load it with the ClickHouse client and the bundled ClickHouse seed:
+
+```
+docker exec -i cbio-clickhouse clickhouse-client --multiquery < db/clickhouse/seed_mini.clickhouse.sql
 ```
 
 ### Run integration tests
@@ -97,6 +93,24 @@ Use Maven to run the integration tests. Ensure you are in the root directory of 
 ```
 mvn integration-test
 ```
+
+Testcontainers automatically launches and seeds a ClickHouse container during the test phase, so ensure Docker is available before running the suite.
+
+### Maintaining the ClickHouse schema and seed
+
+The repository includes ClickHouse-native versions of the cgds schema and the `seed_mini` dataset under `db/clickhouse`. When the upstream MySQL assets change, regenerate the ClickHouse SQL by extracting the latest MySQL schema (either from the published cBioPortal sources or from the loader jar) and running:
+
+```bash
+jar xf core-*.jar db-scripts/cgds.sql
+
+python scripts/tools/generate_clickhouse_sql.py \
+  --mysql-schema db-scripts/cgds.sql \
+  --mysql-seed src/test/resources/seed_mini.sql \
+  --output-schema db/clickhouse/cgds.clickhouse.sql \
+  --output-seed db/clickhouse/seed_mini.clickhouse.sql
+```
+
+The helper performs deterministic type conversions and syntax adjustments, ensuring the ClickHouse schema stays aligned with the canonical MySQL version.
 
 ## Development
 
@@ -171,4 +185,3 @@ The script will search for `core-*.jar` in the root of the project:
 ```bash
 python scripts/importer/metaImport.py -s tests/test_data/study_es_0 -p tests/test_data/api_json_unit_tests -o
 ```
-

@@ -34,7 +34,7 @@ package org.mskcc.cbio.portal.scripts;
 
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -54,7 +54,7 @@ import java.util.Set;
 public class ImportMicroRNAIDs {
 
     public static void importData(File geneFile) throws IOException, DaoException {
-        MySQLbulkLoader.bulkLoadOff();
+        ClickHouseBulkLoader.bulkLoadOff();
         FileReader reader = new FileReader(geneFile);
         BufferedReader buf = new BufferedReader(reader);
         String line = buf.readLine(); // skip first line

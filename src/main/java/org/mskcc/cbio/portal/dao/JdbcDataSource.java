@@ -45,7 +45,7 @@ public class JdbcDataSource extends BasicDataSource {
         String username = dbProperties.getSpringDbUser();
         String password = dbProperties.getSpringDbPassword();
         String connectionURL = dbProperties.getSpringConnectionURL();
-        String mysqlDriverClassName = dbProperties.getSpringDbDriverClassName();
+        String driverClassName = dbProperties.getSpringDbDriverClassName();
         // extract optional property values
         String enablePooling = dbProperties.getDbEnablePooling();
         if (stringIsNullOrBlank(enablePooling)) {
@@ -56,18 +56,15 @@ public class JdbcDataSource extends BasicDataSource {
         requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.username", username, "username"));
         requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.password", password, "password"));
         requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.url", connectionURL, "connectionURL"));
-        requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.driver-class-name", mysqlDriverClassName, "driver class name"));
+        requiredPropertyInfoList.add(new RequiredPropertyInfo("spring.datasource.driver-class-name", driverClassName, "driver class name"));
         validateRequiredProperties(requiredPropertyInfoList);
         //  Set up poolable data source
         this.setUsername(username);
         this.setPassword(password);
         this.setUrl(connectionURL);
-        this.setDriverClassName(mysqlDriverClassName);
+        this.setDriverClassName(driverClassName);
         // Disable this to avoid caching statements
         this.setPoolPreparedStatements(Boolean.valueOf(enablePooling));
-        // this property setting is needed to enable MySQLbulkLoader to load data from a local file
-        // this is set here in case this class is initialized via JdbcUtil (not expected), but is also set in applicationContext resource files.
-        this.addConnectionProperty("allowLoadLocalInfile", "true");
         // these values are from the production cbioportal application context for a jndi data source
         this.setMaxTotal(500);
         this.setMaxIdle(30);

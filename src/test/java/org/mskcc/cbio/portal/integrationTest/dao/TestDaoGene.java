@@ -36,7 +36,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
@@ -65,8 +65,8 @@ public class TestDaoGene {
     public void testAddExistingGene() throws DaoException {
 
 		// save bulkload setting before turning off
-		boolean isBulkLoad = MySQLbulkLoader.isBulkLoad();
-		MySQLbulkLoader.bulkLoadOff();
+		boolean isBulkLoad = ClickHouseBulkLoader.isBulkLoad();
+		ClickHouseBulkLoader.bulkLoadOff();
 
         //  Add BRCA1 and BRCA2 Genes
         CanonicalGene gene = new CanonicalGene(672, "BRCA1",
@@ -77,7 +77,7 @@ public class TestDaoGene {
 
 		// restore bulk setting
 		if (isBulkLoad) {
-			MySQLbulkLoader.bulkLoadOn();
+			ClickHouseBulkLoader.bulkLoadOn();
 		}
     }
 
@@ -89,8 +89,8 @@ public class TestDaoGene {
     public void testAddNewGene() throws DaoException {
 
 		// save bulkload setting before turning off
-		boolean isBulkLoad = MySQLbulkLoader.isBulkLoad();
-		MySQLbulkLoader.bulkLoadOff();
+		boolean isBulkLoad = ClickHouseBulkLoader.isBulkLoad();
+		ClickHouseBulkLoader.bulkLoadOff();
 
         //  Add BRCA1 and BRCA2 Genes
         CanonicalGene gene = new CanonicalGene(1956, "EGFR",
@@ -101,7 +101,7 @@ public class TestDaoGene {
 
 		// restore bulk setting
 		if (isBulkLoad) {
-			MySQLbulkLoader.bulkLoadOn();
+			ClickHouseBulkLoader.bulkLoadOn();
 		}
     }
 

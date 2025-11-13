@@ -42,7 +42,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -71,6 +70,7 @@ public final class DaoCancerStudy {
     private static final Map<Integer, java.util.Date> cacheDateByInternalId = new HashMap<Integer, java.util.Date>();
     private static final Map<String,CancerStudy> byStableId = new HashMap<String,CancerStudy>();
     private static final Map<Integer,CancerStudy> byInternalId = new HashMap<Integer,CancerStudy>();
+    private static final String CANCER_STUDY_SEQUENCE = "seq_cancer_study";
 
     static {
         reCacheAll();
@@ -305,41 +305,38 @@ public final class DaoCancerStudy {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
+            long cancerStudyId = ClickHouseAutoIncrement.nextId(CANCER_STUDY_SEQUENCE);
             pstmt = con.prepareStatement("INSERT INTO cancer_study " +
-                    "( `CANCER_STUDY_IDENTIFIER`, `NAME`, "
+                    "( `CANCER_STUDY_ID`, `CANCER_STUDY_IDENTIFIER`, `NAME`, "
                     + "`DESCRIPTION`, `PUBLIC`, `TYPE_OF_CANCER_ID`, "
-                    + "`PMID`, `CITATION`, `GROUPS`, `STATUS`,`REFERENCE_GENOME_ID`, `IMPORT_DATE` ) VALUES (?,?,?,?,?,?,?,?,?,?,NOW())",
-                    Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, stableId);
-            pstmt.setString(2, cancerStudy.getName());
-            pstmt.setString(3, cancerStudy.getDescription());
-            pstmt.setBoolean(4, cancerStudy.isPublicStudy());
-            pstmt.setString(5, cancerStudy.getTypeOfCancerId());
-            pstmt.setString(6, cancerStudy.getPmid());
-            pstmt.setString(7, cancerStudy.getCitation());
+                    + "`PMID`, `CITATION`, `GROUPS`, `STATUS`,`REFERENCE_GENOME_ID`, `IMPORT_DATE` ) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())");
+            pstmt.setLong(1, cancerStudyId);
+            pstmt.setString(2, stableId);
+            pstmt.setString(3, cancerStudy.getName());
+            pstmt.setString(4, cancerStudy.getDescription());
+            pstmt.setBoolean(5, cancerStudy.isPublicStudy());
+            pstmt.setString(6, cancerStudy.getTypeOfCancerId());
+            pstmt.setString(7, cancerStudy.getPmid());
+            pstmt.setString(8, cancerStudy.getCitation());
             Set<String> groups = cancerStudy.getGroups();
             if (groups==null) {
-                pstmt.setString(8, null);
+                pstmt.setString(9, null);
             } else {
-                pstmt.setString(8, StringUtils.join(groups, ";"));
+                pstmt.setString(9, StringUtils.join(groups, ";"));
             }
             //status is UNAVAILABLE until other data is loaded for this study. Once all is loaded, the
             //data loading process can set this to AVAILABLE:
             //TODO - use this field in parts of the system that build up the list of studies to display in home page:
-            pstmt.setInt(9, Status.UNAVAILABLE.ordinal());
+            pstmt.setInt(10, Status.UNAVAILABLE.ordinal());
             try {
                 ReferenceGenome referenceGenome = DaoReferenceGenome.getReferenceGenomeByGenomeName(cancerStudy.getReferenceGenome());
-                pstmt.setInt(10, referenceGenome.getReferenceGenomeId());
+                pstmt.setInt(11, referenceGenome.getReferenceGenomeId());
             }
             catch (NullPointerException e) {
                 throw new DaoException("Unsupported reference genome");
             }
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                int autoId = rs.getInt(1);
-                cancerStudy.setInternalId(autoId);
-            }
+            cancerStudy.setInternalId((int)cancerStudyId);
             cacheCancerStudy(cancerStudy, new java.util.Date());
         } catch (SQLException e) {
             throw new DaoException(e);

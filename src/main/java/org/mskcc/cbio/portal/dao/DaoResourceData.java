@@ -38,8 +38,8 @@ public final class DaoResourceData {
 
     public static int addDatum(String query, String tableName, int internalId, String resourceId, String url)
             throws DaoException {
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.getMySQLbulkLoader(tableName).insertRecord(Integer.toString(internalId), resourceId, url);
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.getClickHouseBulkLoader(tableName).insertRecord(Integer.toString(internalId), resourceId, url);
             return 1;
         }
 

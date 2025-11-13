@@ -44,11 +44,13 @@ import java.util.*;
  * @author jgao
  */
 public final class DaoCnaEvent {
+
+    private static final String CNA_EVENT_SEQUENCE = "seq_cna_event";
     private DaoCnaEvent() {}
     
     public static void addCaseCnaEvent(CnaEvent cnaEvent, boolean newCnaEvent) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert sample_cna_event");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert sample_cna_event");
         }
         else {
         	long eventId = cnaEvent.getEventId();
@@ -58,7 +60,7 @@ public final class DaoCnaEvent {
                 cnaEvent.setEventId(eventId);
             }
             
-            MySQLbulkLoader.getMySQLbulkLoader("sample_cna_event").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("sample_cna_event").insertRecord(
                     Long.toString(eventId),
                     Integer.toString(cnaEvent.getSampleId()),
                     Integer.toString(cnaEvent.getCnaProfileId()),
@@ -73,8 +75,8 @@ public final class DaoCnaEvent {
                 && !cnaEvent.getDriverTiersFilter().isEmpty()
                 && !cnaEvent.getDriverTiersFilter().toLowerCase().equals("na"))
             ) {
-                MySQLbulkLoader
-                    .getMySQLbulkLoader("alteration_driver_annotation")
+                ClickHouseBulkLoader
+                    .getClickHouseBulkLoader("alteration_driver_annotation")
                     .insertRecord(
                         Long.toString(eventId),
                         Integer.toString(cnaEvent.getCnaProfileId()),
@@ -98,25 +100,23 @@ public final class DaoCnaEvent {
     private static long addCnaEventDirectly(CnaEvent cnaEvent) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
+            long newId = ClickHouseAutoIncrement.nextId(CNA_EVENT_SEQUENCE);
             pstmt = con.prepareStatement
                     ("INSERT INTO cna_event (" +
-                            "`ENTREZ_GENE_ID`," +
+                            "`CNA_EVENT_ID`, `ENTREZ_GENE_ID`," +
                             "`ALTERATION` )" +
-                            " VALUES(?,?)", Statement.RETURN_GENERATED_KEYS);
-            pstmt.setLong(1, cnaEvent.getEntrezGeneId());
-            pstmt.setShort(2, cnaEvent.getAlteration().getCode());
+                            " VALUES(?,?,?)");
+            pstmt.setLong(1, newId);
+            pstmt.setLong(2, cnaEvent.getEntrezGeneId());
+            pstmt.setShort(3, cnaEvent.getAlteration().getCode());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            rs.next();
-            long newId = rs.getLong(1);
             return newId;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, null);
         }
 	}
 

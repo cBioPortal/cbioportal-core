@@ -1,5 +1,4 @@
-spring.datasource.url=jdbc:mysql://localhost:3306/cbioportal?useSSL=false
+spring.datasource.url=jdbc:clickhouse://localhost:8123/cbioportal
 spring.datasource.username=cbio
 spring.datasource.password=P@ssword1
-spring.datasource.driver-class-name=com.mysql.jdbc.Driver
-spring.jpa.database-platform=org.hibernate.dialect.MySQL5InnoDBDialect
+spring.datasource.driver-class-name=com.clickhouse.jdbc.ClickHouseDriver

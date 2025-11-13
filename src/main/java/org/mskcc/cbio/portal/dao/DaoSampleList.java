@@ -44,6 +44,8 @@ public class DaoSampleList {
 
     private static final String DELETE_SAMPLE_LIST_LIST = "DELETE FROM sample_list_list WHERE `LIST_ID` = ?";
 
+    private static final String SAMPLE_LIST_SEQUENCE = "seq_sample_list";
+
     /**
 	 * Adds record to sample_list table.
 	 */
@@ -54,22 +56,17 @@ public class DaoSampleList {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
 
-            pstmt = con.prepareStatement("INSERT INTO sample_list (`STABLE_ID`, `CANCER_STUDY_ID`, `NAME`, `CATEGORY`," +
-                    "`DESCRIPTION`)" + " VALUES (?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, sampleList.getStableId());
-            pstmt.setInt(2, sampleList.getCancerStudyId());
-            pstmt.setString(3, sampleList.getName());
-            pstmt.setString(4, sampleList.getSampleListCategory().getCategory());
-            pstmt.setString(5, sampleList.getDescription());
+            long listId = ClickHouseAutoIncrement.nextId(SAMPLE_LIST_SEQUENCE);
+            pstmt = con.prepareStatement("INSERT INTO sample_list (`LIST_ID`, `STABLE_ID`, `CANCER_STUDY_ID`, `NAME`, `CATEGORY`," +
+                    "`DESCRIPTION`)" + " VALUES (?,?,?,?,?,?)");
+            pstmt.setLong(1, listId);
+            pstmt.setString(2, sampleList.getStableId());
+            pstmt.setInt(3, sampleList.getCancerStudyId());
+            pstmt.setString(4, sampleList.getName());
+            pstmt.setString(5, sampleList.getSampleListCategory().getCategory());
+            pstmt.setString(6, sampleList.getDescription());
             rows = pstmt.executeUpdate();
-            try (ResultSet generatedKey = pstmt.getGeneratedKeys()) {
-                if (generatedKey.next()) {
-                    int listId = generatedKey.getInt(1);
-                    addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
-                } else {
-                    throw new DaoException("Creating sample list failed, no ID obtained.");
-                }
-            }
+            addSampleListList(sampleList.getCancerStudyId(), (int) listId, sampleList.getSampleList(), con);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {

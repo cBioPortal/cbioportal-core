@@ -12,12 +12,11 @@ import logging.handlers
 from collections import OrderedDict
 from subprocess import Popen, PIPE, STDOUT
 from typing import Dict, Optional
-import dsnparse
-import pymysql
-pymysql.install_as_MySQLdb()
+from urllib.parse import urlparse, parse_qs
+from itertools import zip_longest
 
-# MySQLdb import should come after the install_as_MySQLdb() line above
-import MySQLdb
+import clickhouse_connect
+from clickhouse_connect.driver.exceptions import ClickHouseError
 
 
 # ------------------------------------------------------------------------------
@@ -1101,6 +1100,82 @@ class PortalProperties(object):
         self.database_url = database_url
 
 
+class ClickHouseConnectionProxy:
+    def __init__(self, client):
+        self._client = client
+
+    def commit(self):
+        # ClickHouse auto-commits every statement.
+        return None
+
+    def rollback(self):
+        # Transactions are not supported over HTTP, keep a no-op for compatibility.
+        return None
+
+    def close(self):
+        self._client.close()
+
+
+class ClickHouseCursor:
+    def __init__(self, client):
+        self._client = client
+        self._last_result = []
+
+    def execute(self, statement: str, params=None):
+        normalized = statement.strip()
+        if not normalized:
+            self._last_result = []
+            return
+        if normalized.endswith(';'):
+            normalized = normalized[:-1]
+        rendered = self._render_statement(normalized, params)
+        command = normalized.split(None, 1)[0].lower()
+        if command in ('select', 'with', 'show', 'describe', 'exists'):
+            result = self._client.query(rendered)
+            self._last_result = result.result_rows
+        else:
+            self._client.command(rendered)
+            self._last_result = []
+
+    def executemany(self, statement: str, params_list):
+        for params in params_list:
+            self.execute(statement, params)
+
+    def fetchall(self):
+        return self._last_result
+
+    def fetchone(self):
+        return self._last_result[0] if self._last_result else None
+
+    def close(self):
+        self._last_result = []
+
+    def _render_statement(self, statement, params):
+        if params is None:
+            return statement
+        if not isinstance(params, (list, tuple)):
+            params = [params]
+        segments = statement.split('%s')
+        if len(segments) - 1 != len(params):
+            raise ValueError('Parameter count does not match placeholder count')
+        rendered = []
+        for segment, value in zip_longest(segments, params, fillvalue=None):
+            rendered.append(segment)
+            if value is not None:
+                rendered.append(self._serialize_param(value))
+        return ''.join(rendered)
+
+    def _serialize_param(self, value):
+        if value is None:
+            return 'NULL'
+        if isinstance(value, bool):
+            return '1' if value else '0'
+        if isinstance(value, (int, float)):
+            return str(value)
+        escaped = str(value).replace("'", "''")
+        return f"'{escaped}'"
+
+
 def get_database_properties(properties_filename: str) -> Optional[PortalProperties]:
 
     properties = parse_properties_file(properties_filename)
@@ -1158,32 +1233,47 @@ def parse_properties_file(properties_filename: str) -> Dict[str, str]:
     return properties
 
 
+def _parse_clickhouse_jdbc_url(database_url: str):
+    if not database_url.startswith('jdbc:'):
+        raise ValueError('Database URL must start with jdbc:')
+    parsed = urlparse(database_url[5:])
+    if parsed.scheme != 'clickhouse':
+        raise ValueError('Only ClickHouse JDBC URLs are supported')
+    database = parsed.path.lstrip('/') or 'default'
+    params = parse_qs(parsed.query)
+    secure_param = params.get('ssl', params.get('secure', ['false']))[0].lower()
+    secure = secure_param == 'true'
+    port = parsed.port or (8443 if secure else 8123)
+    host = parsed.hostname or 'localhost'
+    settings = {
+        key: value[0]
+        for key, value in params.items()
+        if key not in ('ssl', 'secure')
+    }
+    return host, port, database, secure, settings
+
+
 def get_db_cursor(portal_properties: PortalProperties):
 
     try:
-        url_elements = dsnparse.parse(portal_properties.database_url)
-        connection_kwargs = {
-            "host": url_elements.host,
-            "port": url_elements.port if url_elements.port is not None else 3306,
-            "db": url_elements.paths[0],
-            "user": portal_properties.database_user,
-            "passwd": portal_properties.database_pw
-        }
-        if url_elements.query.get("useSSL") == "true":
-            connection_kwargs['ssl_mode'] = 'REQUIRED'
-            connection_kwargs['ssl'] = {"ssl_mode": True}
-        else:
-            if url_elements.query.get("get-server-public-key") == "true":
-                connection_kwargs['ssl'] = {
-                    'MYSQL_OPT_GET_SERVER_PUBLIC_KEY': True
-                }
-        connection = MySQLdb.connect(**connection_kwargs)
-    except MySQLdb.Error as exception:
+        host, port, database, secure, settings = _parse_clickhouse_jdbc_url(
+            portal_properties.database_url)
+        client = clickhouse_connect.get_client(
+            host=host,
+            port=port,
+            username=portal_properties.database_user,
+            password=portal_properties.database_pw,
+            database=database,
+            secure=secure,
+            settings=settings
+        )
+        connection = ClickHouseConnectionProxy(client)
+        cursor = ClickHouseCursor(client)
+        return connection, cursor
+    except (ClickHouseError, ValueError) as exception:
         print(exception, file=ERROR_FILE)
         message = (
-            "--> Error connecting to server with URL: "
+            "--> Error connecting to ClickHouse server with URL: "
             + portal_properties.database_url)
         print(message, file=ERROR_FILE)
         raise ConnectionError(message) from exception
-    if connection is not None:
-        return connection, connection.cursor()

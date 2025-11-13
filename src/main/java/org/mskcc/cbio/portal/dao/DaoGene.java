@@ -87,8 +87,8 @@ final class DaoGene {
             //when it is called in a process that may update a gene more than once
             //(e.g. the ImportGeneData updates some of the fields based on one 
             // input file and other fields based on another input file):
-            setBulkLoadAtEnd = MySQLbulkLoader.isBulkLoad();
-            MySQLbulkLoader.bulkLoadOff();
+            setBulkLoadAtEnd = ClickHouseBulkLoader.isBulkLoad();
+            ClickHouseBulkLoader.bulkLoadOff();
             
             int rows = 0;
             con = JdbcUtil.getDbConnection(DaoGene.class);
@@ -108,7 +108,7 @@ final class DaoGene {
         } finally {
             if (setBulkLoadAtEnd) {
                 //reset to original state:
-                MySQLbulkLoader.bulkLoadOn();
+                ClickHouseBulkLoader.bulkLoadOn();
             }   
             JdbcUtil.closeAll(DaoGene.class, con, pstmt, rs);
         }
@@ -181,11 +181,11 @@ final class DaoGene {
      * @throws DaoException Database Error.
      */
     public static int addGeneAliases(CanonicalGene gene)  throws DaoException {
-        if (MySQLbulkLoader.isBulkLoad()) {
-            //  write to the temp file maintained by the MySQLbulkLoader
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            //  write to the temp file maintained by the ClickHouseBulkLoader
             Set<String> aliases = gene.getAliases();
             for (String alias : aliases) {
-                MySQLbulkLoader.getMySQLbulkLoader("gene_alias").insertRecord(
+                ClickHouseBulkLoader.getClickHouseBulkLoader("gene_alias").insertRecord(
                         Long.toString(gene.getEntrezGeneId()),
                         alias);
 

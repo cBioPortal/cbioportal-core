@@ -46,11 +46,11 @@
 	
 	<!-- Values are for testing only, so need to correspond to the cgds in the pom.xml -->
 	<bean id="dbcpDataSource" destroy-method="close" class="org.apache.commons.dbcp2.BasicDataSource">
-		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
-		<property name="url" value="jdbc:mysql://localhost:3306/cgds_test?allowLoadLocalInfile=true&amp;useSSL=false&amp;allowPublicKeyRetrieval=true" />
+		<property name="driverClassName" value="com.clickhouse.jdbc.ClickHouseDriver" />
+		<property name="url" value="${test.datasource.url:jdbc:clickhouse://localhost:8123/cgds_test}" />
         <!-- - test db credentials should be keep in sync with parent pom.xml -->
-		<property name="username" value="${db.test.username:cbio_user}" />
-		<property name="password" value="${db.test.password:somepassword}" />
+		<property name="username" value="${test.datasource.username:${db.test.username:cbio_user}}" />
+		<property name="password" value="${test.datasource.password:${db.test.password:somepassword}}" />
 		<property name="minIdle" value="0" />
 		<property name="maxIdle" value="10" />
 		<property name="maxTotal" value="100" />
@@ -60,7 +60,7 @@
     <bean id="databaseIdProvider" class="org.apache.ibatis.mapping.VendorDatabaseIdProvider">
         <property name="properties">
             <props>
-                <prop key="MySQL">mysql</prop>
+                <prop key="ClickHouse">clickhouse</prop>
                 <prop key="H2">h2</prop>
             </props>
         </property>

@@ -152,8 +152,8 @@ public class ImportGenericAssayPatientLevelData {
                 
                 line = buf.readLine();
             }
-            if (MySQLbulkLoader.isBulkLoad()) {
-               MySQLbulkLoader.flushAll();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+               ClickHouseBulkLoader.flushAll();
             }
             
             if (entriesSkipped > 0) {

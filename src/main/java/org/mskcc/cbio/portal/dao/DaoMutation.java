@@ -71,8 +71,8 @@ public final class DaoMutation {
     private static final String DELETE_MUTATION = "DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
 
     public static int addMutation(ExtendedMutation mutation, boolean newMutationEvent) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert mutations");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert mutations");
         } else {
             int result = 1;
             if (newMutationEvent) {
@@ -87,7 +87,7 @@ public final class DaoMutation {
                 (mutation.getDriverTiersFilter() != null
                 && !mutation.getDriverTiersFilter().isEmpty()
                 && !mutation.getDriverTiersFilter().toLowerCase().equals("na"))) {
-                MySQLbulkLoader.getMySQLbulkLoader("alteration_driver_annotation").insertRecord(
+                ClickHouseBulkLoader.getClickHouseBulkLoader("alteration_driver_annotation").insertRecord(
                     Long.toString(mutation.getMutationEventId()),
                     Integer.toString(mutation.getGeneticProfileId()),
                     Integer.toString(mutation.getSampleId()),
@@ -98,7 +98,7 @@ public final class DaoMutation {
                 );
             }
 
-            MySQLbulkLoader.getMySQLbulkLoader("mutation").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("mutation").insertRecord(
                     Long.toString(mutation.getMutationEventId()),
                     Integer.toString(mutation.getGeneticProfileId()),
                     Integer.toString(mutation.getSampleId()),
@@ -135,9 +135,9 @@ public final class DaoMutation {
 
     public static int addMutationEvent(ExtendedMutation.MutationEvent event) throws DaoException {
         // use this code if bulk loading
-        // write to the temp file maintained by the MySQLbulkLoader
+        // write to the temp file maintained by the ClickHouseBulkLoader
         String keyword = MutationKeywordUtils.guessOncotatorMutationKeyword(event.getProteinChange(), event.getMutationType());
-        MySQLbulkLoader.getMySQLbulkLoader("mutation_event").insertRecord(
+        ClickHouseBulkLoader.getClickHouseBulkLoader("mutation_event").insertRecord(
                 Long.toString(event.getMutationEventId()),
                 Long.toString(event.getGene().getEntrezGeneId()),
                 event.getChr(),
@@ -215,8 +215,8 @@ public final class DaoMutation {
     }
 
     public static void calculateMutationCountByKeyword(int geneticProfileId) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to update mutation counts by keyword");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to update mutation counts by keyword");
         } else {
             MultiKeyMap mutationEventKeywordCountMap = getMutationEventKeywordCountByGeneticProfileId(geneticProfileId); // mutation event keyword -> entrez id -> keyword count
             Map<Long, Integer> geneCountMap = getGeneCountByGeneticProfileId(geneticProfileId); // entrez id -> gene count
@@ -228,7 +228,7 @@ public final class DaoMutation {
                 Long entrezGeneId = Long.valueOf(mk.getKey(1).toString());
                 String keywordCount = it.getValue().toString();
                 Integer geneCount = geneCountMap.get(entrezGeneId);
-                MySQLbulkLoader.getMySQLbulkLoader("mutation_count_by_keyword").insertRecord(
+                ClickHouseBulkLoader.getClickHouseBulkLoader("mutation_count_by_keyword").insertRecord(
                         Integer.toString(geneticProfileId),
                         mutationEventKeyword,
                         Long.toString(entrezGeneId),

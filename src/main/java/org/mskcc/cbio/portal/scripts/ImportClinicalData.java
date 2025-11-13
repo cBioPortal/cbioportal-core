@@ -43,7 +43,7 @@ import org.mskcc.cbio.portal.dao.DaoClinicalData;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.Patient;
@@ -171,10 +171,10 @@ public class ImportClinicalData extends ConsoleRunnable {
         // code has to be added to check whether
         // a clinical attribute update should be
         // perform instead of an insert
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         
         if(relaxed) {
-            MySQLbulkLoader.relaxedModeOn();
+            ClickHouseBulkLoader.relaxedModeOn();
         }    
         
         FileReader reader =  new FileReader(clinicalDataFile);
@@ -204,9 +204,9 @@ public class ImportClinicalData extends ConsoleRunnable {
             DaoPatient.createSampleCountClinicalData(cancerStudy.getInternalId());
         }
         
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-            MySQLbulkLoader.relaxedModeOff();
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
+            ClickHouseBulkLoader.relaxedModeOff();
         }
     }
 

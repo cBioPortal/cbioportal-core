@@ -25,7 +25,7 @@ import os
 import sys
 import time
 import getopt
-import MySQLdb
+from urllib.parse import urlparse
 
 import smtplib
 import gdata.docs.client
@@ -37,6 +37,9 @@ from oauth2client import client
 from oauth2client.file import Storage
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.tools import run_flow, argparser
+from clickhouse_connect.driver.exceptions import ClickHouseError
+
+from importer import cbioportal_common as portal_common
 
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEBase import MIMEBase
@@ -52,10 +55,9 @@ ERROR_FILE = sys.stderr
 OUTPUT_FILE = sys.stdout
 
 # fields in application.properties
-CGDS_DATABASE_HOST = 'spring.datasource.password'
-CGDS_DATABASE_NAME = 'db.portal_db_name'
-CGDS_DATABASE_USER = 'spring.datasource.user'
-CGDS_DATABASE_PW = 'db.password'
+CGDS_DATABASE_URL = 'spring.datasource.url'
+CGDS_DATABASE_USER = 'spring.datasource.username'
+CGDS_DATABASE_PW = 'spring.datasource.password'
 GOOGLE_ID = 'google.id'
 GOOGLE_PW = 'google.pw'
 CGDS_USERS_SPREADSHEET = 'users.spreadsheet'
@@ -98,12 +100,13 @@ MESSAGE_BCC = []
 # ------------------------------------------------------------------------------
 # class definitions
 
-class PortalProperties(object):
+class UserPortalProperties(object):
     def __init__(self,
-                 cgds_database_host,
+                 cgds_database_url,
                  cgds_database_name, cgds_database_user, cgds_database_pw,
-                 google_id, google_pw, google_spreadsheet, google_worksheet,google_importer_spreadsheet):
-        self.cgds_database_host = cgds_database_host
+                 google_id, google_pw, google_spreadsheet, google_worksheet, google_importer_spreadsheet,
+                 db_properties=None):
+        self.cgds_database_url = cgds_database_url
         self.cgds_database_name = cgds_database_name
         self.cgds_database_user = cgds_database_user
         self.cgds_database_pw = cgds_database_pw
@@ -112,6 +115,8 @@ class PortalProperties(object):
         self.google_spreadsheet = google_spreadsheet
         self.google_worksheet = google_worksheet
         self.google_importer_spreadsheet = google_importer_spreadsheet
+        self.db_properties = db_properties or portal_common.PortalProperties(
+            cgds_database_user, cgds_database_pw, cgds_database_url)
 
 class User(object):
     def __init__(self, inst_email, google_email, name, enabled, authorities):
@@ -219,7 +224,7 @@ def insert_new_users(cursor, new_user_list):
             authorities = user.authorities
             cursor.executemany("insert into authorities values(%s, %s)",
                                [(user.google_email.lower(), authority) for authority in authorities])
-    except MySQLdb.Error, msg:
+    except ClickHouseError, msg:
         print >> OUTPUT_FILE, msg
         print >> ERROR_FILE, msg
         return False
@@ -241,7 +246,7 @@ def get_current_user_map(cursor):
         cursor.execute('select * from users')
         for row in cursor.fetchall():
             to_return[row[0].lower()] = User(row[0].lower(), row[0].lower(), row[1], row[2], 'not_used_here')
-    except MySQLdb.Error, msg:
+    except ClickHouseError, msg:
         print >> ERROR_FILE, msg
         return None
 
@@ -261,7 +266,7 @@ def get_user_authorities(cursor, google_email):
                 cursor.execute('select * from authorities where email = (%s)', [google_email])
                 for row in cursor.fetchall():
                         to_return.append(row[1])
-        except MySQLdb.Error, msg:
+        except ClickHouseError, msg:
                 print >> ERROR_FILE, msg
                 return None
 
@@ -290,7 +295,7 @@ def get_new_user_map(spreadsheet, worksheet_feed, current_user_map, portal_name,
             name = entry.custom[FULLNAME_KEY].text.strip()
             authorities = entry.custom[AUTHORITIES_KEY].text.strip()
             # do not add entry if this entry is a current user
-            # we lowercase google account because entries added to mysql are lowercased.
+            # we lowercase google account because entries added to the database are lowercased.
             if google_email.lower() not in current_user_map:
                 if authorities[-1:] == ';':
                     authorities = authorities[:-1]
@@ -331,17 +336,11 @@ def get_all_user_map(spreadsheet, worksheet_feed,mskcc_user_spreadsheet):
 # get db connection
 def get_db_connection(portal_properties):
 
-    # try and create a connection to the db
     try:
-        connection = MySQLdb.connect(host=portal_properties.cgds_database_host, port=3306,
-                                     user=portal_properties.cgds_database_user,
-                                     passwd=portal_properties.cgds_database_pw,
-                                     db=portal_properties.cgds_database_name)
-    except MySQLdb.Error, msg:
+        return portal_common.get_db_cursor(portal_properties.db_properties)
+    except (ConnectionError, ClickHouseError) as msg:
         print >> ERROR_FILE, msg
-        return None
-
-    return connection
+        return None, None
 
 
 # ------------------------------------------------------------------------------
@@ -368,8 +367,7 @@ def get_portal_properties(portal_properties_filename):
     portal_properties_file.close()
 
     # error check
-    if (CGDS_DATABASE_HOST not in properties or len(properties[CGDS_DATABASE_HOST]) == 0 or
-        CGDS_DATABASE_NAME not in properties or len(properties[CGDS_DATABASE_NAME]) == 0 or
+    if (CGDS_DATABASE_URL not in properties or len(properties[CGDS_DATABASE_URL]) == 0 or
         CGDS_DATABASE_USER not in properties or len(properties[CGDS_DATABASE_USER]) == 0 or
         CGDS_DATABASE_PW not in properties or len(properties[CGDS_DATABASE_PW]) == 0 or
         GOOGLE_ID not in properties or len(properties[GOOGLE_ID]) == 0 or
@@ -379,17 +377,27 @@ def get_portal_properties(portal_properties_filename):
         IMPORTER_SPREADSHEET not in properties or len(properties[IMPORTER_SPREADSHEET]) == 0):
         print >> ERROR_FILE, 'Missing one or more required properties, please check property file'
         return None
+
+    db_properties = portal_common.PortalProperties(properties[CGDS_DATABASE_USER],
+                            properties[CGDS_DATABASE_PW],
+                            properties[CGDS_DATABASE_URL])
+    try:
+        database_name = extract_database_name(properties[CGDS_DATABASE_URL])
+    except ValueError as error:
+        print >> ERROR_FILE, error
+        return None
     
     # return an instance of PortalProperties
-    return PortalProperties(properties[CGDS_DATABASE_HOST],
-                            properties[CGDS_DATABASE_NAME],
-                            properties[CGDS_DATABASE_USER],
-                            properties[CGDS_DATABASE_PW],
+    return UserPortalProperties(db_properties.database_url,
+                            database_name,
+                            db_properties.database_user,
+                            db_properties.database_pw,
                             properties[GOOGLE_ID],
                             properties[GOOGLE_PW],
                             properties[CGDS_USERS_SPREADSHEET],
                             properties[CGDS_USERS_WORKSHEET],
-                            properties[IMPORTER_SPREADSHEET])
+                            properties[IMPORTER_SPREADSHEET],
+                            db_properties=db_properties)
 
 # ------------------------------------------------------------------------------
 # adds new users from the google spreadsheet into the cgds portal database
@@ -438,7 +446,7 @@ def update_user_authorities(spreadsheet, cursor, worksheet_feed, portal_name, ms
                 try:
                         cursor.executemany("insert into authorities values(%s, %s)",
                                            [(user.google_email, authority) for authority in worksheet_authorities - db_authorities])
-                except MySQLdb.Error, msg:
+                except ClickHouseError, msg:
                         print >> ERROR_FILE, msg
 
 # ------------------------------------------------------------------------------
@@ -502,6 +510,15 @@ def get_portal_name_map(google_spreadsheet,client):
     return portal_name,mskcc_user_spreadsheet
 
 
+def extract_database_name(database_url):
+    normalized = database_url[5:] if database_url.startswith('jdbc:') else database_url
+    parsed = urlparse(normalized)
+    db_name = parsed.path.lstrip('/')
+    if not db_name:
+        raise ValueError('spring.datasource.url must include a database name')
+    return db_name
+
+
 # ------------------------------------------------------------------------------
 # displays program usage (invalid args)
 
@@ -556,10 +573,8 @@ def main():
 
     # get db connection & create cursor
     print >> OUTPUT_FILE, 'Connecting to database: ' + portal_properties.cgds_database_name
-    connection = get_db_connection(portal_properties)
-    if connection is not None:
-        cursor = connection.cursor()
-    else:
+    connection, cursor = get_db_connection(portal_properties)
+    if connection is None or cursor is None:
         print >> OUTPUT_FILE, 'Error connecting to database, exiting'
         return
 

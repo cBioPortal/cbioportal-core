@@ -110,30 +110,29 @@ public class DaoPatient {
         }
     }
 
+    private static final String PATIENT_SEQUENCE = "seq_patient";
+
     public static int addPatient(Patient patient) throws DaoException
     {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoPatient.class);
-            pstmt = con.prepareStatement("INSERT INTO patient (`STABLE_ID`, `CANCER_STUDY_ID`) VALUES (?,?)",
-                                         Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, patient.getStableId());
-            pstmt.setInt(2, patient.getCancerStudy().getInternalId());
+            long internalId = ClickHouseAutoIncrement.nextId(PATIENT_SEQUENCE);
+            pstmt = con.prepareStatement("INSERT INTO patient (`INTERNAL_ID`, `STABLE_ID`, `CANCER_STUDY_ID`) VALUES (?,?,?)");
+            pstmt.setLong(1, internalId);
+            pstmt.setString(2, patient.getStableId());
+            pstmt.setInt(3, patient.getCancerStudy().getInternalId());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), rs.getInt(1)), patient.getCancerStudy().getInternalId());
-                return rs.getInt(1);
-            }
-            return -1;
+            cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), (int) internalId),
+                    patient.getCancerStudy().getInternalId());
+            return (int) internalId;
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, null);
         }
     }
 

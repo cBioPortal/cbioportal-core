@@ -189,7 +189,7 @@ public class ImportStructuralVariantData {
         }
 
         buf.close();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 
     private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {

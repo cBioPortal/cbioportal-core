@@ -62,6 +62,7 @@ public class DaoGistic {
      */
 
     private static final Logger log = LoggerFactory.getLogger(DaoGistic.class);
+    private static final String GISTIC_SEQUENCE = "seq_gistic";
 
     public static void addGistic(Gistic gistic) throws DaoException, validationException {
         if (gistic == null) {
@@ -77,38 +78,34 @@ public class DaoGistic {
         try {
             con = JdbcUtil.getDbConnection(DaoGistic.class);
             // insert into SQL gistic table
+            long roiId = ClickHouseAutoIncrement.nextId(GISTIC_SEQUENCE);
             pstmt = con.prepareStatement
-				("INSERT INTO gistic (`CANCER_STUDY_ID`," +
+				("INSERT INTO gistic (`GISTIC_ROI_ID`, `CANCER_STUDY_ID`," +
 				  "`CHROMOSOME`, " +
                   "`CYTOBAND`, " +
 				  "`WIDE_PEAK_START`, " +
 				  "`WIDE_PEAK_END`, " +
 				  "`Q_VALUE`, "  +
 				  "`AMP`) "  +
-				  "VALUES (?,?,?,?,?,?,?)",
-				 Statement.RETURN_GENERATED_KEYS);
+				  "VALUES (?,?,?,?,?,?,?,?)");
 
-            pstmt.setInt(1, gistic.getCancerStudyId());
-            pstmt.setInt(2, gistic.getChromosome()) ;
-            pstmt.setString(3, gistic.getCytoband());
-            pstmt.setInt(4, gistic.getPeakStart());
-            pstmt.setInt(5, gistic.getPeakEnd());
-            pstmt.setDouble(6, gistic.getqValue());
-            pstmt.setBoolean(7, gistic.getAmp());
+            pstmt.setLong(1, roiId);
+            pstmt.setInt(2, gistic.getCancerStudyId());
+            pstmt.setInt(3, gistic.getChromosome()) ;
+            pstmt.setString(4, gistic.getCytoband());
+            pstmt.setInt(5, gistic.getPeakStart());
+            pstmt.setInt(6, gistic.getPeakEnd());
+            pstmt.setDouble(7, gistic.getqValue());
+            pstmt.setBoolean(8, gistic.getAmp());
             pstmt.executeUpdate();
 
-            // insert into SQL gistic_to_gene table
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                int autoId = rs.getInt(1);
-                gistic.setInternalId(autoId);
-            }
+            gistic.setInternalId((int) roiId);
             addGisticGenes(gistic, con);
 
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoGistic.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoGistic.class, con, pstmt, null);
         }
     }
 

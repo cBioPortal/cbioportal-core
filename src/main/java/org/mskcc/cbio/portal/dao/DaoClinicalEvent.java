@@ -52,11 +52,11 @@ public final class DaoClinicalEvent {
     private DaoClinicalEvent() {}
     
     public static int addClinicalEvent(ClinicalEvent clinicalEvent) {
-        if (!MySQLbulkLoader.isBulkLoad()) {
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
             throw new IllegalStateException("Only bulk load mode is allowed for importing clinical events");
         }
         
-        MySQLbulkLoader.getMySQLbulkLoader("clinical_event").insertRecord(
+        ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event").insertRecord(
                 Long.toString(clinicalEvent.getClinicalEventId()),
                 Integer.toString(clinicalEvent.getPatientId()),
                 clinicalEvent.getStartDate().toString(),
@@ -69,7 +69,7 @@ public final class DaoClinicalEvent {
     private static int addClinicalEventData(ClinicalEvent clinicalEvent) {
         long eventId = clinicalEvent.getClinicalEventId();
         for (Map.Entry<String,String> entry : clinicalEvent.getEventData().entrySet()) {
-            MySQLbulkLoader.getMySQLbulkLoader("clinical_event_data").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event_data").insertRecord(
                     Long.toString(eventId),
                     entry.getKey(),
                     entry.getValue()

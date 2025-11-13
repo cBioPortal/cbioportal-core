@@ -54,13 +54,13 @@ import org.mskcc.cbio.portal.model.ExtendedMutation;
  */
 public class DaoCosmicData {
     public static int addCosmic(CosmicMutationFrequency cosmic) throws DaoException {
-            if (!MySQLbulkLoader.isBulkLoad()) {
-                throw new DaoException("You have to turn on MySQLbulkLoader in order to insert mutations");
+            if (!ClickHouseBulkLoader.isBulkLoad()) {
+                throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert mutations");
             } else {
 
                     // use this code if bulk loading
-                    // write to the temp file maintained by the MySQLbulkLoader
-                    MySQLbulkLoader.getMySQLbulkLoader("cosmic_mutation").insertRecord(
+                    // write to the temp file maintained by the ClickHouseBulkLoader
+                    ClickHouseBulkLoader.getClickHouseBulkLoader("cosmic_mutation").insertRecord(
                             cosmic.getId(),
                             cosmic.getChr(),
                             Long.toString(cosmic.getStartPosition()),

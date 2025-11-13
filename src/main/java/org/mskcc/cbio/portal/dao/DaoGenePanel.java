@@ -44,6 +44,8 @@ import static org.mskcc.cbio.portal.util.GenePanelUtil.*;
  * @author heinsz
  */
 public class DaoGenePanel {
+
+    private static final String GENE_PANEL_SEQUENCE = "seq_gene_panel";
     private static final Map<String, GenePanel> genePanelMap = initMap();
 
     /**
@@ -135,26 +137,23 @@ public class DaoGenePanel {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGenePanel.class);
-            pstmt = con.prepareStatement("INSERT INTO gene_panel (`STABLE_ID`, `DESCRIPTION`) VALUES (?,?)",
-                Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, stableId);
-            pstmt.setString(2, description);
+            long genePanelId = ClickHouseAutoIncrement.nextId(GENE_PANEL_SEQUENCE);
+            pstmt = con.prepareStatement("INSERT INTO gene_panel (`INTERNAL_ID`, `STABLE_ID`, `DESCRIPTION`) VALUES (?,?,?)");
+            pstmt.setLong(1, genePanelId);
+            pstmt.setString(2, stableId);
+            pstmt.setString(3, description);
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                addGenePanelGeneList(rs.getInt(1), canonicalGenes);
-                // add panel to class map
-                GenePanel gp = new GenePanel();
-                gp.setInternalId(rs.getInt(1));
-                gp.setStableId(stableId);
-                gp.setDescription(description);
-                gp.setGenes(canonicalGenes);
-                genePanelMap.put(stableId, gp);
-            }
+            addGenePanelGeneList((int) genePanelId, canonicalGenes);
+            GenePanel gp = new GenePanel();
+            gp.setInternalId((int) genePanelId);
+            gp.setStableId(stableId);
+            gp.setDescription(description);
+            gp.setGenes(canonicalGenes);
+            genePanelMap.put(stableId, gp);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoGenePanel.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoGenePanel.class, con, pstmt, null);
         }
     }
 

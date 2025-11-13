@@ -42,7 +42,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -88,7 +88,7 @@ public class TestDaoMutation {
 
     @Test
     public void testDaoMutation() throws DaoException {
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         runTheTest();
     }
 
@@ -148,8 +148,8 @@ public class TestDaoMutation {
         DaoMutation.addMutation(mutation,true);
 
         // if bulkLoading, execute LOAD FILE
-        if( MySQLbulkLoader.isBulkLoad()){
-            MySQLbulkLoader.flushAll();
+        if( ClickHouseBulkLoader.isBulkLoad()){
+            ClickHouseBulkLoader.flushAll();
         }
         ArrayList<ExtendedMutation> mutationList = DaoMutation.getMutations(geneticProfileId, 1, 321);
         validateMutation(mutationList.get(0));

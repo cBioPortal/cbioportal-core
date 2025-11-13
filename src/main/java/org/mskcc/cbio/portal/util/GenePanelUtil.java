@@ -100,7 +100,7 @@ public class GenePanelUtil {
 
     /**
      * Gets a Pair representing the gene sets to add and to remove from a gene panel
-     * in the database, since MySQL throws an error when trying to add duplicate genes.
+     * in the database, since the loader throws an error when trying to add duplicate genes.
      * add represents genes from incoming that original does not have.
      * remove represents genes from original that incoming does not have.
      *

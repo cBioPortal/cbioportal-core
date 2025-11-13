@@ -24,7 +24,7 @@ import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ClinicalEvent;
 import org.mskcc.cbio.portal.model.Patient;
@@ -63,7 +63,7 @@ public class TestIncrementalTimelineImport {
 
 	@Test
     public void testTimelineDataReloading() throws DaoException {
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         ClinicalEvent event = new ClinicalEvent();
         event.setClinicalEventId(1L);
         Patient sbPatient = DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudy.getInternalId(), "TCGA-A1-A0SB");
@@ -72,7 +72,7 @@ public class TestIncrementalTimelineImport {
         event.setEventType("SPECIMEN");
         event.setEventData(Map.of("SPECIMEN_SITE", "specimen_site_to_erase"));
         DaoClinicalEvent.addClinicalEvent(event);
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         File singleTcgaSampleFolder = new File("src/test/resources/incremental/clinical/");
         File metaFile = new File(singleTcgaSampleFolder, "meta_timeline.txt");

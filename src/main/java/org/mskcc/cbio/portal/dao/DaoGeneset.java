@@ -51,6 +51,8 @@ import java.util.stream.Collectors;
 
 public class DaoGeneset {
 
+    private static final String GENESET_SEQUENCE = "seq_geneset";
+
 	private DaoGeneset() {
 	}
 
@@ -71,20 +73,18 @@ public class DaoGeneset {
             geneset.setGeneticEntityId(geneticEntityId);
             
             con = JdbcUtil.getDbConnection(DaoGeneset.class);
-            pstmt = con.prepareStatement("INSERT INTO geneset " 
-                    + "(`GENETIC_ENTITY_ID`, `EXTERNAL_ID`, `NAME`, `DESCRIPTION`, `REF_LINK`) "
-                    + "VALUES(?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
-            pstmt.setInt(1, geneset.getGeneticEntityId());
-            pstmt.setString(2, geneset.getExternalId());
-            pstmt.setString(3, geneset.getName());
-            pstmt.setString(4, geneset.getDescription());
-            pstmt.setString(5, geneset.getRefLink());
+            long genesetId = ClickHouseAutoIncrement.nextId(GENESET_SEQUENCE);
+            pstmt = con.prepareStatement("INSERT INTO geneset "
+                    + "(`ID`, `GENETIC_ENTITY_ID`, `EXTERNAL_ID`, `NAME`, `DESCRIPTION`, `REF_LINK`) "
+                    + "VALUES(?,?,?,?,?,?)");
+            pstmt.setLong(1, genesetId);
+            pstmt.setInt(2, geneset.getGeneticEntityId());
+            pstmt.setString(3, geneset.getExternalId());
+            pstmt.setString(4, geneset.getName());
+            pstmt.setString(5, geneset.getDescription());
+            pstmt.setString(6, geneset.getRefLink());
             pstmt.executeUpdate();
-            //get the auto generated key:
-            rs = pstmt.getGeneratedKeys();
-            rs.next();
-            int newId = rs.getInt(1);
-            geneset.setId(newId);
+            geneset.setId((int) genesetId);
             
             return geneset;
         }
@@ -97,7 +97,7 @@ public class DaoGeneset {
     }
     
     /**
-     * Prepares a list of Gene records from Geneset object to be added to database via MySQLbulkLoader.
+     * Prepares a list of Gene records from Geneset object to be added to database via ClickHouseBulkLoader.
      * @param geneset
      * @return number of records where entrez gene id is found in db
      */
@@ -115,8 +115,8 @@ public class DaoGeneset {
                 continue;
             }
             // use this code if bulk loading
-            // write to the temp file maintained by the MySQLbulkLoader
-            MySQLbulkLoader.getMySQLbulkLoader("geneset_gene").insertRecord(
+            // write to the temp file maintained by the ClickHouseBulkLoader
+            ClickHouseBulkLoader.getClickHouseBulkLoader("geneset_gene").insertRecord(
                     Integer.toString(geneset.getId()),
                     Long.toString(entrezGeneId));
             rows ++;

@@ -46,7 +46,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -127,7 +127,7 @@ public class TestImportGenericAssayPatientLevelData {
 	@Test
     public void testImportGenericAssayPatientLevelDataBulkLoadOff() throws Exception {
 
-        MySQLbulkLoader.bulkLoadOff();
+        ClickHouseBulkLoader.bulkLoadOff();
         runImportGenericAssayPatientLevelData();
     }
     
@@ -137,7 +137,7 @@ public class TestImportGenericAssayPatientLevelData {
      */
 	@Test
     public void testImportGenericAssayPatientLevelDataBulkLoadOn() throws Exception {
-		MySQLbulkLoader.bulkLoadOn();
+		ClickHouseBulkLoader.bulkLoadOn();
         runImportGenericAssayPatientLevelData();
     }
     

@@ -26,7 +26,7 @@ import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegmentFile;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ClinicalData;
 import org.mskcc.cbio.portal.model.CopyNumberSegment;
@@ -73,7 +73,7 @@ public class TestIncrementalCopyNumberSegmentDataImport {
         copyNumberSegmentFile.description = "test seg file description";
         DaoCopyNumberSegmentFile.addCopyNumberSegmentFile(copyNumberSegmentFile);
         DaoClinicalData.addSampleDatum(segDataSample.getInternalId(), "FRACTION_GENOME_ALTERED", "TEST");
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         CopyNumberSegment copyNumberSegment = new CopyNumberSegment(
                 cancerStudy.getInternalId(),
                 segDataSample.getInternalId(),
@@ -84,7 +84,7 @@ public class TestIncrementalCopyNumberSegmentDataImport {
                 0.01);
         copyNumberSegment.setSegId(1L);
         DaoCopyNumberSegment.addCopyNumberSegment(copyNumberSegment);
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         File dataFolder = new File("src/test/resources/incremental/copy_number_alteration/");
         File metaFile = new File(dataFolder, "meta_cna_seg.txt");

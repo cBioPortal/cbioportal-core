@@ -255,7 +255,7 @@ public class ImportGenesetData extends ConsoleRunnable {
             line = buf.readLine();
         }
         //flush bulkloader to commit geneset genes:
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         // close file
         reader.close();
 

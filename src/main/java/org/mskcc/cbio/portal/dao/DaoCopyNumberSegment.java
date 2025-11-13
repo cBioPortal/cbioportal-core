@@ -50,10 +50,10 @@ public final class DaoCopyNumberSegment {
     private DaoCopyNumberSegment() {}
     
     public static int addCopyNumberSegment(CopyNumberSegment seg) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert mutations");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert mutations");
         } else {
-            MySQLbulkLoader.getMySQLbulkLoader("copy_number_seg").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("copy_number_seg").insertRecord(
                     Long.toString(seg.getSegId()),
                     Integer.toString(seg.getCancerStudyId()),
                     Integer.toString(seg.getSampleId()),

@@ -17,7 +17,7 @@ public class DaoGeneticEntity {
     }
 
     private enum SqlAction {
-        INSERT, UPDATE, SELECT, DELETE
+        UPDATE, SELECT, DELETE
     }
 
     /**
@@ -30,15 +30,23 @@ public class DaoGeneticEntity {
 
     public static GeneticEntity addNewGeneticEntity(GeneticEntity geneticEntity) throws DaoException {
 
-        DbContainer container = executeSQLstatment(
-            SqlAction.INSERT,
-            "INSERT INTO genetic_entity (`ENTITY_TYPE`, `STABLE_ID`) "
-            + "VALUES(?,?)",
-            geneticEntity.getEntityType(),
-            geneticEntity.getStableId()
-        );
-
-        geneticEntity.setId(container.getId());
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
+            long entityId = ClickHouseAutoIncrement.nextId("seq_genetic_entity");
+            pstmt = con.prepareStatement("INSERT INTO genetic_entity (`ID`, `ENTITY_TYPE`, `STABLE_ID`) "
+                    + "VALUES(?,?,?)");
+            pstmt.setLong(1, entityId);
+            pstmt.setString(2, geneticEntity.getEntityType());
+            pstmt.setString(3, geneticEntity.getStableId());
+            pstmt.executeUpdate();
+            geneticEntity.setId((int) entityId);
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticEntity.class, con, pstmt, null);
+        }
 
         return geneticEntity;
     }
@@ -107,8 +115,8 @@ public class DaoGeneticEntity {
     
     /**
      * Helper method for retrieval of a geneticEntity record from the database
-     * @param action type of MySQL operation
-     * @param statement MySQL statement
+     * @param action type of SQL operation
+     * @param statement SQL statement
      * @param keys Series of values used in the statement (order is important)
      * @return Object return data from 
      * @throws DaoException 
@@ -120,24 +128,13 @@ public class DaoGeneticEntity {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
 
-            // for insert statements the number of affected records is returned
-            // this requires the RETURN_GENERATED_KEYS to be set for insert statements.
-            int switchGetGeneratedKeys = PreparedStatement.NO_GENERATED_KEYS;
-            if (action == SqlAction.INSERT)
-                switchGetGeneratedKeys = PreparedStatement.RETURN_GENERATED_KEYS;
-
-            pstmt = con.prepareStatement(statement, switchGetGeneratedKeys);
+            pstmt = con.prepareStatement(statement);
 
             int cnt = 1;
             for (int i = 0; i < keys.length; i++)
                 pstmt.setString(cnt++, keys[i]);
 
             switch(action) {
-                case INSERT:
-                    pstmt.executeUpdate();
-                    rs = pstmt.getGeneratedKeys();
-                    rs.next();
-                    return new DbContainer(rs.getInt(1));
                 case SELECT:
                     rs = pstmt.executeQuery();
                     if (rs.next()) {
