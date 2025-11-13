@@ -92,4 +92,8 @@ public final class ClickHouseAutoIncrement {
             JdbcUtil.closeAll(ClickHouseAutoIncrement.class, con, stmt, rs);
         }
     }
+
+    public static void reset() {
+        COUNTERS.clear();
+    }
 }

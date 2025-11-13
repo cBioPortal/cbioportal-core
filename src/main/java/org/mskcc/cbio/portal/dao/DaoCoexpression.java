@@ -72,7 +72,7 @@ public class DaoCoexpression {
             pstmt = con.prepareStatement("SELECT * FROM coexpression WHERE " +
                     "GENETIC_PROFILE_ID='" + geneticProfileId + "' AND " +
                     "(GENE_1 in ('" + StringUtils.join(queryGenes, "','") + "')" + " OR " +
-                    " GENE_2 in ('" + StringUtils.join(queryGenes, "','") + "'));");
+                    " GENE_2 in ('" + StringUtils.join(queryGenes, "','") + "'))");
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 int gene1Id = Integer.parseInt(rs.getString("GENE_1"));

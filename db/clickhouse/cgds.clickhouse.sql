@@ -148,15 +148,15 @@ ORDER BY (`NODE_ID`);
 
 DROP TABLE IF EXISTS `geneset_hierarchy_leaf`;
 CREATE TABLE IF NOT EXISTS `geneset_hierarchy_leaf` (
-  `NODE_ID` String,
-  `GENESET_ID` String
+  `NODE_ID` Int32,
+  `GENESET_ID` Int32
 ) ENGINE = MergeTree
 ORDER BY (`NODE_ID`, `GENESET_ID`);
 
 DROP TABLE IF EXISTS `generic_entity_properties`;
 CREATE TABLE IF NOT EXISTS `generic_entity_properties` (
   `ID` Int32,
-  `GENETIC_ENTITY_ID` String,
+  `GENETIC_ENTITY_ID` Int32,
   `NAME` String,
   `VALUE` String
 ) ENGINE = MergeTree

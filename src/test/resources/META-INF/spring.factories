@@ -1,2 +1,4 @@
 org.springframework.test.context.ContextCustomizerFactory=\
 org.mskcc.cbio.portal.testsupport.ClickHouseTestContextCustomizerFactory
+org.springframework.test.context.TestExecutionListener=\
+org.mskcc.cbio.portal.testsupport.ClickHouseDatabaseResetTestExecutionListener

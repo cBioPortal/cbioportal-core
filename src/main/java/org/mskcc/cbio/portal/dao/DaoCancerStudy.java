@@ -572,7 +572,7 @@ public final class DaoCancerStudy {
                 "DELETE FROM gistic_to_gene WHERE GISTIC_ROI_ID IN (SELECT GISTIC_ROI_ID FROM gistic WHERE CANCER_STUDY_ID=?)",
                 "DELETE FROM gistic WHERE CANCER_STUDY_ID=?",
                 "DELETE FROM mut_sig WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM cancer_study WHERE CANCER_STUDY_ID=?;"
+                "DELETE FROM cancer_study WHERE CANCER_STUDY_ID=?"
                 };
         Connection con = null;
         PreparedStatement pstmt = null;

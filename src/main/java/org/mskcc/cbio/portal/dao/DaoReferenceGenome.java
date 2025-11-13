@@ -113,9 +113,9 @@ public final class DaoReferenceGenome {
                 con = JdbcUtil.getDbConnection(DaoReferenceGenome.class);
                 long refId = ClickHouseAutoIncrement.nextId(REFERENCE_GENOME_SEQUENCE);
                 pstmt = con.prepareStatement("INSERT INTO reference_genome " +
-                        "( `REFERENCE_GENOME_ID`, `species`, `name`, "
-                        + "`build_name`, `genome_size`, `URL`, "
-                        + " `release_date` ) VALUES (?,?,?,?,?,?,?)");
+                        "( `REFERENCE_GENOME_ID`, `SPECIES`, `NAME`, "
+                        + "`BUILD_NAME`, `GENOME_SIZE`, `URL`, "
+                        + " `RELEASE_DATE` ) VALUES (?,?,?,?,?,?,?)");
                 pstmt.setLong(1, refId);
                 pstmt.setString(2, referenceGenome.getSpecies());
                 pstmt.setString(3, referenceGenome.getGenomeName());
@@ -178,9 +178,9 @@ public final class DaoReferenceGenome {
         try {
             con = JdbcUtil.getDbConnection(DaoReferenceGenome.class);
             pstmt = con.prepareStatement("UPDATE reference_genome " +
-                "SET `species`=?, `name`=?, "
-                + "`build_name`=?, `genome_size`=?, `URL`=?, "
-                + " `release_date`=? WHERE `reference_genome_id`=?");
+                "SET `SPECIES`=?, `NAME`=?, "
+                + "`BUILD_NAME`=?, `GENOME_SIZE`=?, `URL`=?, "
+                + " `RELEASE_DATE`=? WHERE `REFERENCE_GENOME_ID`=?");
             pstmt.setString(1, referenceGenome.getSpecies());
             pstmt.setString(2, referenceGenome.getGenomeName());
             pstmt.setString(3, referenceGenome.getBuildName());

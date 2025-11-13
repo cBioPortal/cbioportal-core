@@ -125,17 +125,29 @@ public final class DaoCnaEvent {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
+            if (sampleIds.isEmpty()) {
+                return;
+            }
+            String placeholders = String.join(",", Collections.nCopies(sampleIds.size(), "?"));
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            pstmt = con.prepareStatement
-                    ("DELETE sample_cna_event, alteration_driver_annotation" +
-                            " FROM sample_cna_event" +
-                            " LEFT JOIN alteration_driver_annotation ON alteration_driver_annotation.`ALTERATION_EVENT_ID` = sample_cna_event.`CNA_EVENT_ID`" +
-                            " AND alteration_driver_annotation.`SAMPLE_ID` = sample_cna_event.`SAMPLE_ID`" +
-                            " AND alteration_driver_annotation.`GENETIC_PROFILE_ID` = sample_cna_event.`GENETIC_PROFILE_ID`" +
-                            " WHERE sample_cna_event.`GENETIC_PROFILE_ID` = ? AND sample_cna_event.`SAMPLE_ID` IN (" +
-                            String.join(",", Collections.nCopies(sampleIds.size(), "?"))
-                            + ")");
+            pstmt = con.prepareStatement(
+                    "DELETE FROM alteration_driver_annotation " +
+                            "WHERE `GENETIC_PROFILE_ID` = ? AND `SAMPLE_ID` IN (" + placeholders + ") " +
+                            "AND `ALTERATION_EVENT_ID` IN (SELECT `CNA_EVENT_ID` FROM sample_cna_event WHERE `GENETIC_PROFILE_ID` = ? AND `SAMPLE_ID` IN (" + placeholders + "))");
             int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, cnaProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.setInt(parameterIndex++, cnaProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
+            pstmt.close();
+            pstmt = con.prepareStatement(
+                    "DELETE FROM sample_cna_event WHERE `GENETIC_PROFILE_ID` = ? AND `SAMPLE_ID` IN (" + placeholders + ")");
+            parameterIndex = 1;
             pstmt.setInt(parameterIndex++, cnaProfileId);
             for (Integer sampleId : sampleIds) {
                 pstmt.setInt(parameterIndex++, sampleId);
@@ -197,23 +209,22 @@ public final class DaoCnaEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
             pstmt = con.prepareStatement
-		("SELECT sample_cna_event.CNA_EVENT_ID,"
-                    + " sample_cna_event.SAMPLE_ID,"
-                    + " sample_cna_event.GENETIC_PROFILE_ID,"
-                    + " ENTREZ_GENE_ID,"
-                    + " ALTERATION,"
-                    + " alteration_driver_annotation.DRIVER_FILTER,"
-                    + " alteration_driver_annotation.DRIVER_FILTER_ANNOTATION,"
-                    + " alteration_driver_annotation.DRIVER_TIERS_FILTER,"
-                    + " alteration_driver_annotation.DRIVER_TIERS_FILTER_ANNOTATION"
+		("SELECT sample_cna_event.CNA_EVENT_ID AS CNA_EVENT_ID,"
+                    + " sample_cna_event.SAMPLE_ID AS SAMPLE_ID,"
+                    + " sample_cna_event.GENETIC_PROFILE_ID AS GENETIC_PROFILE_ID,"
+                    + " cna_event.ENTREZ_GENE_ID AS ENTREZ_GENE_ID,"
+                    + " cna_event.ALTERATION AS ALTERATION,"
+                    + " alteration_driver_annotation.DRIVER_FILTER AS DRIVER_FILTER,"
+                    + " alteration_driver_annotation.DRIVER_FILTER_ANNOTATION AS DRIVER_FILTER_ANNOTATION,"
+                    + " alteration_driver_annotation.DRIVER_TIERS_FILTER AS DRIVER_TIERS_FILTER,"
+                    + " alteration_driver_annotation.DRIVER_TIERS_FILTER_ANNOTATION AS DRIVER_TIERS_FILTER_ANNOTATION"
                     + " FROM sample_cna_event"
                     + " LEFT JOIN alteration_driver_annotation ON"
                     + "  sample_cna_event.GENETIC_PROFILE_ID = alteration_driver_annotation.GENETIC_PROFILE_ID"
                     + "  and sample_cna_event.SAMPLE_ID = alteration_driver_annotation.SAMPLE_ID"
-                    + "  and sample_cna_event.CNA_EVENT_ID = alteration_driver_annotation.ALTERATION_EVENT_ID,"
-                    + " cna_event"
+                    + "  and sample_cna_event.CNA_EVENT_ID = alteration_driver_annotation.ALTERATION_EVENT_ID"
+                    + " INNER JOIN cna_event ON sample_cna_event.CNA_EVENT_ID=cna_event.CNA_EVENT_ID"
                     + " WHERE sample_cna_event.GENETIC_PROFILE_ID=?"
-                    + " AND sample_cna_event.CNA_EVENT_ID=cna_event.CNA_EVENT_ID"
                     + (entrezGeneIds==null?"":" AND ENTREZ_GENE_ID IN(" + StringUtils.join(entrezGeneIds,",") + ")")
                     + " AND ALTERATION IN (" + StringUtils.join(cnaLevels,",") + ")"
                     + " AND sample_cna_event.SAMPLE_ID in ('"+StringUtils.join(sampleIds, "','")+"')");

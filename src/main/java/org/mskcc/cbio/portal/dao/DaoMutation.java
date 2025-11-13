@@ -164,11 +164,11 @@ public final class DaoMutation {
 
     public static void createMutationCountClinicalData(GeneticProfile geneticProfile) throws DaoException {
         Connection con = null;
-        PreparedStatement pstmt = null;
+        PreparedStatement deleteStmt = null;
+        PreparedStatement insertStmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
-            // add mutation count meta attribute if it does not exist
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(MUTATION_COUNT_ATTR_ID, geneticProfile.getCancerStudyId());
             if (clinicalAttribute == null) {
                 ClinicalAttribute attr = new ClinicalAttribute(MUTATION_COUNT_ATTR_ID, "Mutation Count", "Mutation Count", "NUMBER",
@@ -176,26 +176,8 @@ public final class DaoMutation {
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
 
-            /*
-             * Add MUTATION_COUNT for each sample by checking number of
-             * mutations for the given genetic profile.
-             *
-             * We do not add the MUTATION_COUNT clinical data for the sample if
-             * it's not profiled. If it *is* profiled but there are 0
-             * mutations, add a MUTATION_COUNT with 0 value record. Do not
-             * include germline when counting mutations.
-             *
-             * Use REPLACE (conditional INSERT/UPDATE) which inserts
-             * new counts if they don't exist and overwrites them if they do.
-             * This is necessary for when the mutation data is split over
-             * multiple files with same profile id. Note that since
-             * clinical_sample has a key contraint on INTERNAL_ID and ATTR_ID,
-             * there can only be one MUTATION_COUNT record for each sample, so
-             * we assume each sample is in only one MUTATION_EXTENDED profile.
-             */
-            pstmt = con.prepareStatement(
-                    "REPLACE `clinical_sample` " +
-                    "SELECT sample_profile.`SAMPLE_ID`, 'MUTATION_COUNT', COUNT(DISTINCT mutation_event.`CHR`, mutation_event.`START_POSITION`, " +
+            String mutationCountSelect =
+                "SELECT sample_profile.`SAMPLE_ID`, 'MUTATION_COUNT', COUNT(DISTINCT mutation_event.`CHR`, mutation_event.`START_POSITION`, " +
                     "mutation_event.`END_POSITION`, mutation_event.`REFERENCE_ALLELE`, mutation_event.`TUMOR_SEQ_ALLELE`) AS MUTATION_COUNT " +
                     "FROM `sample_profile` " +
                     "LEFT JOIN mutation ON mutation.`SAMPLE_ID` = sample_profile.`SAMPLE_ID` " +
@@ -204,13 +186,27 @@ public final class DaoMutation {
                     "INNER JOIN genetic_profile ON genetic_profile.`GENETIC_PROFILE_ID` = sample_profile.`GENETIC_PROFILE_ID` " +
                     "WHERE genetic_profile.`GENETIC_ALTERATION_TYPE` = 'MUTATION_EXTENDED' " +
                     "AND genetic_profile.`GENETIC_PROFILE_ID`=? " +
-                    "GROUP BY sample_profile.`GENETIC_PROFILE_ID` , sample_profile.`SAMPLE_ID`;");
-            pstmt.setInt(1, geneticProfile.getGeneticProfileId());
-            pstmt.executeUpdate();
+                    "GROUP BY sample_profile.`GENETIC_PROFILE_ID` , sample_profile.`SAMPLE_ID`";
+
+            deleteStmt = con.prepareStatement(
+                "ALTER TABLE clinical_sample "
+                    + "DELETE WHERE ATTR_ID = 'MUTATION_COUNT' "
+                    + "AND INTERNAL_ID IN (SELECT SAMPLE_ID FROM sample_profile WHERE GENETIC_PROFILE_ID = ?) "
+                    + "SETTINGS mutations_sync=2"
+            );
+            deleteStmt.setInt(1, geneticProfile.getGeneticProfileId());
+            deleteStmt.executeUpdate();
+
+            insertStmt = con.prepareStatement(
+                "INSERT INTO clinical_sample " + mutationCountSelect
+            );
+            insertStmt.setInt(1, geneticProfile.getGeneticProfileId());
+            insertStmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoMutation.class, null, deleteStmt, null);
+            JdbcUtil.closeAll(DaoMutation.class, con, insertStmt, rs);
         }
     }
 
@@ -250,7 +246,7 @@ public final class DaoMutation {
                     "SELECT mutation_event.`KEYWORD`, mutation_event.`ENTREZ_GENE_ID`,  IF(mutation_event.`KEYWORD` IS NULL, 0, COUNT(DISTINCT(mutation.SAMPLE_ID))) AS KEYWORD_COUNT " +
                             "FROM mutation_event JOIN mutation on mutation.`MUTATION_EVENT_ID` = mutation_event.`MUTATION_EVENT_ID` " +
                             "WHERE mutation.`GENETIC_PROFILE_ID` = ? " +
-                            "GROUP BY mutation_event.`KEYWORD`, mutation_event.`ENTREZ_GENE_ID`;"
+                            "GROUP BY mutation_event.`KEYWORD`, mutation_event.`ENTREZ_GENE_ID`"
             );
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
@@ -275,7 +271,7 @@ public final class DaoMutation {
             pstmt = con.prepareStatement(
                 "SELECT ENTREZ_GENE_ID AS `ENTREZ_GENE_ID`, COUNT(DISTINCT(SAMPLE_ID)) AS `GENE_COUNT`" +
                     " FROM mutation WHERE GENETIC_PROFILE_ID = ? " +
-                    "GROUP BY ENTREZ_GENE_ID;");
+                    "GROUP BY ENTREZ_GENE_ID");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -778,7 +774,7 @@ public final class DaoMutation {
     private static ExtendedMutation.MutationEvent extractMutationEvent(ResultSet rs) throws SQLException, DaoException {
         ExtendedMutation.MutationEvent event = new ExtendedMutation.MutationEvent();
         event.setMutationEventId(rs.getLong("MUTATION_EVENT_ID"));
-        long entrezId = rs.getLong("mutation_event.ENTREZ_GENE_ID");
+        long entrezId = rs.getLong("ENTREZ_GENE_ID");
         DaoGeneOptimized aDaoGene = DaoGeneOptimized.getInstance();
         CanonicalGene gene = aDaoGene.getGene(entrezId);
         event.setGene(gene);

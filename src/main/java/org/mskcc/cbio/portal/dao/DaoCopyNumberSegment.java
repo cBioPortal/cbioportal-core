@@ -83,15 +83,19 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "SELECT `SAMPLE_ID`, IF((SELECT SUM(`END`-`START`) FROM copy_number_seg " + 
-                    "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
-                    "ABS(c2.`SEGMENT_MEAN`) >= 0.2) IS NULL, 0, (SELECT SUM(`END`-`START`) FROM copy_number_seg " + 
-                    "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
-                    "ABS(c2.`SEGMENT_MEAN`) >= 0.2) / SUM(`END`-`START`)) AS `VALUE` FROM `copy_number_seg` AS c1 , `cancer_study` " +
-                    "WHERE c1.`CANCER_STUDY_ID` = cancer_study.`CANCER_STUDY_ID` AND cancer_study.`CANCER_STUDY_ID`=? " +
-                            (sampleIds == null ? "" : ("AND `SAMPLE_ID` IN ("+ String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") "))
-                    +"GROUP BY cancer_study.`CANCER_STUDY_ID` , `SAMPLE_ID` HAVING SUM(`END`-`START`) > 0;");
+                    "SELECT c1.`SAMPLE_ID`, " +
+                            "CASE WHEN SUM(c1.`END` - c1.`START`) > 0 THEN " +
+                            "ROUND(SUM(CASE WHEN ABS(c1.`SEGMENT_MEAN`) >= ? THEN (c1.`END` - c1.`START`) ELSE 0 END) * 1.0 / " +
+                            "SUM(c1.`END` - c1.`START`), 4) " +
+                            "ELSE 0 END AS `VALUE` " +
+                            "FROM `copy_number_seg` AS c1 " +
+                            "INNER JOIN `cancer_study` ON c1.`CANCER_STUDY_ID` = cancer_study.`CANCER_STUDY_ID` " +
+                            "WHERE cancer_study.`CANCER_STUDY_ID`=? " +
+                            (sampleIds == null ? "" : ("AND c1.`SAMPLE_ID` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") ")) +
+                            "GROUP BY cancer_study.`CANCER_STUDY_ID`, c1.`SAMPLE_ID` " +
+                            "HAVING SUM(c1.`END` - c1.`START`) > 0");
             int parameterIndex = 1;
+            pstmt.setDouble(parameterIndex++, FRACTION_GENOME_ALTERED_CUTOFF);
             pstmt.setInt(parameterIndex++, cancerStudyId);
             if (sampleIds != null) {
                 for (Integer sampleId : sampleIds) {

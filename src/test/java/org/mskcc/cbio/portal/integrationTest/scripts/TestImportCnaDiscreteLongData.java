@@ -577,11 +577,11 @@ public class TestImportCnaDiscreteLongData {
 
     private List<NamespaceAnnotationJson> getAnnotationJsonBy(long geneticProfileId) throws DaoException {
         return runSelectQuery(
-            "select cna_event.CNA_EVENT_ID, SAMPLE_ID, STABLE_ID, GENETIC_PROFILE_ID, ENTREZ_GENE_ID, ANNOTATION_JSON " +
+            "select cna_event.CNA_EVENT_ID AS CNA_EVENT_ID, sample_cna_event.SAMPLE_ID AS SAMPLE_ID, STABLE_ID, GENETIC_PROFILE_ID, ENTREZ_GENE_ID, ANNOTATION_JSON " +
                 "FROM sample_cna_event " +
                 "LEFT JOIN sample ON sample.INTERNAL_ID = sample_cna_event.SAMPLE_ID " +
                 "LEFT JOIN cna_event ON cna_event.CNA_EVENT_ID = sample_cna_event.CNA_EVENT_ID " +
-                "WHERE GENETIC_PROFILE_ID=" + geneticProfileId + " ;",
+                "WHERE sample_cna_event.GENETIC_PROFILE_ID=" + geneticProfileId + " ;",
             (ResultSet rs) -> {
                 NamespaceAnnotationJson result = new NamespaceAnnotationJson();
                 result.cnaEventId = rs.getInt("CNA_EVENT_ID");

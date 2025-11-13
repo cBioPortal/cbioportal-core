@@ -22,6 +22,7 @@
 */
 
 package org.mskcc.cbio.portal.dao;
+import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.model.StructuralVariant;
 
 import java.sql.Connection;
@@ -91,6 +92,11 @@ public class DaoStructuralVariant {
         bl.setFieldNames(fieldNames);
 
         // write to the temp file maintained by the ClickHouseBulkLoader
+        String svStatus = structuralVariant.getSvStatus();
+        if (svStatus == null || svStatus.isBlank() || TabDelimitedFileUtil.NA_STRING.equalsIgnoreCase(svStatus)) {
+            svStatus = "SOMATIC";
+        }
+
         bl.insertRecord(
             Long.toString(structuralVariant.getInternalId()),
             Integer.toString(structuralVariant.getGeneticProfileId()),
@@ -130,7 +136,7 @@ public class DaoStructuralVariant {
             structuralVariant.getVariantClass(),
             Integer.toString(structuralVariant.getLength()),
             structuralVariant.getComments(),
-            structuralVariant.getSvStatus(),
+            svStatus,
             structuralVariant.getAnnotationJson()
         );
 
@@ -159,15 +165,22 @@ public class DaoStructuralVariant {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGene.class);
-            pstmt = con.prepareStatement("DELETE structural_variant, alteration_driver_annotation" +
-                    " FROM structural_variant" +
-                    " LEFT JOIN alteration_driver_annotation" +
-                    " ON alteration_driver_annotation.GENETIC_PROFILE_ID = structural_variant.GENETIC_PROFILE_ID" +
-                    " AND alteration_driver_annotation.SAMPLE_ID = structural_variant.SAMPLE_ID" +
-                    " WHERE structural_variant.GENETIC_PROFILE_ID=? AND structural_variant.SAMPLE_ID IN ("
-                    + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
-                    + ")");
+            if (sampleIds.isEmpty()) {
+                return;
+            }
+            String placeholders = String.join(",", Collections.nCopies(sampleIds.size(), "?"));
+            pstmt = con.prepareStatement("DELETE FROM alteration_driver_annotation " +
+                    "WHERE GENETIC_PROFILE_ID=? AND SAMPLE_ID IN (" + placeholders + ")");
             int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, geneticProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
+            pstmt.close();
+            pstmt = con.prepareStatement("DELETE FROM structural_variant " +
+                    "WHERE GENETIC_PROFILE_ID=? AND SAMPLE_ID IN (" + placeholders + ")");
+            parameterIndex = 1;
             pstmt.setInt(parameterIndex++, geneticProfileId);
             for (Integer sampleId : sampleIds) {
                 pstmt.setInt(parameterIndex++, sampleId);
@@ -282,4 +295,3 @@ public class DaoStructuralVariant {
         return structuralVariant;
     }
 }
-

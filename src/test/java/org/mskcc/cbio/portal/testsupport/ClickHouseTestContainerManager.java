@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -35,8 +36,7 @@ final class ClickHouseTestContainerManager {
                 return;
             }
             startContainer();
-            applySql("db/clickhouse/cgds.clickhouse.sql");
-            applySql("db/clickhouse/seed_mini.clickhouse.sql");
+            applySchemaAndSeed();
             String jdbcUrl = String.format("jdbc:clickhouse://%s:%d/%s",
                 container.getHost(),
                 container.getMappedPort(8123),
@@ -45,6 +45,16 @@ final class ClickHouseTestContainerManager {
             System.setProperty("test.datasource.username", DB_USER);
             System.setProperty("test.datasource.password", DB_PASSWORD);
             INITIALIZED.set(true);
+        }
+    }
+
+    static void resetDatabaseState() {
+        synchronized (ClickHouseTestContainerManager.class) {
+            if (!INITIALIZED.get()) {
+                ensureStarted();
+                return;
+            }
+            applySchemaAndSeed();
         }
     }
 
@@ -57,13 +67,19 @@ final class ClickHouseTestContainerManager {
             .withEnv("CLICKHOUSE_PASSWORD", DB_PASSWORD)
             .withExposedPorts(8123, 9000)
             .withReuse(true)
-            .waitingFor(Wait.forHttp("/").forStatusCode(200).withStartupTimeout(Duration.ofMinutes(2)));
+            .waitingFor(Wait.forHttp("/ping").forStatusCode(200).withStartupTimeout(Duration.ofMinutes(2)));
         container.start();
         String jdbcUrl = String.format("jdbc:clickhouse://%s:%d/%s",
             container.getHost(),
             container.getMappedPort(8123),
             DATABASE_NAME);
         LOG.info("ClickHouse test container started on JDBC URL {}", jdbcUrl);
+    }
+
+    private static void applySchemaAndSeed() {
+        applySql("db/clickhouse/cgds.clickhouse.sql");
+        applySql("db/clickhouse/seed_mini.clickhouse.sql");
+        ClickHouseAutoIncrement.reset();
     }
 
     private static void applySql(String relativePath) {
@@ -74,18 +90,21 @@ final class ClickHouseTestContainerManager {
         String target = "/tmp/" + sqlPath.getFileName();
         container.copyFileToContainer(MountableFile.forHostPath(sqlPath), target);
         try {
+            var command = new java.util.ArrayList<String>();
+            command.add("clickhouse-client");
+            command.add("--user");
+            command.add(DB_USER);
+            if (!DB_PASSWORD.isEmpty()) {
+                command.add("--password");
+                command.add(DB_PASSWORD);
+            }
+            command.add("--multiquery");
+            command.add("--database");
+            command.add(DATABASE_NAME);
+            command.add("--queries-file");
+            command.add(target);
             ExecResult result = container.execInContainer(
-                "clickhouse-client",
-                "--user",
-                DB_USER,
-                "--password",
-                DB_PASSWORD,
-                "--multiquery",
-                "--database",
-                DATABASE_NAME,
-                "--queries-file",
-                target
-            );
+                command.toArray(new String[0]));
             if (result.getExitCode() != 0) {
                 throw new IllegalStateException("Failed to apply " + sqlPath + ": " + result.getStderr());
             }

@@ -183,26 +183,44 @@ public class DaoPatient {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
+        Map<Integer, Integer> sampleCounts = new LinkedHashMap<>();
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "REPLACE `clinical_patient`" +
-                    "SELECT patient.`INTERNAL_ID`, 'SAMPLE_COUNT', COUNT(*) FROM sample " + 
-                    "INNER JOIN patient ON sample.`PATIENT_ID` = patient.`INTERNAL_ID`" +
-                    "WHERE patient.`CANCER_STUDY_ID`=? " +
-                    "GROUP BY patient.`INTERNAL_ID`;");
+                    "SELECT patient.`INTERNAL_ID` AS INTERNAL_ID, COUNT(*) AS SAMPLE_COUNT FROM sample " +
+                            "INNER JOIN patient ON sample.`PATIENT_ID` = patient.`INTERNAL_ID` " +
+                            "WHERE patient.`CANCER_STUDY_ID`=? " +
+                            "GROUP BY patient.`INTERNAL_ID`");
             pstmt.setInt(1, cancerStudyId);
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                sampleCounts.put(rs.getInt("INTERNAL_ID"), rs.getInt("SAMPLE_COUNT"));
+            }
+            if (sampleCounts.isEmpty()) {
+                return;
+            }
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(SAMPLE_COUNT_ATTR_ID, cancerStudyId);
             if (clinicalAttribute == null) {
                 ClinicalAttribute attr = new ClinicalAttribute(SAMPLE_COUNT_ATTR_ID, "Number of Samples Per Patient", 
                     "Number of Samples Per Patient", "STRING", true, "1", cancerStudyId);
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
+            String placeholders = String.join(",", Collections.nCopies(sampleCounts.size(), "?"));
+            pstmt.close();
+            pstmt = con.prepareStatement("DELETE FROM clinical_patient WHERE ATTR_ID=? AND INTERNAL_ID IN (" + placeholders + ")");
+            pstmt.setString(1, SAMPLE_COUNT_ATTR_ID);
+            int parameterIndex = 2;
+            for (Integer patientId : sampleCounts.keySet()) {
+                pstmt.setInt(parameterIndex++, patientId);
+            }
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
+        }
+        for (Map.Entry<Integer, Integer> entry : sampleCounts.entrySet()) {
+            DaoClinicalData.addPatientDatum(entry.getKey(), SAMPLE_COUNT_ATTR_ID, Integer.toString(entry.getValue()));
         }
     }
 

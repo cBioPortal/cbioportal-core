@@ -74,31 +74,43 @@ public final class DaoSampleProfile {
             return;
         }
         Connection con = null;
-        PreparedStatement pstmt = null;
+        PreparedStatement deleteStmt = null;
+        PreparedStatement insertStmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-
-            pstmt = con.prepareStatement
-                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
-                            " VALUES" +
-                            String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
-                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);");
+            String tuplePlaceholders = String.join(",", Collections.nCopies(idTuples.size(), "(?,?)"));
+            deleteStmt = con.prepareStatement(
+                "ALTER TABLE sample_profile "
+                    + "DELETE WHERE (SAMPLE_ID, GENETIC_PROFILE_ID) IN (" + tuplePlaceholders + ") "
+                    + "SETTINGS mutations_sync=2"
+            );
             int parameterIndex = 1;
             for (SampleProfileTuple idTuple : idTuples) {
-                pstmt.setInt(parameterIndex++, idTuple.sampleId());
-                pstmt.setInt(parameterIndex++, idTuple.geneticProfileId());
+                deleteStmt.setInt(parameterIndex++, idTuple.sampleId());
+                deleteStmt.setInt(parameterIndex++, idTuple.geneticProfileId());
+            }
+            deleteStmt.executeUpdate();
+
+            String insertSql = "INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`) VALUES "
+                + String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)"));
+            insertStmt = con.prepareStatement(insertSql);
+            parameterIndex = 1;
+            for (SampleProfileTuple idTuple : idTuples) {
+                insertStmt.setInt(parameterIndex++, idTuple.sampleId());
+                insertStmt.setInt(parameterIndex++, idTuple.geneticProfileId());
                 if (idTuple.panelId() != null) {
-                    pstmt.setInt(parameterIndex, idTuple.panelId());
+                    insertStmt.setInt(parameterIndex, idTuple.panelId());
                 } else {
-                    pstmt.setNull(parameterIndex, java.sql.Types.INTEGER);
+                    insertStmt.setNull(parameterIndex, java.sql.Types.INTEGER);
                 }
                 parameterIndex++;
             }
-            pstmt.executeUpdate();
+            insertStmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, null);
+            JdbcUtil.closeAll(DaoSampleProfile.class, null, deleteStmt, null);
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, insertStmt, null);
         }
     }
 

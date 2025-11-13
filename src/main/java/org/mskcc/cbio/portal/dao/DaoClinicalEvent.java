@@ -211,7 +211,12 @@ public final class DaoClinicalEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
 
-            pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE clinical_event.PATIENT_ID = ?");
+            pstmt = con.prepareStatement("DELETE FROM clinical_event_data WHERE CLINICAL_EVENT_ID IN (" +
+                    "SELECT CLINICAL_EVENT_ID FROM clinical_event WHERE PATIENT_ID = ?)");
+            pstmt.setInt(1, patientId);
+            pstmt.executeUpdate();
+            pstmt.close();
+            pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE PATIENT_ID = ?");
             pstmt.setInt(1, patientId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
