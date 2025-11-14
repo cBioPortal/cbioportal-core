@@ -47,6 +47,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -60,6 +61,8 @@ import java.util.Set;
  * @author Ersin Ciftci
  */
 public final class DaoCancerStudy {
+
+    private static final int DELETE_BATCH_SIZE = 500;
 
     public static enum Status {
         UNAVAILABLE,
@@ -543,37 +546,6 @@ public final class DaoCancerStudy {
      * @deprecated
      */
     public static void deleteCancerStudy(int internalCancerStudyId) throws DaoException {
-        String[] deleteStudyStatements = {
-                "DELETE FROM sample_cna_event WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM genetic_alteration WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM genetic_profile_samples WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM sample_profile WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM mutation WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM alteration_driver_annotation WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM mutation_count_by_keyword WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?",
-                "DELETE FROM resource_definition WHERE cancer_study_id=?",
-                "DELETE FROM resource_study WHERE internal_id=?",
-                "DELETE FROM clinical_event_data WHERE clinical_event_id IN (SELECT clinical_event_id FROM clinical_event WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?))",
-                "DELETE FROM clinical_event WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
-                "DELETE FROM sample_list_list WHERE list_id IN (SELECT list_id FROM sample_list WHERE cancer_study_id=?)",
-                "DELETE FROM clinical_sample WHERE internal_id IN (SELECT internal_id FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?))",
-                "DELETE FROM resource_sample WHERE internal_id IN (SELECT internal_id FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?))",
-                "DELETE FROM copy_number_seg WHERE cancer_study_id=?",
-                "DELETE FROM copy_number_seg_file WHERE cancer_study_id=?",
-                "DELETE FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
-                "DELETE FROM clinical_patient WHERE internal_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
-                "DELETE FROM resource_patient WHERE internal_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
-                "DELETE FROM patient WHERE cancer_study_id=?",
-                "DELETE FROM sample_list WHERE cancer_study_id=?",
-                "DELETE FROM structural_variant WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
-                "DELETE FROM genetic_profile_link WHERE referred_genetic_profile_id IN (select genetic_profile_id FROM genetic_profile where cancer_study_id=?)",
-                "DELETE FROM genetic_profile WHERE cancer_study_id=?",
-                "DELETE FROM gistic_to_gene WHERE gistic_roi_id IN (SELECT gistic_roi_id FROM gistic WHERE cancer_study_id=?)",
-                "DELETE FROM gistic WHERE cancer_study_id=?",
-                "DELETE FROM mut_sig WHERE cancer_study_id=?",
-                "DELETE FROM cancer_study WHERE cancer_study_id=?"
-                };
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -582,14 +554,57 @@ public final class DaoCancerStudy {
             DaoGenericAssay.checkAndDeleteGenericAssayMetaInStudy(internalCancerStudyId);
             
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
-            for (String statementString : deleteStudyStatements) {
-                pstmt = con.prepareStatement(statementString);
-                if (statementString.contains("?")) {
-                    pstmt.setInt(1, internalCancerStudyId);
-                }
-                pstmt.executeUpdate();
-                pstmt.close();
-            }
+            List<Integer> geneticProfileIds = collectIds(con,
+                "SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?", internalCancerStudyId);
+            List<Integer> patientIds = collectIds(con,
+                "SELECT internal_id FROM patient WHERE cancer_study_id=?", internalCancerStudyId);
+            List<Integer> sampleIds = collectIds(con,
+                "SELECT internal_id FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
+                internalCancerStudyId);
+            List<Integer> sampleListIds = collectIds(con,
+                "SELECT list_id FROM sample_list WHERE cancer_study_id=?", internalCancerStudyId);
+            List<Integer> clinicalEventIds = collectIds(con,
+                "SELECT clinical_event_id FROM clinical_event WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
+                internalCancerStudyId);
+            List<Integer> gisticIds = collectIds(con,
+                "SELECT gistic_roi_id FROM gistic WHERE cancer_study_id=?", internalCancerStudyId);
+
+            deleteByIds(con, "DELETE FROM sample_cna_event WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM genetic_alteration WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM genetic_profile_samples WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM sample_profile WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM mutation WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM alteration_driver_annotation WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM mutation_count_by_keyword WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM structural_variant WHERE genetic_profile_id IN ", geneticProfileIds);
+            deleteByIds(con, "DELETE FROM genetic_profile_link WHERE referred_genetic_profile_id IN ", geneticProfileIds);
+
+            deleteByIds(con, "DELETE FROM gistic_to_gene WHERE gistic_roi_id IN ", gisticIds);
+
+            deleteByIds(con, "DELETE FROM clinical_event_data WHERE clinical_event_id IN ", clinicalEventIds);
+            deleteByIds(con, "DELETE FROM clinical_event WHERE clinical_event_id IN ", clinicalEventIds);
+
+            deleteByIds(con, "DELETE FROM sample_list_list WHERE list_id IN ", sampleListIds);
+
+            deleteByIds(con, "DELETE FROM clinical_sample WHERE internal_id IN ", sampleIds);
+            deleteByIds(con, "DELETE FROM resource_sample WHERE internal_id IN ", sampleIds);
+
+            deleteByIds(con, "DELETE FROM sample WHERE internal_id IN ", sampleIds);
+            deleteByIds(con, "DELETE FROM clinical_patient WHERE internal_id IN ", patientIds);
+            deleteByIds(con, "DELETE FROM resource_patient WHERE internal_id IN ", patientIds);
+
+            deleteByStudyId(con, "DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM resource_study WHERE internal_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM copy_number_seg WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM copy_number_seg_file WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM patient WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM sample_list WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM genetic_profile WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM gistic WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM mut_sig WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM cancer_study WHERE cancer_study_id=?", internalCancerStudyId);
+
             removeCancerStudyFromCache(internalCancerStudyId);
         } catch (SQLException e) {
             throw new DaoException(e);
@@ -607,9 +622,9 @@ public final class DaoCancerStudy {
      */
     public static void purgeUnreferencedRecordsAfterDeletionOfStudy() throws DaoException {
         String[] deleteStudyStatements = {
-                "DELETE FROM cna_event WHERE NOT EXISTS (SELECT * FROM sample_cna_event WHERE sample_cna_event.cna_event_id = cna_event.cna_event_id)",
-                "DELETE FROM mutation_event WHERE NOT EXISTS (SELECT * FROM mutation WHERE mutation.mutation_event_id = mutation_event.mutation_event_id)"
-                };
+            "DELETE FROM cna_event WHERE cna_event_id NOT IN (SELECT DISTINCT cna_event_id FROM sample_cna_event)",
+            "DELETE FROM mutation_event WHERE mutation_event_id NOT IN (SELECT DISTINCT mutation_event_id FROM mutation)"
+        };
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -624,6 +639,48 @@ public final class DaoCancerStudy {
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(DaoCancerStudy.class, con, pstmt, rs);
+        }
+    }
+
+    private static List<Integer> collectIds(Connection con, String sql, int cancerStudyId) throws SQLException {
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<Integer> ids = new ArrayList<>();
+        try {
+            pstmt = con.prepareStatement(sql);
+            pstmt.setInt(1, cancerStudyId);
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                ids.add(rs.getInt(1));
+            }
+        } finally {
+            JdbcUtil.closeAll(DaoCancerStudy.class, null, pstmt, rs);
+        }
+        return ids;
+    }
+
+    private static void deleteByStudyId(Connection con, String sql, int cancerStudyId) throws SQLException {
+        try (PreparedStatement pstmt = con.prepareStatement(sql)) {
+            pstmt.setInt(1, cancerStudyId);
+            pstmt.executeUpdate();
+        }
+    }
+
+    private static void deleteByIds(Connection con, String sqlPrefix, List<Integer> ids) throws SQLException {
+        if (ids.isEmpty()) {
+            return;
+        }
+        for (int start = 0; start < ids.size(); start += DELETE_BATCH_SIZE) {
+            int end = Math.min(start + DELETE_BATCH_SIZE, ids.size());
+            List<Integer> chunk = ids.subList(start, end);
+            String placeholders = String.join(",", Collections.nCopies(chunk.size(), "?"));
+            try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")")) {
+                int idx = 1;
+                for (Integer id : chunk) {
+                    pstmt.setInt(idx++, id);
+                }
+                pstmt.executeUpdate();
+            }
         }
     }
 

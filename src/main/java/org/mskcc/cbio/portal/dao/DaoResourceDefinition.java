@@ -65,7 +65,7 @@ public class DaoResourceDefinition {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
 
             pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE resource_id IN ('"
-                    + StringUtils.join(resourceIds, "','") + "')  AND CANCER_STUDY_ID=" + String.valueOf(cancerStudyId));
+                    + StringUtils.join(resourceIds, "','") + "')  AND cancer_study_id=" + String.valueOf(cancerStudyId));
 
             rs = pstmt.executeQuery();
 

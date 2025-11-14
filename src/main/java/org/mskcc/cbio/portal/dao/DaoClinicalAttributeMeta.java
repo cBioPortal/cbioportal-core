@@ -108,7 +108,7 @@ public class DaoClinicalAttributeMeta {
             con = JdbcUtil.getDbConnection(DaoClinicalAttributeMeta.class);
 
             pstmt = con.prepareStatement("SELECT * FROM clinical_attribute_meta WHERE attr_id IN ('"
-                    + StringUtils.join(attrIds,"','")+"')  AND CANCER_STUDY_ID=" + String.valueOf(cancerStudyId));
+                    + StringUtils.join(attrIds,"','")+"')  AND cancer_study_id=" + String.valueOf(cancerStudyId));
 
             rs = pstmt.executeQuery();
 

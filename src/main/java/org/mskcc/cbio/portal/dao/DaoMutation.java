@@ -243,7 +243,7 @@ public final class DaoMutation {
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
             pstmt = con.prepareStatement(
-                    "SELECT mutation_event.`keyword`, mutation_event.`entrez_gene_id`,  IF(mutation_event.`keyword` IS NULL, 0, count(DISTINCT(mutation.sample_id))) AS keyword_count " +
+                    "SELECT mutation_event.`keyword`, mutation_event.`entrez_gene_id`,  if(mutation_event.`keyword` IS NULL, 0, count(DISTINCT(mutation.sample_id))) AS keyword_count " +
                             "FROM mutation_event JOIN mutation on mutation.`mutation_event_id` = mutation_event.`mutation_event_id` " +
                             "WHERE mutation.`genetic_profile_id` = ? " +
                             "GROUP BY mutation_event.`keyword`, mutation_event.`entrez_gene_id`"
@@ -1651,8 +1651,8 @@ public final class DaoMutation {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
             pstmt = con.prepareStatement(
                     "SELECT "
-                    + "(SELECT COUNT(*) FROM mutation_event) = "
-                    + "(SELECT COUNT(DISTINCT ENTREZ_GENE_ID, CHR, START_POSITION, END_POSITION, TUMOR_SEQ_ALLELE, PROTEIN_CHANGE, MUTATION_TYPE) FROM mutation_event)");
+                    + "(SELECT count(*) FROM mutation_event) = "
+                    + "(SELECT count(DISTINCT entrez_gene_id, chr, start_position, end_position, tumor_seq_allele, protein_change, mutation_type) FROM mutation_event)");
             rs = pstmt.executeQuery();
             if (rs.next()) {
                 sqlQueryResult = rs.getInt(1);
