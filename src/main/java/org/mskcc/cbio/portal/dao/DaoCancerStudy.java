@@ -215,7 +215,7 @@ public final class DaoCancerStudy {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
-            pstmt = con.prepareStatement("UPDATE cancer_study set IMPORT_DATE = NOW() where cancer_study_id = ?");
+            pstmt = con.prepareStatement("UPDATE cancer_study set import_date = now() where cancer_study_id = ?");
             pstmt.setInt(1, internalId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -235,10 +235,10 @@ public final class DaoCancerStudy {
         try {
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
             if (internalId.length > 0) {
-                pstmt = con.prepareStatement("SELECT IMPORT_DATE FROM cancer_study where cancer_study_id = ?");
+                pstmt = con.prepareStatement("SELECT import_date FROM cancer_study where cancer_study_id = ?");
                 pstmt.setInt(1, internalId[0]);
             } else {
-                pstmt = con.prepareStatement("SELECT IMPORT_DATE FROM cancer_study where cancer_study_identifier = ?");
+                pstmt = con.prepareStatement("SELECT import_date FROM cancer_study where cancer_study_identifier = ?");
                 pstmt.setString(1, stableCancerStudyId);
             }
             rs = pstmt.executeQuery();
@@ -307,9 +307,9 @@ public final class DaoCancerStudy {
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
             long cancerStudyId = ClickHouseAutoIncrement.nextId(CANCER_STUDY_SEQUENCE);
             pstmt = con.prepareStatement("INSERT INTO cancer_study " +
-                    "( `CANCER_STUDY_ID`, `CANCER_STUDY_IDENTIFIER`, `NAME`, "
-                    + "`DESCRIPTION`, `PUBLIC`, `TYPE_OF_CANCER_ID`, "
-                    + "`PMID`, `CITATION`, `GROUPS`, `STATUS`,`REFERENCE_GENOME_ID`, `IMPORT_DATE` ) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())");
+                    "( `cancer_study_id`, `cancer_study_identifier`, `name`, "
+                    + "`description`, `public`, `type_of_cancer_id`, "
+                    + "`pmid`, `citation`, `groups`, `status`,`reference_genome_id`, `import_date` ) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())");
             pstmt.setLong(1, cancerStudyId);
             pstmt.setString(2, stableId);
             pstmt.setString(3, cancerStudy.getName());
@@ -354,7 +354,7 @@ public final class DaoCancerStudy {
             try {
                 con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
                 pstmt = con.prepareStatement("INSERT INTO cancer_study_tags " +
-                        "( `CANCER_STUDY_ID`,`TAGS` ) VALUES (?,?)");
+                        "( `cancer_study_id`,`tags` ) VALUES (?,?)");
                 pstmt.setInt(1, cancerStudyTags.getCancerStudyId());
                 pstmt.setString(2, cancerStudyTags.getTags());
                 pstmt.executeUpdate();
@@ -544,35 +544,35 @@ public final class DaoCancerStudy {
      */
     public static void deleteCancerStudy(int internalCancerStudyId) throws DaoException {
         String[] deleteStudyStatements = {
-                "DELETE FROM sample_cna_event WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM genetic_alteration WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM genetic_profile_samples WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM sample_profile WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM mutation WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM alteration_driver_annotation WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM mutation_count_by_keyword WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM clinical_attribute_meta WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM resource_definition WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM resource_study WHERE INTERNAL_ID=?",
-                "DELETE FROM clinical_event_data WHERE CLINICAL_EVENT_ID IN (SELECT CLINICAL_EVENT_ID FROM clinical_event WHERE PATIENT_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?))",
-                "DELETE FROM clinical_event WHERE PATIENT_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM sample_list_list WHERE LIST_ID IN (SELECT LIST_ID FROM sample_list WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM clinical_sample WHERE INTERNAL_ID IN (SELECT INTERNAL_ID FROM sample WHERE PATIENT_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?))",
-                "DELETE FROM resource_sample WHERE INTERNAL_ID IN (SELECT INTERNAL_ID FROM sample WHERE PATIENT_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?))",
-                "DELETE FROM copy_number_seg WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM copy_number_seg_file WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM sample WHERE PATIENT_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM clinical_patient WHERE INTERNAL_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM resource_patient WHERE INTERNAL_ID IN (SELECT INTERNAL_ID FROM patient WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM patient WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM sample_list WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM structural_variant WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_profile WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM genetic_profile_link WHERE REFERRED_GENETIC_PROFILE_ID IN (select GENETIC_PROFILE_ID FROM genetic_profile where CANCER_STUDY_ID=?)",
-                "DELETE FROM genetic_profile WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM gistic_to_gene WHERE GISTIC_ROI_ID IN (SELECT GISTIC_ROI_ID FROM gistic WHERE CANCER_STUDY_ID=?)",
-                "DELETE FROM gistic WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM mut_sig WHERE CANCER_STUDY_ID=?",
-                "DELETE FROM cancer_study WHERE CANCER_STUDY_ID=?"
+                "DELETE FROM sample_cna_event WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM genetic_alteration WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM genetic_profile_samples WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM sample_profile WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM mutation WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM alteration_driver_annotation WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM mutation_count_by_keyword WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?",
+                "DELETE FROM resource_definition WHERE cancer_study_id=?",
+                "DELETE FROM resource_study WHERE internal_id=?",
+                "DELETE FROM clinical_event_data WHERE clinical_event_id IN (SELECT clinical_event_id FROM clinical_event WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?))",
+                "DELETE FROM clinical_event WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
+                "DELETE FROM sample_list_list WHERE list_id IN (SELECT list_id FROM sample_list WHERE cancer_study_id=?)",
+                "DELETE FROM clinical_sample WHERE internal_id IN (SELECT internal_id FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?))",
+                "DELETE FROM resource_sample WHERE internal_id IN (SELECT internal_id FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?))",
+                "DELETE FROM copy_number_seg WHERE cancer_study_id=?",
+                "DELETE FROM copy_number_seg_file WHERE cancer_study_id=?",
+                "DELETE FROM sample WHERE patient_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
+                "DELETE FROM clinical_patient WHERE internal_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
+                "DELETE FROM resource_patient WHERE internal_id IN (SELECT internal_id FROM patient WHERE cancer_study_id=?)",
+                "DELETE FROM patient WHERE cancer_study_id=?",
+                "DELETE FROM sample_list WHERE cancer_study_id=?",
+                "DELETE FROM structural_variant WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_profile WHERE cancer_study_id=?)",
+                "DELETE FROM genetic_profile_link WHERE referred_genetic_profile_id IN (select genetic_profile_id FROM genetic_profile where cancer_study_id=?)",
+                "DELETE FROM genetic_profile WHERE cancer_study_id=?",
+                "DELETE FROM gistic_to_gene WHERE gistic_roi_id IN (SELECT gistic_roi_id FROM gistic WHERE cancer_study_id=?)",
+                "DELETE FROM gistic WHERE cancer_study_id=?",
+                "DELETE FROM mut_sig WHERE cancer_study_id=?",
+                "DELETE FROM cancer_study WHERE cancer_study_id=?"
                 };
         Connection con = null;
         PreparedStatement pstmt = null;
@@ -607,8 +607,8 @@ public final class DaoCancerStudy {
      */
     public static void purgeUnreferencedRecordsAfterDeletionOfStudy() throws DaoException {
         String[] deleteStudyStatements = {
-                "DELETE FROM cna_event WHERE NOT EXISTS (SELECT * FROM sample_cna_event WHERE sample_cna_event.CNA_EVENT_ID = cna_event.CNA_EVENT_ID)",
-                "DELETE FROM mutation_event WHERE NOT EXISTS (SELECT * FROM mutation WHERE mutation.MUTATION_EVENT_ID = mutation_event.MUTATION_EVENT_ID)"
+                "DELETE FROM cna_event WHERE NOT EXISTS (SELECT * FROM sample_cna_event WHERE sample_cna_event.cna_event_id = cna_event.cna_event_id)",
+                "DELETE FROM mutation_event WHERE NOT EXISTS (SELECT * FROM mutation WHERE mutation.mutation_event_id = mutation_event.mutation_event_id)"
                 };
         Connection con = null;
         PreparedStatement pstmt = null;
@@ -632,18 +632,18 @@ public final class DaoCancerStudy {
      */
     private static CancerStudy extractCancerStudy(ResultSet rs) throws DaoException {
         try {
-            CancerStudy cancerStudy = new CancerStudy(rs.getString("NAME"),
-                    rs.getString("DESCRIPTION"),
-                    rs.getString("CANCER_STUDY_IDENTIFIER"),
-                    rs.getString("TYPE_OF_CANCER_ID"),
-                    rs.getBoolean("PUBLIC"));
-            cancerStudy.setPmid(rs.getString("PMID"));
-            cancerStudy.setCitation(rs.getString("CITATION"));
-            cancerStudy.setGroupsInUpperCase(rs.getString("GROUPS"));
-            cancerStudy.setInternalId(rs.getInt("CANCER_STUDY_ID"));
-            cancerStudy.setImportDate(rs.getDate("IMPORT_DATE"));
+            CancerStudy cancerStudy = new CancerStudy(rs.getString("name"),
+                    rs.getString("description"),
+                    rs.getString("cancer_study_identifier"),
+                    rs.getString("type_of_cancer_id"),
+                    rs.getBoolean("public"));
+            cancerStudy.setPmid(rs.getString("pmid"));
+            cancerStudy.setCitation(rs.getString("citation"));
+            cancerStudy.setGroupsInUpperCase(rs.getString("groups"));
+            cancerStudy.setInternalId(rs.getInt("cancer_study_id"));
+            cancerStudy.setImportDate(rs.getDate("import_date"));
             cancerStudy.setReferenceGenome(DaoReferenceGenome.getReferenceGenomeByInternalId(
-                rs.getInt("REFERENCE_GENOME_ID")).getGenomeName());
+                rs.getInt("reference_genome_id")).getGenomeName());
             return cancerStudy;
         } catch (SQLException e) {
             throw new DaoException(e);

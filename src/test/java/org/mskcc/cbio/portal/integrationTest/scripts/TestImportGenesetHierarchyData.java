@@ -111,7 +111,7 @@ public class TestImportGenesetHierarchyData {
 	        connection = JdbcUtil.getDbConnection(DaoGenesetHierarchyNode.class);
 	        
 	        // Prepare SQL statement
-	        preparedStatement = connection.prepareStatement("SELECT * FROM geneset_hierarchy_node WHERE NODE_ID = ?");
+	        preparedStatement = connection.prepareStatement("SELECT * FROM geneset_hierarchy_node WHERE node_id = ?");
 	        preparedStatement.setInt(1, nodeId);
 
 	        // Execute statement
@@ -120,9 +120,9 @@ public class TestImportGenesetHierarchyData {
 	        // Extract genesetHierarchy values
 	        if (resultSet.next()) {
 	            GenesetHierarchy genesetHierarchy = new GenesetHierarchy();
-	            genesetHierarchy.setNodeId(resultSet.getInt("NODE_ID"));
-	            genesetHierarchy.setNodeName(resultSet.getString("NODE_NAME"));
-	            genesetHierarchy.setParentId(resultSet.getInt("PARENT_ID"));
+	            genesetHierarchy.setNodeId(resultSet.getInt("node_id"));
+	            genesetHierarchy.setNodeName(resultSet.getString("node_name"));
+	            genesetHierarchy.setParentId(resultSet.getInt("parent_id"));
 	            return genesetHierarchy;
 	        }
 	        

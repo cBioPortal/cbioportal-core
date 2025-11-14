@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,28 +32,28 @@ public final class ClickHouseAutoIncrement {
     private static final Map<String, AtomicLong> COUNTERS = new ConcurrentHashMap<>();
 
     static {
-        register("seq_reference_genome", "reference_genome", "REFERENCE_GENOME_ID");
-        register("seq_cancer_study", "cancer_study", "CANCER_STUDY_ID");
-        register("seq_patient", "patient", "INTERNAL_ID");
-        register("seq_sample", "sample", "INTERNAL_ID");
-        register("seq_sample_list", "sample_list", "LIST_ID");
-        register("seq_genetic_entity", "genetic_entity", "ID");
-        register("seq_geneset", "geneset", "ID");
-        register("seq_geneset_hierarchy_node", "geneset_hierarchy_node", "NODE_ID");
-        register("seq_generic_entity_properties", "generic_entity_properties", "ID");
-        register("seq_genetic_profile", "genetic_profile", "GENETIC_PROFILE_ID");
-        register("seq_gene_panel", "gene_panel", "INTERNAL_ID");
-        register("seq_structural_variant", "structural_variant", "INTERNAL_ID");
-        register("seq_mutation_event", "mutation_event", "MUTATION_EVENT_ID");
-        register("seq_gistic", "gistic", "GISTIC_ROI_ID");
-        register("seq_cna_event", "cna_event", "CNA_EVENT_ID");
-        register("seq_copy_number_seg", "copy_number_seg", "SEG_ID");
-        register("seq_copy_number_seg_file", "copy_number_seg_file", "SEG_FILE_ID");
-        register("seq_clinical_event", "clinical_event", "CLINICAL_EVENT_ID");
+        register("seq_reference_genome", "reference_genome", "reference_genome_id");
+        register("seq_cancer_study", "cancer_study", "cancer_study_id");
+        register("seq_patient", "patient", "internal_id");
+        register("seq_sample", "sample", "internal_id");
+        register("seq_sample_list", "sample_list", "list_id");
+        register("seq_genetic_entity", "genetic_entity", "id");
+        register("seq_geneset", "geneset", "id");
+        register("seq_geneset_hierarchy_node", "geneset_hierarchy_node", "node_id");
+        register("seq_generic_entity_properties", "generic_entity_properties", "id");
+        register("seq_genetic_profile", "genetic_profile", "genetic_profile_id");
+        register("seq_gene_panel", "gene_panel", "internal_id");
+        register("seq_structural_variant", "structural_variant", "internal_id");
+        register("seq_mutation_event", "mutation_event", "mutation_event_id");
+        register("seq_gistic", "gistic", "gistic_roi_id");
+        register("seq_cna_event", "cna_event", "cna_event_id");
+        register("seq_copy_number_seg", "copy_number_seg", "seg_id");
+        register("seq_copy_number_seg_file", "copy_number_seg_file", "seg_file_id");
+        register("seq_clinical_event", "clinical_event", "clinical_event_id");
     }
 
     private static void register(String sequenceName, String tableName, String columnName) {
-        CONFIG.put(sequenceName, new SequenceConfig(tableName, columnName));
+        CONFIG.put(sequenceName, new SequenceConfig(tableName, columnName.toLowerCase(Locale.ROOT)));
     }
 
     public static long nextId(String sequenceName) throws DaoException {

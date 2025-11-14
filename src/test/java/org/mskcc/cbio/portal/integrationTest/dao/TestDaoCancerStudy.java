@@ -77,7 +77,7 @@ public class TestDaoCancerStudy {
         DaoCancerStudy.addCancerStudy(cancerStudy);
 
         // Removed testing that depends on internal ids
-        //   `CANCER_STUDY_ID` auto_increment counts from 1
+        //   `cancer_study_id` auto_increment counts from 1
         // assertEquals(1, cancerStudy.getInternalId());
         
         cancerStudy.setDescription("Glioblastoma");

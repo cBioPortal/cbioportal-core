@@ -142,7 +142,7 @@ public class DaoCosmicData {
         try {
             con = JdbcUtil.getDbConnection(DaoCosmicData.class);
             pstmt = con.prepareStatement("SELECT * FROM cosmic_mutation "
-                    + " WHERE KEYWORD in ('" + StringUtils.join(keywordS, "','") + "')");
+                    + " WHERE keyword in ('" + StringUtils.join(keywordS, "','") + "')");
             rs = pstmt.executeQuery();
             Map<String,Set<CosmicMutationFrequency>> ret = new HashMap<String,Set<CosmicMutationFrequency>>();
             while (rs.next()) {
@@ -163,11 +163,11 @@ public class DaoCosmicData {
     }
     
     private static CosmicMutationFrequency extractCosmic(ResultSet rs) throws SQLException {
-        String id = rs.getString("COSMIC_MUTATION_ID");
-        long entrez = rs.getLong("ENTREZ_GENE_ID");
-        String aa = rs.getString("PROTEIN_CHANGE");
-        String keyword = rs.getString("KEYWORD");
-        int count = rs.getInt("COUNT");
+        String id = rs.getString("cosmic_mutation_id");
+        long entrez = rs.getLong("entrez_gene_id");
+        String aa = rs.getString("protein_change");
+        String keyword = rs.getString("keyword");
+        int count = rs.getInt("count");
         return new CosmicMutationFrequency(id, entrez, aa, keyword, count);
     }
     

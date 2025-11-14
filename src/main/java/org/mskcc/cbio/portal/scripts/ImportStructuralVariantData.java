@@ -141,7 +141,7 @@ public class ImportStructuralVariantData {
                         ProgressMonitor.logWarning("Could not find gene 1: " + site1HugoSymbol + " [" + site1EntrezGeneId
                                 + "] or gene 2: " + site2HugoSymbol + " ["
                                 + site2EntrezGeneId + "]. Ignoring it "
-                                + "and all SV data associated with it!");
+                                + "and all sv data associated with it!");
                     // If at least one gene is recognized, continue
                     } else {
                         // Save the Entrez Gene Id if it was not saved before

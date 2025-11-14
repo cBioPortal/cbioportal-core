@@ -129,7 +129,7 @@ public class TestImportGenericAssayData {
 		ResultSet rs = null;
 		try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            stat = con.prepareStatement("SELECT COUNT(*) FROM genetic_entity WHERE ENTITY_TYPE = 'GENERIC_ASSAY'");
+            stat = con.prepareStatement("SELECT count(*) FROM genetic_entity WHERE entity_type = 'generic_assay'");
             rs = stat.executeQuery();
             if (rs.next()) {
                 return rs.getInt(1);

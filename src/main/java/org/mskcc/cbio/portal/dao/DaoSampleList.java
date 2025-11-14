@@ -42,7 +42,7 @@ import java.util.*;
  */
 public class DaoSampleList {
 
-    private static final String DELETE_SAMPLE_LIST_LIST = "DELETE FROM sample_list_list WHERE `LIST_ID` = ?";
+    private static final String DELETE_SAMPLE_LIST_LIST = "DELETE FROM sample_list_list WHERE `list_id` = ?";
 
     private static final String SAMPLE_LIST_SEQUENCE = "seq_sample_list";
 
@@ -57,8 +57,8 @@ public class DaoSampleList {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
 
             long listId = ClickHouseAutoIncrement.nextId(SAMPLE_LIST_SEQUENCE);
-            pstmt = con.prepareStatement("INSERT INTO sample_list (`LIST_ID`, `STABLE_ID`, `CANCER_STUDY_ID`, `NAME`, `CATEGORY`," +
-                    "`DESCRIPTION`)" + " VALUES (?,?,?,?,?,?)");
+            pstmt = con.prepareStatement("INSERT INTO sample_list (`list_id`, `stable_id`, `cancer_study_id`, `name`, `category`," +
+                    "`description`)" + " VALUES (?,?,?,?,?,?)");
             pstmt.setLong(1, listId);
             pstmt.setString(2, sampleList.getStableId());
             pstmt.setInt(3, sampleList.getCancerStudyId());
@@ -86,7 +86,7 @@ public class DaoSampleList {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_list WHERE STABLE_ID = ?");
+                    ("SELECT * FROM sample_list WHERE stable_id = ?");
             pstmt.setString(1, stableId);
             rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -112,7 +112,7 @@ public class DaoSampleList {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_list WHERE LIST_ID = ?");
+                    ("SELECT * FROM sample_list WHERE list_id = ?");
             pstmt.setInt(1, id);
             rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -139,7 +139,7 @@ public class DaoSampleList {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
 
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_list WHERE CANCER_STUDY_ID = ? ORDER BY NAME");
+                    ("SELECT * FROM sample_list WHERE cancer_study_id = ? ORDER BY name");
             pstmt.setInt(1, cancerStudyId);
             rs = pstmt.executeQuery();
             ArrayList<SampleList> list = new ArrayList<SampleList>();
@@ -221,7 +221,7 @@ public class DaoSampleList {
         ResultSet rs = null;
         int skippedPatients = 0;
         try {
-            StringBuilder sql = new StringBuilder("INSERT INTO sample_list_list (`LIST_ID`, `SAMPLE_ID`) VALUES ");
+            StringBuilder sql = new StringBuilder("INSERT INTO sample_list_list (`list_id`, `sample_id`) VALUES ");
             // NOTE - as of 12/12/14, patient lists contain sample ids
             for (String sampleId : sampleList) {
                 Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudyId, sampleId);
@@ -272,13 +272,13 @@ public class DaoSampleList {
         ResultSet rs = null;
         try {
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_list_list WHERE LIST_ID = ?");
+                    ("SELECT * FROM sample_list_list WHERE list_id = ?");
             pstmt.setInt(1, sampleList.getSampleListId());
             rs = pstmt.executeQuery();
             ArrayList<String> patientIds = new ArrayList<String>();
             while (rs.next()) {
                 // NOTE - as of 12/12/14, patient lists contain sample ids
-                int sample_id = rs.getInt("SAMPLE_ID");
+                int sample_id = rs.getInt("sample_id");
                 Sample sample = DaoSample.getSampleById(sample_id);
 				patientIds.add(sample.getStableId());
 			}
@@ -295,12 +295,12 @@ public class DaoSampleList {
 	 */
     private SampleList extractSampleList(ResultSet rs) throws SQLException {
         SampleList sampleList = new SampleList();
-        sampleList.setStableId(rs.getString("STABLE_ID"));
-        sampleList.setCancerStudyId(rs.getInt("CANCER_STUDY_ID"));
-        sampleList.setName(rs.getString("NAME"));
-        sampleList.setSampleListCategory(SampleListCategory.get(rs.getString("CATEGORY")));
-        sampleList.setDescription(rs.getString("DESCRIPTION"));
-        sampleList.setSampleListId(rs.getInt("LIST_ID"));
+        sampleList.setStableId(rs.getString("stable_id"));
+        sampleList.setCancerStudyId(rs.getInt("cancer_study_id"));
+        sampleList.setName(rs.getString("name"));
+        sampleList.setSampleListCategory(SampleListCategory.get(rs.getString("category")));
+        sampleList.setDescription(rs.getString("description"));
+        sampleList.setSampleListId(rs.getInt("list_id"));
         return sampleList;
     }
 }

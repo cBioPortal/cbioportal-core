@@ -35,7 +35,7 @@ public class DaoGeneticEntity {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
             long entityId = ClickHouseAutoIncrement.nextId("seq_genetic_entity");
-            pstmt = con.prepareStatement("INSERT INTO genetic_entity (`ID`, `ENTITY_TYPE`, `STABLE_ID`) "
+            pstmt = con.prepareStatement("INSERT INTO genetic_entity (`id`, `entity_type`, `stable_id`) "
                     + "VALUES(?,?,?)");
             pstmt.setLong(1, entityId);
             pstmt.setString(2, geneticEntity.getEntityType());
@@ -58,7 +58,7 @@ public class DaoGeneticEntity {
      * @throws DaoException 
      */
     public static GeneticEntity getGeneticEntityByStableId(String stableId) throws DaoException {
-        DbContainer container = executeSQLstatment(SqlAction.SELECT, "SELECT * FROM genetic_entity WHERE `STABLE_ID` = ?", stableId);
+        DbContainer container = executeSQLstatment(SqlAction.SELECT, "SELECT * FROM genetic_entity WHERE `stable_id` = ?", stableId);
         return container.getGeneticEntity();
     }
     
@@ -67,7 +67,7 @@ public class DaoGeneticEntity {
      * @param id genetic_entity id
      */
     public static GeneticEntity getGeneticEntityById(int id) throws DaoException {
-        DbContainer container = executeSQLstatment(SqlAction.SELECT, "SELECT * FROM genetic_entity WHERE ID = ?", String.valueOf(id));
+        DbContainer container = executeSQLstatment(SqlAction.SELECT, "SELECT * FROM genetic_entity WHERE id = ?", String.valueOf(id));
         return container.getGeneticEntity();
     }
 
@@ -104,9 +104,9 @@ public class DaoGeneticEntity {
      */
     private static GeneticEntity extractGeneticEntity(ResultSet rs) throws SQLException, DaoException {
 
-        Integer id = rs.getInt("ID");
-        String stableId = rs.getString("STABLE_ID");
-        String entityType = rs.getString("ENTITY_TYPE");
+        Integer id = rs.getInt("id");
+        String stableId = rs.getString("stable_id");
+        String entityType = rs.getString("entity_type");
         
         GeneticEntity geneticEntity = new GeneticEntity(id, entityType, stableId);
 

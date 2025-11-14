@@ -340,7 +340,7 @@ public class ImportExtendedMutationData {
                             !mutationType.equalsIgnoreCase("IGR")) {
                         ProgressMonitor.logWarning(
                             "Treating mutation with gene symbol 'Unknown' " +
-                            (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene ID 0") + " as intergenic ('IGR') " +
+                            (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene id 0") + " as intergenic ('IGR') " +
                             "instead of '" + mutationType + "'. Entry filtered/skipped.");
                     }
                     // treat as IGR:

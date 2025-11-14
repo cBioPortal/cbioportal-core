@@ -90,9 +90,9 @@ public class DaoMutSig {
                 con = JdbcUtil.getDbConnection(DaoMutSig.class);
 
                 pstmt = con.prepareStatement
-                        ("INSERT INTO mut_sig (`CANCER_STUDY_ID`," +
-                                "`ENTREZ_GENE_ID`, " +
-                                "`RANK`, " +
+                        ("INSERT INTO mut_sig (`cancer_study_id`," +
+                                "`entrez_gene_id`, " +
+                                "`rank`, " +
                                 "`NumBasesCovered`, " +
                                 "`NumMutations`, " +
                                 "`P_Value`, " +
@@ -137,7 +137,7 @@ public class DaoMutSig {
             try {
                 con = JdbcUtil.getDbConnection(DaoMutSig.class);
                 pstmt = con.prepareStatement
-                        ("SELECT * FROM mut_sig WHERE ENTREZ_GENE_ID = ? AND CANCER_STUDY_ID = ?");
+                        ("SELECT * FROM mut_sig WHERE entrez_gene_id = ? AND cancer_study_id = ?");
                 pstmt.setLong(1, entrezGeneID);
                 pstmt.setInt(2, cancerStudy);
                 rs = pstmt.executeQuery();
@@ -162,13 +162,13 @@ public class DaoMutSig {
         try {
             con = JdbcUtil.getDbConnection(DaoMutSig.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM mut_sig WHERE ENTREZ_GENE_ID = ? AND CANCER_STUDY_ID = ?");
+                    ("SELECT * FROM mut_sig WHERE entrez_gene_id = ? AND cancer_study_id = ?");
             pstmt.setLong(1, entrezGeneID);
             pstmt.setInt(2, cancerStudy);
             rs = pstmt.executeQuery();
             if (rs.next()) {
                 //first go into gene database, and make a Canonical Gene Object with
-                CanonicalGene gene = daoGene.getGene(rs.getLong("ENTREZ_GENE_ID"));
+                CanonicalGene gene = daoGene.getGene(rs.getLong("entrez_gene_id"));
                 return DaoMutSig.assignMutSig(gene, rs);
             } else {
                 return null;
@@ -190,12 +190,12 @@ public class DaoMutSig {
         try {
             con = JdbcUtil.getDbConnection(DaoMutSig.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM mut_sig WHERE CANCER_STUDY_ID = ?");
+                    ("SELECT * FROM mut_sig WHERE cancer_study_id = ?");
             pstmt.setInt(1, cancerStudy);
             rs = pstmt.executeQuery();
 
             while (rs.next()) {
-                CanonicalGene gene = daoGene.getGene(rs.getLong("ENTREZ_GENE_ID"));
+                CanonicalGene gene = daoGene.getGene(rs.getLong("entrez_gene_id"));
                 MutSig mutSig = DaoMutSig.assignMutSig(gene, rs);
                 mutSigList.add(mutSig);
             }
@@ -217,7 +217,7 @@ public class DaoMutSig {
         try {
             con = JdbcUtil.getDbConnection(DaoMutSig.class);
             pstmt = con.prepareStatement
-                    ("SELECT count(*) FROM mut_sig WHERE CANCER_STUDY_ID = ?");
+                    ("SELECT count(*) FROM mut_sig WHERE cancer_study_id = ?");
             pstmt.setInt(1, cancerStudy);
             rs = pstmt.executeQuery();
 
@@ -243,12 +243,12 @@ public class DaoMutSig {
         try {
             con = JdbcUtil.getDbConnection(DaoMutSig.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM mut_sig WHERE CANCER_STUDY_ID = ? AND Q_Value < ?");
+                    ("SELECT * FROM mut_sig WHERE cancer_study_id = ? AND Q_Value < ?");
             pstmt.setInt(1, cancerStudy);
             pstmt.setDouble(2,qValueThreshold);
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                CanonicalGene gene = daoGene.getGene(rs.getLong("ENTREZ_GENE_ID"));
+                CanonicalGene gene = daoGene.getGene(rs.getLong("entrez_gene_id"));
                 MutSig mutSig = DaoMutSig.assignMutSig(gene, rs);
                 mutSigList.add(mutSig);
             }
@@ -278,9 +278,9 @@ public class DaoMutSig {
     private static MutSig assignMutSig(CanonicalGene gene, ResultSet rs)
             throws SQLException, DaoException {
 
-        return new MutSig(rs.getInt("CANCER_STUDY_ID"),
+        return new MutSig(rs.getInt("cancer_study_id"),
                 gene,
-                rs.getInt("RANK"),
+                rs.getInt("rank"),
                 rs.getInt("NumBasesCovered"),
                 rs.getInt("numMutations"),
                 rs.getFloat("P_Value"),

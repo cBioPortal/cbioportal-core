@@ -52,7 +52,7 @@ public class DaoGenesetHierarchyNode {
 	        
 	        // Prepare SQL statement
             preparedStatement = connection.prepareStatement("INSERT INTO geneset_hierarchy_node "
-	                + "(`NODE_ID`, `NODE_NAME`, `PARENT_ID`) VALUES(?,?,?)");
+	                + "(`node_id`, `node_name`, `parent_id`) VALUES(?,?,?)");
             long nodeId = ClickHouseAutoIncrement.nextId(GENESET_HIERARCHY_SEQUENCE);
             preparedStatement.setLong(1, nodeId);
 	        
@@ -119,7 +119,7 @@ public class DaoGenesetHierarchyNode {
         ResultSet resultSet = null;
         try {
         	connection = JdbcUtil.getDbConnection(DaoGenesetHierarchyNode.class);
-        	preparedStatement = connection.prepareStatement("DELETE FROM geneset_hierarchy_node");
+        	preparedStatement = connection.prepareStatement("TRUNCATE TABLE geneset_hierarchy_node");
         	preparedStatement.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

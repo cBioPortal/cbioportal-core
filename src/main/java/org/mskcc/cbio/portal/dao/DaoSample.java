@@ -155,7 +155,7 @@ public class DaoSample {
             con = JdbcUtil.getDbConnection(DaoSample.class);
             long internalId = ClickHouseAutoIncrement.nextId(SAMPLE_SEQUENCE);
             pstmt = con.prepareStatement("INSERT INTO sample " +
-                                         "( `INTERNAL_ID`, `STABLE_ID`, `SAMPLE_TYPE`, `PATIENT_ID` ) " +
+                                         "( `internal_id`, `stable_id`, `sample_type`, `patient_id` ) " +
                                          "VALUES (?,?,?,?)");
             pstmt.setLong(1, internalId);
             pstmt.setString(2, sample.getStableId());
@@ -302,7 +302,7 @@ public class DaoSample {
         PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSample.class);
-            pstmt = con.prepareStatement("DELETE FROM `sample` WHERE `INTERNAL_ID` IN ("
+            pstmt = con.prepareStatement("DELETE FROM `sample` WHERE `internal_id` IN ("
                     + String.join(",", Collections.nCopies(internalSampleIds.size(), "?"))
                     + ")");
             int parameterIndex = 1;
@@ -322,9 +322,9 @@ public class DaoSample {
 
     private static Sample extractSample(ResultSet rs) throws SQLException
     {
-        return new Sample(rs.getInt("INTERNAL_ID"),
-                          rs.getString("STABLE_ID"),
-                          rs.getInt("PATIENT_ID"));
+        return new Sample(rs.getInt("internal_id"),
+                          rs.getString("stable_id"),
+                          rs.getInt("patient_id"));
     }
 
     /**

@@ -106,9 +106,9 @@ public final class DaoGeneticProfile {
             con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
 
             pstmt = con.prepareStatement
-                    ("INSERT INTO genetic_profile (`STABLE_ID`, `CANCER_STUDY_ID`, "+
-                            "`GENETIC_ALTERATION_TYPE`, `DATATYPE`, `NAME`, `DESCRIPTION`, "+
-                            "`SHOW_PROFILE_IN_ANALYSIS_TAB`, `PIVOT_THRESHOLD`, `SORT_ORDER`, `GENERIC_ASSAY_TYPE`, `PATIENT_LEVEL`) " +
+                    ("INSERT INTO genetic_profile (`stable_id`, `cancer_study_id`, "+
+                            "`genetic_alteration_type`, `datatype`, `name`, `description`, "+
+                            "`show_profile_in_analysis_tab`, `pivot_threshold`, `sort_order`, `generic_assay_type`, `patient_level`) " +
                             "VALUES (?,?,?,?,?,?,?,?,?,?,?)");
             pstmt.setString(1, profile.getStableId());
             pstmt.setInt(2, profile.getCancerStudyId());
@@ -118,7 +118,7 @@ public final class DaoGeneticProfile {
             pstmt.setString(6, profile.getProfileDescription());
             pstmt.setBoolean(7, profile.showProfileInAnalysisTab());
 
-            // `pivot_threshold_value` and `value_sort_order` `GENERIC_ASSAY_TYPE` fields are geneirc assay data specific.
+            // `pivot_threshold_value` and `value_sort_order` `generic_assay_type` fields are geneirc assay data specific.
             // These fields are set to null when not present in profile object.
             if (profile.getPivotThreshold() == null) {
                 pstmt.setNull(8, java.sql.Types.FLOAT);
@@ -167,8 +167,8 @@ public final class DaoGeneticProfile {
         boolean ret = false;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
-            pstmt = con.prepareStatement("UPDATE genetic_profile SET NAME=?, DESCRIPTION=? " +
-                    "WHERE GENETIC_PROFILE_ID=?");
+            pstmt = con.prepareStatement("UPDATE genetic_profile SET name=?, description=? " +
+                    "WHERE genetic_profile_id=?");
             pstmt.setString(1, name);
             pstmt.setString(2, description);
             pstmt.setInt(3, geneticProfileId);
@@ -196,8 +196,8 @@ public final class DaoGeneticProfile {
         boolean ret;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
-            pstmt = con.prepareStatement("UPDATE genetic_profile SET DATATYPE=? " +
-                "WHERE GENETIC_PROFILE_ID=?");
+            pstmt = con.prepareStatement("UPDATE genetic_profile SET datatype=? " +
+                "WHERE genetic_profile_id=?");
             pstmt.setString(1, datatype);
             pstmt.setInt(2, geneticProfileId);
             ret = pstmt.executeUpdate() > 0;
@@ -218,7 +218,7 @@ public final class DaoGeneticProfile {
        ResultSet rs = null;
        try {
            con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
-           pstmt = con.prepareStatement("DELETE FROM genetic_profile WHERE STABLE_ID = ?");
+           pstmt = con.prepareStatement("DELETE FROM genetic_profile WHERE stable_id = ?");
            pstmt.setString(1, profile.getStableId());
            rows = pstmt.executeUpdate();
        } catch (SQLException e) {
@@ -262,29 +262,29 @@ public final class DaoGeneticProfile {
 
     private static GeneticProfile extractGeneticProfile(ResultSet rs) throws SQLException {
         GeneticProfile profileType = new GeneticProfile();
-        profileType.setStableId(rs.getString("STABLE_ID"));
+        profileType.setStableId(rs.getString("stable_id"));
 
-        profileType.setCancerStudyId(rs.getInt("CANCER_STUDY_ID"));
-        profileType.setProfileName(rs.getString("NAME"));
-        profileType.setProfileDescription(rs.getString("DESCRIPTION"));
+        profileType.setCancerStudyId(rs.getInt("cancer_study_id"));
+        profileType.setProfileName(rs.getString("name"));
+        profileType.setProfileDescription(rs.getString("description"));
         try {
-            profileType.setShowProfileInAnalysisTab(rs.getBoolean("SHOW_PROFILE_IN_ANALYSIS_TAB"));
+            profileType.setShowProfileInAnalysisTab(rs.getBoolean("show_profile_in_analysis_tab"));
         } catch (SQLException e) {
             profileType.setShowProfileInAnalysisTab(true);
         }
-        profileType.setGeneticAlterationType(GeneticAlterationType.valueOf(rs.getString("GENETIC_ALTERATION_TYPE")));
-        profileType.setDatatype(rs.getString("DATATYPE"));
-        profileType.setGeneticProfileId(rs.getInt("GENETIC_PROFILE_ID"));
-        if (rs.getFloat("PIVOT_THRESHOLD") != 0) {
-            profileType.setPivotThreshold(rs.getFloat("PIVOT_THRESHOLD"));
+        profileType.setGeneticAlterationType(GeneticAlterationType.valueOf(rs.getString("genetic_alteration_type")));
+        profileType.setDatatype(rs.getString("datatype"));
+        profileType.setGeneticProfileId(rs.getInt("genetic_profile_id"));
+        if (rs.getFloat("pivot_threshold") != 0) {
+            profileType.setPivotThreshold(rs.getFloat("pivot_threshold"));
         }
-        if (rs.getString("SORT_ORDER") != null && ! rs.getString("SORT_ORDER").equals("") ) {
-            profileType.setSortOrder(rs.getString("SORT_ORDER"));
+        if (rs.getString("sort_order") != null && ! rs.getString("sort_order").equals("") ) {
+            profileType.setSortOrder(rs.getString("sort_order"));
         }
-        if (rs.getString("GENERIC_ASSAY_TYPE") != null && ! rs.getString("GENERIC_ASSAY_TYPE").equals("") ) {
-            profileType.setGenericAssayType(rs.getString("GENERIC_ASSAY_TYPE"));
+        if (rs.getString("generic_assay_type") != null && ! rs.getString("generic_assay_type").equals("") ) {
+            profileType.setGenericAssayType(rs.getString("generic_assay_type"));
         }
-        profileType.setPatientLevel(rs.getBoolean("PATIENT_LEVEL"));
+        profileType.setPatientLevel(rs.getBoolean("patient_level"));
         return profileType;
     }
 

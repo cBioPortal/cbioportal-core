@@ -58,7 +58,7 @@ public class DaoUserAuthorities {
 			con = JdbcUtil.getDbConnection(DaoUserAuthorities.class);
 			String email = userAuthorities.getEmail();
 			for (String authority : userAuthorities.getAuthorities()) {
-                pstmt = con.prepareStatement("INSERT INTO authorities (`EMAIL`, `AUTHORITY`) VALUES (?,?)");
+                pstmt = con.prepareStatement("INSERT INTO authorities (`email`, `authority`) VALUES (?,?)");
                 pstmt.setString(1, email);
 				pstmt.setString(2, authority);
 				toReturn += pstmt.executeUpdate();
@@ -79,12 +79,12 @@ public class DaoUserAuthorities {
 		ResultSet rs = null;
 		try {
 			con = JdbcUtil.getDbConnection(DaoUserAuthorities.class);
-			pstmt = con.prepareStatement("SELECT * FROM authorities where EMAIL=?");
+			pstmt = con.prepareStatement("SELECT * FROM authorities where email=?");
 			pstmt.setString(1, user.getEmail());
 			rs = pstmt.executeQuery();
 			ArrayList<String> authorities = new ArrayList<String>();
 			while (rs.next()) {
-				authorities.add(rs.getString("AUTHORITY"));
+				authorities.add(rs.getString("authority"));
 			}
 			return new UserAuthorities(user.getEmail(), authorities);
 		} catch (SQLException e) {
@@ -100,7 +100,7 @@ public class DaoUserAuthorities {
 		ResultSet rs = null;
 		try {
 			con = JdbcUtil.getDbConnection(DaoUserAuthorities.class);
-			pstmt = con.prepareStatement("DELETE FROM authorities where EMAIL=?");
+			pstmt = con.prepareStatement("DELETE FROM authorities where email=?");
 			pstmt.setString(1, user.getEmail());
 			pstmt.executeUpdate();
 		} catch (SQLException e) {

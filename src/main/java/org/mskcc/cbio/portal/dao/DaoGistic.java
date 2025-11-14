@@ -80,13 +80,13 @@ public class DaoGistic {
             // insert into SQL gistic table
             long roiId = ClickHouseAutoIncrement.nextId(GISTIC_SEQUENCE);
             pstmt = con.prepareStatement
-				("INSERT INTO gistic (`GISTIC_ROI_ID`, `CANCER_STUDY_ID`," +
-				  "`CHROMOSOME`, " +
-                  "`CYTOBAND`, " +
-				  "`WIDE_PEAK_START`, " +
-				  "`WIDE_PEAK_END`, " +
-				  "`Q_VALUE`, "  +
-				  "`AMP`) "  +
+				("INSERT INTO gistic (`gistic_roi_id`, `cancer_study_id`," +
+				  "`chromosome`, " +
+                  "`cytoband`, " +
+				  "`wide_peak_start`, " +
+				  "`wide_peak_end`, " +
+				  "`q_value`, "  +
+				  "`amp`) "  +
 				  "VALUES (?,?,?,?,?,?,?,?)");
 
             pstmt.setLong(1, roiId);
@@ -127,8 +127,8 @@ public class DaoGistic {
                     // if this is the case, we are going to simply skip over this gene
                     if (g.getEntrezGeneId() != -1) {
                     pstmt = con.prepareStatement
-                            ("INSERT INTO gistic_to_gene (`GISTIC_ROI_ID`," +
-                                    "`ENTREZ_GENE_ID`)" +
+                            ("INSERT INTO gistic_to_gene (`gistic_roi_id`," +
+                                    "`entrez_gene_id`)" +
                                     "VALUES (?,?)");
 
                     pstmt.setInt(1, gistic.getInternalId());
@@ -174,28 +174,28 @@ public class DaoGistic {
 
         try {
 
-            int id = rs.getInt("GISTIC_ROI_ID");
+            int id = rs.getInt("gistic_roi_id");
 
-            pstmt = con.prepareStatement("SELECT * FROM gistic_to_gene WHERE GISTIC_ROI_ID = ?");
+            pstmt = con.prepareStatement("SELECT * FROM gistic_to_gene WHERE gistic_roi_id = ?");
             pstmt.setInt(1, id);
 
             _rs = pstmt.executeQuery();
 
             while ( _rs.next() ) {
-                long entrez = _rs.getLong("ENTREZ_GENE_ID");
+                long entrez = _rs.getLong("entrez_gene_id");
                 CanonicalGene gene = DaoGeneOptimized.getInstance().getGene(entrez);
                 genes.add(gene);
             }
 
             // create gistic return object
-            gistic = new Gistic(rs.getInt("CANCER_STUDY_ID"),
-                    rs.getInt("CHROMOSOME") ,
-                    rs.getString("CYTOBAND") ,
-                    rs.getInt("WIDE_PEAK_START"),
-                    rs.getInt("WIDE_PEAK_END"),
-                    rs.getFloat("Q_VALUE") ,
+            gistic = new Gistic(rs.getInt("cancer_study_id"),
+                    rs.getInt("chromosome") ,
+                    rs.getString("cytoband") ,
+                    rs.getInt("wide_peak_start"),
+                    rs.getInt("wide_peak_end"),
+                    rs.getFloat("q_value") ,
                     genes,
-                    rs.getBoolean("AMP"));
+                    rs.getBoolean("amp"));
 
         } catch (SQLException e) {
             throw new DaoException(e);
@@ -222,9 +222,9 @@ public class DaoGistic {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGistic.class);
-            pstmt = con.prepareStatement("SELECT * FROM gistic WHERE CHROMOSOME = ? " +
-                    "AND WIDE_PEAK_START = ? " +
-                    "AND WIDE_PEAK_END = ?");
+            pstmt = con.prepareStatement("SELECT * FROM gistic WHERE chromosome = ? " +
+                    "AND wide_peak_start = ? " +
+                    "AND wide_peak_end = ?");
 
             pstmt.setInt(1, chromosome);
             pstmt.setInt(2, peakStart);
@@ -259,7 +259,7 @@ public class DaoGistic {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGistic.class);
-            pstmt = con.prepareStatement("SELECT * FROM gistic WHERE CANCER_STUDY_ID = ? ");
+            pstmt = con.prepareStatement("SELECT * FROM gistic WHERE cancer_study_id = ? ");
             pstmt.setInt(1, cancerStudyId);
 
             rs = pstmt.executeQuery();
@@ -292,7 +292,7 @@ public class DaoGistic {
         try {
             con = JdbcUtil.getDbConnection(DaoGistic.class);
             pstmt = con.prepareStatement
-                    ("SELECT count(*) FROM gistic WHERE CANCER_STUDY_ID = ?");
+                    ("SELECT count(*) FROM gistic WHERE cancer_study_id = ?");
             pstmt.setInt(1, cancerStudy);
             rs = pstmt.executeQuery();
 
@@ -350,11 +350,11 @@ public class DaoGistic {
         try {
             con = JdbcUtil.getDbConnection(DaoGistic.class);
 
-            pstmt = con.prepareStatement("DELETE from gistic_to_gene WHERE GISTIC_ROI_ID=?");
+            pstmt = con.prepareStatement("DELETE from gistic_to_gene WHERE gistic_roi_id=?");
             pstmt.setInt(1, gisticInternalId);
             pstmt.executeUpdate();
 
-            pstmt = con.prepareStatement("DELETE from gistic WHERE GISTIC_ROI_ID=?");
+            pstmt = con.prepareStatement("DELETE from gistic WHERE gistic_roi_id=?");
             pstmt.setInt(1, gisticInternalId);
             pstmt.executeUpdate();
 

@@ -81,7 +81,7 @@ public final class DaoSampleProfile {
             String tuplePlaceholders = String.join(",", Collections.nCopies(idTuples.size(), "(?,?)"));
             deleteStmt = con.prepareStatement(
                 "ALTER TABLE sample_profile "
-                    + "DELETE WHERE (SAMPLE_ID, GENETIC_PROFILE_ID) IN (" + tuplePlaceholders + ") "
+                    + "DELETE WHERE (sample_id, genetic_profile_id) IN (" + tuplePlaceholders + ") "
                     + "SETTINGS mutations_sync=2"
             );
             int parameterIndex = 1;
@@ -91,7 +91,7 @@ public final class DaoSampleProfile {
             }
             deleteStmt.executeUpdate();
 
-            String insertSql = "INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`) VALUES "
+            String insertSql = "INSERT INTO sample_profile (`sample_id`, `genetic_profile_id`, `panel_id`) VALUES "
                 + String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)"));
             insertStmt = con.prepareStatement(insertSql);
             parameterIndex = 1;
@@ -123,7 +123,7 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_profile WHERE SAMPLE_ID = ? AND GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM sample_profile WHERE sample_id = ? AND genetic_profile_id = ?");
             pstmt.setInt(1, sampleId);
             pstmt.setInt(2, geneticProfileId);
             rs = pstmt.executeQuery();
@@ -146,7 +146,7 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT PANEL_ID FROM sample_profile WHERE SAMPLE_ID = ? AND GENETIC_PROFILE_ID = ?");
+                    ("SELECT panel_id FROM sample_profile WHERE sample_id = ? AND genetic_profile_id = ?");
             pstmt.setInt(1, sampleId);
             pstmt.setInt(2, geneticProfileId);
             rs = pstmt.executeQuery();
@@ -157,7 +157,7 @@ public final class DaoSampleProfile {
                 }
                 return panelId;
             } else {
-                throw new NoSuchElementException("No sample_profile with SAMPLE_ID=" + sampleId + " and GENETIC_PROFILE_ID=" + geneticProfileId);
+                throw new NoSuchElementException("No sample_profile with SAMPLE_ID=" + sampleId + " and genetic_profile_id=" + geneticProfileId);
             }
         } catch (NoSuchElementException | SQLException e) {
             throw new DaoException(e);
@@ -173,7 +173,7 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT count(*) FROM sample_profile WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT count(*) FROM sample_profile WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -194,11 +194,11 @@ public final class DaoSampleProfile {
 
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            pstmt = con.prepareStatement("SELECT GENETIC_PROFILE_ID FROM sample_profile WHERE SAMPLE_ID = ?");
+            pstmt = con.prepareStatement("SELECT genetic_profile_id FROM sample_profile WHERE sample_id = ?");
             pstmt.setInt(1, sampleId);
             rs = pstmt.executeQuery();
             if( rs.next() ) {
-               return rs.getInt("GENETIC_PROFILE_ID");
+               return rs.getInt("genetic_profile_id");
             }else{
                return NO_SUCH_PROFILE_ID;
             }
@@ -218,13 +218,13 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_profile WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM sample_profile WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             ArrayList<Integer> sampleIds = new ArrayList<Integer>();
             while (rs.next()) {
-                Sample sample = DaoSample.getSampleById(rs.getInt("SAMPLE_ID"));
-                sampleIds.add(rs.getInt("SAMPLE_ID"));
+                Sample sample = DaoSample.getSampleById(rs.getInt("sample_id"));
+                sampleIds.add(rs.getInt("sample_id"));
             }
             return sampleIds;
         } catch (NullPointerException e) {
@@ -247,7 +247,7 @@ public final class DaoSampleProfile {
             rs = pstmt.executeQuery();
             ArrayList<Integer> sampleIds = new ArrayList<Integer>();
             while (rs.next()) {
-                sampleIds.add(rs.getInt("SAMPLE_ID"));
+                sampleIds.add(rs.getInt("sample_id"));
             }
             return sampleIds;
         } catch (NullPointerException e) {
@@ -289,9 +289,9 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
 
-            String sql = "select `GENETIC_PROFILE_ID`, count(`SAMPLE_ID`) from sample_profile " +
-                    " where `GENETIC_PROFILE_ID` in ("+ StringUtils.join(id2MutationProfile.keySet(), ",") + ")" +
-                    " group by `GENETIC_PROFILE_ID`";
+            String sql = "select `genetic_profile_id`, count(`sample_id`) from sample_profile " +
+                    " where `genetic_profile_id` in ("+ StringUtils.join(id2MutationProfile.keySet(), ",") + ")" +
+                    " group by `genetic_profile_id`";
 
             pstmt = con.prepareStatement(sql);
             rs = pstmt.executeQuery();
@@ -365,7 +365,7 @@ public final class DaoSampleProfile {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            pstmt = con.prepareStatement("select count(*) from sample_profile where PANEL_ID = ?");
+            pstmt = con.prepareStatement("select count(*) from sample_profile where panel_id = ?");
             pstmt.setInt(1, panelId);
             rs = pstmt.executeQuery();
             if (rs.next()) {

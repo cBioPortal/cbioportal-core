@@ -79,9 +79,9 @@ public class DaoGenePanel {
         try {
             while (rs.next()) {
                 GenePanel gp = new GenePanel();
-                gp.setInternalId(rs.getInt("INTERNAL_ID"));
-                gp.setStableId(rs.getString("STABLE_ID"));
-                gp.setDescription(rs.getString("DESCRIPTION"));
+                gp.setInternalId(rs.getInt("internal_id"));
+                gp.setStableId(rs.getString("stable_id"));
+                gp.setDescription(rs.getString("description"));
                 gp.setGenes(extractGenePanelGenes(gp.getInternalId()));
                 genePanelMap.put(gp.getStableId(), gp);
             }
@@ -98,7 +98,7 @@ public class DaoGenePanel {
         HashSet<CanonicalGene> toReturn = new HashSet<>();
         try {
             con = JdbcUtil.getDbConnection(DaoGenePanel.class);
-            pstmt = con.prepareStatement("SELECT * FROM gene_panel_list where INTERNAL_ID = ?");
+            pstmt = con.prepareStatement("SELECT * FROM gene_panel_list where internal_id = ?");
             pstmt.setInt(1, genePanelId);
             rs = pstmt.executeQuery();
             DaoGeneOptimized daoGeneOpt = DaoGeneOptimized.getInstance();
@@ -138,7 +138,7 @@ public class DaoGenePanel {
         try {
             con = JdbcUtil.getDbConnection(DaoGenePanel.class);
             long genePanelId = ClickHouseAutoIncrement.nextId(GENE_PANEL_SEQUENCE);
-            pstmt = con.prepareStatement("INSERT INTO gene_panel (`INTERNAL_ID`, `STABLE_ID`, `DESCRIPTION`) VALUES (?,?,?)");
+            pstmt = con.prepareStatement("INSERT INTO gene_panel (`internal_id`, `stable_id`, `description`) VALUES (?,?,?)");
             pstmt.setLong(1, genePanelId);
             pstmt.setString(2, stableId);
             pstmt.setString(3, description);
@@ -164,7 +164,7 @@ public class DaoGenePanel {
         try {
             con = JdbcUtil.getDbConnection(DaoGenePanel.class);
             for (CanonicalGene canonicalGene : canonicalGenes) {
-                pstmt = con.prepareStatement("INSERT INTO gene_panel_list (`INTERNAL_ID`, `GENE_ID`) VALUES (?,?)");
+                pstmt = con.prepareStatement("INSERT INTO gene_panel_list (`internal_id`, `gene_id`) VALUES (?,?)");
                 pstmt.setInt(1, internalId);
                 pstmt.setLong(2, canonicalGene.getEntrezGeneId());
                 pstmt.executeUpdate();
@@ -187,7 +187,7 @@ public class DaoGenePanel {
         PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGenePanel.class);
-            pstmt = con.prepareStatement("DELETE from gene_panel WHERE INTERNAL_ID = ?");
+            pstmt = con.prepareStatement("DELETE from gene_panel WHERE internal_id = ?");
             pstmt.setInt(1, genePanel.getInternalId());
             pstmt.executeUpdate();
             genePanelMap.remove(genePanel.getStableId());
@@ -278,7 +278,7 @@ public class DaoGenePanel {
 
             // Add and remove genes from specified gene panel
             for (CanonicalGene canonicalGene : toAdd) {
-                pstmt = con.prepareStatement("INSERT INTO gene_panel_list (`INTERNAL_ID`, `GENE_ID`) VALUES (?,?)");
+                pstmt = con.prepareStatement("INSERT INTO gene_panel_list (`internal_id`, `gene_id`) VALUES (?,?)");
                 pstmt.setInt(1, internalId);
                 pstmt.setLong(2, canonicalGene.getEntrezGeneId());
                 pstmt.executeUpdate();

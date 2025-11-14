@@ -51,7 +51,7 @@ public final class DaoCopyNumberSegmentFile {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegmentFile.class);
             long fileId = ClickHouseAutoIncrement.nextId(COPY_NUMBER_SEG_FILE_SEQUENCE);
             pstmt = con.prepareStatement
-                    ("INSERT INTO copy_number_seg_file (`SEG_FILE_ID`, `CANCER_STUDY_ID`, `REFERENCE_GENOME_ID`, `DESCRIPTION`,`FILENAME`)"
+                    ("INSERT INTO copy_number_seg_file (`seg_file_id`, `cancer_study_id`, `reference_genome_id`, `description`,`filename`)"
                      + " VALUES (?,?,?,?,?)");
             pstmt.setLong(1, fileId);
             pstmt.setInt(2, copySegFile.cancerStudyId);
@@ -74,16 +74,16 @@ public final class DaoCopyNumberSegmentFile {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegmentFile.class);
-            pstmt = con.prepareStatement("SELECT * from copy_number_seg_file WHERE `CANCER_STUDY_ID` = ?");
+            pstmt = con.prepareStatement("SELECT * from copy_number_seg_file WHERE `cancer_study_id` = ?");
             pstmt.setInt(1, cancerStudyId);
             rs = pstmt.executeQuery();
             if (rs.next()) {
                 CopyNumberSegmentFile cnsf = new CopyNumberSegmentFile();
-                cnsf.segFileId = rs.getInt("SEG_FILE_ID");
+                cnsf.segFileId = rs.getInt("seg_file_id");
                 cnsf.cancerStudyId = cancerStudyId;
-                cnsf.referenceGenomeId = CopyNumberSegmentFile.ReferenceGenomeId.valueOf(rs.getString("REFERENCE_GENOME_ID"));
-                cnsf.description = rs.getString("DESCRIPTION");
-                cnsf.filename = rs.getString("FILENAME");
+                cnsf.referenceGenomeId = CopyNumberSegmentFile.ReferenceGenomeId.valueOf(rs.getString("reference_genome_id"));
+                cnsf.description = rs.getString("description");
+                cnsf.filename = rs.getString("filename");
                 if (rs.next()) {
                     throw new SQLException("More than one row was returned.");
                 }

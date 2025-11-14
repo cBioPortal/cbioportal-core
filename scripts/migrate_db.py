@@ -118,12 +118,12 @@ def check_reference_genome(portal_properties, cursor, force_migration):
     warnings = []
     try:
         sql_statement = """
-                           select NCBI_BUILD, count(NCBI_BUILD), CANCER_STUDY_IDENTIFIER
+                           select ncbi_build, count(ncbi_build), cancer_study_identifier
                            from mutation_event
-                           join mutation on mutation.MUTATION_EVENT_ID = mutation_event.MUTATION_EVENT_ID
-                           join genetic_profile on genetic_profile.GENETIC_PROFILE_ID = mutation.GENETIC_PROFILE_ID
-                           join cancer_study on cancer_study.CANCER_STUDY_ID = genetic_profile.CANCER_STUDY_ID
-                           group by CANCER_STUDY_IDENTIFIER, NCBI_BUILD
+                           join mutation on mutation.mutation_event_id = mutation_event.mutation_event_id
+                           join genetic_profile on genetic_profile.genetic_profile_id = mutation.genetic_profile_id
+                           join cancer_study on cancer_study.cancer_study_id = genetic_profile.cancer_study_id
+                           group by cancer_study_identifier, ncbi_build
                        """
         cursor.execute(sql_statement)
         study_to_ncbi_to_count = {}  # {cancer_study_identifier : {ncbi_build  : record_count}}
@@ -148,9 +148,9 @@ def check_and_exit_if_fusions(cursor):
     try:
         cursor.execute(
             """
-                SELECT COUNT(*)
+                SELECT count(*)
                 FROM mutation_event
-                WHERE MUTATION_TYPE = "Fusion";
+                WHERE mutation_type = "Fusion";
             """)
         fusion_count = cursor.fetchone()
         if (fusion_count[0] >= 1):
@@ -160,16 +160,16 @@ def check_and_exit_if_fusions(cursor):
             # get the list of studies that need to be cleaned up
             cursor.execute(
                 """
-                    SELECT cancer_study.CANCER_STUDY_IDENTIFIER, COUNT(mutation.MUTATION_EVENT_ID)
+                    SELECT cancer_study.cancer_study_identifier, count(mutation.mutation_event_id)
                     FROM cancer_study,
                         genetic_profile
-                    LEFT JOIN mutation ON genetic_profile.GENETIC_PROFILE_ID = mutation.GENETIC_PROFILE_ID
-                    LEFT JOIN mutation_event ON mutation.MUTATION_EVENT_ID = mutation_event.MUTATION_EVENT_ID
+                    LEFT JOIN mutation ON genetic_profile.genetic_profile_id = mutation.genetic_profile_id
+                    LEFT JOIN mutation_event ON mutation.mutation_event_id = mutation_event.mutation_event_id
                     WHERE 
-                        genetic_profile.CANCER_STUDY_ID = cancer_study.CANCER_STUDY_ID
-                        AND mutation_event.MUTATION_TYPE = "Fusion"
-                    GROUP BY cancer_study.CANCER_STUDY_IDENTIFIER
-                    HAVING count(mutation.MUTATION_EVENT_ID) > 0
+                        genetic_profile.cancer_study_id = cancer_study.cancer_study_id
+                        AND mutation_event.mutation_type = "Fusion"
+                    GROUP BY cancer_study.cancer_study_identifier
+                    HAVING count(mutation.mutation_event_id) > 0
                 """)
             rows = cursor.fetchall()
             print("The following studies have fusions in the mutation_event table:", file=ERROR_FILE)
@@ -189,10 +189,10 @@ def check_and_remove_invalid_foreign_keys(cursor):
         cursor.execute(
             """
                 SELECT *
-                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                    WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
-                    AND TABLE_SCHEMA = DATABASE()
-                    AND CONSTRAINT_NAME = 'genetic_alteration_ibfk_2'
+                FROM information_schema.table_constraints
+                    WHERE constraint_type = 'FOREIGN KEY'
+                    AND table_schema = DATABASE()
+                    AND constraint_name = 'genetic_alteration_ibfk_2'
             """)
         rows = cursor.fetchall()
         if (len(rows) >= 1):
@@ -200,10 +200,10 @@ def check_and_remove_invalid_foreign_keys(cursor):
             cursor.execute(
                 """
                     SELECT *
-                    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-                        WHERE CONSTRAINT_TYPE = 'FOREIGN KEY'
-                        AND TABLE_SCHEMA = DATABASE()
-                        AND CONSTRAINT_NAME = 'genetic_alteration_fk_2'
+                    FROM information_schema.table_constraints
+                        WHERE constraint_type = 'FOREIGN KEY'
+                        AND table_schema = DATABASE()
+                        AND constraint_name = 'genetic_alteration_fk_2'
                 """)
             rows = cursor.fetchall()
             if (len(rows) >= 1):
@@ -225,11 +225,11 @@ def check_and_remove_type_of_cancer_id_foreign_key(cursor):
         cursor.execute(
             """
                 SELECT *
-                FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
-                    WHERE CONSTRAINT_SCHEMA = DATABASE()
-                    AND TABLE_NAME = 'sample'
-                    AND REFERENCED_TABLE_NAME = 'type_of_cancer'
-                    AND CONSTRAINT_NAME = 'sample_ibfk_1'
+                FROM information_schema.referential_constraints
+                    WHERE constraint_schema = DATABASE()
+                    AND table_name = 'sample'
+                    AND referenced_table_name = 'type_of_cancer'
+                    AND constraint_name = 'sample_ibfk_1'
             """)
         rows = cursor.fetchall()
         if (len(rows) >= 1):
@@ -245,11 +245,11 @@ def check_and_remove_type_of_cancer_id_foreign_key(cursor):
         cursor.execute(
             """
                 SELECT *
-                FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
-                    WHERE CONSTRAINT_SCHEMA = DATABASE()
-                    AND TABLE_NAME = 'sample'
-                    AND REFERENCED_TABLE_NAME = 'type_of_cancer'
-                    AND CONSTRAINT_NAME = 'sample_ibfk_2'
+                FROM information_schema.referential_constraints
+                    WHERE constraint_schema = DATABASE()
+                    AND table_name = 'sample'
+                    AND referenced_table_name = 'type_of_cancer'
+                    AND constraint_name = 'sample_ibfk_2'
             """)
         rows = cursor.fetchall()
         if (len(rows) >= 1):

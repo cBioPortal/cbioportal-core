@@ -113,9 +113,9 @@ public final class DaoReferenceGenome {
                 con = JdbcUtil.getDbConnection(DaoReferenceGenome.class);
                 long refId = ClickHouseAutoIncrement.nextId(REFERENCE_GENOME_SEQUENCE);
                 pstmt = con.prepareStatement("INSERT INTO reference_genome " +
-                        "( `REFERENCE_GENOME_ID`, `SPECIES`, `NAME`, "
-                        + "`BUILD_NAME`, `GENOME_SIZE`, `URL`, "
-                        + " `RELEASE_DATE` ) VALUES (?,?,?,?,?,?,?)");
+                        "( `reference_genome_id`, `species`, `name`, "
+                        + "`build_name`, `genome_size`, `url`, "
+                        + " `release_date` ) VALUES (?,?,?,?,?,?,?)");
                 pstmt.setLong(1, refId);
                 pstmt.setString(2, referenceGenome.getSpecies());
                 pstmt.setString(3, referenceGenome.getGenomeName());
@@ -178,9 +178,9 @@ public final class DaoReferenceGenome {
         try {
             con = JdbcUtil.getDbConnection(DaoReferenceGenome.class);
             pstmt = con.prepareStatement("UPDATE reference_genome " +
-                "SET `SPECIES`=?, `NAME`=?, "
-                + "`BUILD_NAME`=?, `GENOME_SIZE`=?, `URL`=?, "
-                + " `RELEASE_DATE`=? WHERE `REFERENCE_GENOME_ID`=?");
+                "SET `species`=?, `name`=?, "
+                + "`build_name`=?, `genome_size`=?, `url`=?, "
+                + " `release_date`=? WHERE `reference_genome_id`=?");
             pstmt.setString(1, referenceGenome.getSpecies());
             pstmt.setString(2, referenceGenome.getGenomeName());
             pstmt.setString(3, referenceGenome.getBuildName());
@@ -250,13 +250,13 @@ public final class DaoReferenceGenome {
      */
     private static ReferenceGenome extractReferenceGenome(ResultSet rs) throws SQLException {
         ReferenceGenome referenceGenome = new ReferenceGenome(
-            rs.getString("NAME"),
-            rs.getString("SPECIES"),
-            rs.getString("BUILD_NAME"));
-        referenceGenome.setReferenceGenomeId(rs.getInt("REFERENCE_GENOME_ID"));
-        referenceGenome.setGenomeSize(rs.getLong("GENOME_SIZE"));
-        referenceGenome.setReleaseDate(rs.getDate("RELEASE_DATE"));
-        referenceGenome.setUrl(rs.getString("URL"));
+            rs.getString("name"),
+            rs.getString("species"),
+            rs.getString("build_name"));
+        referenceGenome.setReferenceGenomeId(rs.getInt("reference_genome_id"));
+        referenceGenome.setGenomeSize(rs.getLong("genome_size"));
+        referenceGenome.setReleaseDate(rs.getDate("release_date"));
+        referenceGenome.setUrl(rs.getString("url"));
         return referenceGenome;
     }
 }

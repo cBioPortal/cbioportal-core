@@ -150,7 +150,7 @@ public class GeneticProfileReader {
 
         // add genetic profile link if set
         if (geneticProfileLink != null) {
-            // Set `REFERRING_GENETIC_PROFILE_ID`
+            // Set `referring_genetic_profile_id`
             int geneticProfileId = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId()).getGeneticProfileId();
             geneticProfileLink.setReferringGeneticProfileId(geneticProfileId);
             DaoGeneticProfileLink.addGeneticProfileLink(geneticProfileLink);
@@ -165,7 +165,7 @@ public class GeneticProfileReader {
     private static GeneticProfileLink createGeneticProfileLink(GeneticProfile geneticProfile) {
         GeneticProfileLink geneticProfileLink = new GeneticProfileLink();
 
-        // Set `REFERRED_GENETIC_PROFILE_ID`
+        // Set `referred_genetic_profile_id`
         String referredGeneticProfileStableId = parseStableId(geneticProfile.getAllOtherMetadataFields(), "source_stable_id");
         if (referredGeneticProfileStableId == null) {
             throw new RuntimeException("'source_stable_id' is required in meta file for " + geneticProfile.getStableId());
@@ -184,7 +184,7 @@ public class GeneticProfileReader {
             // not expected but might be useful for future genetic profile links
             throw new RuntimeException("Unknown datatype '" + geneticProfile.getDatatype() + "' in meta file for " + geneticProfile.getStableId());
         }
-        // Set `REFERENCE_TYPE`
+        // Set `reference_type`
         geneticProfileLink.setReferenceType(referenceType);
 
         return geneticProfileLink;

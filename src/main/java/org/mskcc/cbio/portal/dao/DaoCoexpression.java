@@ -75,11 +75,11 @@ public class DaoCoexpression {
                     " GENE_2 in ('" + StringUtils.join(queryGenes, "','") + "'))");
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                int gene1Id = Integer.parseInt(rs.getString("GENE_1"));
-                int gene2Id = Integer.parseInt(rs.getString("GENE_2"));
-                //int geneticProfileId = Integer.parseInt(rs.getString("GENETIC_PROFILE_ID"));
-                float pearson = Float.parseFloat(rs.getString("PEARSON"));
-                float spearman = Float.parseFloat(rs.getString("SPEARMAN"));
+                int gene1Id = Integer.parseInt(rs.getString("gene_1"));
+                int gene2Id = Integer.parseInt(rs.getString("gene_2"));
+                //int geneticProfileId = Integer.parseInt(rs.getString("genetic_profile_id"));
+                float pearson = Float.parseFloat(rs.getString("pearson"));
+                float spearman = Float.parseFloat(rs.getString("spearman"));
                 result.add(new Coexpression(gene1Id, gene2Id, geneticProfileId, pearson, spearman));
             }
             return result;

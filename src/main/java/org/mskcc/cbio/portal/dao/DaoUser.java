@@ -56,7 +56,7 @@ public class DaoUser {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoUser.class);
-         pstmt = con.prepareStatement("INSERT INTO users ( `EMAIL`, `NAME`, `ENABLED` ) VALUES (?,?,?)");
+         pstmt = con.prepareStatement("INSERT INTO users ( `email`, `name`, `enabled` ) VALUES (?,?,?)");
          pstmt.setString(1, user.getEmail());
          pstmt.setString(2, user.getName());
          pstmt.setBoolean(3, user.isEnabled());
@@ -82,7 +82,7 @@ public class DaoUser {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoUser.class);
-         pstmt = con.prepareStatement("SELECT * FROM users WHERE EMAIL=?");
+         pstmt = con.prepareStatement("SELECT * FROM users WHERE email=?");
          pstmt.setString(1, email);
          rs = pstmt.executeQuery();
          if (rs.next()) {
@@ -138,7 +138,7 @@ public class DaoUser {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoUser.class);
-         pstmt = con.prepareStatement("DELETE FROM users WHERE EMAIL=?");
+         pstmt = con.prepareStatement("DELETE FROM users WHERE email=?");
          pstmt.setString(1, email);
          pstmt.executeUpdate();
       } catch (SQLException e) {
@@ -150,8 +150,8 @@ public class DaoUser {
 
    private static User extractUser(ResultSet rs) throws SQLException {
 
-       return new User(rs.getString("EMAIL"),
-                       rs.getString("NAME"),
-                       rs.getBoolean("ENABLED"));
+       return new User(rs.getString("email"),
+                       rs.getString("name"),
+                       rs.getBoolean("enabled"));
    }
 }

@@ -140,7 +140,7 @@ public class UpdateGenePanel extends ConsoleRunnable {
                 "To add a new gene panel, run the ImportGenePanel script.\n" +
                 "If you are making changes to an existing gene panel due to a miscount of genes, proceed.\n" +
                 "Otherwise, if you would like to add a new version of a gene panel, please exit this script\n" +
-                "and import the gene panel with a new stable ID!\n" +
+                "and import the gene panel with a new stable id!\n" +
                 "Will you proceed to update an existing gene panel? (Y/n)\n"
         );
 

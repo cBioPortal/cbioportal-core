@@ -47,19 +47,19 @@ TYPE_MAP = [
 ADDITIONAL_CLICKHOUSE_TABLES = {
     "cosmic_mutation": """DROP TABLE IF EXISTS `cosmic_mutation`;
 CREATE TABLE IF NOT EXISTS `cosmic_mutation` (
-  `COSMIC_MUTATION_ID` String,
-  `CHR` String,
-  `START_POSITION` Int64,
-  `REFERENCE_ALLELE` String,
-  `TUMOR_SEQ_ALLELE` String,
-  `STRAND` String,
-  `CODON_CHANGE` String,
-  `ENTREZ_GENE_ID` Int32,
-  `PROTEIN_CHANGE` String,
-  `COUNT` Int32,
-  `KEYWORD` String
+  `cosmic_mutation_id` String,
+  `chr` String,
+  `start_position` Int64,
+  `reference_allele` String,
+  `tumor_seq_allele` String,
+  `strand` String,
+  `codon_change` String,
+  `entrez_gene_id` Int32,
+  `protein_change` String,
+  `count` Int32,
+  `keyword` String
 ) ENGINE = MergeTree
-ORDER BY (`COSMIC_MUTATION_ID`);
+ORDER BY (`cosmic_mutation_id`);
 """
 }
 
@@ -133,6 +133,7 @@ def parse_column(line: str) -> ColumnDef:
     if not match:
         raise ValueError(f"Unable to parse column definition: {line}")
     name, mysql_type, rest = match.groups()
+    name = name.lower()
     column_type = convert_type(mysql_type)
     nullable = "NOT NULL" not in rest.upper()
     default_match = re.search(r"DEFAULT\s+([^\s,]+)", rest, re.I)
@@ -175,7 +176,7 @@ def parse_table(block: List[str]) -> TableDef:
             continue
         if upper.startswith("PRIMARY KEY"):
             cols = re.findall(r"`([^`]+)`", stripped)
-            primary_key = cols
+            primary_key = [col.lower() for col in cols]
             continue
         if upper.startswith("CONSTRAINT") or upper.startswith("FOREIGN KEY"):
             continue
@@ -270,8 +271,9 @@ def process_seed_statement(
         statement = statement.replace("@max_entity_id", str(context.last_genetic_entity_id))
     if upper.startswith("INSERT INTO"):
         statement = re.sub(r'"([A-Za-z0-9_]+)"', r'`\1`', statement)
+        statement = lowercase_insert_columns(statement)
     normalized = statement.upper()
-    if normalized.startswith("INSERT INTO `GENETIC_ENTITY`"):
+    if normalized.startswith("INSERT INTO `genetic_entity`"):
         parsed = parse_insert_single_row(statement)
         if parsed:
             _, columns, values = parsed
@@ -281,7 +283,7 @@ def process_seed_statement(
                 stable_id = strip_enclosing_quotes(values[stable_idx])
                 if stable_id:
                     context.entity_by_stable_id[stable_id] = record_id
-    elif normalized.startswith("INSERT INTO `GENE`"):
+    elif normalized.startswith("INSERT INTO `gene`"):
         parsed = parse_insert_single_row(statement)
         if parsed:
             _, columns, values = parsed
@@ -293,10 +295,27 @@ def process_seed_statement(
                     context.gene_by_entrez[int(entrez_value)] = record_id
                 except ValueError as exc:
                     raise ValueError(f"Unable to parse ENTREZ_GENE_ID '{entrez_value}'") from exc
-    elif normalized.startswith("INSERT INTO `GENETIC_ALTERATION`"):
+    elif normalized.startswith("INSERT INTO `genetic_alteration`"):
         statement = substitute_selects(statement, context)
     output_lines.append(statement)
     return context
+
+
+def lowercase_insert_columns(statement: str) -> str:
+    upper = statement.upper()
+    values_idx = upper.find("VALUES")
+    into_idx = upper.find("INTO")
+    if values_idx == -1 or into_idx == -1:
+        return statement
+    first_paren = statement.find("(", into_idx)
+    if first_paren == -1 or first_paren > values_idx:
+        return statement
+    closing = find_matching_paren(statement, first_paren)
+    columns_segment = statement[first_paren + 1 : closing]
+    columns = [token.strip() for token in columns_segment.split(",") if token.strip()]
+    normalized = [f"`{normalize_identifier(column).lower()}`" for column in columns]
+    new_columns = "(" + ", ".join(normalized) + ")"
+    return statement[:first_paren] + new_columns + statement[closing + 1 :]
 
 
 def ensure_genetic_entity_id(statement: str, new_id: int) -> str:
