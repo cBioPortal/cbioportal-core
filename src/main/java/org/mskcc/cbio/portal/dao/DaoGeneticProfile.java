@@ -53,7 +53,7 @@ import java.util.Map;
  */
 public final class DaoGeneticProfile {
     private DaoGeneticProfile() {}
-    
+    private static final String GENETIC_PROFILE_SEQUENCE = "seq_genetic_profile";
     private static final Map<String,GeneticProfile> byStableId = new HashMap<String,GeneticProfile>();
     private static final Map<Integer,GeneticProfile> byInternalId = new HashMap<Integer,GeneticProfile>();
     private static final Map<Integer,List<GeneticProfile>> byStudy = new HashMap<Integer,List<GeneticProfile>>();
@@ -98,6 +98,8 @@ public final class DaoGeneticProfile {
     }
    
     public static int addGeneticProfile(GeneticProfile profile) throws DaoException {
+        //FIXME: this cast may cause problems in the future
+        profile.setGeneticProfileId((int) ClickHouseAutoIncrement.nextId(GENETIC_PROFILE_SEQUENCE));
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -106,38 +108,41 @@ public final class DaoGeneticProfile {
             con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
 
             pstmt = con.prepareStatement
-                    ("INSERT INTO genetic_profile (`stable_id`, `cancer_study_id`, "+
+                    ("INSERT INTO genetic_profile (`genetic_profile_id`, `stable_id`, `cancer_study_id`, "+
                             "`genetic_alteration_type`, `datatype`, `name`, `description`, "+
                             "`show_profile_in_analysis_tab`, `pivot_threshold`, `sort_order`, `generic_assay_type`, `patient_level`) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-            pstmt.setString(1, profile.getStableId());
-            pstmt.setInt(2, profile.getCancerStudyId());
-            pstmt.setString(3, profile.getGeneticAlterationType().name());
-            pstmt.setString(4, profile.getDatatype());
-            pstmt.setString(5, profile.getProfileName());
-            pstmt.setString(6, profile.getProfileDescription());
-            pstmt.setBoolean(7, profile.showProfileInAnalysisTab());
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+
+            int index = 1;
+            pstmt.setInt(index++, profile.getGeneticProfileId());
+            pstmt.setString(index++, profile.getStableId());
+            pstmt.setInt(index++, profile.getCancerStudyId());
+            pstmt.setString(index++, profile.getGeneticAlterationType().name());
+            pstmt.setString(index++, profile.getDatatype());
+            pstmt.setString(index++, profile.getProfileName());
+            pstmt.setString(index++, profile.getProfileDescription());
+            pstmt.setBoolean(index++, profile.showProfileInAnalysisTab());
 
             // `pivot_threshold_value` and `value_sort_order` `generic_assay_type` fields are geneirc assay data specific.
             // These fields are set to null when not present in profile object.
             if (profile.getPivotThreshold() == null) {
-                pstmt.setNull(8, java.sql.Types.FLOAT);
+                pstmt.setNull(index++, java.sql.Types.FLOAT);
             } else {
-                pstmt.setFloat(8, profile.getPivotThreshold());
+                pstmt.setFloat(index++, profile.getPivotThreshold());
             }
             if (profile.getSortOrder() == null) {
-                pstmt.setNull(9, java.sql.Types.INTEGER);
+                pstmt.setNull(index++, java.sql.Types.INTEGER);
             } else {
-                pstmt.setString(9, profile.getSortOrder());
+                pstmt.setString(index++, profile.getSortOrder());
             }
             if (profile.getGenericAssayType() == null) {
-                pstmt.setNull(10, java.sql.Types.VARCHAR);
+                pstmt.setNull(index++, java.sql.Types.VARCHAR);
             } else {
-                pstmt.setString(10, profile.getGenericAssayType());
+                pstmt.setString(index++, profile.getGenericAssayType());
             }
 
             // default value is false
-            pstmt.setBoolean(11, profile.getPatientLevel());
+            pstmt.setBoolean(index++, profile.getPatientLevel());
             
             rows = pstmt.executeUpdate();
 
