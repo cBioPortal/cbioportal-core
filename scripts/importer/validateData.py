@@ -2161,7 +2161,7 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
         field ncbi.build. Expecting GRCh37, GRCh38, GRCm38 or without the GRCx prefix
         """    
     
-        if value != '':
+        if value and self.portal.ncbi_build:
             prefix = 'GRCm' if self.portal.species == 'mouse' else 'GRCh'
             if str(value) in ('37', '38'):
                 value = prefix + str(value)
@@ -3219,7 +3219,7 @@ class StructuralVariantValidator(CustomNamespacesValidator):
 
         def checkNCBIbuild(ncbi_build):
             if ncbi_build is None:
-                self.logger.warning('No value in NCBI_Build, assuming GRCh37 is the assembly',
+                self.logger.warning('No value in NCBI_Build',
                                   extra={'line_number': self.line_number})
             else:
                 # Check NCBI build
@@ -5721,6 +5721,11 @@ def main_validate(args):
     cbio_version = portal_instance.portal_version
 
     if partial_data:
+        # Relax the genome build check for partial (aka incremental) upload until https://github.com/cBioPortal/cbioportal-core/issues/98 is implemented
+        # In case of mismatched genome build a warning will be given during the loading step. See https://github.com/cBioPortal/cbioportal-core/issues/99
+        portal_instance.species = None
+        portal_instance.reference_genome = None
+        portal_instance.ncbi_build = None
         validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
     else:
         validate_study(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
