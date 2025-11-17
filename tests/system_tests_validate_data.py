@@ -198,5 +198,14 @@ class ValidateDataSystemTester(unittest.TestCase):
         self.assertFileGenerated(out_file_name,
                                  TEST_DATA_DIR / 'study_quotes' / 'result_report.html')
 
+    def test_incremental_upload(self):
+        '''
+        Test happy path for the incremental upload
+        '''
+        args = ['--data_directory', self.relpath_dir(TEST_DATA_DIR / 'study_es_0_inc'),
+                '--portal_info_dir', self.relpath(PORTAL_INFO_DIR), '-v']
+        exit_status = self.run_validator(args)
+        self.assertEqual(0, exit_status)
+
 if __name__ == '__main__':
     unittest.main(buffer=True)
