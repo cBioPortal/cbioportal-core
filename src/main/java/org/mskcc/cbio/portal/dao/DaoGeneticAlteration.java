@@ -128,7 +128,7 @@ public class DaoGeneticAlteration {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement
                     ("INSERT INTO genetic_alteration (genetic_profile_id, " +
-                            " GENETIC_ENTITY_ID," +
+                            " genetic_entity_id," +
                             " `values`) "
                             + "VALUES (?,?,?)");
             pstmt.setInt(1, geneticProfileId);
@@ -230,10 +230,10 @@ public class DaoGeneticAlteration {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             if (geneticEntityIds == null) {
                 pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                        + " GENETIC_PROFILE_ID = " + geneticProfileId);
+                        + " genetic_profile_id = " + geneticProfileId);
             } else {
                 pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                        + " GENETIC_PROFILE_ID = " + geneticProfileId
+                        + " genetic_profile_id = " + geneticProfileId
                         + " AND genetic_entity_id IN ("+StringUtils.join(geneticEntityIds, ",")+")");
             }
             rs = pstmt.executeQuery();
@@ -301,7 +301,7 @@ public class DaoGeneticAlteration {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
 
             pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                    + " GENETIC_PROFILE_ID = " + geneticProfileId
+                    + " genetic_profile_id = " + geneticProfileId
                     + " LIMIT 3000 OFFSET " + offSet);
 
             rs = pstmt.executeQuery();
@@ -455,7 +455,7 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_alteration WHERE GENETIC_PROFILE_ID=?");
+                    "genetic_alteration WHERE genetic_profile_id=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.executeUpdate();
         } catch (SQLException e) {

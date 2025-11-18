@@ -70,9 +70,9 @@ public class DaoCoexpression {
             con = JdbcUtil.getDbConnection(DaoCoexpression.class);
             ArrayList<Coexpression> result = new ArrayList<Coexpression>();
             pstmt = con.prepareStatement("SELECT * FROM coexpression WHERE " +
-                    "GENETIC_PROFILE_ID='" + geneticProfileId + "' AND " +
-                    "(GENE_1 in ('" + StringUtils.join(queryGenes, "','") + "')" + " OR " +
-                    " GENE_2 in ('" + StringUtils.join(queryGenes, "','") + "'))");
+                    "genetic_profile_id='" + geneticProfileId + "' AND " +
+                    "(gene_1 in ('" + StringUtils.join(queryGenes, "','") + "')" + " OR " +
+                    " gene_2 in ('" + StringUtils.join(queryGenes, "','") + "'))");
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 int gene1Id = Integer.parseInt(rs.getString("gene_1"));

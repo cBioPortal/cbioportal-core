@@ -95,8 +95,8 @@ public class DaoMutSig {
                                 "`rank`, " +
                                 "`NumBasesCovered`, " +
                                 "`NumMutations`, " +
-                                "`P_Value`, " +
-                                "`Q_Value`) "  +
+                                "`p_value`, " +
+                                "`q_value`) "  +
                                 "VALUES (?,?,?,?,?,?,?)");
 
                 pstmt.setInt(1, mutSig.getCancerType());
@@ -243,7 +243,7 @@ public class DaoMutSig {
         try {
             con = JdbcUtil.getDbConnection(DaoMutSig.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM mut_sig WHERE cancer_study_id = ? AND Q_Value < ?");
+                    ("SELECT * FROM mut_sig WHERE cancer_study_id = ? AND q_value < ?");
             pstmt.setInt(1, cancerStudy);
             pstmt.setDouble(2,qValueThreshold);
             rs = pstmt.executeQuery();
@@ -283,8 +283,8 @@ public class DaoMutSig {
                 rs.getInt("rank"),
                 rs.getInt("NumBasesCovered"),
                 rs.getInt("numMutations"),
-                rs.getFloat("P_Value"),
-                rs.getFloat("Q_Value"));
+                rs.getFloat("p_Value"),
+                rs.getFloat("q_Value"));
     }
 
     /**

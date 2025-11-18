@@ -224,7 +224,7 @@ public class DaoStructuralVariant {
             pstmt = con.prepareStatement(
                 "SELECT * FROM structural_variant" +
                     " LEFT JOIN alteration_driver_annotation ON" +
-                    "  structural_variant.GENETIC_PROFILE_ID = alteration_driver_annotation.GENETIC_PROFILE_ID" +
+                    "  structural_variant.genetic_profile_id = alteration_driver_annotation.genetic_profile_id" +
                     "  and structural_variant.sample_id = alteration_driver_annotation.sample_id" +
                     "  and structural_variant.internal_id = alteration_driver_annotation.alteration_event_id");
             rs = pstmt.executeQuery();

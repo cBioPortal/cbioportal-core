@@ -96,7 +96,7 @@ public final class DaoGeneticProfileSamples
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfileSamples.class);
             pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_profile_samples WHERE GENETIC_PROFILE_ID=?");
+                    "genetic_profile_samples WHERE genetic_profile_id=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.executeUpdate();
         } catch (SQLException e) {

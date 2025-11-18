@@ -481,7 +481,7 @@ public final class DaoClinicalData {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
 
             pstmt = con.prepareStatement("SELECT * FROM clinical_patient WHERE" +
-                " ATTR_ID IN ('" + StringUtils.join(attributeIds, "','") +"') ");
+                " attr_id IN ('" + StringUtils.join(attributeIds, "','") +"') ");
 
             List<Integer> patients = getPatientIdsByCancerStudy(internalCancerStudyId);
 
@@ -692,8 +692,8 @@ public final class DaoClinicalData {
         try{
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
             pstmt = con.prepareStatement("select " +
-                "distinct ATTR_VALUE as attributeValue, " +
-                "ATTR_ID as attributeID from clinical_sample " +
+                "distinct attr_value as attributeValue, " +
+                "attr_id as attributeID from clinical_sample " +
                 "where attr_id in (?, ?) and internal_id in (" +
                 "select internal_id from sample where stable_id in ('"
                 + StringUtils.join(samplesList,"','")+"'))");

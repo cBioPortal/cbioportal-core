@@ -172,7 +172,7 @@ public class DaoTypeOfCancer {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-         pstmt = con.prepareStatement("DELETE from " + "type_of_cancer WHERE TYPE_OF_CANCER_ID=?");
+         pstmt = con.prepareStatement("DELETE from " + "type_of_cancer WHERE type_of_cancer_id=?");
          pstmt.setString(1, typeOfCancerId);
          pstmt.executeUpdate();
       } catch (SQLException e) {

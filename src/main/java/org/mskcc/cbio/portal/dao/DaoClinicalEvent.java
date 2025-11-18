@@ -135,8 +135,8 @@ public final class DaoClinicalEvent {
         ClinicalEvent clinicalEvent = new ClinicalEvent();
         clinicalEvent.setClinicalEventId(rs.getLong("clinical_event_id"));
         clinicalEvent.setPatientId(rs.getInt("patient_id"));
-        clinicalEvent.setStartDate(JdbcUtil.readLongFromResultSet(rs, "START_DATE"));
-        clinicalEvent.setStopDate(JdbcUtil.readLongFromResultSet(rs, "STOP_DATE"));
+        clinicalEvent.setStartDate(JdbcUtil.readLongFromResultSet(rs, "start_date"));
+        clinicalEvent.setStopDate(JdbcUtil.readLongFromResultSet(rs, "stop_date"));
         clinicalEvent.setEventType(rs.getString("event_type"));
         return clinicalEvent;
     }
