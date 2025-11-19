@@ -38,7 +38,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.portal.model.Coexpression;
 
 /**
@@ -69,10 +68,20 @@ public class DaoCoexpression {
         try {
             con = JdbcUtil.getDbConnection(DaoCoexpression.class);
             ArrayList<Coexpression> result = new ArrayList<Coexpression>();
-            pstmt = con.prepareStatement("SELECT * FROM coexpression WHERE " +
-                    "genetic_profile_id='" + geneticProfileId + "' AND " +
-                    "(gene_1 in ('" + StringUtils.join(queryGenes, "','") + "')" + " OR " +
-                    " gene_2 in ('" + StringUtils.join(queryGenes, "','") + "'))");
+            if (queryGenes == null || queryGenes.isEmpty()) {
+                return result;
+            }
+            String placeholders = String.join(",", Collections.nCopies(queryGenes.size(), "?"));
+            pstmt = con.prepareStatement("SELECT * FROM coexpression WHERE genetic_profile_id=? AND "
+                + "(gene_1 IN (" + placeholders + ") OR gene_2 IN (" + placeholders + "))");
+            pstmt.setInt(1, geneticProfileId);
+            int parameterIndex = 2;
+            for (Long geneId : queryGenes) {
+                pstmt.setLong(parameterIndex++, geneId);
+            }
+            for (Long geneId : queryGenes) {
+                pstmt.setLong(parameterIndex++, geneId);
+            }
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 int gene1Id = Integer.parseInt(rs.getString("gene_1"));

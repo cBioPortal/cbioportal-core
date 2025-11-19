@@ -126,10 +126,8 @@ public class DaoGeneticAlteration {
         
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            pstmt = con.prepareStatement
-                    ("INSERT INTO genetic_alteration (genetic_profile_id, " +
-                            " genetic_entity_id," +
-                            " `values`) "
+            pstmt = con.prepareStatement(
+                    "INSERT INTO genetic_alteration (genetic_profile_id, genetic_entity_id, `values`) "
                             + "VALUES (?,?,?)");
             pstmt.setInt(1, geneticProfileId);
             pstmt.setLong(2, geneticEntityId);
@@ -228,13 +226,17 @@ public class DaoGeneticAlteration {
         }
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            if (geneticEntityIds == null) {
-                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                        + " genetic_profile_id = " + geneticProfileId);
+            if (geneticEntityIds == null || geneticEntityIds.isEmpty()) {
+                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ?");
+                pstmt.setInt(1, geneticProfileId);
             } else {
-                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                        + " genetic_profile_id = " + geneticProfileId
-                        + " AND genetic_entity_id IN ("+StringUtils.join(geneticEntityIds, ",")+")");
+                String placeholders = String.join(",", Collections.nCopies(geneticEntityIds.size(), "?"));
+                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ? AND genetic_entity_id IN (" + placeholders + ")");
+                pstmt.setInt(1, geneticProfileId);
+                int index = 2;
+                for (Integer geneticEntityId : geneticEntityIds) {
+                    pstmt.setInt(index++, geneticEntityId);
+                }
             }
             rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -300,10 +302,8 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
 
-            pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                    + " genetic_profile_id = " + geneticProfileId
-                    + " LIMIT 3000 OFFSET " + offSet);
-
+            pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ? LIMIT 3000 OFFSET " + offSet);
+            pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("genetic_entity_id"));
@@ -454,8 +454,7 @@ public class DaoGeneticAlteration {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_alteration WHERE genetic_profile_id=?");
+            pstmt = con.prepareStatement("DELETE from genetic_alteration WHERE genetic_profile_id=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.executeUpdate();
         } catch (SQLException e) {

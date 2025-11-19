@@ -69,10 +69,10 @@ def get_current_mutation_data(study_id, cursor):
     """
     mutations = []
     try:
-        cursor.execute('SELECT genetic_profile.GENETIC_PROFILE_ID, mutation_event.ENTREZ_GENE_ID, PROTEIN_CHANGE as ALTERATION, ' +
+        cursor.execute('SELECT genetic_profile.genetic_profile_id, mutation_event.ENTREZ_GENE_ID, PROTEIN_CHANGE as ALTERATION, ' +
         'MUTATION_TYPE as CONSEQUENCE, mutation.MUTATION_EVENT_ID, mutation.SAMPLE_ID FROM cbioportal.mutation_event ' +
         'inner join mutation on mutation.MUTATION_EVENT_ID = mutation_event.MUTATION_EVENT_ID ' +
-        'inner join genetic_profile on genetic_profile.GENETIC_PROFILE_ID = mutation.GENETIC_PROFILE_ID ' +
+        'inner join genetic_profile on genetic_profile.genetic_profile_id = mutation.genetic_profile_id ' +
         'inner join cancer_study on cancer_study.CANCER_STUDY_ID = genetic_profile.CANCER_STUDY_ID ' +
         'WHERE cancer_study.CANCER_STUDY_IDENTIFIER = "'+study_id +'"')
         for row in cursor.fetchall():
@@ -90,10 +90,10 @@ def get_current_cna_data(study_id, cursor):
     """
     cna = []
     try:
-        cursor.execute('SELECT genetic_profile.GENETIC_PROFILE_ID, '+ 'cna_event.ENTREZ_GENE_ID, cna_event.ALTERATION, '+
+        cursor.execute('SELECT genetic_profile.genetic_profile_id, '+ 'cna_event.ENTREZ_GENE_ID, cna_event.ALTERATION, '+
         'sample_cna_event.CNA_EVENT_ID, sample_cna_event.SAMPLE_ID from cbioportal.cna_event ' +
         'inner join sample_cna_event on sample_cna_event.CNA_EVENT_ID = cna_event.CNA_EVENT_ID '+
-        'inner join genetic_profile on genetic_profile.GENETIC_PROFILE_ID = sample_cna_event.GENETIC_PROFILE_ID '+
+        'inner join genetic_profile on genetic_profile.genetic_profile_id = sample_cna_event.genetic_profile_id '+
         'inner join cancer_study on cancer_study.CANCER_STUDY_ID = genetic_profile.CANCER_STUDY_ID '+
         'WHERE cancer_study.CANCER_STUDY_IDENTIFIER = "'+study_id +'"')
         for row in cursor.fetchall():
@@ -113,10 +113,10 @@ def get_current_sv_data(study_id, cursor):
     """
     sv = []
     try:
-        cursor.execute('SELECT genetic_profile.GENETIC_PROFILE_ID, '+ 'structural_variant.SITE1_ENTREZ_GENE_ID, '+
+        cursor.execute('SELECT genetic_profile.genetic_profile_id, '+ 'structural_variant.SITE1_ENTREZ_GENE_ID, '+
         'structural_variant.SITE2_ENTREZ_GENE_ID, structural_variant.EVENT_INFO, ' +
         'structural_variant.INTERNAL_ID, structural_variant.SAMPLE_ID from cbioportal.structural_variant ' +
-        'inner join genetic_profile on genetic_profile.GENETIC_PROFILE_ID = structural_variant.GENETIC_PROFILE_ID '+
+        'inner join genetic_profile on genetic_profile.genetic_profile_id = structural_variant.genetic_profile_id '+
         'inner join cancer_study on cancer_study.CANCER_STUDY_ID = genetic_profile.CANCER_STUDY_ID '+
         'WHERE cancer_study.CANCER_STUDY_IDENTIFIER = "'+study_id +'"')
         for row in cursor.fetchall():
@@ -189,9 +189,9 @@ def create_sv_request_payload(sv_data, ref_genome):
 def get_current_annotation_data(connection, cursor, study_id):
     annotation_data = []
     try:
-        cursor.execute('SELECT ALTERATION_EVENT_ID, alteration_driver_annotation.GENETIC_PROFILE_ID, SAMPLE_ID, DRIVER_FILTER_ANNOTATION,' +
+        cursor.execute('SELECT alteration_event_id, alteration_driver_annotation.genetic_profile_id, SAMPLE_ID, DRIVER_FILTER_ANNOTATION,' +
             ' DRIVER_TIERS_FILTER, DRIVER_TIERS_FILTER_ANNOTATION FROM cbioportal.alteration_driver_annotation' +
-            ' INNER JOIN cbioportal.genetic_profile ON (genetic_profile.GENETIC_PROFILE_ID = alteration_driver_annotation.GENETIC_PROFILE_ID)' +
+            ' INNER JOIN cbioportal.genetic_profile ON (genetic_profile.genetic_profile_id = alteration_driver_annotation.genetic_profile_id)' +
             ' INNER JOIN cbioportal.cancer_study ON (cancer_study.CANCER_STUDY_ID = genetic_profile.CANCER_STUDY_ID)' +
             ' WHERE cancer_study.CANCER_STUDY_IDENTIFIER = "'+study_id+'"')
         for row in cursor.fetchall():
@@ -213,7 +213,7 @@ def update_annotations(result, connection, cursor, study_id):
             try:
                 cursor.execute('UPDATE cbioportal.alteration_driver_annotation'+
                 ' SET DRIVER_FILTER = "' + oncogenic + '"' +
-                ' WHERE ALTERATION_EVENT_ID = ' + event_id + ' AND GENETIC_PROFILE_ID = '+ genetic_profile_id + 
+                ' WHERE alteration_event_id = ' + event_id + ' AND genetic_profile_id = '+ genetic_profile_id + 
                 ' AND SAMPLE_ID = '+ sample_id)
             except ClickHouseError as msg:
                 print(msg, file=ERROR_FILE)

@@ -334,7 +334,7 @@ public final class DaoMutation {
                     //"INNER JOIN mutation_event ON mutation.mutation_event_id=mutation_event.mutation_event_id " +
                     "WHERE sample_id IN ('" +
                     org.apache.commons.lang3.StringUtils.join(targetSampleList, "','") +
-                    "') AND GENETIC_PROFILE_ID = ? AND mutation.ENTREZ_GENE_ID IN ('" +
+                    "') AND genetic_profile_id = ? AND mutation.entrez_gene_id IN ('" +
                     org.apache.commons.lang3.StringUtils.join(entrezGeneIds, "','") + "')");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
