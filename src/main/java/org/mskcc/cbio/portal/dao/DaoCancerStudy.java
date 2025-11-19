@@ -490,47 +490,6 @@ public final class DaoCancerStudy {
     }
 
     /**
-     * Calls deleteCancerStudyByCascade() if cancer study exists by stable id.
-     * @param cancerStudyStableId
-     * @throws DaoException
-     */
-    public static void deleteCancerStudyByCascade(String cancerStudyStableId) throws DaoException {
-        CancerStudy study = getCancerStudyByStableId(cancerStudyStableId);
-        if (study != null) {
-            deleteCancerStudyByCascade(study.getInternalId());
-        }
-    }
-
-    /**
-     * Deletes a cancer study by internal id from db with foreign key constraints enforced.
-     * @param internalCancerStudyId
-     * @throws DaoException
-     */
-    public static void deleteCancerStudyByCascade(int internalCancerStudyId) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
-            pstmt = con.prepareStatement("DELETE FROM cancer_study WHERE cancer_study_id = ?");
-            pstmt.setInt(1, internalCancerStudyId);
-            int rows = pstmt.executeUpdate();
-            // throw dao exception if no rows affected by update
-            if (rows == 0) {
-                throw new DaoException("deleteCancerStudyByCascade() failed: No rows affected");
-            }
-            removeCancerStudyFromCache(internalCancerStudyId);
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoCancerStudy.class, con, pstmt, rs);
-        }
-        purgeUnreferencedRecordsAfterDeletionOfStudy();
-        reCacheAll();
-        System.out.println("deleted study:\nID: "+internalCancerStudyId);
-    }
-
-    /**
      * Deletes the Specified Cancer Study.
      * This method uses a large set of database operations to progressively delete all associated
      * data for a cancer study (including the study itself). A cleaner alternative based on
@@ -596,6 +555,7 @@ public final class DaoCancerStudy {
             deleteByStudyId(con, "DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId(con, "DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId(con, "DELETE FROM resource_study WHERE internal_id=?", internalCancerStudyId);
+            deleteByStudyId(con, "DELETE FROM cancer_study_tags WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId(con, "DELETE FROM copy_number_seg WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId(con, "DELETE FROM copy_number_seg_file WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId(con, "DELETE FROM patient WHERE cancer_study_id=?", internalCancerStudyId);
