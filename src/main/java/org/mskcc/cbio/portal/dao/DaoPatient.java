@@ -259,23 +259,21 @@ public class DaoPatient {
         DaoSample.deleteSamples(internalStudyId, patientsSampleStableIds);
 
         Connection con = null;
-        PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoPatient.class);
-            pstmt = con.prepareStatement("DELETE FROM `patient` WHERE `internal_id` IN ("
-                    + String.join(",", Collections.nCopies(internalPatientIds.size(), "?"))
-                    + ")");
-            int parameterIndex = 1;
-            for (Integer internalPatientId : internalPatientIds) {
-                pstmt.setInt(parameterIndex++, internalPatientId);
-            };
-            pstmt.executeUpdate();
+            List<Integer> clinicalEventIds = collectIds(con,
+                    "SELECT clinical_event_id FROM clinical_event WHERE patient_id IN ", internalPatientIds);
+            deleteByIds(con, "DELETE FROM clinical_event_data WHERE clinical_event_id IN ", clinicalEventIds);
+            deleteByIds(con, "DELETE FROM clinical_event WHERE clinical_event_id IN ", clinicalEventIds);
+            deleteByIds(con, "DELETE FROM clinical_patient WHERE internal_id IN ", internalPatientIds);
+            deleteByIds(con, "DELETE FROM resource_patient WHERE internal_id IN ", internalPatientIds);
+            deleteByIds(con, "DELETE FROM patient WHERE internal_id IN ", internalPatientIds);
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, null);
+            JdbcUtil.closeAll(DaoPatient.class, con, null, null);
         }
         log.info("Removing {} patients from study with internal id={} done.", patientStableIds, internalStudyId);
     }
@@ -290,5 +288,43 @@ public class DaoPatient {
             internalPatientIds.add(patientByCancerStudyAndPatientId.getInternalId());
         }
         return internalPatientIds;
+    }
+
+    private static List<Integer> collectIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws SQLException {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<Integer> collected = new ArrayList<>();
+        try {
+            pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")");
+            int index = 1;
+            for (Integer id : ids) {
+                pstmt.setInt(index++, id);
+            }
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                collected.add(rs.getInt(1));
+            }
+        } finally {
+            JdbcUtil.closeAll(DaoPatient.class, null, pstmt, rs);
+        }
+        return collected;
+    }
+
+    private static void deleteByIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws SQLException {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")")) {
+            int index = 1;
+            for (Integer id : ids) {
+                pstmt.setInt(index++, id);
+            }
+            pstmt.executeUpdate();
+        }
     }
 }

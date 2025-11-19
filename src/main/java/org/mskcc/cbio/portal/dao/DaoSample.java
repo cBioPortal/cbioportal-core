@@ -299,24 +299,27 @@ public class DaoSample {
         removeSamplesInGeneticAlterationsForStudy(internalStudyId, internalSampleIds);
 
         Connection con = null;
-        PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSample.class);
-            pstmt = con.prepareStatement("DELETE FROM `sample` WHERE `internal_id` IN ("
-                    + String.join(",", Collections.nCopies(internalSampleIds.size(), "?"))
-                    + ")");
-            int parameterIndex = 1;
-            for (Integer internalSampleId : internalSampleIds) {
-                pstmt.setInt(parameterIndex++, internalSampleId);
-            };
-            pstmt.executeUpdate();
+            deleteByIds(con, "DELETE FROM alteration_driver_annotation WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM sample_cna_event WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM mutation WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM structural_variant WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM sample_profile WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM sample_list_list WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM copy_number_seg WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM allele_specific_copy_number WHERE sample_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM clinical_sample WHERE internal_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM resource_sample WHERE internal_id IN ", internalSampleIds);
+            deleteByIds(con, "DELETE FROM sample WHERE internal_id IN ", internalSampleIds);
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoSample.class, con, pstmt, null);
+            JdbcUtil.closeAll(DaoSample.class, con, null, null);
         }
+        DaoCancerStudy.purgeUnreferencedRecordsAfterDeletionOfStudy();
         log.info("Removing {} samples from study with internal id={} done.", sampleStableIds, internalStudyId);
     }
 
@@ -392,5 +395,19 @@ public class DaoSample {
             internalSampleIds.add(sampleByCancerStudyAndSampleId.getInternalId());
         }
         return internalSampleIds;
+    }
+
+    private static void deleteByIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws SQLException {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")")) {
+            int index = 1;
+            for (Integer id : ids) {
+                pstmt.setInt(index++, id);
+            }
+            pstmt.executeUpdate();
+        }
     }
 }
