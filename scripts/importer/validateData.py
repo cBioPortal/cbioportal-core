@@ -313,6 +313,8 @@ class PortalInstance(object):
                     for entrez_id in entrez_list:
                         self.entrez_set.add(int(entrez_id))
 
+        #TODO cBioPortal now supports specifying a genome build per study, so this functionality needs to be updated accordingly.
+        # This improvement has to be done while implementing https://github.com/cBioPortal/cbioportal-core/issues/98
         #Set defaults for genome version and species
         self.__species = 'human'
         self.__ncbi_build = 'GRCh37'
