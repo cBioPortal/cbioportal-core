@@ -7,4 +7,3 @@ profile_description: Putative copy-number from GISTIC 2.0. Values: -2 = homozygo
 profile_name: Putative copy-number alterations from GISTIC
 data_filename: data_cna_discrete.txt
 pd_annotations_filename: data_cna_pd_annotations.txt
-namespaces: CustomNamespace

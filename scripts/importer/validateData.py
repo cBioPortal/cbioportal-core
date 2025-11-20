@@ -313,6 +313,8 @@ class PortalInstance(object):
                     for entrez_id in entrez_list:
                         self.entrez_set.add(int(entrez_id))
 
+        #TODO cBioPortal now supports specifying a genome build per study, so this functionality needs to be updated accordingly.
+        # This improvement has to be done while implementing https://github.com/cBioPortal/cbioportal-core/issues/98
         #Set defaults for genome version and species
         self.__species = 'human'
         self.__ncbi_build = 'GRCh37'
@@ -2157,11 +2159,11 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
 
     def checkNCBIbuild(self, value):
         """
-        Checks whether the value found in MAF NCBI_Build column matches the genome specified in application.properties at 
-        field ncbi.build. Expecting GRCh37, GRCh38, GRCm38 or without the GRCx prefix
+        Verifies that the value in the MAF NCBI_Build column matches the genome build specified for the study (if provided in the meta file).
+        Expecting GRCh37, GRCh38, GRCm38 or without the GRCx prefix
         """    
     
-        if value != '':
+        if value and self.portal.ncbi_build:
             prefix = 'GRCm' if self.portal.species == 'mouse' else 'GRCh'
             if str(value) in ('37', '38'):
                 value = prefix + str(value)
@@ -3219,7 +3221,7 @@ class StructuralVariantValidator(CustomNamespacesValidator):
 
         def checkNCBIbuild(ncbi_build):
             if ncbi_build is None:
-                self.logger.warning('No value in NCBI_Build, assuming GRCh37 is the assembly',
+                self.logger.warning('No value in NCBI_Build',
                                   extra={'line_number': self.line_number})
             else:
                 # Check NCBI build
@@ -5721,6 +5723,11 @@ def main_validate(args):
     cbio_version = portal_instance.portal_version
 
     if partial_data:
+        # Relax the genome build check for partial (aka incremental) upload until https://github.com/cBioPortal/cbioportal-core/issues/98 is implemented
+        # In case of mismatched genome build a warning will be given during the loading step. See https://github.com/cBioPortal/cbioportal-core/issues/99
+        portal_instance.species = None
+        portal_instance.reference_genome = None
+        portal_instance.ncbi_build = None
         validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
     else:
         validate_study(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
