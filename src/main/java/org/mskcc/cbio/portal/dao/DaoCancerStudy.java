@@ -335,34 +335,9 @@ public final class DaoCancerStudy {
                 throw new DaoException("Unsupported reference genome");
             }
             pstmt.executeUpdate();
-
-            // Get the auto-generated ID - different approach for SQLite vs MySQL
-            try {
-                rs = pstmt.getGeneratedKeys();
-                if (rs.next()) {
-                    int autoId = rs.getInt(1);
-                    cancerStudy.setInternalId(autoId);
-                }
-            } catch (SQLException e) {
-                // SQLite JDBC driver doesn't fully support getGeneratedKeys()
-                // Use last_insert_rowid() instead
-                if (e.getMessage() != null && e.getMessage().contains("not implemented by SQLite")) {
-                    PreparedStatement pstmt2 = null;
-                    ResultSet rs2 = null;
-                    try {
-                        pstmt2 = con.prepareStatement("SELECT last_insert_rowid()");
-                        rs2 = pstmt2.executeQuery();
-                        if (rs2.next()) {
-                            int autoId = rs2.getInt(1);
-                            cancerStudy.setInternalId(autoId);
-                        }
-                    } finally {
-                        if (rs2 != null) rs2.close();
-                        if (pstmt2 != null) pstmt2.close();
-                    }
-                } else {
-                    throw e;
-                }
+            int autoId = JdbcUtil.getInsertedId(pstmt, con);
+            if (autoId != -1) {
+                cancerStudy.setInternalId(autoId);
             }
             cacheCancerStudy(cancerStudy, new java.util.Date());
         } catch (SQLException e) {

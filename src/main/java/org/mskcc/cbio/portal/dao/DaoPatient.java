@@ -122,10 +122,10 @@ public class DaoPatient {
             pstmt.setString(1, patient.getStableId());
             pstmt.setInt(2, patient.getCancerStudy().getInternalId());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), rs.getInt(1)), patient.getCancerStudy().getInternalId());
-                return rs.getInt(1);
+            int autoId = JdbcUtil.getInsertedId(pstmt, con);
+            if (autoId != -1) {
+                cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), autoId), patient.getCancerStudy().getInternalId());
+                return autoId;
             }
             return -1;
         }

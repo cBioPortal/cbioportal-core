@@ -278,4 +278,43 @@ public class JdbcUtil {
         }
         stmt.close();
     }
+
+    /**
+     * Get the auto-generated ID after an INSERT in a database-agnostic way.
+     * MySQL supports getGeneratedKeys(), but SQLite JDBC driver has limited support,
+     * so we use last_insert_rowid() for SQLite.
+     *
+     * @param pstmt PreparedStatement that was just executed with an INSERT
+     * @param con Connection used for the INSERT
+     * @return The auto-generated ID, or -1 if not available
+     * @throws SQLException
+     */
+    public static int getInsertedId(PreparedStatement pstmt, Connection con) throws SQLException {
+        try {
+            ResultSet rs = pstmt.getGeneratedKeys();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            // SQLite JDBC driver doesn't fully support getGeneratedKeys()
+            // Use last_insert_rowid() instead
+            if (e.getMessage() != null && e.getMessage().contains("not implemented by SQLite")) {
+                PreparedStatement pstmt2 = null;
+                ResultSet rs2 = null;
+                try {
+                    pstmt2 = con.prepareStatement("SELECT last_insert_rowid()");
+                    rs2 = pstmt2.executeQuery();
+                    if (rs2.next()) {
+                        return rs2.getInt(1);
+                    }
+                } finally {
+                    if (rs2 != null) rs2.close();
+                    if (pstmt2 != null) pstmt2.close();
+                }
+            } else {
+                throw e;
+            }
+        }
+        return -1;
+    }
 }
