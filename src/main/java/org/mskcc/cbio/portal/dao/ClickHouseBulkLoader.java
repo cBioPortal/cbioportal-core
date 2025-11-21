@@ -35,21 +35,24 @@ package org.mskcc.cbio.portal.dao;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * Minimal bulk loader that buffers rows in memory and inserts them via JDBC batches.
- * This replaces the previous legacy LOAD DATA LOCAL INFILE implementation.
+ * Minimal bulk loader that buffers rows in memory and streams them to ClickHouse via
+ * TSVWithNames over the existing JDBC connection. This replaces the previous legacy
+ * LOAD DATA LOCAL INFILE implementation.
  * <p>
  * The loader keeps the public API intact so that the various DAO classes do not need to
  * change their interaction pattern.
@@ -92,14 +95,17 @@ public class ClickHouseBulkLoader {
         PreparedStatement stmt = null;
         try {
             con = JdbcUtil.getDbConnection(ClickHouseBulkLoader.class);
-            stmt = con.prepareStatement(buildInsertStatement());
-            for (String[] record : pendingRecords) {
-                bindRecord(stmt, record);
-                stmt.addBatch();
-            }
+            List<String> columns = resolveColumnNames(con);
+            validateRecordWidths(columns.size());
 
-            int[] updateCounts = stmt.executeBatch();
-            int rowsInserted = calculateInsertedRows(updateCounts, expectedRows);
+            byte[] payload = buildTsvPayload(columns);
+            stmt = con.prepareStatement(buildInsertStatement(columns));
+            stmt.setBinaryStream(1, new ByteArrayInputStream(payload));
+
+            int rowsInserted = stmt.executeUpdate();
+            if (rowsInserted <= 0) {
+                rowsInserted = expectedRows;
+            }
             ProgressMonitor.setCurrentMessage(" --> records inserted into `" + tableName + "` table: " + rowsInserted);
 
             if (!relaxedMode && rowsInserted != expectedRows) {
@@ -109,43 +115,75 @@ public class ClickHouseBulkLoader {
 
             pendingRecords.clear();
             return rowsInserted;
-        } catch (SQLException exception) {
+        } catch (SQLException | IOException exception) {
             throw new DaoException(exception);
         } finally {
             JdbcUtil.closeAll(ClickHouseBulkLoader.class, con, stmt, null);
         }
     }
 
-    private String buildInsertStatement() {
-        final int columnCount = fieldNames != null ? fieldNames.length : pendingRecords.get(0).length;
-        final String columnsClause = fieldNames == null ? "" : " (" + String.join(",", fieldNames) + ")";
-        final String placeholders = "(" + String.join(",", Collections.nCopies(columnCount, "?")) + ")";
-        return "INSERT INTO " + tableName + columnsClause + " VALUES " + placeholders;
+    private String buildInsertStatement(List<String> columnNames) {
+        final String columnsClause = columnNames.isEmpty() ? "" : " (" + String.join(",", columnNames) + ")";
+        return "INSERT INTO " + tableName + columnsClause + " FORMAT TSVWithNames";
     }
 
-    private void bindRecord(PreparedStatement stmt, String[] record) throws SQLException {
-        final int columnCount = fieldNames != null ? fieldNames.length : record.length;
-        for (int i = 0; i < columnCount; i++) {
-            String value = record[i];
-            if (value == null || "\\N".equals(value)) {
-                stmt.setNull(i + 1, Types.VARCHAR);
-            } else {
-                stmt.setString(i + 1, value);
+    private List<String> resolveColumnNames(Connection con) throws SQLException, DaoException {
+        if (fieldNames != null) {
+            return Arrays.asList(fieldNames);
+        }
+
+        try (PreparedStatement stmt = con.prepareStatement("DESCRIBE TABLE " + tableName);
+             ResultSet rs = stmt.executeQuery()) {
+            List<String> columns = new ArrayList<>();
+            while (rs.next()) {
+                columns.add(rs.getString("name"));
+            }
+            if (columns.isEmpty()) {
+                throw new DaoException("DB Error: unable to resolve columns for `" + tableName + "`.");
+            }
+            return columns;
+        }
+    }
+
+    private void validateRecordWidths(int columnCount) throws DaoException {
+        for (String[] record : pendingRecords) {
+            if (record.length != columnCount) {
+                throw new DaoException("DB Error: record column count (" + record.length + ") does not match expected column count ("
+                    + columnCount + ") for `" + tableName + "`.");
             }
         }
     }
 
-    private int calculateInsertedRows(int[] updateCounts, int expectedRows) {
-        int rowsInserted = 0;
-        for (int count : updateCounts) {
-            if (count == Statement.SUCCESS_NO_INFO) {
-                return expectedRows;
-            }
-            if (count > 0) {
-                rowsInserted += count;
-            }
+    private byte[] buildTsvPayload(List<String> columnNames) throws DaoException, IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        writeRow(buffer, columnNames);
+        for (String[] record : pendingRecords) {
+            writeRow(buffer, record);
         }
-        return rowsInserted;
+        return buffer.toByteArray();
+    }
+
+    private void writeRow(ByteArrayOutputStream buffer, List<String> values) throws IOException {
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                buffer.write('\t');
+            }
+            buffer.write(escapeTsvValue(values.get(i)).getBytes(StandardCharsets.UTF_8));
+        }
+        buffer.write('\n');
+    }
+
+    private void writeRow(ByteArrayOutputStream buffer, String[] values) throws DaoException, IOException {
+        if (values == null) {
+            throw new DaoException("DB Error: encountered null record while preparing bulk insert for `" + tableName + "`.");
+        }
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                buffer.write('\t');
+            }
+            buffer.write(escapeTsvValue(values[i]).getBytes(StandardCharsets.UTF_8));
+        }
+        buffer.write('\n');
     }
 
     public void insertRecord(String... fieldValues) {
@@ -177,5 +215,34 @@ public class ClickHouseBulkLoader {
 
     public void setFieldNames(String[] fieldNames) {
         this.fieldNames = fieldNames;
+    }
+
+    private String escapeTsvValue(String value) {
+        if (value == null || "\\N".equals(value)) {
+            return "\\N";
+        }
+
+        StringBuilder builder = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '\\':
+                    builder.append("\\\\");
+                    break;
+                case '\t':
+                    builder.append("\\t");
+                    break;
+                case '\n':
+                    builder.append("\\n");
+                    break;
+                case '\r':
+                    builder.append("\\r");
+                    break;
+                default:
+                    builder.append(ch);
+                    break;
+            }
+        }
+        return builder.toString();
     }
 }
