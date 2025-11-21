@@ -252,7 +252,13 @@ public class JdbcUtil {
      */
     public static void disableForeignKeyCheck(Connection con) throws SQLException {
         Statement stmt = con.createStatement();
-        stmt.execute("SET FOREIGN_KEY_CHECKS=0");
+        String dbUrl = con.getMetaData().getURL();
+        if (dbUrl != null && dbUrl.startsWith("jdbc:sqlite")) {
+            stmt.execute("PRAGMA foreign_keys = OFF");
+        } else {
+            // MySQL syntax
+            stmt.execute("SET FOREIGN_KEY_CHECKS=0");
+        }
         stmt.close();
     }
 
@@ -263,7 +269,13 @@ public class JdbcUtil {
      */
     public static void enableForeignKeyCheck(Connection con) throws SQLException {
         Statement stmt = con.createStatement();
-        stmt.execute("SET FOREIGN_KEY_CHECKS=1");
+        String dbUrl = con.getMetaData().getURL();
+        if (dbUrl != null && dbUrl.startsWith("jdbc:sqlite")) {
+            stmt.execute("PRAGMA foreign_keys = ON");
+        } else {
+            // MySQL syntax
+            stmt.execute("SET FOREIGN_KEY_CHECKS=1");
+        }
         stmt.close();
     }
 }

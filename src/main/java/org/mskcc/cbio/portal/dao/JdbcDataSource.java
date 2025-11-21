@@ -65,9 +65,14 @@ public class JdbcDataSource extends BasicDataSource {
         this.setDriverClassName(mysqlDriverClassName);
         // Disable this to avoid caching statements
         this.setPoolPreparedStatements(Boolean.valueOf(enablePooling));
-        // this property setting is needed to enable MySQLbulkLoader to load data from a local file
-        // this is set here in case this class is initialized via JdbcUtil (not expected), but is also set in applicationContext resource files.
-        this.addConnectionProperty("allowLoadLocalInfile", "true");
+        // MySQL-specific property for bulk loading - only set for MySQL connections
+        if (connectionURL != null && connectionURL.startsWith("jdbc:mysql")) {
+            this.addConnectionProperty("allowLoadLocalInfile", "true");
+        }
+        // SQLite-specific property - enable foreign key constraints
+        if (connectionURL != null && connectionURL.startsWith("jdbc:sqlite")) {
+            this.addConnectionProperty("foreign_keys", "true");
+        }
         // these values are from the production cbioportal application context for a jndi data source
         this.setMaxTotal(500);
         this.setMaxIdle(30);

@@ -216,6 +216,20 @@
 			<artifactId>mysql-connector-java</artifactId>
 			<version>${mysql_driver.version}</version>
 		</dependency>
+
+		<!-- SQLite JDBC Driver -->
+		<dependency>
+			<groupId>org.xerial</groupId>
+			<artifactId>sqlite-jdbc</artifactId>
+			<version>3.44.1.0</version>
+		</dependency>
+
+		<!-- SQLite Dialect for Hibernate -->
+		<dependency>
+			<groupId>com.github.gwenn</groupId>
+			<artifactId>sqlite-dialect</artifactId>
+			<version>0.1.4</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>

@@ -78,11 +78,26 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
 
-            pstmt = con.prepareStatement
-                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
-                            " VALUES" +
-                            String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
-                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);");
+            // Detect database type from connection URL
+            String dbUrl = con.getMetaData().getURL();
+            boolean isSQLite = (dbUrl != null && dbUrl.startsWith("jdbc:sqlite"));
+
+            String sql;
+            if (isSQLite) {
+                // SQLite UPSERT syntax (requires SQLite 3.24.0+)
+                sql = "INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
+                        " VALUES" +
+                        String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
+                        " ON CONFLICT(`SAMPLE_ID`, `GENETIC_PROFILE_ID`) DO UPDATE SET `PANEL_ID` = excluded.`PANEL_ID`;";
+            } else {
+                // MySQL UPSERT syntax
+                sql = "INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
+                        " VALUES" +
+                        String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
+                        " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);";
+            }
+
+            pstmt = con.prepareStatement(sql);
             int parameterIndex = 1;
             for (SampleProfileTuple idTuple : idTuples) {
                 pstmt.setInt(parameterIndex++, idTuple.sampleId());
