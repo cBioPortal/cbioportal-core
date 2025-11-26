@@ -152,16 +152,27 @@ public class DaoSample {
         Connection con = null;
         PreparedStatement pstmt = null;
         try {
-            con = JdbcUtil.getDbConnection(DaoSample.class);
             long internalId = ClickHouseAutoIncrement.nextId(SAMPLE_SEQUENCE);
-            pstmt = con.prepareStatement("INSERT INTO sample " +
-                                         "( `internal_id`, `stable_id`, `sample_type`, `patient_id` ) " +
-                                         "VALUES (?,?,?,?)");
-            pstmt.setLong(1, internalId);
-            pstmt.setString(2, sample.getStableId());
-            pstmt.setString(3, sample.getType().toString());
-            pstmt.setInt(4, sample.getInternalPatientId());
-            pstmt.executeUpdate();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("sample");
+                loader.setFieldNames(new String[]{"internal_id", "stable_id", "sample_type", "patient_id"});
+                loader.insertRecord(
+                    Long.toString(internalId),
+                    sample.getStableId(),
+                    sample.getType().toString(),
+                    Integer.toString(sample.getInternalPatientId())
+                );
+            } else {
+                con = JdbcUtil.getDbConnection(DaoSample.class);
+                pstmt = con.prepareStatement("INSERT INTO sample " +
+                                             "( `internal_id`, `stable_id`, `sample_type`, `patient_id` ) " +
+                                             "VALUES (?,?,?,?)");
+                pstmt.setLong(1, internalId);
+                pstmt.setString(2, sample.getStableId());
+                pstmt.setString(3, sample.getType().toString());
+                pstmt.setInt(4, sample.getInternalPatientId());
+                pstmt.executeUpdate();
+            }
             cacheSample(new Sample((int) internalId, sample.getStableId(),
                     sample.getInternalPatientId()));
             return (int) internalId;

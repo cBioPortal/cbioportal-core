@@ -117,13 +117,23 @@ public class DaoPatient {
         Connection con = null;
         PreparedStatement pstmt = null;
         try {
-            con = JdbcUtil.getDbConnection(DaoPatient.class);
             long internalId = ClickHouseAutoIncrement.nextId(PATIENT_SEQUENCE);
-            pstmt = con.prepareStatement("INSERT INTO patient (`internal_id`, `stable_id`, `cancer_study_id`) VALUES (?,?,?)");
-            pstmt.setLong(1, internalId);
-            pstmt.setString(2, patient.getStableId());
-            pstmt.setInt(3, patient.getCancerStudy().getInternalId());
-            pstmt.executeUpdate();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("patient");
+                loader.setFieldNames(new String[]{"internal_id", "stable_id", "cancer_study_id"});
+                loader.insertRecord(
+                    Long.toString(internalId),
+                    patient.getStableId(),
+                    Integer.toString(patient.getCancerStudy().getInternalId())
+                );
+            } else {
+                con = JdbcUtil.getDbConnection(DaoPatient.class);
+                pstmt = con.prepareStatement("INSERT INTO patient (`internal_id`, `stable_id`, `cancer_study_id`) VALUES (?,?,?)");
+                pstmt.setLong(1, internalId);
+                pstmt.setString(2, patient.getStableId());
+                pstmt.setInt(3, patient.getCancerStudy().getInternalId());
+                pstmt.executeUpdate();
+            }
             cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), (int) internalId),
                     patient.getCancerStudy().getInternalId());
             return (int) internalId;

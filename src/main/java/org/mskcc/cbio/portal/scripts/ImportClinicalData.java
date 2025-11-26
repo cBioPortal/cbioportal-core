@@ -499,6 +499,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         	//in case of PATIENT data import, there are some special checks:
         	if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES) {
         		//if clinical data is already there, then something has gone wrong (e.g. patient is duplicated in file), abort:
+                //TODO we migth want to optimize this for ClickHouse
         		if (patient != null && DaoClinicalData.getDataByPatientId(cancerStudy.getInternalId(), patientId).size() > 0) {
         			throw new RuntimeException("Something has gone wrong. Patient " + patientId + " already has clinical data loaded.");
         		}
