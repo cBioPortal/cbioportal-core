@@ -525,6 +525,9 @@ public class ImportClinicalData extends ConsoleRunnable {
                 internalPatientId = DaoPatient.addPatient(patient);
             }
         }
+        if (internalPatientId % 1000 == 0) {
+            ProgressMonitor.logWarning("Added/Found patient: " + patientId + " (internal id: " + internalPatientId + ")");
+        }
         return internalPatientId;
     }
 
@@ -558,6 +561,9 @@ public class ImportClinicalData extends ConsoleRunnable {
             }
         }
 
+        if (internalSampleId % 1000 == 0) {
+            ProgressMonitor.logWarning("Added sample: " + sampleId + " (internal id: " + internalSampleId + ")");
+        }
         return internalSampleId;
     }
 
