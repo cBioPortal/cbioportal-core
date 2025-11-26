@@ -153,9 +153,9 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             ClickHouseBulkLoader.bulkLoadOn();
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
+            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
             ClickHouseBulkLoader.flushAll();
             ClickHouseBulkLoader.bulkLoadOff();
-            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
         } catch (RuntimeException e) {
             throw e;
         } catch (IOException|DaoException e) {
