@@ -149,6 +149,9 @@ public class ImportExtendedMutationData {
         HashSet <String> sequencedCaseSet = new HashSet<String>();
 
         Map<MutationEvent,MutationEvent> existingEvents = new HashMap<MutationEvent,MutationEvent>();
+        for(MutationEvent mutationEvent: DaoMutation.getAllMutationEvents()) {
+            existingEvents.put(mutationEvent, mutationEvent);
+        }
         Set<MutationEvent> newEvents = new HashSet<MutationEvent>();
 
         Map<ExtendedMutation,ExtendedMutation> mutations = new HashMap<ExtendedMutation,ExtendedMutation>();
@@ -438,10 +441,7 @@ public class ImportExtendedMutationData {
 
                     //  Filter out Mutations
                     if( myMutationFilter.acceptMutation( mutation, this.filteredMutations )) {
-                        MutationEvent event =
-                            existingEvents.containsKey(mutation.getEvent()) ?
-                            existingEvents.get(mutation.getEvent()) :
-                            DaoMutation.getMutationEvent(mutation.getEvent());
+                        MutationEvent event = existingEvents.get(mutation.getEvent());
                         if (event!=null) {
                             mutation.setEvent(event);
                         } else {
