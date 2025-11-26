@@ -149,9 +149,11 @@ public class ImportExtendedMutationData {
         HashSet <String> sequencedCaseSet = new HashSet<String>();
 
         Map<MutationEvent,MutationEvent> existingEvents = new HashMap<MutationEvent,MutationEvent>();
+        ProgressMonitor.logWarning("Starting to load existing mutation events...");
         for(MutationEvent mutationEvent: DaoMutation.getAllMutationEvents()) {
             existingEvents.put(mutationEvent, mutationEvent);
         }
+        ProgressMonitor.logWarning("Loaded " + existingEvents.size() + " existing mutation events.");
         Set<MutationEvent> newEvents = new HashSet<MutationEvent>();
 
         Map<ExtendedMutation,ExtendedMutation> mutations = new HashMap<ExtendedMutation,ExtendedMutation>();
