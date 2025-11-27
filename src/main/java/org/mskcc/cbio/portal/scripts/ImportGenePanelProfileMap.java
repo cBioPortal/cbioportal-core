@@ -36,6 +36,7 @@ import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoGenePanel;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
@@ -167,6 +168,9 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
         // Loop over gene panel matrix and load into database
         ProgressMonitor.setCurrentMessage("Loading gene panel profile matrix data to database..");
         String row;
+        Set<DaoSampleProfile.SampleProfileTuple> sampleProfileTuples = new HashSet<>();
+        ClickHouseBulkLoader.bulkLoadOn();
+        ProgressMonitor.logWarning("Reading gene panel profile file line by line.");
         while((row = buff.readLine()) != null) {
             List<String> row_data = new LinkedList<>(Arrays.asList(row.split("\t")));
             
@@ -179,7 +183,6 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
             row_data.remove((int)sampleIdIndex);
 
 
-            Set<DaoSampleProfile.SampleProfileTuple> sampleProfileTuples = new HashSet<>();
             // Loop over the values in the row
             for (int i = 0; i < row_data.size(); i++) {
                 String genePanelName = row_data.get(i);
@@ -197,20 +200,24 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
 
                 sampleProfileTuples.add(new DaoSampleProfile.SampleProfileTuple(geneticProfileId, sampleInternalId, genePanelId));
             }
-
-            DaoSampleProfile.upsertSampleToProfileMapping(sampleProfileTuples);
         }
+        ProgressMonitor.logWarning("Upserting sample to profile mappings into database.");
+        DaoSampleProfile.upsertSampleToProfileMapping(sampleProfileTuples);
 
         // update mutation counts with the latest sequencing information after the sample profile upsert
         // deals with issue where mutation counts are missing due to sample profile not yet updated at the time of
         // the first mutation count calculation during the mutation import
         ProgressMonitor.setCurrentMessage("Updating mutation counts in database..");
+        ProgressMonitor.logWarning("Updating mutation counts for genetic profiles.");
         for (int i = 0; i < profileIds.size(); i++) {
             GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(profileIds.get(i));
             if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MUTATION_EXTENDED) {
                 DaoMutation.createMutationCountClinicalData(geneticProfile);
             }
         }
+        ProgressMonitor.logWarning("Flushing ClickHouse bulk loader.");
+        ClickHouseBulkLoader.flushAll();
+        ProgressMonitor.logWarning("Finished updating mutation counts for genetic profiles.");
     }
 
     private List<String> getProfilesLine(BufferedReader buff) throws Exception {

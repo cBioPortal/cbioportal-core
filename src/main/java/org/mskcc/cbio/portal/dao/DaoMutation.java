@@ -192,7 +192,6 @@ public final class DaoMutation {
                 "ALTER TABLE clinical_sample "
                     + "DELETE WHERE attr_id = 'mutation_count' "
                     + "AND internal_id IN (SELECT sample_id FROM sample_profile WHERE genetic_profile_id = ?) "
-                    + "SETTINGS mutations_sync=2"
             );
             deleteStmt.setInt(1, geneticProfile.getGeneticProfileId());
             deleteStmt.executeUpdate();
