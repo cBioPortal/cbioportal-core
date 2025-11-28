@@ -401,6 +401,9 @@ public final class DaoClinicalData {
         Connection con = null;
         PreparedStatement pstmt = null;
         try {
+            if (sampleInternalIds.isEmpty()) {
+                return;
+            }
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
             pstmt = con.prepareStatement("DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE
                     + " WHERE `attr_id` = ? AND `internal_id` IN ("
