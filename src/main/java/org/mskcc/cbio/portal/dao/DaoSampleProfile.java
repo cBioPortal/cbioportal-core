@@ -143,12 +143,6 @@ public final class DaoSampleProfile {
         }
     }
 
-    private static void bindDelete(PreparedStatement deleteStmt, SampleProfileTuple idTuple) throws SQLException {
-        deleteStmt.setInt(1, idTuple.sampleId());
-        deleteStmt.setInt(2, idTuple.geneticProfileId());
-        deleteStmt.addBatch();
-    }
-
     private static void bindInsert(PreparedStatement insertStmt, SampleProfileTuple idTuple) throws SQLException {
         insertStmt.setInt(1, idTuple.sampleId());
         insertStmt.setInt(2, idTuple.geneticProfileId());
