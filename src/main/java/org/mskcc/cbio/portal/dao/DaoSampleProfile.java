@@ -43,6 +43,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,7 +85,7 @@ public final class DaoSampleProfile {
         Connection con = null;
         PreparedStatement insertStmt = null;
         try {
-            //batchDeleteSampleProfileMappings(idTuples);
+            deleteSampleProfileMappings(idTuples);
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             insertStmt = con.prepareStatement(
                 "INSERT INTO sample_profile (`sample_id`, `genetic_profile_id`, `panel_id`) VALUES (?,?,?)");
@@ -106,7 +107,7 @@ public final class DaoSampleProfile {
     }
 
     private static void upsertWithBulkLoader(Collection<SampleProfileTuple> idTuples) throws DaoException {
-        //batchDeleteSampleProfileMappings(idTuples);
+        deleteSampleProfileMappings(idTuples);
 
         ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("sample_profile");
         loader.setFieldNames(new String[]{"sample_id", "genetic_profile_id", "panel_id"});
@@ -119,23 +120,22 @@ public final class DaoSampleProfile {
         }
     }
 
-    private static void batchDeleteSampleProfileMappings(Collection<SampleProfileTuple> idTuples) throws DaoException {
+    private static void deleteSampleProfileMappings(Collection<SampleProfileTuple> idTuples) throws DaoException {
         Connection con = null;
         PreparedStatement deleteStmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
+            String tuplePlaceholders = String.join(",", Collections.nCopies(idTuples.size(), "(?,?)"));
             deleteStmt = con.prepareStatement(
-                "ALTER TABLE sample_profile DELETE WHERE sample_id = ? AND genetic_profile_id = ? "
+                    "ALTER TABLE sample_profile "
+                            + "DELETE WHERE (sample_id, genetic_profile_id) IN (" + tuplePlaceholders + ") "
             );
-
-            int batchCount = 0;
+            int parameterIndex = 1;
             for (SampleProfileTuple idTuple : idTuples) {
-                bindDelete(deleteStmt, idTuple);
-                if (++batchCount % UPSERT_BATCH_SIZE == 0) {
-                    deleteStmt.executeBatch();
-                }
+                deleteStmt.setInt(parameterIndex++, idTuple.sampleId());
+                deleteStmt.setInt(parameterIndex++, idTuple.geneticProfileId());
             }
-            deleteStmt.executeBatch();
+            deleteStmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
