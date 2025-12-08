@@ -121,9 +121,6 @@ public class ImportGenericAssayPatientLevelData {
                     sampleCount += samples.size();
                 }
             }
-            Integer genePanelID = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
-            DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelID);
-
             ProgressMonitor.setCurrentMessage(" --> total number of data lines:  " + (numLines-1));
             
             DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);

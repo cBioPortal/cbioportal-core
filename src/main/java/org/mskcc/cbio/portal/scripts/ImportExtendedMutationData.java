@@ -43,7 +43,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
 import org.mskcc.cbio.portal.model.CancerStudy;
@@ -476,7 +475,6 @@ public class ImportExtendedMutationData {
                 }
             }
         }
-        DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
 
         for (MutationEvent event : newEvents) {
             try {
@@ -613,7 +611,6 @@ public class ImportExtendedMutationData {
             }
             line = buffer.readLine().trim();
         }
-        DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
         return line;
     }
 

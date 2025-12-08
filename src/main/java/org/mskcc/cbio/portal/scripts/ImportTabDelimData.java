@@ -39,7 +39,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneset;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -388,7 +387,6 @@ public class ImportTabDelimData {
 
                 line = buf.readLine();
             }
-            DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
             geneticAlterationImporter.finalize();
             if (ClickHouseBulkLoader.isBulkLoad()) {
                 ClickHouseBulkLoader.flushAll();

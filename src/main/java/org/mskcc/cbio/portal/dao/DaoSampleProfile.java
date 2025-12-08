@@ -43,7 +43,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,12 +61,6 @@ public final class DaoSampleProfile {
     private static final int NO_SUCH_PROFILE_ID = -1;
     private static final int UPSERT_BATCH_SIZE = 1_000;
 
-    public static void upsertSampleToProfileMapping(Collection<Integer> sampleIds, Integer geneticProfileId, Integer panelId) throws DaoException {
-        upsertSampleToProfileMapping(
-                sampleIds.stream()
-                        .map(sampleId -> new SampleProfileTuple(geneticProfileId, sampleId, panelId)).toList());
-    }
-
     public record SampleProfileTuple(int geneticProfileId, int sampleId, Integer panelId) {}
 
     public static void upsertSampleToProfileMapping(Collection<SampleProfileTuple> idTuples) throws DaoException {
@@ -85,7 +78,6 @@ public final class DaoSampleProfile {
         Connection con = null;
         PreparedStatement insertStmt = null;
         try {
-            deleteSampleProfileMappings(idTuples);
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             insertStmt = con.prepareStatement(
                 "INSERT INTO sample_profile (`sample_id`, `genetic_profile_id`, `panel_id`) VALUES (?,?,?)");
@@ -107,8 +99,6 @@ public final class DaoSampleProfile {
     }
 
     private static void upsertWithBulkLoader(Collection<SampleProfileTuple> idTuples) throws DaoException {
-        deleteSampleProfileMappings(idTuples);
-
         ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("sample_profile");
         loader.setFieldNames(new String[]{"sample_id", "genetic_profile_id", "panel_id"});
         for (SampleProfileTuple idTuple : idTuples) {
@@ -117,29 +107,6 @@ public final class DaoSampleProfile {
                 Integer.toString(idTuple.geneticProfileId()),
                 idTuple.panelId() != null ? Integer.toString(idTuple.panelId()) : null
             );
-        }
-    }
-
-    private static void deleteSampleProfileMappings(Collection<SampleProfileTuple> idTuples) throws DaoException {
-        Connection con = null;
-        PreparedStatement deleteStmt = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            String tuplePlaceholders = String.join(",", Collections.nCopies(idTuples.size(), "(?,?)"));
-            deleteStmt = con.prepareStatement(
-                    "ALTER TABLE sample_profile "
-                            + "DELETE WHERE (sample_id, genetic_profile_id) IN (" + tuplePlaceholders + ") "
-            );
-            int parameterIndex = 1;
-            for (SampleProfileTuple idTuple : idTuples) {
-                deleteStmt.setInt(parameterIndex++, idTuple.sampleId());
-                deleteStmt.setInt(parameterIndex++, idTuple.geneticProfileId());
-            }
-            deleteStmt.executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoSampleProfile.class, con, deleteStmt, null);
         }
     }
 
