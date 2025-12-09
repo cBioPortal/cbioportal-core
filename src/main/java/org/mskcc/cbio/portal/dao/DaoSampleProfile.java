@@ -36,6 +36,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -58,6 +60,7 @@ public final class DaoSampleProfile {
      * Can use the bulk loader.
      */
     private DaoSampleProfile() {}
+    private final static Logger logger = LoggerFactory.getLogger(DaoSampleProfile.class);
 
     private static final int NO_SUCH_PROFILE_ID = -1;
     private static final int UPSERT_BATCH_SIZE = 1_000;
@@ -71,6 +74,9 @@ public final class DaoSampleProfile {
     public record SampleProfileTuple(int geneticProfileId, int sampleId, Integer panelId) {}
 
     public static void upsertSampleToProfileMapping(Collection<SampleProfileTuple> idTuples) throws DaoException {
+        long ts = System.currentTimeMillis();
+        System.out.println(ts + " milliseconds: Upserting " + idTuples.size() + " sample_profile mappings");
+        logger.info(ts + " milliseconds: Upserting " + idTuples.size() + " sample_profile mappings");
         if (idTuples.isEmpty()) {
             return;
         }
@@ -79,6 +85,8 @@ public final class DaoSampleProfile {
             return;
         }
         upsertWithJdbcBatch(idTuples);
+        System.out.println(System.currentTimeMillis() - ts + " milliseconds: Finished upserting sample_profile mappings");
+        logger.info(System.currentTimeMillis() - ts + " milliseconds: Finished upserting sample_profile mappings");
     }
 
     private static void upsertWithJdbcBatch(Collection<SampleProfileTuple> idTuples) throws DaoException {
@@ -121,6 +129,9 @@ public final class DaoSampleProfile {
     }
 
     private static void deleteSampleProfileMappings(Collection<SampleProfileTuple> idTuples) throws DaoException {
+        long ts = System.currentTimeMillis();
+        System.out.println(ts + "milliseconds: Deleting existing sample_profile mappings for " + idTuples.size() + " tuples");
+        logger.info(ts + "milliseconds: Deleting existing sample_profile mappings for " + idTuples.size() + " tuples");
         Connection con = null;
         PreparedStatement deleteStmt = null;
         try {
@@ -141,6 +152,8 @@ public final class DaoSampleProfile {
         } finally {
             JdbcUtil.closeAll(DaoSampleProfile.class, con, deleteStmt, null);
         }
+        System.out.println(System.currentTimeMillis() - ts + " milliseconds: Finished deleting existing sample_profile mappings");
+        logger.info(System.currentTimeMillis() - ts + " milliseconds: Finished deleting existing sample_profile mappings");
     }
 
     private static void bindInsert(PreparedStatement insertStmt, SampleProfileTuple idTuple) throws SQLException {
