@@ -40,11 +40,11 @@ import org.mskcc.cbio.portal.model.*;
 public final class DaoAlleleSpecificCopyNumber {
 
     public static int addAlleleSpecificCopyNumber(AlleleSpecificCopyNumber ascn) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert allele specific copy numbers");
+        if (!SQLiteBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on SQLiteBulkLoader in order to insert allele specific copy numbers");
         } else {
             int result = 1;
-            MySQLbulkLoader.getMySQLbulkLoader("allele_specific_copy_number").insertRecord(
+            SQLiteBulkLoader.getSQLiteBulkLoader("allele_specific_copy_number").insertRecord(
                 resolveValueToString(ascn.getMutationEventId()),
                 resolveValueToString(ascn.getGeneticProfileId()),
                 resolveValueToString(ascn.getSampleId()),

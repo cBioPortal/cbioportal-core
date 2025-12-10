@@ -35,7 +35,7 @@ package org.mskcc.cbio.portal.scripts;
 import org.mskcc.cbio.portal.dao.DaoCosmicData;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CosmicMutationFrequency;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
@@ -73,7 +73,7 @@ public class ImportCosmicData {
         // Pattern: must have gene, strand, cds, aa and cnt in any order, with other strings possibly in between.
         Pattern p = Pattern.compile("(?=.*GENE=[^;]+.*)(?=.*STRAND=(.).*)(?=.*CDS=[^;]+.*)(?=.*AA=p\\.[^;]+.*)(?=.*CNT=[0-9]+.*)");
         Pattern id_pat = Pattern.compile("(?=.*LEGACY_ID=[^;]+.*)");
-        MySQLbulkLoader.bulkLoadOn();
+        SQLiteBulkLoader.bulkLoadOn();
         FileReader reader = new FileReader(file);
         BufferedReader buf = new BufferedReader(reader);
         String line;
@@ -152,8 +152,8 @@ public class ImportCosmicData {
             }
         }
         buf.close();
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
+        if (SQLiteBulkLoader.isBulkLoad()) {
+            SQLiteBulkLoader.flushAll();
         }
     }
 

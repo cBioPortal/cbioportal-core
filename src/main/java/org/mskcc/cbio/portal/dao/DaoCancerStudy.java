@@ -37,6 +37,7 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CancerStudyTags;
 import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.model.TypeOfCancer;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -48,6 +49,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -502,6 +504,11 @@ public final class DaoCancerStudy {
 
     /**
      * Deletes a cancer study by internal id from db with foreign key constraints enforced.
+     * Implements deferred index recreation for performance:
+     * 1. Saves all index definitions
+     * 2. Drops all indexes
+     * 3. Performs deletion (fast without index maintenance)
+     * 4. Recreates all indexes
      * @param internalCancerStudyId
      * @throws DaoException
      */
@@ -509,8 +516,48 @@ public final class DaoCancerStudy {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
+        Statement stmt = null;
+        List<String> savedIndexDefinitions = new ArrayList<>();
+        long startTime = System.currentTimeMillis();
+
         try {
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
+            stmt = con.createStatement();
+
+            // PHASE 1: Save all index definitions from sqlite_master
+            ProgressMonitor.setCurrentMessage(" --> Saving index definitions before study deletion...");
+            rs = stmt.executeQuery(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
+            );
+            while (rs.next()) {
+                String indexDef = rs.getString("sql");
+                if (indexDef != null && !indexDef.isEmpty()) {
+                    savedIndexDefinitions.add(indexDef);
+                }
+            }
+            rs.close();
+            ProgressMonitor.setCurrentMessage(" --> Saved " + savedIndexDefinitions.size() + " index definitions");
+
+            // PHASE 2: Drop all indexes
+            ProgressMonitor.setCurrentMessage(" --> Dropping indexes for faster deletion...");
+            int droppedCount = 0;
+            for (String indexDef : savedIndexDefinitions) {
+                String indexName = extractIndexName(indexDef);
+                if (indexName != null) {
+                    try {
+                        stmt.execute("DROP INDEX IF EXISTS " + indexName);
+                        droppedCount++;
+                    } catch (SQLException e) {
+                        // Log warning but continue - some indexes might not exist
+                        System.err.println("Warning: Could not drop index " + indexName + ": " + e.getMessage());
+                    }
+                }
+            }
+            ProgressMonitor.setCurrentMessage(" --> Dropped " + droppedCount + " indexes");
+
+            // PHASE 3: Perform deletion (fast without index maintenance)
+            long deleteStartTime = System.currentTimeMillis();
+            ProgressMonitor.setCurrentMessage(" --> Deleting study data without indexes...");
             pstmt = con.prepareStatement("DELETE FROM cancer_study WHERE cancer_study_id = ?");
             pstmt.setInt(1, internalCancerStudyId);
             int rows = pstmt.executeUpdate();
@@ -519,14 +566,75 @@ public final class DaoCancerStudy {
                 throw new DaoException("deleteCancerStudyByCascade() failed: No rows affected");
             }
             removeCancerStudyFromCache(internalCancerStudyId);
+            long deleteTime = System.currentTimeMillis() - deleteStartTime;
+            ProgressMonitor.setCurrentMessage(" --> Study deletion completed in " + (deleteTime / 1000) + " seconds");
+
+            // PHASE 4: Recreate all indexes
+            ProgressMonitor.setCurrentMessage(" --> Recreating indexes...");
+            long indexStartTime = System.currentTimeMillis();
+            int recreatedCount = 0;
+            for (String indexDef : savedIndexDefinitions) {
+                try {
+                    stmt.execute(indexDef);
+                    recreatedCount++;
+                } catch (SQLException e) {
+                    // Log warning but continue
+                    System.err.println("Warning: Could not recreate index: " + indexDef);
+                    System.err.println("Error: " + e.getMessage());
+                }
+            }
+            long indexTime = System.currentTimeMillis() - indexStartTime;
+            ProgressMonitor.setCurrentMessage(" --> Recreated " + recreatedCount + " indexes in " + (indexTime / 1000) + " seconds");
+
+            long totalTime = System.currentTimeMillis() - startTime;
+            ProgressMonitor.setCurrentMessage(" --> Total deletion time: " + (totalTime / 1000) + " seconds (delete: " +
+                (deleteTime / 1000) + "s, indexes: " + (indexTime / 1000) + "s)");
+
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    // ignore
+                }
+            }
             JdbcUtil.closeAll(DaoCancerStudy.class, con, pstmt, rs);
         }
         purgeUnreferencedRecordsAfterDeletionOfStudy();
         reCacheAll();
         System.out.println("deleted study:\nID: "+internalCancerStudyId);
+    }
+
+    /**
+     * Extract index name from a CREATE INDEX SQL statement.
+     * Example: "CREATE INDEX `idx_name` ON table ..." -> "idx_name"
+     * @param createIndexSql the CREATE INDEX SQL statement
+     * @return the index name without backticks
+     */
+    private static String extractIndexName(String createIndexSql) {
+        if (createIndexSql == null || createIndexSql.isEmpty()) {
+            return null;
+        }
+
+        // Pattern: CREATE INDEX `index_name` or CREATE INDEX index_name
+        String[] parts = createIndexSql.split("\\s+");
+        for (int i = 0; i < parts.length - 1; i++) {
+            if (parts[i].equalsIgnoreCase("INDEX")) {
+                String indexName = parts[i + 1];
+                // Remove backticks if present
+                indexName = indexName.replace("`", "");
+                // Remove anything after the index name (e.g., "ON")
+                int onIndex = indexName.indexOf("ON");
+                if (onIndex > 0) {
+                    indexName = indexName.substring(0, onIndex).trim();
+                }
+                return indexName;
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -134,7 +134,7 @@ public class ImportCaisesClinicalXML extends ConsoleRunnable {
     }
     
     public void importData() throws Exception {
-        MySQLbulkLoader.bulkLoadOn();
+        SQLiteBulkLoader.bulkLoadOn();
         
         // add unknow attriutes -- this 
         for (ClinicalAttribute ca : getClinicalAttributes(cancerStudyId)) {
@@ -200,7 +200,7 @@ public class ImportCaisesClinicalXML extends ConsoleRunnable {
             }
         }
         
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
     }
     
     private static Map<String, String> getMapSu2cSampleIdSampleId(int cancerStudyId) throws DaoException {

@@ -110,8 +110,8 @@ public final class DaoClinicalData {
     public static int addDatum(String query, String tableName,
                                int internalId, String attrId, String attrVal) throws DaoException
     {
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.getMySQLbulkLoader(tableName).insertRecord(Integer.toString(internalId),
+        if (SQLiteBulkLoader.isBulkLoad()) {
+            SQLiteBulkLoader.getSQLiteBulkLoader(tableName).insertRecord(Integer.toString(internalId),
                 attrId,
                 attrVal);
             return 1;

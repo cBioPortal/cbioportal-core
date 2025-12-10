@@ -68,9 +68,9 @@ public class DaoMutSig {
 
         CanonicalGene gene = mutSig.getCanonicalGene();
         
-        if (MySQLbulkLoader.isBulkLoad()) {
-                //  write to the temp file maintained by the MySQLbulkLoader
-                MySQLbulkLoader.getMySQLbulkLoader("mut_sig").insertRecord(Integer.toString(mutSig.getCancerType()),
+        if (SQLiteBulkLoader.isBulkLoad()) {
+                //  write to the temp file maintained by the SQLiteBulkLoader
+                SQLiteBulkLoader.getSQLiteBulkLoader("mut_sig").insertRecord(Integer.toString(mutSig.getCancerType()),
                         Long.toString(gene.getEntrezGeneId()),
                         Integer.toString(mutSig.getRank()),
                         Integer.toString(mutSig.getNumBasesCovered()),

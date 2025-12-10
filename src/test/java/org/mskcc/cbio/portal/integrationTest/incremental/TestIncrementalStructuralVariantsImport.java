@@ -27,7 +27,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -90,7 +90,7 @@ public class TestIncrementalStructuralVariantsImport {
         structuralVariant.setSite2RegionNumber(2);
         structuralVariant.setComments("This record has to be overwritten");
         DaoStructuralVariant.addStructuralVariantToBulkLoader(structuralVariant);
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
         DaoSampleProfile.upsertSampleToProfileMapping(List.of(
                 new DaoSampleProfile.SampleProfileTuple(svGeneticProfile.getGeneticProfileId(), svDataSample.getInternalId(), null)));
 

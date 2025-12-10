@@ -50,18 +50,14 @@ public final class DaoCopyNumberSegmentFile {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegmentFile.class);
             pstmt = con.prepareStatement
-                    ("INSERT INTO copy_number_seg_file (`CANCER_STUDY_ID`, `REFERENCE_GENOME_ID`, `DESCRIPTION`,`FILENAME`)"
-                     + " VALUES (?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
+                    ("INSERT INTO copy_number_seg_file (CANCER_STUDY_ID, REFERENCE_GENOME_ID, DESCRIPTION, FILENAME)"
+                     + " VALUES (?,?,?,?)");
             pstmt.setInt(1, copySegFile.cancerStudyId);
             pstmt.setString(2, copySegFile.referenceGenomeId.toString());
             pstmt.setString(3, copySegFile.description);
             pstmt.setString(4, copySegFile.filename);
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-            return -1;
+            return JdbcUtil.getInsertedId(pstmt, con);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {

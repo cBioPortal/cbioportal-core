@@ -72,8 +72,8 @@ public class DaoGeneset {
             
             con = JdbcUtil.getDbConnection(DaoGeneset.class);
             pstmt = con.prepareStatement("INSERT INTO geneset " 
-                    + "(`GENETIC_ENTITY_ID`, `EXTERNAL_ID`, `NAME`, `DESCRIPTION`, `REF_LINK`) "
-                    + "VALUES(?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
+                    + "(GENETIC_ENTITY_ID, EXTERNAL_ID, NAME, DESCRIPTION, REF_LINK) "
+                    + "VALUES(?,?,?,?,?)");
             pstmt.setInt(1, geneset.getGeneticEntityId());
             pstmt.setString(2, geneset.getExternalId());
             pstmt.setString(3, geneset.getName());
@@ -81,9 +81,7 @@ public class DaoGeneset {
             pstmt.setString(5, geneset.getRefLink());
             pstmt.executeUpdate();
             //get the auto generated key:
-            rs = pstmt.getGeneratedKeys();
-            rs.next();
-            int newId = rs.getInt(1);
+            int newId = JdbcUtil.getInsertedId(pstmt, con);
             geneset.setId(newId);
             
             return geneset;
@@ -97,7 +95,7 @@ public class DaoGeneset {
     }
     
     /**
-     * Prepares a list of Gene records from Geneset object to be added to database via MySQLbulkLoader.
+     * Prepares a list of Gene records from Geneset object to be added to database via SQLiteBulkLoader.
      * @param geneset
      * @return number of records where entrez gene id is found in db
      */
@@ -115,8 +113,8 @@ public class DaoGeneset {
                 continue;
             }
             // use this code if bulk loading
-            // write to the temp file maintained by the MySQLbulkLoader
-            MySQLbulkLoader.getMySQLbulkLoader("geneset_gene").insertRecord(
+            // write to the temp file maintained by the SQLiteBulkLoader
+            SQLiteBulkLoader.getSQLiteBulkLoader("geneset_gene").insertRecord(
                     Integer.toString(geneset.getId()),
                     Long.toString(entrezGeneId));
             rows ++;

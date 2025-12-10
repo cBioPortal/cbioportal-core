@@ -34,7 +34,7 @@ package org.mskcc.cbio.portal.util;
 
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.MutSig;
 
@@ -64,7 +64,7 @@ public class MutSigReader {
      */
     public static int loadMutSig(int internalId, File mutSigFile) throws IOException, DaoException {
         int loadedMutSigs = 0;
-        MySQLbulkLoader.bulkLoadOff();
+        SQLiteBulkLoader.bulkLoadOff();
         FileReader reader = new FileReader(mutSigFile);
         BufferedReader buf = new BufferedReader(reader);
         try {

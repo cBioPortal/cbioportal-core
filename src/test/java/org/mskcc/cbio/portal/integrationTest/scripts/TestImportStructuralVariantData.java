@@ -40,7 +40,7 @@ import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.StructuralVariant;
 import org.mskcc.cbio.portal.scripts.ImportStructuralVariantData;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -93,7 +93,7 @@ public class TestImportStructuralVariantData {
         File file = new File("src/test/resources/data_structural_variants.txt");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, noNamespaces, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
 
         List<StructuralVariant> structuralVariants = DaoStructuralVariant.getAllStructuralVariants();
         assertEquals("KIAA1549-BRAF.K16B10.COSF509_2", structuralVariants.get(0).getSite2Description());
@@ -135,7 +135,7 @@ public class TestImportStructuralVariantData {
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
 
         List<StructuralVariant> all = DaoStructuralVariant
             .getAllStructuralVariants();
@@ -161,7 +161,7 @@ public class TestImportStructuralVariantData {
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
 
         List<StructuralVariant> all = DaoStructuralVariant
             .getAllStructuralVariants();
@@ -184,7 +184,7 @@ public class TestImportStructuralVariantData {
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
 
         List<StructuralVariant> all = DaoStructuralVariant
             .getAllStructuralVariants();

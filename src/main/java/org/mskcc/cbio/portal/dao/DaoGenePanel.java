@@ -140,12 +140,12 @@ public class DaoGenePanel {
             pstmt.setString(1, stableId);
             pstmt.setString(2, description);
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                addGenePanelGeneList(rs.getInt(1), canonicalGenes);
+            int newId = JdbcUtil.getInsertedId(pstmt, con);
+            if (newId != -1) {
+                addGenePanelGeneList(con, newId, canonicalGenes);
                 // add panel to class map
                 GenePanel gp = new GenePanel();
-                gp.setInternalId(rs.getInt(1));
+                gp.setInternalId(newId);
                 gp.setStableId(stableId);
                 gp.setDescription(description);
                 gp.setGenes(canonicalGenes);
@@ -158,22 +158,18 @@ public class DaoGenePanel {
         }
     }
 
-    private static void addGenePanelGeneList(Integer internalId, Set<CanonicalGene> canonicalGenes)
+    private static void addGenePanelGeneList(Connection con, Integer internalId, Set<CanonicalGene> canonicalGenes)
         throws DaoException {
-        Connection con = null;
         PreparedStatement pstmt = null;
         try {
-            con = JdbcUtil.getDbConnection(DaoGenePanel.class);
             for (CanonicalGene canonicalGene : canonicalGenes) {
-                pstmt = con.prepareStatement("INSERT INTO gene_panel_list (`INTERNAL_ID`, `GENE_ID`) VALUES (?,?)");
+                pstmt = con.prepareStatement("INSERT INTO gene_panel_list (INTERNAL_ID, GENE_ID) VALUES (?,?)");
                 pstmt.setInt(1, internalId);
                 pstmt.setLong(2, canonicalGene.getEntrezGeneId());
                 pstmt.executeUpdate();
             }
         } catch (SQLException e) {
             throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoGenePanel.class, con, pstmt, null);
         }
     }
 

@@ -71,8 +71,8 @@ public final class DaoMutation {
     private static final String DELETE_MUTATION = "DELETE from mutation WHERE GENETIC_PROFILE_ID=? and SAMPLE_ID=?";
 
     public static int addMutation(ExtendedMutation mutation, boolean newMutationEvent) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert mutations");
+        if (!SQLiteBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on SQLiteBulkLoader in order to insert mutations");
         } else {
             int result = 1;
             if (newMutationEvent) {
@@ -87,7 +87,7 @@ public final class DaoMutation {
                 (mutation.getDriverTiersFilter() != null
                 && !mutation.getDriverTiersFilter().isEmpty()
                 && !mutation.getDriverTiersFilter().toLowerCase().equals("na"))) {
-                MySQLbulkLoader.getMySQLbulkLoader("alteration_driver_annotation").insertRecord(
+                SQLiteBulkLoader.getSQLiteBulkLoader("alteration_driver_annotation").insertRecord(
                     Long.toString(mutation.getMutationEventId()),
                     Integer.toString(mutation.getGeneticProfileId()),
                     Integer.toString(mutation.getSampleId()),
@@ -98,7 +98,7 @@ public final class DaoMutation {
                 );
             }
 
-            MySQLbulkLoader.getMySQLbulkLoader("mutation").insertRecord(
+            SQLiteBulkLoader.getSQLiteBulkLoader("mutation").insertRecord(
                     Long.toString(mutation.getMutationEventId()),
                     Integer.toString(mutation.getGeneticProfileId()),
                     Integer.toString(mutation.getSampleId()),
@@ -135,9 +135,9 @@ public final class DaoMutation {
 
     public static int addMutationEvent(ExtendedMutation.MutationEvent event) throws DaoException {
         // use this code if bulk loading
-        // write to the temp file maintained by the MySQLbulkLoader
+        // write to the temp file maintained by the SQLiteBulkLoader
         String keyword = MutationKeywordUtils.guessOncotatorMutationKeyword(event.getProteinChange(), event.getMutationType());
-        MySQLbulkLoader.getMySQLbulkLoader("mutation_event").insertRecord(
+        SQLiteBulkLoader.getSQLiteBulkLoader("mutation_event").insertRecord(
                 Long.toString(event.getMutationEventId()),
                 Long.toString(event.getGene().getEntrezGeneId()),
                 event.getChr(),
@@ -194,17 +194,18 @@ public final class DaoMutation {
              * we assume each sample is in only one MUTATION_EXTENDED profile.
              */
             pstmt = con.prepareStatement(
-                    "REPLACE `clinical_sample` " +
-                    "SELECT sample_profile.`SAMPLE_ID`, 'MUTATION_COUNT', COUNT(DISTINCT mutation_event.`CHR`, mutation_event.`START_POSITION`, " +
-                    "mutation_event.`END_POSITION`, mutation_event.`REFERENCE_ALLELE`, mutation_event.`TUMOR_SEQ_ALLELE`) AS MUTATION_COUNT " +
-                    "FROM `sample_profile` " +
-                    "LEFT JOIN mutation ON mutation.`SAMPLE_ID` = sample_profile.`SAMPLE_ID` " +
-                    "AND ( mutation.`MUTATION_STATUS` <> 'GERMLINE' OR mutation.`MUTATION_STATUS` IS NULL ) " +
-                    "LEFT JOIN mutation_event ON mutation.`MUTATION_EVENT_ID` = mutation_event.`MUTATION_EVENT_ID` " +
-                    "INNER JOIN genetic_profile ON genetic_profile.`GENETIC_PROFILE_ID` = sample_profile.`GENETIC_PROFILE_ID` " +
-                    "WHERE genetic_profile.`GENETIC_ALTERATION_TYPE` = 'MUTATION_EXTENDED' " +
-                    "AND genetic_profile.`GENETIC_PROFILE_ID`=? " +
-                    "GROUP BY sample_profile.`GENETIC_PROFILE_ID` , sample_profile.`SAMPLE_ID`;");
+                    "INSERT OR REPLACE INTO clinical_sample (INTERNAL_ID, ATTR_ID, ATTR_VALUE) " +
+                    "SELECT sample_profile.SAMPLE_ID, 'MUTATION_COUNT', " +
+                    "(SELECT COUNT(*) FROM (SELECT DISTINCT mutation_event.CHR, mutation_event.START_POSITION, " +
+                    "mutation_event.END_POSITION, mutation_event.REFERENCE_ALLELE, mutation_event.TUMOR_SEQ_ALLELE " +
+                    "FROM mutation INNER JOIN mutation_event ON mutation.MUTATION_EVENT_ID = mutation_event.MUTATION_EVENT_ID " +
+                    "WHERE mutation.SAMPLE_ID = sample_profile.SAMPLE_ID " +
+                    "AND ( mutation.MUTATION_STATUS <> 'GERMLINE' OR mutation.MUTATION_STATUS IS NULL ))) AS MUTATION_COUNT " +
+                    "FROM sample_profile " +
+                    "INNER JOIN genetic_profile ON genetic_profile.GENETIC_PROFILE_ID = sample_profile.GENETIC_PROFILE_ID " +
+                    "WHERE genetic_profile.GENETIC_ALTERATION_TYPE = 'MUTATION_EXTENDED' " +
+                    "AND genetic_profile.GENETIC_PROFILE_ID=? " +
+                    "GROUP BY sample_profile.GENETIC_PROFILE_ID , sample_profile.SAMPLE_ID;");
             pstmt.setInt(1, geneticProfile.getGeneticProfileId());
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -215,8 +216,8 @@ public final class DaoMutation {
     }
 
     public static void calculateMutationCountByKeyword(int geneticProfileId) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to update mutation counts by keyword");
+        if (!SQLiteBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on SQLiteBulkLoader in order to update mutation counts by keyword");
         } else {
             MultiKeyMap mutationEventKeywordCountMap = getMutationEventKeywordCountByGeneticProfileId(geneticProfileId); // mutation event keyword -> entrez id -> keyword count
             Map<Long, Integer> geneCountMap = getGeneCountByGeneticProfileId(geneticProfileId); // entrez id -> gene count
@@ -228,7 +229,7 @@ public final class DaoMutation {
                 Long entrezGeneId = Long.valueOf(mk.getKey(1).toString());
                 String keywordCount = it.getValue().toString();
                 Integer geneCount = geneCountMap.get(entrezGeneId);
-                MySQLbulkLoader.getMySQLbulkLoader("mutation_count_by_keyword").insertRecord(
+                SQLiteBulkLoader.getSQLiteBulkLoader("mutation_count_by_keyword").insertRecord(
                         Integer.toString(geneticProfileId),
                         mutationEventKeyword,
                         Long.toString(entrezGeneId),
@@ -247,10 +248,11 @@ public final class DaoMutation {
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
             pstmt = con.prepareStatement(
-                    "SELECT mutation_event.`KEYWORD`, mutation_event.`ENTREZ_GENE_ID`,  IF(mutation_event.`KEYWORD` IS NULL, 0, COUNT(DISTINCT(mutation.SAMPLE_ID))) AS KEYWORD_COUNT " +
-                            "FROM mutation_event JOIN mutation on mutation.`MUTATION_EVENT_ID` = mutation_event.`MUTATION_EVENT_ID` " +
-                            "WHERE mutation.`GENETIC_PROFILE_ID` = ? " +
-                            "GROUP BY mutation_event.`KEYWORD`, mutation_event.`ENTREZ_GENE_ID`;"
+                    "SELECT mutation_event.KEYWORD, mutation_event.ENTREZ_GENE_ID, " +
+                            "CASE WHEN mutation_event.KEYWORD IS NULL THEN 0 ELSE COUNT(DISTINCT mutation.SAMPLE_ID) END AS KEYWORD_COUNT " +
+                            "FROM mutation_event JOIN mutation on mutation.MUTATION_EVENT_ID = mutation_event.MUTATION_EVENT_ID " +
+                            "WHERE mutation.GENETIC_PROFILE_ID = ? " +
+                            "GROUP BY mutation_event.KEYWORD, mutation_event.ENTREZ_GENE_ID;"
             );
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
@@ -1656,7 +1658,7 @@ public final class DaoMutation {
             pstmt = con.prepareStatement(
                     "SELECT "
                     + "(SELECT COUNT(*) FROM mutation_event) = "
-                    + "(SELECT COUNT(DISTINCT ENTREZ_GENE_ID, CHR, START_POSITION, END_POSITION, TUMOR_SEQ_ALLELE, PROTEIN_CHANGE, MUTATION_TYPE) FROM mutation_event)");
+                    + "(SELECT COUNT(*) FROM (SELECT DISTINCT ENTREZ_GENE_ID, CHR, START_POSITION, END_POSITION, TUMOR_SEQ_ALLELE, PROTEIN_CHANGE, MUTATION_TYPE FROM mutation_event))");
             rs = pstmt.executeQuery();
             if (rs.next()) {
                 sqlQueryResult = rs.getInt(1);

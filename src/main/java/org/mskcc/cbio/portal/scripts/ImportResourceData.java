@@ -11,7 +11,7 @@ import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoResourceData;
 import org.mskcc.cbio.portal.dao.DaoResourceDefinition;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.ResourceDefinition;
@@ -68,10 +68,10 @@ public class ImportResourceData extends ConsoleRunnable {
         // code has to be added to check whether
         // a resource data update should be
         // perform instead of an insert
-        MySQLbulkLoader.bulkLoadOn();
+        SQLiteBulkLoader.bulkLoadOn();
 
         if (relaxed) {
-            MySQLbulkLoader.relaxedModeOn();
+            SQLiteBulkLoader.relaxedModeOn();
         }
 
         FileReader reader = new FileReader(resourceDataFile);
@@ -108,9 +108,9 @@ public class ImportResourceData extends ConsoleRunnable {
         importData(buff, resources, headerIndexMap);
         buff.close();
 
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-            MySQLbulkLoader.relaxedModeOff();
+        if (SQLiteBulkLoader.isBulkLoad()) {
+            SQLiteBulkLoader.flushAll();
+            SQLiteBulkLoader.relaxedModeOff();
         }
     }
 

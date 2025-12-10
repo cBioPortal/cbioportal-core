@@ -37,7 +37,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.List;
 
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.scripts.UsageException;
 
 import joptsimple.OptionException;
@@ -170,9 +170,9 @@ public class ConsoleUtil {
 			if( options.has( "loadMode" ) ){
 				String actionArg = (String) options.valueOf( "loadMode" );
 				if (actionArg.equalsIgnoreCase("directLoad")) {
-					MySQLbulkLoader.bulkLoadOff();
+					SQLiteBulkLoader.bulkLoadOff();
 				} else if (actionArg.equalsIgnoreCase( "bulkLoad" )) {
-					MySQLbulkLoader.bulkLoadOn();
+					SQLiteBulkLoader.bulkLoadOn();
 				} else {
 					throw new UsageException(progName, description, parser,
 							"Error: unknown loadMode action:  " + actionArg);
@@ -282,9 +282,9 @@ public class ConsoleUtil {
 			if( options.has( "loadMode" ) ){
 				String actionArg = (String) options.valueOf( "loadMode" );
 				if (actionArg.equalsIgnoreCase("directLoad")) {
-					MySQLbulkLoader.bulkLoadOff();
+					SQLiteBulkLoader.bulkLoadOff();
 				} else if (actionArg.equalsIgnoreCase( "bulkLoad" )) {
-					MySQLbulkLoader.bulkLoadOn();
+					SQLiteBulkLoader.bulkLoadOn();
 				} else {
 					throw new UsageException(progName, description, parser,
 							"Error: unknown loadMode action:  " + actionArg);

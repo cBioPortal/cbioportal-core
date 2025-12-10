@@ -44,7 +44,7 @@ import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -144,7 +144,7 @@ public class ImportExtendedMutationData {
     }
 
     public void importData() throws IOException, DaoException {
-        MySQLbulkLoader.bulkLoadOn();
+        SQLiteBulkLoader.bulkLoadOn();
 
         HashSet <String> sequencedCaseSet = new HashSet<String>();
 
@@ -500,8 +500,8 @@ public class ImportExtendedMutationData {
             }
         }
 
-        if( MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
+        if( SQLiteBulkLoader.isBulkLoad()) {
+            SQLiteBulkLoader.flushAll();
         }
         // run sanity check on `mutation_event` to determine whether duplicate
         // events were introduced during current import
@@ -522,8 +522,8 @@ public class ImportExtendedMutationData {
         ProgressMonitor.setCurrentMessage("Calculating mutation counts by keyword...");
         DaoMutation.calculateMutationCountByKeyword(geneticProfileId);
 
-        if( MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
+        if( SQLiteBulkLoader.isBulkLoad()) {
+            SQLiteBulkLoader.flushAll();
         }
 
         if (entriesSkipped > 0) {

@@ -41,7 +41,7 @@ import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
@@ -453,7 +453,7 @@ public class TestImportProfileData {
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
         daoGene.addGene(new CanonicalGene(999999672, "TESTBRCA1"));
         daoGene.addGene(new CanonicalGene(999999675, "TESTBRCA2"));
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
         String[] args = {
                 "--data","src/test/resources/data_CNA_sample.txt",
                 "--meta","src/test/resources/meta_CNA.txt" ,
@@ -561,6 +561,6 @@ public class TestImportProfileData {
         daoGene.addGene(new CanonicalGene(1952L, "CELSR2"));
         daoGene.addGene(new CanonicalGene(2322L, "FLT3"));
         daoGene.addGene(new CanonicalGene(867L, "CBL"));
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
     }
 }

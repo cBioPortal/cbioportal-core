@@ -98,9 +98,8 @@ public class DaoGistic {
             pstmt.executeUpdate();
 
             // insert into SQL gistic_to_gene table
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                int autoId = rs.getInt(1);
+            int autoId = JdbcUtil.getInsertedId(pstmt, con);
+            if (autoId != -1) {
                 gistic.setInternalId(autoId);
             }
             addGisticGenes(gistic, con);

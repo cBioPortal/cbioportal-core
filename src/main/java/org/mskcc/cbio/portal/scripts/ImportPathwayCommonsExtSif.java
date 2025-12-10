@@ -34,7 +34,7 @@ package org.mskcc.cbio.portal.scripts;
 
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
@@ -72,7 +72,7 @@ public class ImportPathwayCommonsExtSif {
         int numInteractionsSaved = 0;
         int numInteractionsNotSaved = 0;
 
-        MySQLbulkLoader.bulkLoadOn();
+        SQLiteBulkLoader.bulkLoadOn();
         FileReader reader = new FileReader(sifFile);
         BufferedReader buf = new BufferedReader(reader);
         String line = buf.readLine(); // skip the first line
@@ -108,8 +108,8 @@ public class ImportPathwayCommonsExtSif {
         }
 
         //  Flush database
-        if (MySQLbulkLoader.isBulkLoad()) {
-           MySQLbulkLoader.flushAll();
+        if (SQLiteBulkLoader.isBulkLoad()) {
+           SQLiteBulkLoader.flushAll();
         }
         ProgressMonitor.setCurrentMessage("Total number of interactions saved:  " + numInteractionsSaved);
         ProgressMonitor.setCurrentMessage("Total number of interactions not saved, due to " +

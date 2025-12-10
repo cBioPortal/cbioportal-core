@@ -32,7 +32,7 @@ import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
@@ -123,6 +123,6 @@ public class TestImportCopyNumberSegmentData {
             Integer pId = (p == null) ? DaoPatient.addPatient(new Patient(cancerStudy, sampleId)) : p.getInternalId();
             DaoSample.addSample(new Sample(sampleId, pId, cancerStudy.getTypeOfCancerId()));
         }
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
     }
 }

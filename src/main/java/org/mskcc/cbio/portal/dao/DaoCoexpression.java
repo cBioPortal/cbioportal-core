@@ -47,12 +47,12 @@ import org.mskcc.cbio.portal.model.Coexpression;
  */
 public class DaoCoexpression {
     public static int addCoexpression(Coexpression coexpression) throws DaoException {
-            if (!MySQLbulkLoader.isBulkLoad()) {
-                throw new DaoException("You have to turn on MySQLbulkLoader in order to insert Coexpression data");
+            if (!SQLiteBulkLoader.isBulkLoad()) {
+                throw new DaoException("You have to turn on SQLiteBulkLoader in order to insert Coexpression data");
             } else {
                     // use this code if bulk loading
-                    // write to the temp file maintained by the MySQLbulkLoader
-                    MySQLbulkLoader.getMySQLbulkLoader("coexpression").insertRecord(
+                    // write to the temp file maintained by the SQLiteBulkLoader
+                    SQLiteBulkLoader.getSQLiteBulkLoader("coexpression").insertRecord(
                             Long.toString(coexpression.getGene1()),
                             Long.toString(coexpression.getGene2()), 
                             Integer.toString(coexpression.getProfileId()),

@@ -61,8 +61,11 @@ public class JdbcUtil {
      */
     public static DataSource getDataSource() {
         if (dataSource == null) {
-            dataSource = new TransactionAwareDataSourceProxy(new JdbcDataSource());
+            DataSource unwrapped = new JdbcDataSource();
+            dataSource = new TransactionAwareDataSourceProxy(unwrapped);
             setupTransactionManagement();
+            // Apply SQLite optimizations once at startup using unwrapped connection
+            applySQLiteGlobalOptimizations(unwrapped);
         }
         return dataSource;
     }
@@ -70,6 +73,31 @@ public class JdbcUtil {
     private static void setupTransactionManagement() {
         transactionManager = new DataSourceTransactionManager(dataSource);
         transactionTemplate = new TransactionTemplate(transactionManager);
+    }
+
+    /**
+     * Apply SQLite global optimizations once at startup before any transactions.
+     * These must be set outside of transactions.
+     */
+    private static void applySQLiteGlobalOptimizations(DataSource unwrappedDataSource) {
+        try (Connection con = unwrappedDataSource.getConnection()) {
+            String dbUrl = con.getMetaData().getURL();
+            if (dbUrl != null && dbUrl.startsWith("jdbc:sqlite")) {
+                try (Statement stmt = con.createStatement()) {
+                    // Disable synchronous writes - HUGE performance boost for bulk inserts
+                    stmt.execute("PRAGMA synchronous = OFF");
+                    // Use Write-Ahead Logging for better concurrency
+                    stmt.execute("PRAGMA journal_mode = WAL");
+                    // Increase cache size to 256MB (default is ~2MB)
+                    stmt.execute("PRAGMA cache_size = -262144");
+                    // Store temp tables in memory
+                    stmt.execute("PRAGMA temp_store = MEMORY");
+                    LOG.info("Applied SQLite global performance optimizations");
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to apply SQLite global optimizations", e);
+        }
     }
 
     /**
@@ -112,6 +140,12 @@ public class JdbcUtil {
         Connection con;
         try {
             con = getDataSource().getConnection();
+            // For SQLite, explicitly set auto-commit to false to work with Spring transactions
+            if (con.getMetaData().getURL().startsWith("jdbc:sqlite")) {
+                if (con.getAutoCommit()) {
+                    con.setAutoCommit(false);
+                }
+            }
         } catch (Exception e) {
             logMessage(e.getMessage());
             throw new SQLException(e);
@@ -135,6 +169,15 @@ public class JdbcUtil {
     private static void closeConnection(String requester, Connection con) {
         try {
             if (con != null && !con.isClosed()) {
+                // For SQLite with auto-commit disabled, commit before closing to ensure
+                // changes are visible to subsequent connections/commands
+                if (!con.getAutoCommit() && con.getMetaData().getURL().startsWith("jdbc:sqlite")) {
+                    try {
+                        con.commit();
+                    } catch (SQLException e) {
+                        LOG.warn("Failed to commit SQLite connection before closing", e);
+                    }
+                }
                 con.close();
                 if (requester!=null) {
                     int count = activeConnectionCount.get(requester) - 1;
@@ -290,30 +333,18 @@ public class JdbcUtil {
      * @throws SQLException
      */
     public static int getInsertedId(PreparedStatement pstmt, Connection con) throws SQLException {
+        // SQLite-only: Use last_insert_rowid() to get auto-increment ID
+        PreparedStatement pstmt2 = null;
+        ResultSet rs2 = null;
         try {
-            ResultSet rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                return rs.getInt(1);
+            pstmt2 = con.prepareStatement("SELECT last_insert_rowid()");
+            rs2 = pstmt2.executeQuery();
+            if (rs2.next()) {
+                return rs2.getInt(1);
             }
-        } catch (SQLException e) {
-            // SQLite JDBC driver doesn't fully support getGeneratedKeys()
-            // Use last_insert_rowid() instead
-            if (e.getMessage() != null && e.getMessage().contains("not implemented by SQLite")) {
-                PreparedStatement pstmt2 = null;
-                ResultSet rs2 = null;
-                try {
-                    pstmt2 = con.prepareStatement("SELECT last_insert_rowid()");
-                    rs2 = pstmt2.executeQuery();
-                    if (rs2.next()) {
-                        return rs2.getInt(1);
-                    }
-                } finally {
-                    if (rs2 != null) rs2.close();
-                    if (pstmt2 != null) pstmt2.close();
-                }
-            } else {
-                throw e;
-            }
+        } finally {
+            if (rs2 != null) rs2.close();
+            if (pstmt2 != null) pstmt2.close();
         }
         return -1;
     }

@@ -1,5 +1,7 @@
 package org.mskcc.cbio.portal.dao;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.dbcp2.BasicDataSource;
@@ -69,17 +71,60 @@ public class JdbcDataSource extends BasicDataSource {
         if (connectionURL != null && connectionURL.startsWith("jdbc:mysql")) {
             this.addConnectionProperty("allowLoadLocalInfile", "true");
         }
-        // SQLite-specific property - enable foreign key constraints
+        // SQLite-specific properties
         if (connectionURL != null && connectionURL.startsWith("jdbc:sqlite")) {
+            // Enable foreign key constraints
             this.addConnectionProperty("foreign_keys", "true");
+            // SQLite pooling settings - small pool but not single connection
+            this.setMaxTotal(5);
+            this.setMaxIdle(2);
+            this.setMinIdle(1);
+            this.setMaxWaitMillis(30000);
+            this.setTestOnBorrow(false);  // Skip validation for SQLite
+        } else {
+            // MySQL/other DB pooling settings
+            this.setMaxTotal(500);
+            this.setMaxIdle(30);
+            this.setMaxWaitMillis(10000);
+            this.setMinEvictableIdleTimeMillis(30000);
+            this.setTestOnBorrow(true);
+            this.setValidationQuery("SELECT 1");
         }
-        // these values are from the production cbioportal application context for a jndi data source
-        this.setMaxTotal(500);
-        this.setMaxIdle(30);
-        this.setMaxWaitMillis(10000);
-        this.setMinEvictableIdleTimeMillis(30000);
-        this.setTestOnBorrow(true);
-        this.setValidationQuery("SELECT 1");
+    }
+
+    @Override
+    public Connection getConnection() throws SQLException {
+        Connection con = super.getConnection();
+        String url = con.getMetaData().getURL();
+        // For SQLite, wrap connection to keep auto-commit false
+        if (url != null && url.startsWith("jdbc:sqlite")) {
+            con.setAutoCommit(false);
+            return new SQLiteConnectionWrapper(con);
+        }
+        return con;
+    }
+
+    /**
+     * Wrapper that prevents auto-commit from being set to true for SQLite.
+     * This is needed because DBCP2/Spring try to reset connection state.
+     */
+    private static class SQLiteConnectionWrapper extends org.apache.commons.dbcp2.DelegatingConnection<Connection> {
+        public SQLiteConnectionWrapper(Connection con) {
+            super(con);
+        }
+
+        @Override
+        public void setAutoCommit(boolean autoCommit) throws SQLException {
+            // For SQLite, always keep auto-commit false to work with transactions
+            if (autoCommit) {
+                // Ignore attempts to set auto-commit true, just commit pending work
+                if (!getDelegate().getAutoCommit()) {
+                    getDelegate().commit();
+                }
+            } else {
+                getDelegate().setAutoCommit(false);
+            }
+        }
     }
 
     private void logUsedDeprecatedProperties(DatabaseProperties dbProperties) {

@@ -42,7 +42,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Patient;
@@ -94,17 +94,17 @@ public class TestDaoGeneticAlteration {
 	@Test
     public void testDaoGeneticAlterationBulkOn() throws DaoException {
         
-        // test with MySQLbulkLoader.isBulkLoad()
+        // test with SQLiteBulkLoader.isBulkLoad()
 		runTheTest();
 	}
 
 	@Test
     public void testDaoGeneticAlterationBulkOff() throws DaoException {
         
-        // test without MySQLbulkLoader.isBulkLoad()
-        MySQLbulkLoader.bulkLoadOff();
+        // test without SQLiteBulkLoader.isBulkLoad()
+        SQLiteBulkLoader.bulkLoadOff();
         runTheTest();
-        MySQLbulkLoader.bulkLoadOn();
+        SQLiteBulkLoader.bulkLoadOn();
     }
     
     private void runTheTest() throws DaoException{
@@ -121,8 +121,8 @@ public class TestDaoGeneticAlteration {
         assertEquals (1, numRows);
 
         // if bulkLoading, execute LOAD FILE
-        if( MySQLbulkLoader.isBulkLoad()){
-           MySQLbulkLoader.flushAll();
+        if( SQLiteBulkLoader.isBulkLoad()){
+           SQLiteBulkLoader.flushAll();
         }
 
         HashMap<Integer, String> valueMap = dao.getGeneticAlterationMap(geneticProfileId, 672);

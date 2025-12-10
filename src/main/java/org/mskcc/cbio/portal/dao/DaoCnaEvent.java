@@ -47,8 +47,8 @@ public final class DaoCnaEvent {
     private DaoCnaEvent() {}
     
     public static void addCaseCnaEvent(CnaEvent cnaEvent, boolean newCnaEvent) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert sample_cna_event");
+        if (!SQLiteBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on SQLiteBulkLoader in order to insert sample_cna_event");
         }
         else {
         	long eventId = cnaEvent.getEventId();
@@ -58,7 +58,7 @@ public final class DaoCnaEvent {
                 cnaEvent.setEventId(eventId);
             }
             
-            MySQLbulkLoader.getMySQLbulkLoader("sample_cna_event").insertRecord(
+            SQLiteBulkLoader.getSQLiteBulkLoader("sample_cna_event").insertRecord(
                     Long.toString(eventId),
                     Integer.toString(cnaEvent.getSampleId()),
                     Integer.toString(cnaEvent.getCnaProfileId()),
@@ -73,8 +73,8 @@ public final class DaoCnaEvent {
                 && !cnaEvent.getDriverTiersFilter().isEmpty()
                 && !cnaEvent.getDriverTiersFilter().toLowerCase().equals("na"))
             ) {
-                MySQLbulkLoader
-                    .getMySQLbulkLoader("alteration_driver_annotation")
+                SQLiteBulkLoader
+                    .getSQLiteBulkLoader("alteration_driver_annotation")
                     .insertRecord(
                         Long.toString(eventId),
                         Integer.toString(cnaEvent.getCnaProfileId()),
@@ -109,9 +109,7 @@ public final class DaoCnaEvent {
             pstmt.setLong(1, cnaEvent.getEntrezGeneId());
             pstmt.setShort(2, cnaEvent.getAlteration().getCode());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            rs.next();
-            long newId = rs.getLong(1);
+            long newId = JdbcUtil.getInsertedId(pstmt, con);
             return newId;
         } catch (SQLException e) {
             throw new DaoException(e);

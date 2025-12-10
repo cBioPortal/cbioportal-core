@@ -81,7 +81,7 @@ public class PiHelperImporter extends AbstractDrugInfoImporter {
         if(getDrugInfoFile() == null || getDrugTargetsFile() == null) {
             throw new IllegalArgumentException("Please provide drug and drug targets before you stat importing.");
         }
-		MySQLbulkLoader.bulkLoadOff();
+		SQLiteBulkLoader.bulkLoadOff();
         importDrugs();
         importDrugTargets();
     }

@@ -62,13 +62,11 @@ public class DaoSampleList {
             pstmt.setString(4, sampleList.getSampleListCategory().getCategory());
             pstmt.setString(5, sampleList.getDescription());
             rows = pstmt.executeUpdate();
-            try (ResultSet generatedKey = pstmt.getGeneratedKeys()) {
-                if (generatedKey.next()) {
-                    int listId = generatedKey.getInt(1);
-                    addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
-                } else {
-                    throw new DaoException("Creating sample list failed, no ID obtained.");
-                }
+            int listId = JdbcUtil.getInsertedId(pstmt, con);
+            if (listId != -1) {
+                addSampleListList(sampleList.getCancerStudyId(), listId, sampleList.getSampleList(), con);
+            } else {
+                throw new DaoException("Creating sample list failed, no ID obtained.");
             }
         } catch (SQLException e) {
             throw new DaoException(e);

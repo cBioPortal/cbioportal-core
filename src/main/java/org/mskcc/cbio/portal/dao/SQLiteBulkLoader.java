@@ -38,36 +38,41 @@ import java.sql.*;
 import java.util.*;
 
 /**
- * SQLite bulk loader implementation using JDBC batch inserts.
- * Unlike MySQL's LOAD DATA INFILE, SQLite doesn't have a direct file-based bulk loading mechanism,
- * so this implementation uses batched prepared statements for efficient bulk inserts.
+ * Bulk loader implementation using JDBC batch inserts for SQLite.
+ * Uses batched prepared statements for efficient bulk inserts.
  *
- * @author cBioPortal SQLite Migration
+ * Note: This class retains the SQLiteBulkLoader name for backward compatibility,
+ * but now only supports SQLite.
  */
 public class SQLiteBulkLoader {
     private static boolean bulkLoad = false;
     private static boolean relaxedMode = false;
     private String[] fieldNames = null;
 
-    private static final Map<String, SQLiteBulkLoader> sqliteBulkLoaders = new LinkedHashMap<String, SQLiteBulkLoader>();
-    private static final int BATCH_SIZE = 1000; // Commit every 1000 records
+    private static final Map<String, SQLiteBulkLoader> bulkLoaders = new LinkedHashMap<String, SQLiteBulkLoader>();
+    private static final int BATCH_SIZE = 10000;
 
     /**
-     * Get a SQLiteBulkLoader
+     * Get a SQLiteBulkLoader for the given table
      * @param tableName table name
      * @return SQLiteBulkLoader instance
      */
     public static SQLiteBulkLoader getSQLiteBulkLoader(String tableName) {
-        SQLiteBulkLoader sqliteBulkLoader = sqliteBulkLoaders.get(tableName);
-        if (sqliteBulkLoader == null) {
-            sqliteBulkLoader = new SQLiteBulkLoader(tableName);
-            sqliteBulkLoaders.put(tableName, sqliteBulkLoader);
+        SQLiteBulkLoader bulkLoader = bulkLoaders.get(tableName);
+        if (bulkLoader == null) {
+            bulkLoader = new SQLiteBulkLoader(tableName);
+            bulkLoaders.put(tableName, bulkLoader);
         }
-        return sqliteBulkLoader;
+        return bulkLoader;
     }
 
     /**
      * Flushes all pending data from the bulk writer.
+     * Implements deferred index creation for performance:
+     * 1. Saves all index definitions
+     * 2. Drops all indexes
+     * 3. Performs bulk import (fast without index maintenance)
+     * 4. Recreates all indexes
      * @return the number of rows added
      * @throws DaoException
      */
@@ -76,6 +81,9 @@ public class SQLiteBulkLoader {
         Statement stmt = null;
         boolean executedSetFKChecks = false;
         Connection con = null;
+        List<String> savedIndexDefinitions = new ArrayList<>();
+        long startTime = System.currentTimeMillis();
+
         try {
             con = JdbcUtil.getDbConnection(SQLiteBulkLoader.class);
 
@@ -88,16 +96,73 @@ public class SQLiteBulkLoader {
             stmt.execute("PRAGMA foreign_keys = OFF");
             executedSetFKChecks = true;
 
-            int n = 0;
-            for (SQLiteBulkLoader sqliteBulkLoader : sqliteBulkLoaders.values()) {
-                n += sqliteBulkLoader.loadDataIntoDB();
+            // PHASE 1: Save all index definitions from sqlite_master
+            ProgressMonitor.setCurrentMessage(" --> Saving index definitions...");
+            ResultSet rs = stmt.executeQuery(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL"
+            );
+            while (rs.next()) {
+                String indexDef = rs.getString("sql");
+                if (indexDef != null && !indexDef.isEmpty()) {
+                    savedIndexDefinitions.add(indexDef);
+                }
             }
+            rs.close();
+            ProgressMonitor.setCurrentMessage(" --> Saved " + savedIndexDefinitions.size() + " index definitions");
+
+            // PHASE 2: Drop all indexes
+            ProgressMonitor.setCurrentMessage(" --> Dropping indexes for faster import...");
+            int droppedCount = 0;
+            for (String indexDef : savedIndexDefinitions) {
+                String indexName = extractIndexName(indexDef);
+                if (indexName != null) {
+                    try {
+                        stmt.execute("DROP INDEX IF EXISTS " + indexName);
+                        droppedCount++;
+                    } catch (SQLException e) {
+                        // Log warning but continue - some indexes might not exist
+                        System.err.println("Warning: Could not drop index " + indexName + ": " + e.getMessage());
+                    }
+                }
+            }
+            ProgressMonitor.setCurrentMessage(" --> Dropped " + droppedCount + " indexes");
+
+            // PHASE 3: Perform bulk import (fast without index maintenance)
+            long importStartTime = System.currentTimeMillis();
+            ProgressMonitor.setCurrentMessage(" --> Importing data without indexes...");
+            int n = 0;
+            for (SQLiteBulkLoader bulkLoader : bulkLoaders.values()) {
+                n += bulkLoader.loadDataIntoDB();
+            }
+            long importTime = System.currentTimeMillis() - importStartTime;
+            ProgressMonitor.setCurrentMessage(" --> Data import completed in " + (importTime / 1000) + " seconds");
+
+            // PHASE 4: Recreate all indexes
+            ProgressMonitor.setCurrentMessage(" --> Recreating indexes...");
+            long indexStartTime = System.currentTimeMillis();
+            int recreatedCount = 0;
+            for (String indexDef : savedIndexDefinitions) {
+                try {
+                    stmt.execute(indexDef);
+                    recreatedCount++;
+                } catch (SQLException e) {
+                    // Log warning but continue
+                    System.err.println("Warning: Could not recreate index: " + indexDef);
+                    System.err.println("Error: " + e.getMessage());
+                }
+            }
+            long indexTime = System.currentTimeMillis() - indexStartTime;
+            ProgressMonitor.setCurrentMessage(" --> Recreated " + recreatedCount + " indexes in " + (indexTime / 1000) + " seconds");
+
+            long totalTime = System.currentTimeMillis() - startTime;
+            ProgressMonitor.setCurrentMessage(" --> Total flush time: " + (totalTime / 1000) + " seconds (import: " +
+                (importTime / 1000) + "s, indexes: " + (indexTime / 1000) + "s)");
 
             return n;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            sqliteBulkLoaders.clear();
+            bulkLoaders.clear();
             if (executedSetFKChecks && stmt != null) {
                 try {
                     stmt.execute("PRAGMA foreign_keys = " + (checks == 1 ? "ON" : "OFF"));
@@ -105,7 +170,6 @@ public class SQLiteBulkLoader {
                     throw new DaoException(e);
                 }
             }
-            // Manually close resources since we have a Statement, not PreparedStatement
             if (stmt != null) {
                 try {
                     stmt.close();
@@ -128,7 +192,7 @@ public class SQLiteBulkLoader {
     private int rows;
     private static final long numDebuggingRowsToPrint = 0;
 
-    private SQLiteBulkLoader(String tableName) {
+    protected SQLiteBulkLoader(String tableName) {
         this.tableName = tableName;
     }
 
@@ -200,7 +264,7 @@ public class SQLiteBulkLoader {
                     if (record[i] == null || record[i].equals("\\N")) {
                         pstmt.setNull(i + 1, Types.VARCHAR);
                     } else {
-                        // Unescape values that were escaped for MySQL file format
+                        // Unescape values that were escaped for file format
                         String value = record[i].replace("\\n", "\n").replace("\\t", "\t");
                         pstmt.setString(i + 1, value);
                     }
@@ -277,5 +341,35 @@ public class SQLiteBulkLoader {
 
     public void setFieldNames(String[] fieldNames) {
         this.fieldNames = fieldNames;
+    }
+
+    /**
+     * Extract index name from a CREATE INDEX SQL statement.
+     * Example: "CREATE INDEX `idx_name` ON table ..." -> "idx_name"
+     * @param createIndexSql the CREATE INDEX SQL statement
+     * @return the index name without backticks
+     */
+    private static String extractIndexName(String createIndexSql) {
+        if (createIndexSql == null || createIndexSql.isEmpty()) {
+            return null;
+        }
+
+        // Pattern: CREATE INDEX `index_name` or CREATE INDEX index_name
+        String[] parts = createIndexSql.split("\\s+");
+        for (int i = 0; i < parts.length - 1; i++) {
+            if (parts[i].equalsIgnoreCase("INDEX")) {
+                String indexName = parts[i + 1];
+                // Remove backticks if present
+                indexName = indexName.replace("`", "");
+                // Remove anything after the index name (e.g., "ON")
+                int onIndex = indexName.indexOf("ON");
+                if (onIndex > 0) {
+                    indexName = indexName.substring(0, onIndex).trim();
+                }
+                return indexName;
+            }
+        }
+
+        return null;
     }
 }

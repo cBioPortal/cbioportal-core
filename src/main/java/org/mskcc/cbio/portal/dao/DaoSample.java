@@ -161,11 +161,11 @@ public class DaoSample {
             pstmt.setString(2, sample.getType().toString());
             pstmt.setInt(3, sample.getInternalPatientId());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                cacheSample(new Sample(rs.getInt(1), sample.getStableId(),
+            int autoId = JdbcUtil.getInsertedId(pstmt, con);
+            if (autoId != -1) {
+                cacheSample(new Sample(autoId, sample.getStableId(),
                                        sample.getInternalPatientId()));
-                return rs.getInt(1);
+                return autoId;
             }
             return -1;
         }

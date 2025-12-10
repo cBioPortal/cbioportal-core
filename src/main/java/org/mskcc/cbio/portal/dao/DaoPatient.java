@@ -187,11 +187,11 @@ public class DaoPatient {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "REPLACE `clinical_patient`" +
-                    "SELECT patient.`INTERNAL_ID`, 'SAMPLE_COUNT', COUNT(*) FROM sample " + 
-                    "INNER JOIN patient ON sample.`PATIENT_ID` = patient.`INTERNAL_ID`" +
-                    "WHERE patient.`CANCER_STUDY_ID`=? " +
-                    "GROUP BY patient.`INTERNAL_ID`;");
+                    "REPLACE INTO clinical_patient " +
+                    "SELECT patient.INTERNAL_ID, 'SAMPLE_COUNT', COUNT(*) FROM sample " +
+                    "INNER JOIN patient ON sample.PATIENT_ID = patient.INTERNAL_ID " +
+                    "WHERE patient.CANCER_STUDY_ID=? " +
+                    "GROUP BY patient.INTERNAL_ID");
             pstmt.setInt(1, cancerStudyId);
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(SAMPLE_COUNT_ATTR_ID, cancerStudyId);
             if (clinicalAttribute == null) {

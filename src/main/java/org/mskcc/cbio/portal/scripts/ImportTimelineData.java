@@ -36,7 +36,7 @@ import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.ClinicalEvent;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
@@ -61,7 +61,7 @@ import java.util.Set;
 public class ImportTimelineData extends ConsoleRunnable {
 
 	private static void importData(String dataFile, int cancerStudyId, boolean overwriteExisting) throws IOException, DaoException {
-		MySQLbulkLoader.bulkLoadOn();
+		SQLiteBulkLoader.bulkLoadOn();
 
 		ProgressMonitor.setCurrentMessage("Reading file " + dataFile);
 		FileReader reader = new FileReader(dataFile);
@@ -124,7 +124,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 				DaoClinicalEvent.addClinicalEvent(event);
 			}
 	
-			MySQLbulkLoader.flushAll();
+			SQLiteBulkLoader.flushAll();
 		}
 		finally {
 			buff.close();

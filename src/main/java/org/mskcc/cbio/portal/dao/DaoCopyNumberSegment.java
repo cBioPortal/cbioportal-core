@@ -50,10 +50,10 @@ public final class DaoCopyNumberSegment {
     private DaoCopyNumberSegment() {}
     
     public static int addCopyNumberSegment(CopyNumberSegment seg) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert mutations");
+        if (!SQLiteBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on SQLiteBulkLoader in order to insert mutations");
         } else {
-            MySQLbulkLoader.getMySQLbulkLoader("copy_number_seg").insertRecord(
+            SQLiteBulkLoader.getSQLiteBulkLoader("copy_number_seg").insertRecord(
                     Long.toString(seg.getSegId()),
                     Integer.toString(seg.getCancerStudyId()),
                     Integer.toString(seg.getSampleId()),
@@ -83,14 +83,12 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "SELECT `SAMPLE_ID`, IF((SELECT SUM(`END`-`START`) FROM copy_number_seg " + 
-                    "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
-                    "ABS(c2.`SEGMENT_MEAN`) >= 0.2) IS NULL, 0, (SELECT SUM(`END`-`START`) FROM copy_number_seg " + 
-                    "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
-                    "ABS(c2.`SEGMENT_MEAN`) >= 0.2) / SUM(`END`-`START`)) AS `VALUE` FROM `copy_number_seg` AS c1 , `cancer_study` " +
-                    "WHERE c1.`CANCER_STUDY_ID` = cancer_study.`CANCER_STUDY_ID` AND cancer_study.`CANCER_STUDY_ID`=? " +
-                            (sampleIds == null ? "" : ("AND `SAMPLE_ID` IN ("+ String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") "))
-                    +"GROUP BY cancer_study.`CANCER_STUDY_ID` , `SAMPLE_ID` HAVING SUM(`END`-`START`) > 0;");
+                    "SELECT SAMPLE_ID, COALESCE((SELECT SUM(END-START) FROM copy_number_seg " +
+                    "AS c2 WHERE c2.CANCER_STUDY_ID = c1.CANCER_STUDY_ID AND c2.SAMPLE_ID = c1.SAMPLE_ID AND " +
+                    "ABS(c2.SEGMENT_MEAN) >= 0.2), 0) * 1.0 / SUM(END-START) AS VALUE FROM copy_number_seg AS c1 , cancer_study " +
+                    "WHERE c1.CANCER_STUDY_ID = cancer_study.CANCER_STUDY_ID AND cancer_study.CANCER_STUDY_ID=? " +
+                            (sampleIds == null ? "" : ("AND SAMPLE_ID IN ("+ String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") "))
+                    +"GROUP BY cancer_study.CANCER_STUDY_ID , SAMPLE_ID HAVING SUM(END-START) > 0;");
             int parameterIndex = 1;
             pstmt.setInt(parameterIndex++, cancerStudyId);
             if (sampleIds != null) {

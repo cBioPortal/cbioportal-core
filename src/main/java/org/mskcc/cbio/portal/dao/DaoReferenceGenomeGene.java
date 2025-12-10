@@ -49,7 +49,7 @@ public class DaoReferenceGenomeGene {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
-            MySQLbulkLoader.bulkLoadOff();
+            SQLiteBulkLoader.bulkLoadOff();
             con = JdbcUtil.getDbConnection(DaoReferenceGenome.class);
             pstmt = con.prepareStatement
                 ("UPDATE reference_genome_gene SET `START`=?, `END`=? WHERE `ENTREZ_GENE_ID`=? AND `REFERENCE_GENOME_ID`=?");
@@ -61,7 +61,7 @@ public class DaoReferenceGenomeGene {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            MySQLbulkLoader.bulkLoadOn();
+            SQLiteBulkLoader.bulkLoadOn();
             JdbcUtil.closeAll(DaoGene.class, con, pstmt, rs);
         }
     }

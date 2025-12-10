@@ -43,7 +43,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CopyNumberStatus;
@@ -135,7 +135,7 @@ public class TestImportTabDelimData {
 	@Test
     public void testImportCnaDataBulkLoadOff() throws Exception {
 
-        MySQLbulkLoader.bulkLoadOff();
+        SQLiteBulkLoader.bulkLoadOff();
         runImportCnaData();
     }
     
@@ -145,7 +145,7 @@ public class TestImportTabDelimData {
      */
 	@Test
     public void testImportCnaDataBulkLoadOn() throws Exception {
-		MySQLbulkLoader.bulkLoadOn();
+		SQLiteBulkLoader.bulkLoadOn();
         runImportCnaData();
     }
     
@@ -207,8 +207,8 @@ public class TestImportTabDelimData {
      */
     @Test
     public void testImportCnaData2BulkLoadOff() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-        MySQLbulkLoader.bulkLoadOff();
+        // test with both values of SQLiteBulkLoader.isBulkLoad()
+        SQLiteBulkLoader.bulkLoadOff();
         runImportCnaData2();
     }
     
@@ -219,8 +219,8 @@ public class TestImportTabDelimData {
      */
     @Test
     public void testImportCnaData2BulkLoadOn() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-    	MySQLbulkLoader.bulkLoadOn();
+        // test with both values of SQLiteBulkLoader.isBulkLoad()
+    	SQLiteBulkLoader.bulkLoadOn();
         runImportCnaData2();
     }
     
@@ -269,8 +269,8 @@ public class TestImportTabDelimData {
      */
     @Test
     public void testImportmRnaData1BulkLoadOff() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-        MySQLbulkLoader.bulkLoadOff();
+        // test with both values of SQLiteBulkLoader.isBulkLoad()
+        SQLiteBulkLoader.bulkLoadOff();
         runImportRnaData1();
     }
     
@@ -280,8 +280,8 @@ public class TestImportTabDelimData {
      */
     @Test
     public void testImportmRnaData1BulkLoadOn() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-      	MySQLbulkLoader.bulkLoadOn();
+        // test with both values of SQLiteBulkLoader.isBulkLoad()
+      	SQLiteBulkLoader.bulkLoadOn();
         runImportRnaData1();
     }
     
@@ -335,7 +335,7 @@ public class TestImportTabDelimData {
      */
     @Test
     public void testImportmRnaData2() throws Exception {
-       	MySQLbulkLoader.bulkLoadOn();
+       	SQLiteBulkLoader.bulkLoadOn();
         
 
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
@@ -421,7 +421,7 @@ public class TestImportTabDelimData {
      */
     @Test
     public void testImportRppaData() throws Exception {
-       	MySQLbulkLoader.bulkLoadOn();
+       	SQLiteBulkLoader.bulkLoadOn();
         
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
@@ -516,6 +516,6 @@ public class TestImportTabDelimData {
             Integer pId = (p == null) ? DaoPatient.addPatient(new Patient(study, sampleId)) : p.getInternalId();
             DaoSample.addSample(new Sample(sampleId, pId, study.getTypeOfCancerId()));
         }
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
     }
 }

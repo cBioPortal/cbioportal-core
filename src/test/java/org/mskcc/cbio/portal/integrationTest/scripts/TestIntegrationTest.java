@@ -47,7 +47,7 @@ import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
 import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.SQLiteBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
@@ -455,7 +455,7 @@ public class TestIntegrationTest {
             daoGene.addGene(gene);
         }
 
-        MySQLbulkLoader.flushAll();
+        SQLiteBulkLoader.flushAll();
 
     }
 

@@ -135,9 +135,11 @@ public class DaoGeneticEntity {
             switch(action) {
                 case INSERT:
                     pstmt.executeUpdate();
-                    rs = pstmt.getGeneratedKeys();
-                    rs.next();
-                    return new DbContainer(rs.getInt(1));
+                    int autoId = JdbcUtil.getInsertedId(pstmt, con);
+                    if (autoId != -1) {
+                        return new DbContainer(autoId);
+                    }
+                    throw new DaoException("Failed to get auto-generated ID");
                 case SELECT:
                     rs = pstmt.executeQuery();
                     if (rs.next()) {

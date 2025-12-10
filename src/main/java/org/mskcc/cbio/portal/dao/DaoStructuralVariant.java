@@ -45,7 +45,7 @@ public class DaoStructuralVariant {
      */
 
     public static void addStructuralVariantToBulkLoader(StructuralVariant structuralVariant) throws DaoException {
-        MySQLbulkLoader bl =  MySQLbulkLoader.getMySQLbulkLoader("structural_variant");
+        SQLiteBulkLoader bl =  SQLiteBulkLoader.getSQLiteBulkLoader("structural_variant");
         String[] fieldNames = new String[]{
             "INTERNAL_ID",
             "GENETIC_PROFILE_ID",
@@ -90,7 +90,7 @@ public class DaoStructuralVariant {
         };
         bl.setFieldNames(fieldNames);
 
-        // write to the temp file maintained by the MySQLbulkLoader
+        // write to the temp file maintained by the SQLiteBulkLoader
         bl.insertRecord(
             Long.toString(structuralVariant.getInternalId()),
             Integer.toString(structuralVariant.getGeneticProfileId()),
@@ -141,7 +141,7 @@ public class DaoStructuralVariant {
             (structuralVariant.getDriverTiersFilter() != null
             && !structuralVariant.getDriverTiersFilter().isEmpty()
             && !structuralVariant.getDriverTiersFilter().toLowerCase().equals("na"))) {
-            MySQLbulkLoader.getMySQLbulkLoader("alteration_driver_annotation").insertRecord(
+            SQLiteBulkLoader.getSQLiteBulkLoader("alteration_driver_annotation").insertRecord(
                 Long.toString(structuralVariant.getInternalId()),
                 Integer.toString(structuralVariant.getGeneticProfileId()),
                 Integer.toString(structuralVariant.getSampleIdInternal()),

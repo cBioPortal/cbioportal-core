@@ -66,9 +66,9 @@ public class DaoGenesetHierarchyNode {
             preparedStatement.executeUpdate();
 
             // Get the auto generated key, which is the Node ID:
-            resultSet = preparedStatement.getGeneratedKeys();
-            if (resultSet.next()) {
-            	genesetHierarchy.setNodeId(resultSet.getInt(1));	
+            int nodeId = JdbcUtil.getInsertedId(preparedStatement, connection);
+            if (nodeId != -1) {
+            	genesetHierarchy.setNodeId(nodeId);
             }       
         } catch (SQLException e) {
             throw new DaoException(e);
