@@ -93,7 +93,7 @@ public final class DaoSampleProfile {
         Connection con = null;
         PreparedStatement insertStmt = null;
         try {
-            deleteSampleProfileMappings(idTuples);
+            //deleteSampleProfileMappings(idTuples);
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             insertStmt = con.prepareStatement(
                 "INSERT INTO sample_profile (`sample_id`, `genetic_profile_id`, `panel_id`) VALUES (?,?,?)");
@@ -115,7 +115,7 @@ public final class DaoSampleProfile {
     }
 
     private static void upsertWithBulkLoader(Collection<SampleProfileTuple> idTuples) throws DaoException {
-        deleteSampleProfileMappings(idTuples);
+        //deleteSampleProfileMappings(idTuples);
 
         ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("sample_profile");
         loader.setFieldNames(new String[]{"sample_id", "genetic_profile_id", "panel_id"});
