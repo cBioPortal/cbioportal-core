@@ -151,14 +151,11 @@ public class GeneticProfileReader {
         // add genetic profile link if set
         if (geneticProfileLink != null) {
             // Set `referring_genetic_profile_id`
-            int geneticProfileId = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId()).getGeneticProfileId();
-            geneticProfileLink.setReferringGeneticProfileId(geneticProfileId);
+            geneticProfileLink.setReferringGeneticProfileId(geneticProfile.getGeneticProfileId());
             DaoGeneticProfileLink.addGeneticProfileLink(geneticProfileLink);
         }
 
         // Get ID
-        GeneticProfile gp = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
-        geneticProfile.setGeneticProfileId(gp.getGeneticProfileId());
         return geneticProfile;
     }
 
