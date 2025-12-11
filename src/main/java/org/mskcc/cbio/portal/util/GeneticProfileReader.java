@@ -59,6 +59,8 @@ import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_L
  */
 public class GeneticProfileReader {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GeneticProfileReader.class);
+
     /**
      * Load a GeneticProfile. Get a stableID from a description file. If the same
      * GeneticProfile already exists in the dbms use it, otherwise create a new
@@ -146,7 +148,9 @@ public class GeneticProfileReader {
         }
 
         // add new genetic profile
-        DaoGeneticProfile.addGeneticProfile(geneticProfile);
+        int rows = DaoGeneticProfile.addGeneticProfile(geneticProfile);
+        log.info("Inserted " + rows + " row(s) into genetic_profile table for genetic profile "
+                + geneticProfile.getStableId());
 
         // add genetic profile link if set
         if (geneticProfileLink != null) {

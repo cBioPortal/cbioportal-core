@@ -34,6 +34,7 @@ package org.mskcc.cbio.portal.dao;
 
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.slf4j.Logger;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -52,6 +53,7 @@ import java.util.Map;
  * Data access object for Genetic Profile table
  */
 public final class DaoGeneticProfile {
+    private static final Logger log = org.slf4j.LoggerFactory.getLogger(DaoGeneticProfile.class);
     private DaoGeneticProfile() {}
     private static final String GENETIC_PROFILE_SEQUENCE = "seq_genetic_profile";
     private static final Map<String,GeneticProfile> byStableId = new HashMap<String,GeneticProfile>();
@@ -71,6 +73,7 @@ public final class DaoGeneticProfile {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
+            log.info("Connection obtained for recaching genetic_profile: " + con);
 
             pstmt = con.prepareStatement
                     ("SELECT * FROM genetic_profile");
@@ -100,12 +103,15 @@ public final class DaoGeneticProfile {
     public static int addGeneticProfile(GeneticProfile profile) throws DaoException {
         //FIXME: this cast may cause problems in the future
         profile.setGeneticProfileId((int) ClickHouseAutoIncrement.nextId(GENETIC_PROFILE_SEQUENCE));
+        log.info("Assigned genetic profile ID " + profile.getGeneticProfileId() +
+                " to stable ID " + profile.getStableId());
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         int rows = 0;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfile.class);
+            log.info("Connection obtained for inserting genetic_profile: " + con);
 
             pstmt = con.prepareStatement
                     ("INSERT INTO genetic_profile (`genetic_profile_id`, `stable_id`, `cancer_study_id`, "+
