@@ -32,6 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
+import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CancerStudyTags;
 import org.mskcc.cbio.portal.util.CancerStudyReader;
@@ -91,6 +93,11 @@ public class ImportCancerStudy extends ConsoleRunnable {
      * @param args  the arguments given on the command line
      */
     public static void main(String[] args) {
+        try {
+            ClickHouseAutoIncrement.initializeAllCountersIfNecessary();
+        } catch (DaoException e) {
+            throw new RuntimeException(e);
+        }
         ConsoleRunnable runner = new ImportCancerStudy(args);
         runner.runInConsole();
     }

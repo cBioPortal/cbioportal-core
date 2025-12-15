@@ -1,5 +1,10 @@
 package org.mskcc.cbio.portal.dao;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -31,8 +36,8 @@ public final class ClickHouseAutoIncrement {
 
     private static final Map<String, SequenceConfig> CONFIG = new ConcurrentHashMap<>();
     private static final Map<String, AtomicLong> COUNTERS = new ConcurrentHashMap<>();
-    private static final String SEQUENCE_TABLE = "cbioportal_sequence_state";
-    private static final AtomicBoolean SEQUENCE_TABLE_READY = new AtomicBoolean(false);
+    private static final Map<String, AtomicLong> PERSISTED_COUNTERS = new ConcurrentHashMap<>();
+    private static final String SEQUENCE_STATE_FILEPATH = "/data/cbioportal_sequence_state";
 
     static {
         register("seq_reference_genome", "reference_genome", "reference_genome_id");
@@ -53,6 +58,8 @@ public final class ClickHouseAutoIncrement {
         register("seq_copy_number_seg", "copy_number_seg", "seg_id");
         register("seq_copy_number_seg_file", "copy_number_seg_file", "seg_file_id");
         register("seq_clinical_event", "clinical_event", "clinical_event_id");
+        Thread persistingHook = new Thread(() -> ClickHouseAutoIncrement.persistSequences());
+        Runtime.getRuntime().addShutdownHook(persistingHook);
     }
 
     private static void register(String sequenceName, String tableName, String columnName) {
@@ -64,80 +71,64 @@ public final class ClickHouseAutoIncrement {
         if (config == null) {
             throw new DaoException("Unknown sequence: " + sequenceName);
         }
+        initializeAllCountersIfNecessary();
         AtomicLong counter = COUNTERS.get(sequenceName);
         if (counter == null) {
-            synchronized (ClickHouseAutoIncrement.class) {
-                counter = COUNTERS.get(sequenceName);
-                if (counter == null) {
-                    long current = initializeCounter(sequenceName, config);
-                    counter = new AtomicLong(current);
-                    COUNTERS.put(sequenceName, counter);
-                }
-            }
+            throw new DaoException("Unable to initialize sequence: " + sequenceName);
         }
         long next = counter.incrementAndGet();
-        persistLastValue(sequenceName, next);
         return next;
     }
 
     private static long initializeCounter(String sequenceName, SequenceConfig config) throws DaoException {
-        ensureSequenceTableExists();
         long persisted = fetchPersistedMax(sequenceName);
         long tableMax = fetchCurrentMax(config);
         long current = Math.max(persisted, tableMax);
-        if (current != persisted) {
-            persistLastValue(sequenceName, current);
-        }
         return current;
     }
 
-    private static void ensureSequenceTableExists() throws DaoException {
-        if (SEQUENCE_TABLE_READY.get()) {
+    public static void initializeAllCountersIfNecessary() throws DaoException {
+        if (! COUNTERS.isEmpty()) {
             return;
         }
         synchronized (ClickHouseAutoIncrement.class) {
-            if (SEQUENCE_TABLE_READY.get()) {
-                return;
+            for (Map.Entry<String, SequenceConfig> entry : CONFIG.entrySet()) {
+                String sequenceName = entry.getKey();
+                SequenceConfig config = entry.getValue();
+                long current = initializeCounter(sequenceName, config);
+                AtomicLong counter = new AtomicLong(current);
+                COUNTERS.put(sequenceName, counter);
             }
-            Connection con = null;
-            PreparedStatement stmt = null;
+        }
+    }
+
+    private static void readPersistedFileIfNecessary() throws DaoException{
+        if (! PERSISTED_COUNTERS.isEmpty()) {
+            return;
+        }
+        synchronized (ClickHouseAutoIncrement.class) {
             try {
-                con = JdbcUtil.getDbConnection(ClickHouseAutoIncrement.class);
-                stmt = con.prepareStatement(
-                    "CREATE TABLE IF NOT EXISTS " + SEQUENCE_TABLE + " ("
-                        + "sequence_name String, "
-                        + "last_value UInt64"
-                        + ") ENGINE = ReplacingMergeTree "
-                        + "ORDER BY sequence_name");
-                stmt.execute();
-                SEQUENCE_TABLE_READY.set(true);
-            } catch (SQLException ex) {
+                File f = new File(SEQUENCE_STATE_FILEPATH);
+                if (!f.exists()) {
+                    return;
+                }
+                FileInputStream fis = new FileInputStream(f);
+                ObjectInputStream ois = new ObjectInputStream(fis);
+                Map<String, AtomicLong> read_persisted_counters = (ConcurrentHashMap) ois.readObject();
+                PERSISTED_COUNTERS.putAll(read_persisted_counters);
+            } catch (Exception ex) {
                 throw new DaoException(ex);
-            } finally {
-                JdbcUtil.closeAll(ClickHouseAutoIncrement.class, con, stmt, null);
             }
         }
     }
 
     private static long fetchPersistedMax(String sequenceName) throws DaoException {
-        Connection con = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(ClickHouseAutoIncrement.class);
-            stmt = con.prepareStatement(
-                "SELECT max(last_value) FROM " + SEQUENCE_TABLE + " WHERE sequence_name = ?");
-            stmt.setString(1, sequenceName);
-            rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getLong(1);
-            }
+        readPersistedFileIfNecessary();
+        AtomicLong persistedMax = PERSISTED_COUNTERS.get(sequenceName);
+        if (persistedMax == null) {
             return 0L;
-        } catch (SQLException ex) {
-            throw new DaoException(ex);
-        } finally {
-            JdbcUtil.closeAll(ClickHouseAutoIncrement.class, con, stmt, rs);
         }
+        return persistedMax.get();
     }
 
     private static long fetchCurrentMax(SequenceConfig config) throws DaoException {
@@ -159,25 +150,20 @@ public final class ClickHouseAutoIncrement {
         }
     }
 
-    private static void persistLastValue(String sequenceName, long value) throws DaoException {
-        Connection con = null;
-        PreparedStatement stmt = null;
+    public static void persistSequences() {
+        if (COUNTERS.isEmpty()) {
+            return;
+        }
         try {
-            con = JdbcUtil.getDbConnection(ClickHouseAutoIncrement.class);
-            stmt = con.prepareStatement(
-                "INSERT INTO " + SEQUENCE_TABLE + " (sequence_name, last_value) VALUES (?, ?)");
-            stmt.setString(1, sequenceName);
-            stmt.setLong(2, value);
-            stmt.executeUpdate();
-        } catch (SQLException ex) {
-            throw new DaoException(ex);
-        } finally {
-            JdbcUtil.closeAll(ClickHouseAutoIncrement.class, con, stmt, null);
+            FileOutputStream fos = new FileOutputStream(SEQUENCE_STATE_FILEPATH);
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(COUNTERS);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
     }
 
     public static void reset() {
         COUNTERS.clear();
-        SEQUENCE_TABLE_READY.set(false);
     }
 }
