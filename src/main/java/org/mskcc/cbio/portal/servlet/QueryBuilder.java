@@ -640,23 +640,6 @@ public class QueryBuilder extends HttpServlet {
             RequestDispatcher dispatcher =
                 getServletContext().getRequestDispatcher("/WEB-INF/jsp/visualize.jsp");
             dispatcher.forward(request, response);
-        } else if (tabIndex != null && tabIndex.equals(QueryBuilder.TAB_DOWNLOAD)) {
-            // include downloadable data in session
-            ArrayList<DownloadLink> downloadLinkSet = new ArrayList<>();
-            for(GeneticProfile profile : geneticProfileMap.values()){
-                String _sampleIdsStr = StringUtils.join(studySampleMap.get(DaoCancerStudy.getCancerStudyByInternalId(profile.getCancerStudyId()).getCancerStudyStableId()), " ");
-                if (_sampleIdsStr != null && _sampleIdsStr.length() != 0) {
-                    GetProfileData remoteCall =
-                        new GetProfileData(profile, new ArrayList<>(Arrays.asList(decodedGeneList.split("( )|(\\n)"))), _sampleIdsStr);
-                    DownloadLink downloadLink = new DownloadLink(profile, new ArrayList<>(Arrays.asList(decodedGeneList.split("( )|(\\n)"))), sampleIdsStr,
-                        remoteCall.getRawContent());
-                    downloadLinkSet.add(downloadLink);
-                }
-            }
-            request.getSession().setAttribute(DOWNLOAD_LINKS, downloadLinkSet);
-
-            ShowData.showDataAtSpecifiedIndex(servletContext, request,
-                response, 0, xdebug);
         }
     }
 

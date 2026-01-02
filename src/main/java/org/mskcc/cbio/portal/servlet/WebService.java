@@ -224,9 +224,6 @@ public class WebService extends HttpServlet {
             if (cmd.equals("getGeneticProfiles")) {
                 // PROVIDES CANCER_STUDY_ID
                 getGeneticProfiles(httpServletRequest, writer);
-            } else if (cmd.equals("getProfileData")) {
-                // PROVIDES genetic_profile_id
-                getProfileData(httpServletRequest, writer);
             } else if (cmd.equals("getCaseLists")) {
                 // PROVIDES CANCER_STUDY_ID
                 getSampleLists(httpServletRequest, writer);
@@ -321,29 +318,6 @@ public class WebService extends HttpServlet {
             throws DaoException, ProtocolException, IOException {
         List<String> sampleList = WebserviceParserUtils.getSampleIds(request);
         validateRequestForProfileOrMutationData(request);
-        ArrayList<String> geneticProfileIdList = WebserviceParserUtils.getGeneticProfileId(request);
-        ArrayList<String> targetGeneList = getGeneList(request);
-
-        if (targetGeneList.size() > 1 && geneticProfileIdList.size() > 1) {
-            throw new ProtocolException
-                    ("You can specify multiple genes or multiple genetic profiles, " +
-                            "but not both at once!");
-        }
-
-        Boolean suppressMondrianHeader = Boolean.parseBoolean(request.getParameter(SUPPRESS_MONDRIAN_HEADER));
-        GetProfileData getProfileData = new GetProfileData(geneticProfileIdList, targetGeneList,
-                sampleList, suppressMondrianHeader);
-
-        String format = WebserviceParserUtils.getFormat(request);
-
-        if (format == null || "txt".equals(format.toLowerCase())) {
-            // default to txt if format parameter is not specified
-            String out = getProfileData.getRawContent();
-            writer.print(out);
-        }
-        else if ("json".equals(format.toLowerCase())) {
-            JSONArray.writeJSONString(getProfileData.getJson(), writer);
-        }
     }
 
     private void getClinicalData(HttpServletRequest request, PrintWriter writer)
