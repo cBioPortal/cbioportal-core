@@ -160,18 +160,6 @@ public class GlobalProperties {
     public static final String MERGE_ONCOKB_ICONS_BY_DEFAULT = "oncokb.merge_icons_by_default";
     public static final String ONCOKB_TOKEN = "oncokb.token";
 
-    private static String sessionServiceURL;
-    @Value("${session.service.url:}") // default is empty string
-    public void setSessionServiceURL(String property) { sessionServiceURL = property; }
-
-    private static String sessionServiceUser;
-    @Value("${session.service.user:}") // default is empty string
-    public void setSessionServiceUser(String property) { sessionServiceUser = property; }
-
-    private static String sessionServicePassword;
-    @Value("${session.service.password:}") // default is empty string
-    public void setSessionServicePassword(String property) { sessionServicePassword = property; }
-
     private static String frontendConfig;
     @Value("${frontend.config:}") // default is empty string
     public void setFrontendConfig(String property) { frontendConfig = property; }
@@ -915,21 +903,6 @@ public class GlobalProperties {
         return null;
     }
    
-    public static String getSessionServiceUrl()
-    {
-        return sessionServiceURL;
-    }
-
-    public static String getSessionServiceUser()
-    {
-        return sessionServiceUser;
-    }
-
-    public static String getSessionServicePassword()
-    {
-        return sessionServicePassword;
-    }
-
     public static String getCivicUrl() {
         return civicUrl;
     }

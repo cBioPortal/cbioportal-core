@@ -67,12 +67,6 @@ public class ProgressMonitor {
         
     }
     
-    private static boolean isRunningOnServer() {
-        // FXIME because we bring core as dependency into cbioportal-core, we have web server classes in classpath
-        // But we run loader as standalone java process atm, not from the web server.
-        // return ServerDetector.getServerId() != null;
-        return false;
-    } 
     /**
      * Sets Console Flag.
      * When set to true Progress Monitor Messages are displayed to System.out.
@@ -115,10 +109,10 @@ public class ProgressMonitor {
      * Whether the progress (in % complete and memory used) should be 
      * printed to the console. 
      * 
-     * @return returns true if !isRunningOnServer() and progressMonitor.showProgress==true
+     * @return returns true if progressMonitor.showProgress==true
      */
     public static boolean isShowProgress() {
-    	return !isRunningOnServer() && progressMonitor.showProgress;
+    	return progressMonitor.showProgress;
     }
     
     /**
@@ -127,7 +121,7 @@ public class ProgressMonitor {
      * @return Boolean Flag.
      */
     public static boolean isConsoleMode() {
-        return !isRunningOnServer() && progressMonitor.consoleMode;
+        return progressMonitor.consoleMode;
     }
 
     /**
@@ -202,8 +196,6 @@ public class ProgressMonitor {
      * @return String Object.
      */
     public static String getLog() {
-        if (isRunningOnServer())
-            return null;
         return progressMonitor.log.toString();
     }
 
@@ -213,8 +205,6 @@ public class ProgressMonitor {
      * @param currentMessage Current Task Message.
      */
     public static void setCurrentMessage(String currentMessage) {
-        if (isRunningOnServer())
-            return;
         progressMonitor.currentMessage = currentMessage;
         progressMonitor.log.append(currentMessage + "\n");
         if (progressMonitor.consoleMode) {
@@ -224,8 +214,6 @@ public class ProgressMonitor {
 
     public static void logWarning(String warning) {
         logger.warn(warning);
-        if (isRunningOnServer())
-            return;
         progressMonitor.warnings.add(warning);
         if (!progressMonitor.warningCounts.containsKey(warning)) {
             progressMonitor.warningCounts.put(warning, 0);
@@ -241,8 +229,6 @@ public class ProgressMonitor {
     
     public static ArrayList<String> getWarnings() {
         ArrayList<String> ret = new ArrayList<>();
-        if (isRunningOnServer())
-            return ret;
         for(Iterator<String> sit = progressMonitor.warnings.iterator(); sit.hasNext(); ) {
             String w = sit.next();
             ret.add(w + "; "+progressMonitor.warningCounts.get(w)+"x");
