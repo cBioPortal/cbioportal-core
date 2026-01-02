@@ -49,7 +49,6 @@ import org.mskcc.cbio.portal.model.Drug;
 import org.mskcc.cbio.portal.model.DrugInteraction;
 import org.mskcc.cbio.portal.model.Interaction;
 import org.mskcc.cbio.portal.scripts.drug.AbstractDrugInfoImporter;
-import org.mskcc.cbio.portal.web_api.ConnectionManager;
 import org.mskcc.cbio.portal.util.GlobalProperties;
 
 /**
@@ -90,34 +89,6 @@ public final class NetworkIO {
         }
 
         return sbUrl.toString();
-    }
-
-    public static Network readNetworkFromCPath2(Set<String> genes, boolean removeSelfEdge)
-            throws DaoException, IOException {
-        String cPath2Url = getCPath2URL(genes);
-
-        MultiThreadedHttpConnectionManager connectionManager =
-                ConnectionManager.getConnectionManager();
-        HttpClient client = new HttpClient(connectionManager);
-
-        GetMethod method = new GetMethod(cPath2Url);
-        try {
-            int statusCode = client.executeMethod(method);
-            if (statusCode == HttpStatus.SC_OK) {
-                Network network = readNetworkFromCPath2(method.getResponseBodyAsStream(), true);
-                Set<Node> seedNodes = addMissingGenesAndReturnSeedNodes(network, genes);
-                classifyNodes(network, seedNodes);
-                return network;
-            } else {
-                //  Otherwise, throw HTTP Exception Object
-                throw new HttpException(statusCode + ": " + HttpStatus.getStatusText(statusCode)
-                        + " Base URL:  " + cPath2Url);
-            }
-
-        } finally {
-            //  Must release connection back to Apache Commons Connection Pool
-            method.releaseConnection();
-        }
     }
 
     /**

@@ -867,17 +867,6 @@ public class GlobalProperties {
         return "study?id=" + cancerStudyId;
     }
 
-    public static String getLinkToIGVForBAM(String cancerStudyId, String caseId, String locus)
-    {
-        return ("igvlinking.json?" +
-				org.mskcc.cbio.portal.servlet.IGVLinkingJSON.CANCER_STUDY_ID +
-                "=" + cancerStudyId +
-				"&" + org.mskcc.cbio.portal.servlet.IGVLinkingJSON.CASE_ID +
-				"=" + caseId +
-				"&" + org.mskcc.cbio.portal.servlet.IGVLinkingJSON.LOCUS +
-				"=" + locus);
-    }
-
     public static String getDigitalSlideArchiveIframeUrl(String caseId)
     {
         String url = portalProperties.getProperty(PATIENT_VIEW_DIGITAL_SLIDE_IFRAME_URL);

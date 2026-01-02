@@ -44,18 +44,7 @@ import org.springframework.stereotype.Component;
 public class SpringUtil {
     private static final Logger log = LoggerFactory.getLogger(SpringUtil.class);
 
-    private static AccessControl accessControl;
     private static ApplicationContext applicationContext;
-
-    @Autowired
-    public void setAccessControl(AccessControl accessControl) {
-        log.debug("Setting access control");
-        SpringUtil.accessControl = accessControl;
-    }
-
-    public static AccessControl getAccessControl() {
-        return accessControl;
-    }
 
     public static synchronized void initDataSource() {
         if (SpringUtil.applicationContext == null) {
