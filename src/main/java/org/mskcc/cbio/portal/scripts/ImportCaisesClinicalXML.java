@@ -65,9 +65,6 @@ public class ImportCaisesClinicalXML extends ConsoleRunnable {
     }
     
     public void run() {
-//        args = new String[] {"--data","/Users/jgao/projects/cbio-portal-data/studies/prad/su2c/data_clinical_caises.xml",
-//            "--meta","/Users/jgao/projects/cbio-portal-data/studies/prad/su2c/meta_clinical_caises.txt",
-//            "--loadMode", "bulkLoad"};
         try {
             String progName = "ImportCaisesClinicalXML";
             String description = "Import clinical Caises XML files";

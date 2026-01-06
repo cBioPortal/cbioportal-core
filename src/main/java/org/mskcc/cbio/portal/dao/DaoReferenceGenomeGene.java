@@ -18,7 +18,6 @@
 package org.mskcc.cbio.portal.dao;
 
 import org.mskcc.cbio.portal.model.ReferenceGenomeGene;
-import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

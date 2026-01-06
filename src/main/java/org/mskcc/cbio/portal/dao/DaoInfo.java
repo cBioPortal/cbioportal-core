@@ -32,7 +32,6 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import java.lang.StringBuilder;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

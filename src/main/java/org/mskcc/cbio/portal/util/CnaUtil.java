@@ -1,13 +1,11 @@
 package org.mskcc.cbio.portal.util;
 
-import com.fasterxml.jackson.core.*;
 import org.cbioportal.legacy.model.*;
 import org.mskcc.cbio.maf.NamespaceColumnParser;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.GeneticProfile;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
 import java.util.*;
@@ -28,7 +26,6 @@ public class CnaUtil {
 
     public static final String CBP_DRIVER_TIERS_ANNOTATION = "cbp_driver_tiers_annotation";
     private NamespaceColumnParser namespaceColumnParser;
-    private ObjectMapper objectMapper = new ObjectMapper();
 
     public CnaUtil(String[] headerParts, Set<String> namespaces) {
         this.columnIndexMap = new HashMap<>();
@@ -86,10 +83,6 @@ public class CnaUtil {
             )
         );
         return cna;
-    }
-    
-    private String convertMapToJsonString(Map<String, Map<String, Object>> map) throws JsonProcessingException {
-        return this.objectMapper.writeValueAsString(map);
     }
     
     public long getEntrezSymbol(String[] parts) {

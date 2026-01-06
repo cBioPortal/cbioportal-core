@@ -32,18 +32,11 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
-import org.springframework.stereotype.Component;
 
-@Component
+//TODO Has to be removed after rewriting dump portal info and dropping cbioportal de
 public class SpringUtil {
-    private static final Logger log = LoggerFactory.getLogger(SpringUtil.class);
-
     private static ApplicationContext applicationContext;
 
     public static synchronized void initDataSource() {
@@ -71,13 +64,4 @@ public class SpringUtil {
         SpringUtil.applicationContext = context;
     }
 
-    /**
-     * Directly injects a context into the class, so we don't need to open
-     * any more XML files.
-     *
-     * @param context
-     */
-    public static synchronized void initDataSource(ApplicationContext context) {
-        SpringUtil.applicationContext = context;
-    }
 }

@@ -32,9 +32,6 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
@@ -131,32 +128,6 @@ public class GenerateMutationData {
 
 		// outta here
 		buf.close();
-		return toReturn;
-	}
-
-	/**
-	 * Returns hash map of all gene, case combinations set to NaN.
-	 *
-	 * @param allCasesList List
-	 * @return Map<String, String>
-	 */
-	private Map<String,String> getMutationMap(List<String> allCasesList)
-            throws DaoException, IOException {
-
-		// map to return
-		Map<String,String> toReturn = new HashMap<String,String>();
-
-        DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
-		ArrayList<CanonicalGene> geneList = daoGene.getAllGenes();
-
-		for (CanonicalGene canonicalGene : geneList) {
-			for (String caseId : allCasesList) {
-				toReturn.put(Long.toString(canonicalGene.getEntrezGeneId())
-                        + GenerateMutationData.MAP_KEY_DELIMETER + caseId, "NaN");
-			}
-		}
-
-		// outta here
 		return toReturn;
 	}
 

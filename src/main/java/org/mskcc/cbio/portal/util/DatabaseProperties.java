@@ -32,8 +32,6 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.mskcc.cbio.portal.util.GlobalProperties;
-
 /**
  * Stores db props (name, id, pw, host) from application.properties
  * and makes them accessible.

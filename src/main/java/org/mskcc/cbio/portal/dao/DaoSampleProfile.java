@@ -32,9 +32,6 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 
 import java.sql.Connection;
@@ -44,9 +41,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
