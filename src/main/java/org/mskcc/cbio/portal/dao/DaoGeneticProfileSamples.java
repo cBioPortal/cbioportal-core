@@ -32,8 +32,6 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.Sample;
-
 import java.sql.*;
 import java.util.*;
 

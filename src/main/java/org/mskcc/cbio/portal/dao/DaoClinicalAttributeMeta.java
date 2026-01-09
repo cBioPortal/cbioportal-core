@@ -38,7 +38,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.sql.*;
 import java.util.*;
-import org.mskcc.cbio.portal.util.InternalIdUtil;
 
 /**
  * Data Access Object for `clinical_attribute_meta` table

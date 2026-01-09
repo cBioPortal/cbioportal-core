@@ -32,16 +32,12 @@
 
 package org.mskcc.cbio.portal.validate;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Gistic;
 
 import java.util.ArrayList;
 
-// todo: later this can be refactored into a factory method.
 public class ValidateGistic {
-    private static final Logger logger = LoggerFactory.getLogger(ValidateGistic.class);
 
     /**
      * Validates a gistic bean object according to some basic "business logic".
@@ -81,78 +77,5 @@ public class ValidateGistic {
         }
 
         // todo: how do you validate ampdel?
-    }
-
-    /**
-     * Checks to make sure that we know all the fields that we are getting.
-     * @param fields
-     * @throws validationException
-     */
-
-    public static void validateFieldNames_tabularFile(String[] fields) throws validationException {
-        int fields_len = fields.length;
-
-        for (int i = 0; i < fields_len; i+=1) {
-            // each field should be one of the following
-            if (!(fields[i].equals("chromosome")
-                    || fields[i].equals("peak_start")
-                    || fields[i].equals("peak_end")
-                    || fields[i].equals("genes_in_region")
-                    || fields[i].equals("genes_in_peak")
-                    || fields[i].equals("n_genes_on_chip")
-                    || fields[i].equals("genes_on_chip")
-                    || fields[i].equals("top 3")
-                    || fields[i].equals("n_genes_in_region")
-                    || fields[i].equals("n_genes_in_peak")
-                    || fields[i].equals("region_start")
-                    || fields[i].equals("region_end")
-                    || fields[i].equals("enlarged_peak_start")
-                    || fields[i].equals("enlarged_peak_end")
-                    || fields[i].equals("index")))
-            {
-//                System.out.println(fields.toString());
-                throw new validationException(fields[i]);
-            }
-        }
-    }
-
-    /**
-     * Checks to make sure that we know all the fields that we are getting.
-     * @param cols
-     * @throws validationException
-     */
-    public static void validateNonTabularRow(String[] cols) throws validationException {
-        int cols_len = cols.length;
-
-        String field_name = cols[0];
-
-        for (int i = 0; i < cols_len; i+=1) {
-            // each field should be one of the following
-            if (!((field_name.equals("q value")
-                    || field_name.equals("residual q value"))
-                    || field_name.equals("genes in wide peak")
-                    || field_name.equals("cytoband")
-                    || field_name.equals("")                    // likely to actually contain a gene
-                    || field_name.equals("wide peak boundaries"))) {
-                {
-                    throw new validationException(field_name);
-                }
-            }
-        }
-    }
-
-    /**
-     * Validates that two files are either both amplified for both deleted
-     * @param ampdel1       ampdel from one gistic file
-     * @param ampdel2       ampdel from another gistic file
-     * @throws validationException
-     */
-    public static void validateAmpdels(boolean ampdel1, boolean ampdel2) throws validationException {
-
-        if (ampdel1 != ampdel2) {
-            String x = ampdel1 == Gistic.AMPLIFIED ? "Amplified" : "Deleted";
-            String y = ampdel2 == Gistic.AMPLIFIED ? "Amplified" : "Deleted";
-            throw new validationException(x + " " + y);
-        }
     }
 }

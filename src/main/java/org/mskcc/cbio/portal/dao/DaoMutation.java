@@ -290,7 +290,7 @@ public final class DaoMutation {
     }
 
     /**
-     * Used by GeneticAlterationUtil (which is used by GetProfileData via webservice.do).  This use comes out of an
+     * Used by GeneticAlterationUtil (which is used by GetProfileData).  This use comes out of an
      * effort to discontinue the use of the business module.
      */
     public static ArrayList<ExtendedMutation> getMutations (int geneticProfileId, Collection<Integer> targetSampleList,

@@ -59,32 +59,6 @@ public class GeneticProfileUtil {
         return null;
     }
 
-    /**
-     * Returns true if Any of the Profiles Selected by the User Refer to mRNA Expression
-     * outlier profiles.
-     *
-     * @param geneticProfileIdSet   Set of Chosen Profiles IDs.
-     * @param profileList           List of Genetic Profiles.
-     * @return true or false.
-     */
-    public static boolean outlierExpressionSelected(HashSet<String> geneticProfileIdSet,
-            ArrayList<GeneticProfile> profileList) {
-        Iterator<String> geneticProfileIdIterator = geneticProfileIdSet.iterator();
-        while (geneticProfileIdIterator.hasNext()) {
-            String geneticProfileId = geneticProfileIdIterator.next();
-            GeneticProfile geneticProfile = getProfile (geneticProfileId, profileList);
-            if (geneticProfile != null && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.MRNA_EXPRESSION) {
-                String profileName = geneticProfile.getProfileName();
-                if (profileName != null) {
-                    if (profileName.toLowerCase().contains("outlier")) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
     public static int getGenePanelId(String panelId) {
         GenePanel genePanel = DaoGenePanel.getGenePanelByStableId(panelId);
         if (genePanel == null) {
@@ -93,12 +67,4 @@ public class GeneticProfileUtil {
         return genePanel.getInternalId();
     }
 
-    public static boolean geneInPanel(CanonicalGene gene, GenePanel genePanel) {
-         for (CanonicalGene panelGene : genePanel.getGenes()) {
-            if (panelGene.getEntrezGeneId() == gene.getEntrezGeneId()) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

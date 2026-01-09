@@ -70,9 +70,9 @@ This section guides you through the process of running integration tests by sett
 
 1. **Download the cBioPortal Database Schema**: To begin, you need to download the database schema for the version of cBioPortal you are interested in testing.
 Locate the pom.xml file in your project directory and check the values of `<db.version>` and `<cbioportal.version>` to determine the correct version.
-Replace `v6.0.3` in the command below with your desired cBioPortal version:
+Replace `v6.4.1` in the command below with your desired cBioPortal version:
 ```
-curl -o cgds.sql https://raw.githubusercontent.com/cBioPortal/cbioportal/v6.0.3/src/main/resources/db-scripts/cgds.sql
+curl -o cgds.sql https://raw.githubusercontent.com/cBioPortal/cbioportal/v6.4.1/src/main/resources/db-scripts/cgds.sql
 ```
 
 2. **Launch the MySQL Server Container**: Use Docker to start a MySQL server pre-loaded with the cBioPortal schema. Execute the following command from the root of your project directory.

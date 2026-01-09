@@ -17,7 +17,6 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.math.BigInteger;
 import java.util.Date;
 import org.mskcc.cbio.portal.util.*;
 

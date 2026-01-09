@@ -32,47 +32,6 @@
 
 package org.mskcc.cbio.portal.util;
 
-// imports
-import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.web_api.ProtocolException;
-
-import org.springframework.security.access.prepost.PostFilter;
-import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.List;
-
-/**
- * Utilities for managing access control.
- *
- * @author Benjamin Gross
- */
 public interface AccessControl {
-
     public static final String ALL_CANCER_STUDIES_ID = "all";
-    public static final String ALL_TCGA_CANCER_STUDIES_ID = "all_tcga";
-    public static final String ALL_TARGET_CANCER_STUDIES_ID = "all_nci_target";
-    public static final String MULTIPLE_CANCER_STUDIES_ID = "multiple";
-
-    /**
-     * Gets Cancer Studies. Used by QueryBuilder.
-     *
-     * @return List<CancerStudy>
-     * @throws DaoException         Database Error.
-     * @throws ProtocolException    Protocol Error.
-     */
-    @PostFilter("hasPermission(filterObject.getCancerStudyStableId(), 'CancerStudyId', T(org.cbioportal.legacy.utils.security.AccessLevel).READ)")
-    List<CancerStudy> getCancerStudies() throws DaoException, ProtocolException;
-
-    /**
-     * Return true if the user can access the study, false otherwise.
-	 *
-     * @param stableStudyId
-     * @return ListCancerStudy
-     * @throws DaoException
-     */
-    @PostFilter("hasPermission(#stableStudyId, 'CancerStudyId', T(org.cbioportal.legacy.utils.security.AccessLevel).READ)")
-    List<CancerStudy> isAccessibleCancerStudy(String stableStudyId) throws DaoException;
-
-    UserDetails getUserDetails();
 }

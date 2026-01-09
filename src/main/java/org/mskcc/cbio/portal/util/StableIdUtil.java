@@ -33,9 +33,6 @@
 package org.mskcc.cbio.portal.util;
 
 import org.mskcc.cbio.portal.model.Sample;
-import org.mskcc.cbio.portal.model.Patient;
-import org.mskcc.cbio.portal.dao.DaoPatient;
-import org.mskcc.cbio.portal.dao.DaoSample;
 
 import java.util.*;
 import java.util.regex.*;

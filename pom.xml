@@ -3,14 +3,11 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-
 	<modelVersion>4.0.0</modelVersion>
 	<packaging>jar</packaging>
-
 	<groupId>org.mskcc.cbio</groupId>
 	<artifactId>core</artifactId>
 	<version>1.0.16</version>
-
 	<name>Portal Core</name>
 	<description>Core libraries shared among other modules</description>
 
@@ -23,24 +20,15 @@
 		<cbioportal.version>v6.4.1</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
 
-
 		<mysql_driver.version>8.0.28</mysql_driver.version>
 		<mysql_commons_lang3.version>3.13.0</mysql_commons_lang3.version>
 
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
 		<commons_io.version>2.14.0</commons_io.version>
-		<jung.version>2.1.1</jung.version>
 
 		<jackson.version>2.15.2</jackson.version>
-		<antlr.version>3.5.2</antlr.version>
-		<httpclient.version>4.5.13</httpclient.version>
 		<commons_cli.version>1.4</commons_cli.version>
-		<commons_httpclient.version>3.1</commons_httpclient.version>
 		<commons_text.version>1.9</commons_text.version>
-		<antisamy.version>1.4</antisamy.version>
-		<commons_fileupload.version>1.4</commons_fileupload.version>
-		<batik_codec.version>1.14</batik_codec.version>
-		<fop.version>2.6</fop.version>
 		<opencsv.version>2.4</opencsv.version>
 		<dom4j.version>1.6.1</dom4j.version>
 		<spring_starter_test.version>3.5.0</spring_starter_test.version>
@@ -50,7 +38,6 @@
 		<junitparams.version>1.1.0</junitparams.version>
 		<byte_buddy.version>1.14.9</byte_buddy.version>
 	</properties>
-
 
 	<dependencies>
 		<!-- cBioPortal Projects -->
@@ -71,7 +58,6 @@
 			<artifactId>commons-lang3</artifactId>
 			<version>${mysql_commons_lang3.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-dbcp2</artifactId>
@@ -87,22 +73,6 @@
 			<artifactId>commons-text</artifactId>
 			<version>${commons_text.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>commons-fileupload</groupId>
-			<artifactId>commons-fileupload</artifactId>
-			<version>${commons_fileupload.version}</version>
-		</dependency>
-		<!-- Jung Graph -->
-		<dependency>
-			<groupId>net.sf.jung</groupId>
-			<artifactId>jung-api</artifactId>
-			<version>${jung.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>net.sf.jung</groupId>
-			<artifactId>jung-graph-impl</artifactId>
-			<version>${jung.version}</version>
-		</dependency>
 
 		<!-- jackson -->
 		<dependency>
@@ -116,57 +86,12 @@
 			<version>${jackson.version}</version>
 		</dependency>
 
-		<!-- antlr -->
-		<dependency>
-			<groupId>org.antlr</groupId>
-			<artifactId>antlr-runtime</artifactId>
-			<version>${antlr.version}</version>
-		</dependency>
-
-		<!-- HTTPClient -->
-		<dependency>
-			<groupId>commons-cli</groupId>
-			<artifactId>commons-cli</artifactId>
-			<version>${commons_cli.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>commons-httpclient</groupId>
-			<artifactId>commons-httpclient</artifactId>
-			<version>${commons_httpclient.version}</version>
-		</dependency>
-
-		<!-- antisamy -->
-		<dependency>
-			<groupId>org.owasp</groupId>
-			<artifactId>antisamy</artifactId>
-			<version>${antisamy.version}</version>
-		</dependency>
-
-		<!-- svg to pdf converter -->
-		<dependency>
-			<groupId>org.apache.xmlgraphics</groupId>
-			<artifactId>batik-codec</artifactId>
-			<version>${batik_codec.version}</version>
-			<exclusions>
-				<exclusion>
-					<groupId>xalan</groupId>
-					<artifactId>xalan</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.xmlgraphics</groupId>
-			<artifactId>fop</artifactId>
-			<version>${fop.version}</version>
-		</dependency>
-
 		<!--xml parser-->
 		<dependency>
 			<groupId>dom4j</groupId>
 			<artifactId>dom4j</artifactId>
 			<version>${dom4j.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>au.com.bytecode</groupId>
 			<artifactId>opencsv</artifactId>
@@ -204,13 +129,11 @@
 			<version>${junitparams.version}</version>
 			<scope>test</scope>
 		</dependency>
-
 		<dependency>
 			<groupId>net.bytebuddy</groupId>
 			<artifactId>byte-buddy</artifactId>
 			<version>${byte_buddy.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
@@ -339,7 +262,6 @@
 			</plugin>
 		</plugins>
 	</build>
-
 
 	<repositories>
 		<repository>
