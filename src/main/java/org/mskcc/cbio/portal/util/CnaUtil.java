@@ -1,16 +1,15 @@
 package org.mskcc.cbio.portal.util;
 
-import org.cbioportal.legacy.model.*;
-import org.mskcc.cbio.maf.NamespaceColumnParser;
-import org.mskcc.cbio.maf.TabDelimitedFileUtil;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.CnaEvent;
-import org.mskcc.cbio.portal.model.GeneticProfile;
-
 import java.io.*;
 import java.util.*;
-
-import static org.mskcc.cbio.portal.scripts.ImportTabDelimData.*;
+import org.cbioportal.legacy.model.CNA;
+import org.mskcc.cbio.maf.NamespaceColumnParser;
+import org.mskcc.cbio.maf.TabDelimitedFileUtil;
+import org.mskcc.cbio.portal.dao.DaoCnaEvent;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 
 public class CnaUtil {
 
@@ -104,8 +103,8 @@ public class CnaUtil {
         String value = TabDelimitedFileUtil.getPartString(getColumnIndex(CnaUtil.VALUE), parts);
         String result = value;
         // temporary solution -- change partial deletion back to full deletion.
-        if (value.equals(CNA_VALUE_PARTIAL_DELETION)) {
-            result = CNA_VALUE_HOMOZYGOUS_DELETION;
+        if (value.equals(ImportTabDelimData.CNA_VALUE_PARTIAL_DELETION)) {
+            result = ImportTabDelimData.CNA_VALUE_HOMOZYGOUS_DELETION;
         }
         return Integer.valueOf(result).shortValue();
     }

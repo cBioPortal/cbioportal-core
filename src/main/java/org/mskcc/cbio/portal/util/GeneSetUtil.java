@@ -32,11 +32,9 @@
 
 package org.mskcc.cbio.portal.util;
 
+import java.io.*;
+import java.util.*;
 import org.mskcc.cbio.portal.model.SetOfGenes;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
 
 /**
  * Singleton to store arbitrary gene sets, to be displayed to the user.

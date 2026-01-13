@@ -32,6 +32,9 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
+import java.util.regex.*;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -53,19 +56,6 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.SurvivalAttributeUtil;
 import org.mskcc.cbio.portal.util.SurvivalAttributeUtil.SurvivalStatusAttributes;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-import java.util.regex.Matcher;
 
 public class ImportClinicalData extends ConsoleRunnable {
 

@@ -32,9 +32,9 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.io.Serializable;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.Serializable;
 
 /**
  * A TypeOfCancer is a clinical cancer type, such as Glioblastoma, Ovarian, etc.

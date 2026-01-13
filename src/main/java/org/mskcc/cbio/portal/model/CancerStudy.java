@@ -32,11 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.util.*;
 

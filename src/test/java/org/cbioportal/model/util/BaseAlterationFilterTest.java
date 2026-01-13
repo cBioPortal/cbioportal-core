@@ -1,11 +1,9 @@
 package org.cbioportal.legacy.model.util;
 
+import java.util.*;
 import org.cbioportal.legacy.model.BaseAlterationFilter;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class BaseAlterationFilterTest {
 

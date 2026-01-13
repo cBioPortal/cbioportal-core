@@ -32,6 +32,9 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.math.BigDecimal;
+import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
@@ -48,16 +51,6 @@ import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
 
 /**
  * Import Segment data into database.

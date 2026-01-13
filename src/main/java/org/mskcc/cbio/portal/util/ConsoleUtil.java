@@ -34,15 +34,13 @@ package org.mskcc.cbio.portal.util;
 
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-import java.util.List;
-
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
-import org.mskcc.cbio.portal.scripts.UsageException;
-
+import java.util.*;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.scripts.UsageException;
 
 /**
  * Misc Utility Methods for Console Applications.

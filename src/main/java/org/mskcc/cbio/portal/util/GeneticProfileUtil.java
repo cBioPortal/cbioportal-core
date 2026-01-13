@@ -32,10 +32,10 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.dao.DaoGenePanel;
-
 import java.util.*;
+import org.mskcc.cbio.portal.dao.DaoGenePanel;
+import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.GenePanel;
 
 /**
  * Genetic Profile Util Class.

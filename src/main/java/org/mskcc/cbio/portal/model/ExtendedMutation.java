@@ -33,7 +33,6 @@
 package org.mskcc.cbio.portal.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.mskcc.cbio.maf.MafUtil;
 

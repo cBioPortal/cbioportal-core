@@ -32,18 +32,13 @@
 
 package org.mskcc.cbio.portal.util;
 
-import static org.junit.Assert.*;
-
-import java.util.ArrayList;
-
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mskcc.cbio.portal.dao.DaoUser;
-import org.mskcc.cbio.portal.model.User;
 import java.io.*;
 import java.util.*;
-import static org.junit.Assert.*;
-import static org.hamcrest.CoreMatchers.*;
+import org.junit.runner.RunWith;
+import org.junit.Test;
+import org.mskcc.cbio.portal.dao.DaoUser;
+import org.mskcc.cbio.portal.model.User;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * JUnit test for DaoUser class.

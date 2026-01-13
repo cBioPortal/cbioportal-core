@@ -1,12 +1,11 @@
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
-import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.io.File;
+import org.springframework.transaction.TransactionStatus;
 
 /**
  * A high-level script runner than can be used to run a batch of scripts within a 

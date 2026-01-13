@@ -33,8 +33,7 @@
 package org.mskcc.cbio.portal.model;
 
 import java.io.Serializable;
-import java.util.Properties;
-
+import java.util.*;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**

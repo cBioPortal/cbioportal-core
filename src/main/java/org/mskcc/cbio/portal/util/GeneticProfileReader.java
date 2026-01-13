@@ -32,22 +32,19 @@
 
 package org.mskcc.cbio.portal.util;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
-
+import java.io.*;
+import java.util.*;
 import java.util.stream.Collectors;
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfileLink;
+import org.mskcc.cbio.portal.dao.DaoInfo;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfileLink;
 import org.mskcc.cbio.portal.scripts.TrimmedProperties;
-
 import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
 import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 

@@ -32,10 +32,11 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
-
 import java.util.*;
+import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.model.Patient;
+import org.mskcc.cbio.portal.model.Sample;
 
 public class InternalIdUtil
 {

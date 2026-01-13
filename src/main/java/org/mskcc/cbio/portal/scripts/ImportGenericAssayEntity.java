@@ -36,14 +36,11 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import java.io.*;
+import java.util.*;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
 import org.cbioportal.legacy.model.EntityType;
 import org.cbioportal.legacy.model.GenericEntityProperty;
 import org.cbioportal.legacy.model.GeneticEntity;
@@ -51,10 +48,6 @@ import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import joptsimple.OptionParser;
-import joptsimple.OptionSet;
-import joptsimple.OptionSpec;
 import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**

@@ -28,7 +28,6 @@
 package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
-
 import org.mskcc.cbio.portal.model.GenesetHierarchy;
 
 public class DaoGenesetHierarchyNode {

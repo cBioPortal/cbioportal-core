@@ -32,10 +32,11 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.*;
-
 import java.sql.*;
 import java.util.*;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.SampleList;
+import org.mskcc.cbio.portal.model.SampleListCategory;
 
 /**
  * Data access object for patient_List table

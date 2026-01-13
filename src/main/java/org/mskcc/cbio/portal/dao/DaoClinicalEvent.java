@@ -32,9 +32,6 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.ClinicalEvent;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -43,6 +40,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.model.ClinicalEvent;
 
 /**
  *

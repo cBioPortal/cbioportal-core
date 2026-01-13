@@ -1,8 +1,8 @@
 package org.mskcc.cbio.portal.integrationTest.util;
 
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.beans.factory.annotation.Autowired;

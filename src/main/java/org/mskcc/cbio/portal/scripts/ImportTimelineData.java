@@ -32,6 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -41,17 +43,6 @@ import org.mskcc.cbio.portal.model.ClinicalEvent;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
 
 /**
  * Imports timeline data for display in patient view

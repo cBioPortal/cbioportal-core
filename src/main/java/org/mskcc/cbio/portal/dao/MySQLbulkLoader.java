@@ -32,13 +32,13 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.util.*;
-import org.apache.commons.io.FileUtils;
-
 import java.io.*;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
  * To speed up CGDS data loading, bulk load from files using MySQL "LOAD DATA INFILE" functionality.
@@ -242,7 +242,7 @@ public class MySQLbulkLoader {
          stmt.execute( command );
          
          int updateCount = stmt.getUpdateCount();
-         ProgressMonitor.setCurrentMessage(" --> records inserted into `"+tableName + "` table: " + updateCount);
+         ProgressMonitor.setCurrentMessage(" --> records inserted into `" + tableName + "` table: " + updateCount);
          int nLines = FileUtil.getNumLines(tempFileHandle);
          if (nLines!=updateCount && !relaxedMode) {
              String otherDetails = "";

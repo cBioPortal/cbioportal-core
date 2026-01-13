@@ -28,14 +28,16 @@
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.*;
+import java.util.*;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
@@ -49,12 +51,6 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.rules.SpringClassRule;
 import org.springframework.test.context.junit4.rules.SpringMethodRule;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Set;
-
 import static com.google.common.collect.Sets.newHashSet;
 import static org.junit.Assert.assertEquals;
 

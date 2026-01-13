@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.mskcc.cbio.portal.model;
+
 /**
  * Class to wrap Reference Genome Gene.
  * @author Kelsey Zhu

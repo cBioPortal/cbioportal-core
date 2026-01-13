@@ -17,6 +17,10 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -29,15 +33,6 @@ import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Command Line Tool to Import Reference Genome Used by Molecular Profiling.

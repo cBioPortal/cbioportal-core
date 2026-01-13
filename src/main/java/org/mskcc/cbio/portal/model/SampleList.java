@@ -32,8 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-// imports
-import java.util.ArrayList;
+import java.util.*;
 
 /**
  * Class to store information of patient list.

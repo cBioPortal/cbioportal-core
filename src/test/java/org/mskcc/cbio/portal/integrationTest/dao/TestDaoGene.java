@@ -32,8 +32,9 @@
 
 package org.mskcc.cbio.portal.integrationTest.dao;
 
-import org.junit.Test;
+import java.util.*;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
@@ -42,10 +43,6 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Arrays;
-import java.util.HashSet;
-
 import static org.junit.Assert.assertEquals;
 
 /**

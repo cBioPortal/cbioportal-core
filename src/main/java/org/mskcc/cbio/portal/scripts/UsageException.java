@@ -1,7 +1,6 @@
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.IOException;
-
+import java.io.*;
 import joptsimple.OptionParser;
 
 /**

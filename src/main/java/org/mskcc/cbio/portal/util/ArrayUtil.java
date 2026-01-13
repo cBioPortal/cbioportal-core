@@ -1,7 +1,6 @@
 package org.mskcc.cbio.portal.util;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class ArrayUtil {
     public static <K, V> Map<K, V> zip(K[] keys, V[] values) {

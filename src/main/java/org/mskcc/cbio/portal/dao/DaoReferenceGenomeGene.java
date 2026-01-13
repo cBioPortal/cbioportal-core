@@ -17,12 +17,8 @@
 
 package org.mskcc.cbio.portal.dao;
 
+import java.sql.*;
 import org.mskcc.cbio.portal.model.ReferenceGenomeGene;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 
 /**
  * Data Access Object to Reference Genome Gene Table

@@ -32,6 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
@@ -40,10 +42,6 @@ import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.io.File;
-import java.util.Set;
-
 import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 /**

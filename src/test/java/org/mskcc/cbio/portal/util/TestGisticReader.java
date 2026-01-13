@@ -32,8 +32,7 @@
 
 package org.mskcc.cbio.portal.util;
 
-import java.io.IOException;
-
+import java.io.*;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoException;
 

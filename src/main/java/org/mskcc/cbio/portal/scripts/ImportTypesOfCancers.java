@@ -40,7 +40,6 @@ import org.mskcc.cbio.portal.model.TypeOfCancer;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.TsvUtil;
-
 /**
  * Load all the types of cancer and their names from a file.
  *

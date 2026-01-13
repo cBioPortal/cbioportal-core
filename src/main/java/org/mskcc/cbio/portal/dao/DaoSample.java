@@ -32,6 +32,9 @@
 
 package org.mskcc.cbio.portal.dao;
 
+import java.sql.*;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.mskcc.cbio.portal.model.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
@@ -39,21 +42,6 @@ import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * DAO to `sample`.

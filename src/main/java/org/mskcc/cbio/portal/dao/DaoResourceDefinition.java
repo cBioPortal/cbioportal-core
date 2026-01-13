@@ -1,12 +1,10 @@
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.*;
-
-import org.apache.commons.lang3.StringUtils;
-import org.cbioportal.legacy.model.ResourceType;
-
 import java.sql.*;
 import java.util.*;
+import org.apache.commons.lang3.StringUtils;
+import org.cbioportal.legacy.model.ResourceType;
+import org.mskcc.cbio.portal.model.ResourceDefinition;
 
 /**
  * Data Access Object for `resource_definition` table

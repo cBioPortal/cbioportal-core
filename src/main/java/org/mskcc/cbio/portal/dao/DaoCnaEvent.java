@@ -32,12 +32,11 @@
 
 package org.mskcc.cbio.portal.dao;
 
+import java.sql.*;
+import java.util.*;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.Sample;
-
-import java.sql.*;
-import java.util.*;
 
 /**
  *

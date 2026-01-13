@@ -22,16 +22,10 @@
 */
 
 package org.mskcc.cbio.portal.dao;
-import org.mskcc.cbio.portal.model.StructuralVariant;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.sql.*;
+import java.util.*;
+import org.mskcc.cbio.portal.model.StructuralVariant;
 
 public class DaoStructuralVariant {
 

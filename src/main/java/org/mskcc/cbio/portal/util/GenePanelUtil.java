@@ -1,10 +1,9 @@
 package org.mskcc.cbio.portal.util;
 
-import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.model.CanonicalGene;
-
 import java.util.*;
 import java.util.stream.Collectors;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.model.CanonicalGene;
 
 /**
  * Utilities for operations on sets and importing/updating gene panels.

@@ -35,10 +35,10 @@ package org.mskcc.cbio.portal.dao;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import org.mskcc.cbio.portal.model.*;
-
-import static org.mskcc.cbio.portal.util.GenePanelUtil.*;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.GenePanel;
+import org.mskcc.cbio.portal.util.GenePanelUtil;
+import org.mskcc.cbio.portal.util.GenePanelUtil.Pair;
 
 /**
  * @author heinsz
@@ -232,7 +232,7 @@ public class DaoGenePanel {
      * @throws DaoException
      */
     public static void updatePreview(GenePanel genePanel, Set<CanonicalGene> incoming) throws DaoException {
-        Pair pair = getAddRemove(incoming, extractGenePanelGenes(genePanel.getInternalId()));
+        Pair pair = GenePanelUtil.getAddRemove(incoming, extractGenePanelGenes(genePanel.getInternalId()));
         String add = pair.add.stream()
             .map(CanonicalGene::toString)
             .collect(Collectors.joining(", "));
@@ -280,7 +280,7 @@ public class DaoGenePanel {
             }
 
             con = JdbcUtil.getDbConnection(DaoGenePanel.class);
-            Pair pair = getAddRemove(incoming, extractGenePanelGenes(internalId));
+            Pair pair = GenePanelUtil.getAddRemove(incoming, extractGenePanelGenes(internalId));
             Set<CanonicalGene> toAdd = pair.add;
             Set<CanonicalGene> toRemove = pair.remove;
 

@@ -22,7 +22,7 @@
 */
 package org.mskcc.cbio.portal.scripts;
 
-import java.util.Properties;
+import java.util.*;
 
 @SuppressWarnings("serial")
 /**

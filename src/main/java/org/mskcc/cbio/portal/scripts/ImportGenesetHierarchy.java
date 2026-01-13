@@ -30,8 +30,10 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import joptsimple.*;
-
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneset;
+import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyLeaf;
+import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyNode;
 import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.model.GenesetHierarchy;
 import org.mskcc.cbio.portal.model.GenesetHierarchyLeaf;

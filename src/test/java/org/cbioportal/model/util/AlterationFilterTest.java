@@ -1,13 +1,11 @@
 package org.cbioportal.legacy.model.util;
 
+import java.util.*;
 import org.cbioportal.legacy.model.AlterationFilter;
 import org.cbioportal.legacy.model.CNA;
 import org.cbioportal.legacy.model.MutationEventType;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class AlterationFilterTest {
 

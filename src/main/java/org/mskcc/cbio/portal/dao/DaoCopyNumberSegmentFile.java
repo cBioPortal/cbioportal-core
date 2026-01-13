@@ -32,9 +32,8 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.CopyNumberSegmentFile;
-
 import java.sql.*;
+import org.mskcc.cbio.portal.model.CopyNumberSegmentFile;
 
 public final class DaoCopyNumberSegmentFile {
     private DaoCopyNumberSegmentFile() {}
