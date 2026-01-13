@@ -22,16 +22,14 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.util.SpringUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.cbioportal.legacy.service.GenesetService;
-import org.cbioportal.legacy.service.GenePanelService;
-import org.cbioportal.legacy.web.config.CustomObjectMapper;
 
 import org.mskcc.cbio.portal.dao.*;
 import org.mskcc.cbio.portal.model.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.io.*;
@@ -50,8 +48,7 @@ public class DumpPortalInfo extends ConsoleRunnable {
     private static final String API_GENESETS = "/genesets";
     private static final String API_GENESET_VERSION = "/genesets/version";
     private static final String API_GENE_PANELS = "/gene-panels";
-    private static final int MAX_PAGE_SIZE = 10000000;
-    private static final int MIN_PAGE_NUMBER = 0;
+    private static final ObjectMapper OBJECT_MAPPER = createPortalObjectMapper();
 
     static class GeneAlias implements Serializable {
         public String alias;
@@ -84,12 +81,18 @@ public class DumpPortalInfo extends ConsoleRunnable {
         return new File(dirName, fileName);
     }
 
+    private static ObjectMapper createPortalObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING);
+        return mapper;
+    }
+
     private static void writeJsonFile(
-            List<? extends Serializable> objectList,
+            Object value,
             File outputFile) throws IOException {
-            ObjectMapper mapper = new CustomObjectMapper();
             try {
-                mapper.writeValue(outputFile, objectList);
+                OBJECT_MAPPER.writeValue(outputFile, value);
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(
                         "Error converting API data to JSON file: " +
@@ -119,13 +122,6 @@ public class DumpPortalInfo extends ConsoleRunnable {
                     "Writing portal info files to directory '" +
                     outputDirName + "'...\n");
 
-            // initialize application context, including database connection
-            SpringUtil.initDataSource();
-            GenesetService genesetService = SpringUtil.getApplicationContext().getBean(
-                GenesetService.class);
-            GenePanelService genePanelService = SpringUtil.getApplicationContext().getBean(
-                GenePanelService.class);
-
             File outputDir = new File(outputDirName);
             // this will do nothing if the directory already exists:
             // the files will simply be overwritten
@@ -149,13 +145,13 @@ public class DumpPortalInfo extends ConsoleRunnable {
                         extractGeneAliases(allGenes),
                         nameJsonFile(outputDir, API_GENE_ALIASES));
                 writeJsonFile(
-                    genesetService.getAllGenesets("SUMMARY", MAX_PAGE_SIZE, MIN_PAGE_NUMBER),
+                    DaoGeneset.getAllGenesets(),
                     nameJsonFile(outputDir, API_GENESETS));
                 writeJsonFile(
-                    Arrays.asList(genesetService.getGenesetVersion()),
+                    List.of(DaoGeneset.getGenesetVersion()),
                     nameJsonFile(outputDir, API_GENESET_VERSION));
                 writeJsonFile(
-                    genePanelService.getAllGenePanels("DETAILED", MAX_PAGE_SIZE, MIN_PAGE_NUMBER, null, "ASC"),
+                    DaoGenePanel.getAllGenePanels(),
                     nameJsonFile(outputDir, API_GENE_PANELS));
             } catch (DaoException e) {
                 throw new RuntimeException(e);

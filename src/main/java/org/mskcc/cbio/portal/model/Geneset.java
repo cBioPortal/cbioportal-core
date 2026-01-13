@@ -32,6 +32,9 @@
 
 package org.mskcc.cbio.portal.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.io.Serializable;
 import java.util.Set;
 
@@ -41,13 +44,17 @@ import java.util.Set;
  */
 
 public class Geneset implements Serializable {
-    
+
+    @JsonIgnore
     private int id;
+    @JsonIgnore
     private int geneticEntityId;
+    @JsonProperty("genesetId")
     private String externalId;
     private String name;
     private String description;
     private String refLink;
+    @JsonIgnore
     private Set<Long> genesetGeneIds;
 
     /**

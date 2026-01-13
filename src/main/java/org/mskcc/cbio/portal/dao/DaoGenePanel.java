@@ -54,6 +54,13 @@ public class DaoGenePanel {
         return genePanelMap.get(stableId);
     }
 
+    /**
+     * @return All available gene panels
+     */
+    public static Collection<GenePanel> getAllGenePanels() {
+        return genePanelMap.values();
+    }
+
     private static Map<String, GenePanel> initMap() {
         Map<String, GenePanel> genePanelMap = null;
         Connection con = null;

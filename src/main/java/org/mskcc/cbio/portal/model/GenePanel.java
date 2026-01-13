@@ -36,19 +36,20 @@ package org.mskcc.cbio.portal.model;
  * @author heinsz
  */
 
-import org.mskcc.cbio.portal.model.CanonicalGene;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.io.Serializable;
 import java.util.Set;
 
 public class GenePanel  implements Serializable {
 
+    @JsonIgnore
     private Integer internalId;
+    @JsonProperty("genePanelId")
     private String stableId;
     private String description;
     private Set<CanonicalGene> genes;
-
-    public GenePanel() {}
 
     public Integer getInternalId() {
         return internalId;

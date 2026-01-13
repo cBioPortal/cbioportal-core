@@ -198,22 +198,21 @@ public class DaoGeneset {
     }
     
     /**
-     * Get Geneset record.
+     * Get list of all genesets
      */
-    public Geneset getGenesetById(int genesetId) throws DaoException {
+    public static List<Geneset> getAllGenesets() throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
+        List<Geneset> result = new ArrayList<>();
         try {
             con = JdbcUtil.getDbConnection(DaoGeneset.class);
-            pstmt = con.prepareStatement("SELECT * FROM geneset WHERE ID = ?");
-            pstmt.setInt(1, genesetId);
+            pstmt = con.prepareStatement("SELECT * FROM geneset");
             rs = pstmt.executeQuery();
-            if (rs.next()) {
-            	return extractGeneset(rs);
-            } else {
-                return null;
+            while (rs.next()) {
+                result.add(extractGeneset(rs));
             }
+            return result;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
@@ -433,5 +432,25 @@ public class DaoGeneset {
     	deleteGenesetGeneticProfiles();
     	deleteGenesetGeneticEntityRecords();
     	DaoGenesetHierarchyNode.deleteAllGenesetHierarchyRecords();
+    }
+
+    public static String getGenesetVersion() throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneset.class);
+            pstmt = con.prepareStatement("SELECT geneset_version FROM info");
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String version = rs.getString(1);
+                return version == null ? "" : version;
+            }
+            return "";
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneset.class, con, pstmt, rs);
+        }
     }
 }
