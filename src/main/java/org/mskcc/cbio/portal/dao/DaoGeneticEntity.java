@@ -1,12 +1,12 @@
 package org.mskcc.cbio.portal.dao;
 
+import org.mskcc.cbio.portal.model.shared.GeneticEntity;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
-
-import org.cbioportal.legacy.model.GeneticEntity;
 
 public class DaoGeneticEntity {
 

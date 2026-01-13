@@ -32,17 +32,12 @@
 
 package org.mskcc.cbio.portal.util;
 
+import java.util.*;
+import java.util.regex.*;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
-
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Utility class related to ExtendedMutation.

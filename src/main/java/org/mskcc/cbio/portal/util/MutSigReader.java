@@ -32,14 +32,12 @@
 
 package org.mskcc.cbio.portal.util;
 
+import java.io.*;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.MutSig;
-
-import java.io.*;
-
 import static org.mskcc.cbio.portal.dao.DaoMutSig.addMutSig;
 
 /*

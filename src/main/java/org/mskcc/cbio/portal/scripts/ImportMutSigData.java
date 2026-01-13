@@ -32,15 +32,13 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MutSigReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.io.File;
-import java.io.IOException;
 
 /**
  * ImportMutSig is used to import the Broad Institute's MutSig data into our CGDS SQL database.

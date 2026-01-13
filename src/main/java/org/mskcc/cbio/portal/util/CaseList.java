@@ -1,6 +1,6 @@
 package org.mskcc.cbio.portal.util;
 
-import java.util.List;
+import java.util.*;
 
 public class CaseList {
 

@@ -28,7 +28,6 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
-
 /**
  * Command Line Tool to update the status of a Single Cancer Study.
  */

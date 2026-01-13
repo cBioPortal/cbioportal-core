@@ -32,6 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGistic;
@@ -41,10 +43,6 @@ import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.GisticReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.validate.validationException;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
 
 
 /**

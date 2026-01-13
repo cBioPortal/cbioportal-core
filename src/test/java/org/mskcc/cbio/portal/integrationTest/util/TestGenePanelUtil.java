@@ -1,24 +1,19 @@
 package org.mskcc.cbio.portal.integrationTest.util;
 
-import org.junit.Test;
+import java.util.*;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.mskcc.cbio.portal.util.GenePanelUtil.Pair;
 import static org.mskcc.cbio.portal.util.GenePanelUtil.extractGenes;
 import static org.mskcc.cbio.portal.util.GenePanelUtil.extractPropertyValue;
 import static org.mskcc.cbio.portal.util.GenePanelUtil.getAddRemove;
+import static org.mskcc.cbio.portal.util.GenePanelUtil.Pair;
 
 
 @RunWith(SpringJUnit4ClassRunner.class)

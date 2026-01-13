@@ -32,10 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Encapsulates any type of Clinical Parameter.

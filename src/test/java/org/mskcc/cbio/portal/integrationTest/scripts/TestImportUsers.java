@@ -32,10 +32,8 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
-// imports
-
-import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoUser;
 import org.mskcc.cbio.portal.dao.DaoUserAuthorities;
 import org.mskcc.cbio.portal.model.User;
@@ -45,7 +43,6 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

@@ -37,17 +37,16 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.cbioportal.legacy.model.EntityType;
-import org.cbioportal.legacy.model.GeneticEntity;
-import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyNode;
-import org.mskcc.cbio.portal.model.CanonicalGene;
-import org.mskcc.cbio.portal.model.Geneset;
-import org.mskcc.cbio.portal.scripts.ImportGenesetData;
-import org.mskcc.cbio.portal.util.ProgressMonitor;
-
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.Geneset;
+import org.mskcc.cbio.portal.model.shared.EntityType;
+import org.mskcc.cbio.portal.model.shared.GeneticEntity;
+import org.mskcc.cbio.portal.scripts.ImportGenesetData;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 public class DaoGeneset {
 
@@ -198,22 +197,21 @@ public class DaoGeneset {
     }
     
     /**
-     * Get Geneset record.
+     * Get list of all genesets
      */
-    public Geneset getGenesetById(int genesetId) throws DaoException {
+    public static List<Geneset> getAllGenesets() throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
+        List<Geneset> result = new ArrayList<>();
         try {
             con = JdbcUtil.getDbConnection(DaoGeneset.class);
-            pstmt = con.prepareStatement("SELECT * FROM geneset WHERE ID = ?");
-            pstmt.setInt(1, genesetId);
+            pstmt = con.prepareStatement("SELECT * FROM geneset");
             rs = pstmt.executeQuery();
-            if (rs.next()) {
-            	return extractGeneset(rs);
-            } else {
-                return null;
+            while (rs.next()) {
+                result.add(extractGeneset(rs));
             }
+            return result;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
@@ -434,4 +432,5 @@ public class DaoGeneset {
     	deleteGenesetGeneticEntityRecords();
     	DaoGenesetHierarchyNode.deleteAllGenesetHierarchyRecords();
     }
+
 }

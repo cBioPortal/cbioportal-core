@@ -650,17 +650,10 @@ class CollapsingLogMessageHandler(logging.handlers.MemoryHandler):
 def get_meta_file_type(meta_dictionary, logger, filename):
     """
      Returns one of the metatypes found in MetaFileTypes
-
-     NB: a subset of these types (combined with allowed_data_types.txt)
-     is also tracked in org.cbioportal.legacy.model.GeneticProfile.java. If you add
-     things here, please make sure to update there as well if it regards a
-     genetic profile data type.
     """
     # The following dictionary is required to define the MetaFileType for all
     # combinations, which are used in validateData to determine which validator
-    # should be used. There is some redundancy with allowed_data_types.txt, which
-    # also contains genetic alteration types and datatype combinations, but is used
-    # to check if the correct stable id is used.
+    # should be used.
     # GENETIC_ALTERATION_TYPE    DATATYPE    meta
     alt_type_datatype_to_meta = {
         # cancer type
@@ -743,8 +736,8 @@ def get_meta_file_type(meta_dictionary, logger, filename):
 
 
 def validate_types_and_id(meta_dictionary, logger, filename):
-    """Validate a genetic_alteration_type, datatype (and stable_id in some cases) 
-    against predefined allowed combinations instead of reading from allowed_data_types.txt.
+    """
+    Validate a genetic_alteration_type, datatype (and stable_id in some cases) against predefined allowed combinations.
     """
     result = True
 

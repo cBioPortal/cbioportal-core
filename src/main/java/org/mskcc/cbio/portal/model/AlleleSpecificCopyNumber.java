@@ -34,7 +34,6 @@ package org.mskcc.cbio.portal.model;
 
 import java.io.Serializable;
 import java.util.*;
-
 import static org.mskcc.cbio.maf.ValueTypeUtil.toFloat;
 import static org.mskcc.cbio.maf.ValueTypeUtil.toInt;
 

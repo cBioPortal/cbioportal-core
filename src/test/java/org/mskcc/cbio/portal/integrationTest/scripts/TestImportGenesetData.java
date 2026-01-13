@@ -27,8 +27,9 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
-import org.junit.Test;
+import java.io.*;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoGeneset;
 import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.scripts.ImportGenesetData;
@@ -37,9 +38,6 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.File;
-
 import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringJUnit4ClassRunner.class)

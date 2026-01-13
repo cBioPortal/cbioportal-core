@@ -28,10 +28,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.cbioportal.legacy.model.GeneticEntity;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
@@ -60,10 +62,10 @@ import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.SampleList;
 import org.mskcc.cbio.portal.model.StructuralVariant;
 import org.mskcc.cbio.portal.model.TypeOfCancer;
+import org.mskcc.cbio.portal.model.shared.GeneticEntity;
 import org.mskcc.cbio.portal.scripts.ImportGenePanel;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.SpringUtil;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -71,20 +73,6 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -109,9 +97,14 @@ public class TestIntegrationTest {
     private ApplicationContext applicationContext;
 
     @Before
-    public void setUp() throws DaoException, JsonParseException, JsonMappingException, IOException, Exception {
-        SpringUtil.setApplicationContext(applicationContext);
-        ProgressMonitor.setConsoleMode(false);
+    public void setUp() throws Exception {
+        System.setIn(new InputStream() {
+            @Override
+            public int read() {
+                throw new RuntimeException("None of the tasks in this test should be user-interactive");
+            }
+        });
+        ProgressMonitor.setConsoleMode(true);
         ProgressMonitor.resetWarnings();
         DaoCancerStudy.reCacheAll();
         DaoGeneOptimized.getInstance().reCache();

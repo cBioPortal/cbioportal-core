@@ -32,17 +32,9 @@
 
 package org.mskcc.cbio.portal.dao;
 
+import java.sql.*;
+import java.util.*;
 import org.mskcc.cbio.portal.model.Sample;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.NoSuchElementException;
 
 /**
  * Data access object for sample_profile table

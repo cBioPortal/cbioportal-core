@@ -32,7 +32,7 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.*;
+import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
 
 /**
  * Data access object for Mutation table

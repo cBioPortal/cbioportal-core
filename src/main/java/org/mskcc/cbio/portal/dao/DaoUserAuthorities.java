@@ -32,15 +32,10 @@
 
 package org.mskcc.cbio.portal.dao;
 
-// imports
+import java.sql.*;
+import java.util.*;
 import org.mskcc.cbio.portal.model.User;
 import org.mskcc.cbio.portal.model.UserAuthorities;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
 
 /**
  * DAO into authorities table.

@@ -32,8 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-// imports
-import java.util.Collection;
+import java.util.*;
 
 /**
  * User authorites bean.

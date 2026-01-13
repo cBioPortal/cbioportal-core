@@ -31,13 +31,10 @@
 */
 
 package org.mskcc.cbio.portal.model;
-import static org.junit.Assert.assertEquals;
 
-import java.util.ArrayList;
-
+import java.util.*;
 import org.junit.Test;
-
-
+import static org.junit.Assert.assertEquals;
 
 /**
  * Tests the Extended Mutation Map.

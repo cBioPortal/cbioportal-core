@@ -1,15 +1,11 @@
 package org.mskcc.cbio.portal.scripts;
 
+import java.util.*;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
 import static java.lang.String.format;
 
 public class GeneticAlterationImporter {

@@ -23,12 +23,13 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
+import java.util.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
@@ -47,6 +48,7 @@ import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.ClinicalData;
 import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.CopyNumberStatus;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
@@ -59,12 +61,6 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
@@ -488,7 +484,7 @@ public class TestImportProfileData {
         for (String sample : sampleIds) {
             sampleInternalIds.add(DaoSample.getSampleByCancerStudyAndSampleId(studyId, sample).getInternalId());
         }
-        Collection<Short> cnaLevels = Arrays.asList((short)-2, (short)2);
+        Collection<Integer> cnaLevels = Arrays.asList(CopyNumberStatus.HOMOZYGOUS_DELETION, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION);
         List<CnaEvent> cnaEvents = DaoCnaEvent.getCnaEvents(sampleInternalIds, null, geneticProfileId, cnaLevels);
         assertEquals(2, cnaEvents.size());
         //validate specific records. Data looks like:
@@ -496,18 +492,18 @@ public class TestImportProfileData {
         //999999675    TESTBRCA2    0    2    0    -1
         //Check if the first two samples are loaded correctly:
         int sampleId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, "TCGA-02-0001-01").getInternalId();
-        sampleInternalIds = Arrays.asList((int)sampleId);
+        sampleInternalIds = Arrays.asList(sampleId);
         CnaEvent cnaEvent = DaoCnaEvent.getCnaEvents(sampleInternalIds, null, geneticProfileId, cnaLevels).get(0);
-        assertEquals(-2, cnaEvent.getAlteration().getCode());
+        assertEquals(Integer.valueOf(CopyNumberStatus.HOMOZYGOUS_DELETION), cnaEvent.getAlteration());
         assertEquals("TESTBRCA1", cnaEvent.getGeneSymbol());
         assertEquals("Putative_Passenger", cnaEvent.getDriverFilter());
         assertEquals("Test passenger", cnaEvent.getDriverFilterAnnotation());
         assertEquals("Class 2", cnaEvent.getDriverTiersFilter());
         assertEquals("Class 2 annotation", cnaEvent.getDriverTiersFilterAnnotation());
         sampleId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, "TCGA-02-0003-01").getInternalId();
-        sampleInternalIds = Arrays.asList((int)sampleId);
+        sampleInternalIds = Arrays.asList(sampleId);
         cnaEvent = DaoCnaEvent.getCnaEvents(sampleInternalIds, null, geneticProfileId, cnaLevels).get(0);
-        assertEquals(2, cnaEvent.getAlteration().getCode());
+        assertEquals(Integer.valueOf(CopyNumberStatus.COPY_NUMBER_AMPLIFICATION), cnaEvent.getAlteration());
         assertEquals("TESTBRCA2", cnaEvent.getGeneSymbol());
         assertEquals("Putative_Driver", cnaEvent.getDriverFilter());
         assertEquals("Test driver", cnaEvent.getDriverFilterAnnotation());
