@@ -247,8 +247,7 @@ public class ImportCnaDiscreteLongData {
                 }
                 return "" + event
                     .cnaEvent
-                    .getAlteration()
-                    .getCode();
+                    .getAlteration();
             })
             .toArray(String[]::new);
 

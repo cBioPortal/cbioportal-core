@@ -2,12 +2,12 @@ package org.mskcc.cbio.portal.util;
 
 import java.io.*;
 import java.util.*;
-import org.cbioportal.legacy.model.CNA;
 import org.mskcc.cbio.maf.NamespaceColumnParser;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.CopyNumberStatus;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 
@@ -46,7 +46,8 @@ public class CnaUtil {
         List<CnaEvent> cnaEventsToAdd
     ) throws DaoException {
         for (CnaEvent cnaEvent : cnaEventsToAdd) {
-            if (!CNA.AMP.equals(cnaEvent.getAlteration()) && !CNA.HOMDEL.equals(cnaEvent.getAlteration())) {
+            if (CopyNumberStatus.COPY_NUMBER_AMPLIFICATION != cnaEvent.getAlteration() &&
+                    CopyNumberStatus.HOMOZYGOUS_DELETION != cnaEvent.getAlteration()) {
                 continue;
             }
             // Revert PR https://github.com/cBioPortal/cbioportal-core/pull/1 breaks importer

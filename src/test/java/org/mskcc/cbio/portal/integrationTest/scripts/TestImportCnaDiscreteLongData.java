@@ -49,6 +49,7 @@ import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.CopyNumberStatus;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.model.Sample;
@@ -140,22 +141,22 @@ public class TestImportCnaDiscreteLongData {
         );
 
         // Test gene with homozygous deletion and amplification has two cna events:
-        List<String> cnaEvents = resultCnaEvents
+        List<Integer> cnaEvents = resultCnaEvents
             .stream()
             .filter(e -> e.getGene().getEntrezGeneId() == 2115)
-            .map(e -> e.getAlteration().getDescription())
+            .map(e -> e.getAlteration())
             .collect(toList());
         assertEquals(2, cnaEvents.size());
-        assertTrue(newArrayList("Amplified", "Homozygously deleted").containsAll(cnaEvents));
+        assertTrue(newArrayList(CopyNumberStatus.COPY_NUMBER_AMPLIFICATION, CopyNumberStatus.HOMOZYGOUS_DELETION).containsAll(cnaEvents));
 
         // Test gene with partial deletion and amplification has two cna events:
-        List<String> convertedCnaEvents = resultCnaEvents
+        List<Integer> convertedCnaEvents = resultCnaEvents
             .stream()
             .filter(e -> e.getGene().getEntrezGeneId() == 3983)
-            .map(e -> e.getAlteration().getDescription())
+            .map(e -> e.getAlteration())
             .collect(toList());
         assertEquals(2, cnaEvents.size());
-        assertTrue(newArrayList("Amplified", "Homozygously deleted").containsAll(cnaEvents));
+        assertTrue(newArrayList(CopyNumberStatus.COPY_NUMBER_AMPLIFICATION, CopyNumberStatus.HOMOZYGOUS_DELETION).containsAll(convertedCnaEvents));
 
         // Test gene with homozygous deletion and amplification has no cna events:
         List<CnaEvent.Event> skippedCnaEvents = resultCnaEvents
