@@ -50,6 +50,7 @@ import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCnaDiscreteLongData;
 import org.mskcc.cbio.portal.util.StableIdUtil;
@@ -61,8 +62,6 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
-import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -352,7 +351,7 @@ public class TestImportCnaDiscreteLongData {
         File file = new File("src/test/resources/data_cna_discrete_import_test.txt");
         
         String startInputDatatype = getGeneticProfileDatatype(this.geneticProfile.getGeneticProfileId());
-        assertEquals(DISCRETE_LONG.name(), startInputDatatype);
+        assertEquals(MolecularProfileDataType.DISCRETE_LONG, startInputDatatype);
 
         new ImportCnaDiscreteLongData(
             file,
@@ -363,7 +362,7 @@ public class TestImportCnaDiscreteLongData {
         ).importData();
 
         String resultDatatype = getGeneticProfileDatatype(this.geneticProfile.getGeneticProfileId());
-        assertEquals(DISCRETE.name(), resultDatatype);
+        assertEquals(MolecularProfileDataType.DISCRETE, resultDatatype);
     }
 
 

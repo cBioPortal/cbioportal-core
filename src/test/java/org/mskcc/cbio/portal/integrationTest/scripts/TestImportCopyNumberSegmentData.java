@@ -25,7 +25,6 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import java.io.*;
 import java.util.*;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
@@ -39,9 +38,6 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData;
-import org.mskcc.cbio.portal.util.SpringUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -57,21 +53,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class TestImportCopyNumberSegmentData {
 
-	@Autowired
-	ApplicationContext applicationContext;
-	
 	//To use in test cases where we expect an exception:
 	@Rule
 	public ExpectedException exception = ExpectedException.none();
     
-	
-	@Before 
-	public void setUp() throws DaoException
-	{
-		//set it, to avoid this being set to the runtime (not for testing) application context:
-		SpringUtil.setApplicationContext(applicationContext);
-	}
-	
 	/**
      * Test importing of Clinical Data File.
      *

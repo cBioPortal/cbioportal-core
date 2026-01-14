@@ -38,8 +38,9 @@ import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
@@ -49,8 +50,6 @@ import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
-import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
-import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 public class ImportCnaDiscreteLongData {
 
@@ -82,7 +81,7 @@ public class ImportCnaDiscreteLongData {
         this.cnaFile = cnaFile;
         this.geneticProfileId = geneticProfileId;
         this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-        if (!Set.of(DISCRETE.name(), DISCRETE_LONG.name()).contains(geneticProfile.getDatatype())) {
+        if (!Set.of(MolecularProfileDataType.DISCRETE, MolecularProfileDataType.DISCRETE_LONG).contains(geneticProfile.getDatatype())) {
             throw new IllegalStateException("Platform "
                     + geneticProfileId
                     + " has not supported datatype: "
@@ -158,7 +157,7 @@ public class ImportCnaDiscreteLongData {
         }
 
         // Once the CNA import is done, update DISCRETE_LONG input datatype into resulting DISCRETE datatype:
-        geneticProfile.setDatatype(DISCRETE.name());
+        geneticProfile.setDatatype(MolecularProfileDataType.DISCRETE);
         DaoGeneticProfile.updateDatatype(geneticProfile.getGeneticProfileId(), geneticProfile.getDatatype());
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());

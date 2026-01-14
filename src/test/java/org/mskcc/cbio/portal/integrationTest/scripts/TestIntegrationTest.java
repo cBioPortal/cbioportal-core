@@ -66,7 +66,6 @@ import org.mskcc.cbio.portal.model.TypeOfCancer;
 import org.mskcc.cbio.portal.scripts.ImportGenePanel;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.SpringUtil;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -98,8 +97,7 @@ public class TestIntegrationTest {
     private ApplicationContext applicationContext;
 
     @Before
-    public void setUp() throws DaoException, JsonParseException, JsonMappingException, IOException, Exception {
-        SpringUtil.setApplicationContext(applicationContext);
+    public void setUp() throws Exception {
         ProgressMonitor.setConsoleMode(false);
         ProgressMonitor.resetWarnings();
         DaoCancerStudy.reCacheAll();

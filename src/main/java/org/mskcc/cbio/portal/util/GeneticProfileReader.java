@@ -41,12 +41,11 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileLink;
 import org.mskcc.cbio.portal.dao.DaoInfo;
 import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfileLink;
+import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.scripts.TrimmedProperties;
-import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
-import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 /**
  * Prepare a GeneticProfile for having its data loaded.
@@ -83,8 +82,9 @@ public class GeneticProfileReader {
                                           + existingGeneticProfile.getStableId() + ") but different genetic alteration type: "
                                           + existingGeneticProfile.getGeneticProfileId());
             }
-            if (DISCRETE_LONG.name().equals(geneticProfile.getDatatype())) {
-                if (!Set.of(DISCRETE_LONG.name(), DISCRETE.name()).contains(existingGeneticProfile.getDatatype())) {
+            if (MolecularProfileDataType.DISCRETE_LONG.equals(geneticProfile.getDatatype())) {
+                if (!Set.of(MolecularProfileDataType.DISCRETE_LONG, MolecularProfileDataType.DISCRETE)
+                        .contains(existingGeneticProfile.getDatatype())) {
                     throw new IllegalStateException("genetic_profile record found with same Stable ID ("
                             + existingGeneticProfile.getStableId() + ") but unsupported data type: "
                             + existingGeneticProfile.getDatatype());

@@ -18,16 +18,14 @@
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import java.io.*;
-import java.util.*;
+
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
-import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.springframework.test.annotation.Rollback;
@@ -38,10 +36,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
-import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertNoChange;
-import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertPriorDataState;
-import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.geneStableIdsToEntityIds;
-import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.geneStableIdToEntityId;
 
 /**
  * Tests Incremental Import is not supported for GSVA data type

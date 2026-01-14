@@ -37,12 +37,12 @@ import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 /**
  * Import 'profile' files that contain data matrices indexed by gene, case.
@@ -136,7 +136,7 @@ public class ImportProfileData extends ConsoleRunnable {
                 }
             } else if(
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
-                && DISCRETE_LONG.name().equals(geneticProfile.getOtherMetaDataField("datatype"))
+                && MolecularProfileDataType.DISCRETE_LONG.equals(geneticProfile.getOtherMetaDataField("datatype"))
             ) {
                 Set<String> namespaces = GeneticProfileReader.getNamespaces(descriptorFile);
                 ImportCnaDiscreteLongData importer = new ImportCnaDiscreteLongData(

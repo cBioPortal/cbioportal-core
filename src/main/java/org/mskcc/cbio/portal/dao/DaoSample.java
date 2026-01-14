@@ -35,7 +35,7 @@ package org.mskcc.cbio.portal.dao;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
