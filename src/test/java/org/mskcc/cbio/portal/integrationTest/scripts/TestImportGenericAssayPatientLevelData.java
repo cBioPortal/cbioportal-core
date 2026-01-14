@@ -34,7 +34,6 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import java.io.*;
 import java.util.*;
-import org.cbioportal.legacy.model.GeneticEntity;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
@@ -54,6 +53,7 @@ import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.shared.GeneticEntity;
 import org.mskcc.cbio.portal.scripts.ImportGenericAssayPatientLevelData;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.springframework.test.annotation.Rollback;

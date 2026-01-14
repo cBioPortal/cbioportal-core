@@ -41,9 +41,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.cbioportal.legacy.model.GeneticEntity;
+
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.shared.EntityType;
+import org.mskcc.cbio.portal.model.shared.GeneticEntity;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**

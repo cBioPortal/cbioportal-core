@@ -41,12 +41,12 @@ import java.util.*;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import org.cbioportal.legacy.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.model.shared.EntityType;
 import org.mskcc.cbio.portal.model.shared.GenericEntityProperty;
 import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticEntity;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.TsvUtil;
 
