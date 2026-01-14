@@ -42,7 +42,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 import org.cbioportal.legacy.model.EntityType;
 import org.cbioportal.legacy.model.GeneticEntity;
-import org.mskcc.cbio.portal.dao.DaoGenesetHierarchyNode;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.scripts.ImportGenesetData;
@@ -433,23 +432,4 @@ public class DaoGeneset {
     	DaoGenesetHierarchyNode.deleteAllGenesetHierarchyRecords();
     }
 
-    public static String getGenesetVersion() throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoGeneset.class);
-            pstmt = con.prepareStatement("SELECT geneset_version FROM info");
-            rs = pstmt.executeQuery();
-            if (rs.next()) {
-                String version = rs.getString(1);
-                return version == null ? "" : version;
-            }
-            return "";
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoGeneset.class, con, pstmt, rs);
-        }
-    }
 }

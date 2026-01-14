@@ -32,6 +32,7 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGenePanel;
 import org.mskcc.cbio.portal.dao.DaoGeneset;
+import org.mskcc.cbio.portal.dao.DaoInfo;
 import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -149,7 +150,7 @@ public class DumpPortalInfo extends ConsoleRunnable {
                     DaoGeneset.getAllGenesets(),
                     nameJsonFile(outputDir, API_GENESETS));
                 writeJsonFile(
-                    List.of(DaoGeneset.getGenesetVersion()),
+                    List.of(DaoInfo.getGenesetVersion()),
                     nameJsonFile(outputDir, API_GENESET_VERSION));
                 writeJsonFile(
                     DaoGenePanel.getAllGenePanels(),
