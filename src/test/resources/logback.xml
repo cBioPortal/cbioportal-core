@@ -7,7 +7,7 @@
     </appender>
 
     <!-- examples of log levels for specific packages -->
-    <!-- 
+    <!--
         <logger name="org.mskcc" level="debug">
             <appender-ref ref="STDOUT" />
         </logger>
@@ -16,5 +16,5 @@
     <root level="error">
         <appender-ref ref="STDOUT" />
     </root>
-    
+
 </configuration>

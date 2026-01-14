@@ -36,7 +36,7 @@
 		<jakarta_ws_rs.version>3.1.0</jakarta_ws_rs.version>
 		<easymock.version>4.3</easymock.version>
 		<junitparams.version>1.1.0</junitparams.version>
-		<byte_buddy.version>1.14.9</byte_buddy.version>
+		<byte_buddy.version>1.18.3</byte_buddy.version>
 	</properties>
 
 	<dependencies>
