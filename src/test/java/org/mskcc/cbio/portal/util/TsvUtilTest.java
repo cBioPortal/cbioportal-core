@@ -1,4 +1,4 @@
-package org.cbioportal.legacy.model.util;
+package org.mskcc.cbio.portal.util;
 
 import org.junit.Test;
 import static org.junit.Assert.assertThrows;
