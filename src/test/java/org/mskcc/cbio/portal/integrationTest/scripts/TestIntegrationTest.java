@@ -98,7 +98,13 @@ public class TestIntegrationTest {
 
     @Before
     public void setUp() throws Exception {
-        ProgressMonitor.setConsoleMode(false);
+        System.setIn(new InputStream() {
+            @Override
+            public int read() {
+                throw new RuntimeException("None of the tasks in this test should be user-interactive");
+            }
+        });
+        ProgressMonitor.setConsoleMode(true);
         ProgressMonitor.resetWarnings();
         DaoCancerStudy.reCacheAll();
         DaoGeneOptimized.getInstance().reCache();
