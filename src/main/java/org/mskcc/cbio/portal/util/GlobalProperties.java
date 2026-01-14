@@ -44,7 +44,6 @@ public class GlobalProperties {
 
     public static final String HOME_DIR = "PORTAL_HOME";
     private static final String PORTAL_PROPERTIES_FILE_NAME = "application.properties";
-    private static final String MAVEN_PROPERTIES_FILE_NAME = "maven.properties";
 
     public static final String APP_VERSION = "app.version";
     public static final String DB_VERSION = "db.version";
@@ -57,7 +56,6 @@ public class GlobalProperties {
 
     private static Logger LOG = LoggerFactory.getLogger(GlobalProperties.class);
     private static ConfigPropertyResolver portalProperties = new ConfigPropertyResolver();
-    private static Properties mavenProperties = initializeProperties(MAVEN_PROPERTIES_FILE_NAME);
 
     /**
      * Minimal portal property resolver that takes system property overrides.
@@ -165,19 +163,13 @@ public class GlobalProperties {
 		return (portalProperties.containsKey(property)) ? portalProperties.getProperty(property) : null;
 	}
 
-    public static String getAppVersion()
-    {
-        String appVersion = mavenProperties.getProperty(APP_VERSION);
-        return (appVersion == null) ? "1.0" : appVersion;
-    }
-    
     public static String getSpecies(){
     	String species = portalProperties.getProperty(SPECIES);
     	return species == null ? DEFAULT_SPECIES : species;
     	}
 
     public static String getDbVersion() {
-        String version = mavenProperties.getProperty(DB_VERSION);
+        String version = portalProperties.getProperty(DB_VERSION);
         if (version == null)
         {
             return "0";
@@ -188,11 +180,5 @@ public class GlobalProperties {
     public static String getReferenceGenomeName() {
         return portalProperties.getProperty(UCSC_BUILD, DEFAULT_UCSC_BUILD);
     }
-    
-    public static void main(String[] args)
-    {
-        System.out.println(getAppVersion());    
-    }
-
 
 }

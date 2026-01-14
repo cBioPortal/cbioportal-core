@@ -56,22 +56,6 @@
         <property name="poolPreparedStatements" value="true" />
     </bean>
 
-    <bean id="databaseIdProvider" class="org.apache.ibatis.mapping.VendorDatabaseIdProvider">
-        <property name="properties">
-            <props>
-                <prop key="MySQL">mysql</prop>
-                <prop key="H2">h2</prop>
-            </props>
-        </property>
-    </bean>
-
-    <!-- define the SqlSessionFactory -->
-    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
-        <property name="dataSource" ref="businessDataSource" />
-        <property name="typeAliasesPackage" value="org.mskcc.cbio.portal.model" />
-        <property name="databaseIdProvider" ref="databaseIdProvider"/>
-    </bean>
-
     <!-- enable autowire -->
     <context:annotation-config />
 

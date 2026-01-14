@@ -17,7 +17,6 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import jakarta.validation.constraints.NotNull;
 import java.util.*;
 import java.util.stream.Collectors;
 import joptsimple.OptionException;
@@ -115,7 +114,6 @@ public class RemoveSamples extends ConsoleRunnable {
         this.sampleIds = parseCsvAsSet(options.valueOf(sampleIdsOpt));
     }
 
-    @NotNull
     private Set<String> parseCsvAsSet(String s) {
         return Arrays.stream(s.trim().split(COMMA)).filter(val -> !"".equals(val)).collect(Collectors.toUnmodifiableSet());
     }
