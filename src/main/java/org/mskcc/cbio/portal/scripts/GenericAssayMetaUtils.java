@@ -2,10 +2,10 @@ package org.mskcc.cbio.portal.scripts;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import org.cbioportal.legacy.model.EntityType;
 import org.cbioportal.legacy.model.GeneticEntity;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
+import org.mskcc.cbio.portal.model.shared.EntityType;
 
 public class GenericAssayMetaUtils {
     public static Map<String, Integer> buildGenericAssayStableIdToEntityIdMap() {

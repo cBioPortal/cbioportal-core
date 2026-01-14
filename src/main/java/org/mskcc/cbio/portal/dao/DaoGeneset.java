@@ -40,10 +40,10 @@ package org.mskcc.cbio.portal.dao;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.cbioportal.legacy.model.EntityType;
 import org.cbioportal.legacy.model.GeneticEntity;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Geneset;
+import org.mskcc.cbio.portal.model.shared.EntityType;
 import org.mskcc.cbio.portal.scripts.ImportGenesetData;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
