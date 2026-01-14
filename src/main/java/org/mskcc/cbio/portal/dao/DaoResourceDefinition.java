@@ -3,8 +3,8 @@ package org.mskcc.cbio.portal.dao;
 import java.sql.*;
 import java.util.*;
 import org.apache.commons.lang3.StringUtils;
-import org.cbioportal.legacy.model.ResourceType;
 import org.mskcc.cbio.portal.model.ResourceDefinition;
+import org.mskcc.cbio.portal.model.shared.ResourceType;
 
 /**
  * Data Access Object for `resource_definition` table
