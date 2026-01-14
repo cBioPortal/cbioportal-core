@@ -32,12 +32,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import org.cbioportal.legacy.model.meta.GenericAssayMeta;
+
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
+import org.mskcc.cbio.portal.model.shared.GenericAssayMeta;
 import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.scripts.ImportGenericAssayEntity;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
