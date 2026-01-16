@@ -16,7 +16,6 @@
         <property name="locations">
             <list>
                 <value>file:///#{systemEnvironment['PORTAL_HOME']}/src/main/resources/application.properties</value>
-                <value>file:///#{systemEnvironment['PORTAL_HOME']}/src/main/resources/maven.properties</value>
             </list>
         </property>
     </bean>
