@@ -8,6 +8,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.mskcc.cbio.portal.util.GenePanelUtil.extractGenes;
@@ -20,7 +21,7 @@ import static org.mskcc.cbio.portal.util.GenePanelUtil.Pair;
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
 @Rollback
 @Transactional
-public class TestGenePanelUtil {
+public class TestGenePanelUtil extends IntegrationTestBase {
 
     CanonicalGene otor = makeGene(13321, 56914, "OTOR", makeAliases("FDP", "MIAL1"));
     CanonicalGene cadm2 = makeGene(20001, 253559, "CADM2", makeAliases("IGSF4D", "Necl-3", "NECL3", "SynCAM 2", "synCAM2"));

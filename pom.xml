@@ -37,6 +37,7 @@
 		<easymock.version>4.3</easymock.version>
 		<junitparams.version>1.1.0</junitparams.version>
 		<byte_buddy.version>1.18.3</byte_buddy.version>
+		<testcontainers.version>1.19.8</testcontainers.version>
 	</properties>
 
 	<dependencies>
@@ -180,6 +181,12 @@
 			<version>1.5.3</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>mysql</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
@@ -244,39 +251,6 @@
 							</includes>
 							<forkCount>1</forkCount>
 							<reuseForks>false</reuseForks>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>exec-maven-plugin</artifactId>
-				<version>3.1.0</version>
-				<executions>
-					<execution>
-						<id>start-test-db</id>
-						<phase>pre-integration-test</phase>
-						<goals>
-							<goal>exec</goal>
-						</goals>
-						<configuration>
-							<executable>bash</executable>
-							<arguments>
-								<argument>${project.basedir}/scripts/start_test_db.sh</argument>
-							</arguments>
-						</configuration>
-					</execution>
-					<execution>
-						<id>stop-test-db</id>
-						<phase>integration-test</phase>
-						<goals>
-							<goal>exec</goal>
-						</goals>
-						<configuration>
-							<executable>bash</executable>
-							<arguments>
-								<argument>${project.basedir}/scripts/stop_test_db.sh</argument>
-							</arguments>
 						</configuration>
 					</execution>
 				</executions>

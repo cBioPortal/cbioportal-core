@@ -51,6 +51,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.rules.SpringClassRule;
 import org.springframework.test.context.junit4.rules.SpringMethodRule;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static com.google.common.collect.Sets.newHashSet;
 import static org.junit.Assert.assertEquals;
 
@@ -63,7 +64,7 @@ import static org.junit.Assert.assertEquals;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class TestImportStructuralVariantData {
+public class TestImportStructuralVariantData extends IntegrationTestBase {
     int studyId;
     int geneticProfileId;
     Set<String> noNamespaces = null;

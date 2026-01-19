@@ -24,7 +24,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build and run tests
+      - name: Build and run integration tests (Testcontainers)
         run: mvn -B integration-test --file pom.xml
 
       # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive

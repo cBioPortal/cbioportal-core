@@ -40,6 +40,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -55,7 +56,7 @@ import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class TestIncrementalGenePanelMatrixImport {
+public class TestIncrementalGenePanelMatrixImport extends IntegrationTestBase {
 
     /**
      * Test incremental upload

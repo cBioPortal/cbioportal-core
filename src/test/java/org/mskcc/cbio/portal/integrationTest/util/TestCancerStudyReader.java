@@ -42,6 +42,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -52,7 +53,7 @@ import static org.junit.Assert.fail;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class TestCancerStudyReader {
+public class TestCancerStudyReader extends IntegrationTestBase {
 
    @Test
    public void testCancerStudyReaderCancerType() throws Exception {

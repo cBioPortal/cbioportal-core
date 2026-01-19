@@ -68,20 +68,20 @@ This section guides you through the process of running integration tests by sett
 
 ### Preparing the cbioportal test database
 
-The integration-test phase now prepares the test database automatically. When you run `mvn integration-test`, Maven executes `scripts/start_test_db.sh`, which:
+Integration tests now start a MySQL 5.7 container via Testcontainers. When you run `mvn integration-test`, the test bootstrap:
 
 - downloads `cgds.sql` for the `cbioportal.version` in `pom.xml` into `target/test-db/`
 - starts a MySQL 5.7 container pre-loaded with `cgds.sql` and `src/test/resources/seed_mini.sql`
 
-Maven then runs `scripts/stop_test_db.sh` after the integration tests to clean up the container.
+Docker is required for integration tests. To use an existing MySQL instance instead, set `CBIOPORTAL_TEST_DB_SKIP=true` and provide connection overrides via JVM system properties (for example `-Ddb.test.host=... -Ddb.test.port=... -Ddb.test.username=... -Ddb.test.password=...`).
 
-To use an existing MySQL instance instead, set `CBIOPORTAL_TEST_DB_SKIP=true` and ensure your `application.properties` points at the database.
-If the build exits early and the test container is still running, stop it with:
+Optional manual startup (matches the Testcontainers config, assuming `target/test-db/cgds.sql` exists; download it with curl if needed):
+
 ```
-scripts/stop_test_db.sh
+curl -o target/test-db/cgds.sql https://raw.githubusercontent.com/cBioPortal/cbioportal/<cbioportal.version>/src/main/resources/db-scripts/cgds.sql
 ```
 
-Optional manual startup (matches the script, assuming `target/test-db/cgds.sql` exists; see `scripts/start_test_db.sh` for the download URL):
+Replace `<cbioportal.version>` with the value from `pom.xml`.
 
 ```
 docker run -p 3306:3306 \

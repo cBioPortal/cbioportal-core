@@ -39,6 +39,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
@@ -53,7 +54,7 @@ import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 @Rollback
 @Transactional
-public class TestIncrementalMutationsImport {
+public class TestIncrementalMutationsImport extends IntegrationTestBase {
 
     public static final String STUDY_ID = "study_tcga_pub";
     private CancerStudy cancerStudy;

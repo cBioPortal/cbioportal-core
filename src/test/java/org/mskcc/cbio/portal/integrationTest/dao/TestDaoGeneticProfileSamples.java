@@ -47,6 +47,7 @@ import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -56,7 +57,7 @@ import static org.junit.Assert.assertEquals;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-public class TestDaoGeneticProfileSamples {
+public class TestDaoGeneticProfileSamples extends IntegrationTestBase {
 	
 	CancerStudy study;
 	ArrayList<Integer> internalSampleIds;
