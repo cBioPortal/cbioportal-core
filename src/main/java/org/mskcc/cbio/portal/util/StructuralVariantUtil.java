@@ -32,10 +32,9 @@
 
 package org.mskcc.cbio.portal.util;
 
+import com.fasterxml.jackson.databind.*;
 import java.io.*;
 import java.util.*;
-
-import com.fasterxml.jackson.databind.*;
 import org.mskcc.cbio.maf.NamespaceColumnParser;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
 import org.mskcc.cbio.portal.model.StructuralVariant;

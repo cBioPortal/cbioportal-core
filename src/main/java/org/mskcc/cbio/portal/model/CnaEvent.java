@@ -32,7 +32,6 @@
 
 package org.mskcc.cbio.portal.model;
 
-import org.cbioportal.legacy.model.CNA;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 
 /**
@@ -52,7 +51,7 @@ public class CnaEvent {
     public static class Event {
         private long eventId;
         private CanonicalGene gene;
-        private CNA alteration;
+        private int alteration;
 
         public long getEventId() {
             return eventId;
@@ -77,26 +76,23 @@ public class CnaEvent {
             } 
         }
 
-        public CNA getAlteration() {
+        public int getAlteration() {
             return alteration;
         }
 
-        public void setAlteration(CNA alteration) {
-            this.alteration = alteration;
-        }
-        
-        public void setAlteration(short alteration) {
-            this.alteration = CNA.getByCode(alteration);
-            if (this.alteration == null) {
-                throw new IllegalArgumentException("wrong copy number alteration");
+        public void setAlteration(int alteration) {
+            if (alteration < CopyNumberStatus.HOMOZYGOUS_DELETION || alteration > CopyNumberStatus.COPY_NUMBER_AMPLIFICATION) {
+                throw new IllegalArgumentException("Invalid alteration value: " + alteration
+                        + ". Must be between " + CopyNumberStatus.HOMOZYGOUS_DELETION + " and " + CopyNumberStatus.COPY_NUMBER_AMPLIFICATION);
             }
+            this.alteration = alteration;
         }
 
         @Override
         public int hashCode() {
             int hash = 3;
             hash = 97 * hash + (this.gene != null ? this.gene.hashCode() : 0);
-            hash = 97 * hash + (this.alteration != null ? this.alteration.hashCode() : 0);
+            hash = 97 * hash + this.alteration;
             return hash;
         }
 
@@ -124,7 +120,7 @@ public class CnaEvent {
         
     }
 
-    public CnaEvent(int sampleId, int cnaProfileId, long entrezGeneId, short alteration) {
+    public CnaEvent(int sampleId, int cnaProfileId, long entrezGeneId, int alteration) {
         event = new Event();
         setEntrezGeneId(entrezGeneId);
         this.sampleId = sampleId;
@@ -132,16 +128,12 @@ public class CnaEvent {
         event.setAlteration(alteration);
     }
 
-    public CNA getAlteration() {
+    public Integer getAlteration() {
         return event.alteration;
     }
 
-    public void setAlteration(CNA alteration) {
+    public void setAlteration(int alteration) {
         event.setAlteration(alteration);
-    }
-
-    public void setAlteration(short alteration) {
-        event.setAlteration(CNA.getByCode(alteration));
     }
 
     public int getSampleId() {

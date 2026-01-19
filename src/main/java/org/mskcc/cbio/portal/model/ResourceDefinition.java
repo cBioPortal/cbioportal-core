@@ -1,6 +1,6 @@
 package org.mskcc.cbio.portal.model;
 
-import org.cbioportal.legacy.model.ResourceType;
+import org.mskcc.cbio.portal.model.shared.ResourceType;
 
 public class ResourceDefinition {
 

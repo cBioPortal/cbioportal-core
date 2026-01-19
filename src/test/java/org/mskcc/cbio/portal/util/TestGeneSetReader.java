@@ -32,15 +32,10 @@
 
 package org.mskcc.cbio.portal.util;
 
-
+import java.io.*;
+import java.util.*;
 import org.mskcc.cbio.portal.model.SetOfGenes;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.FileInputStream;
-import java.util.ArrayList;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * JUnit test for the Gene Set Reader.

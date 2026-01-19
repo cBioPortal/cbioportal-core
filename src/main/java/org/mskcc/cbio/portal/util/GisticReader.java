@@ -32,19 +32,18 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.mskcc.cbio.portal.dao.*;
+import java.io.*;
+import java.util.*;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Gistic;
 import org.mskcc.cbio.portal.scripts.ValidationUtils;
-
-import java.io.*;
-import java.util.ArrayList;
 
 /**
  * Utility for importing Gistic data from a file
  */
 public class GisticReader {
-
 
     public ArrayList<Gistic> parse(File gistic_f, int cancerStudyId) throws IOException, DaoException {
 

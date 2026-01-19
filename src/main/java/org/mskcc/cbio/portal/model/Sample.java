@@ -32,11 +32,9 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.EnumSet;
-import java.util.Set;
-import org.mskcc.cbio.portal.util.StableIdUtil;
-
+import java.util.*;
 import java.util.regex.*;
+import org.mskcc.cbio.portal.util.StableIdUtil;
 
 /**
  * Encapsulates Sample Data.

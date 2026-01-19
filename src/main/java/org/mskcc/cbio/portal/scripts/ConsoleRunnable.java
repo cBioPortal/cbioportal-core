@@ -23,7 +23,6 @@ package org.mskcc.cbio.portal.scripts;
 
 import java.io.IOException;
 import java.util.Date;
-
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 

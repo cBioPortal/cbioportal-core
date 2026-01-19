@@ -2,9 +2,7 @@ package org.mskcc.cbio.portal.util;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.List;
-
+import java.util.*;
 import org.apache.commons.lang3.ArrayUtils;
 
 public class TransactionalScripts implements Runnable {

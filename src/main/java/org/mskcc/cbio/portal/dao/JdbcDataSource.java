@@ -1,7 +1,6 @@
 package org.mskcc.cbio.portal.dao;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.mskcc.cbio.portal.util.DatabaseProperties;
 import org.slf4j.Logger;

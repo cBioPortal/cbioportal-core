@@ -1,14 +1,16 @@
 package org.mskcc.cbio.portal.scripts;
 
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.util.ProgressMonitor;
-
 import java.io.*;
 import java.util.*;
-
-import joptsimple.*;
-
+import joptsimple.OptionException;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.DaoGenePanel;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+import org.mskcc.cbio.portal.model.GenePanel;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 import static org.mskcc.cbio.portal.util.GenePanelUtil.extractGenes;
 import static org.mskcc.cbio.portal.util.GenePanelUtil.extractPropertyValue;
 

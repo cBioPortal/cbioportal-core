@@ -676,3 +676,9 @@ INSERT INTO authorities (EMAIL,AUTHORITY) values ('Lonnie@openid.org','ROLE_USER
 INSERT INTO authorities (EMAIL,AUTHORITY) values ('Dhorak@yahoo.com','ROLE_USER');
 INSERT INTO authorities (EMAIL,AUTHORITY) values ('Dhorak@yahoo.com','ROLE_MANAGER');
 
+-- info
+UPDATE info SET GENESET_VERSION = 'test_geneset_version';
+
+-- geneset
+INSERT INTO geneset (ID, GENETIC_ENTITY_ID, EXTERNAL_ID, NAME, DESCRIPTION, REF_LINK) VALUES ('1', '1', 'HGNC:1100', 'BRCA1', 'Breast cancer type 1 susceptibility protein', 'https://www.ncbi.nlm.nih.gov/gene/672');
+INSERT INTO geneset (ID, GENETIC_ENTITY_ID, EXTERNAL_ID, NAME, DESCRIPTION, REF_LINK) VALUES ('2', '2', 'HGNC:1101', 'BRCA2', 'Breast cancer type 2 susceptibility protein', 'https://www.ncbi.nlm.nih.gov/gene/675');

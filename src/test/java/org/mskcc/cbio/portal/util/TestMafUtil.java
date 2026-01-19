@@ -32,19 +32,15 @@
 
 package org.mskcc.cbio.portal.util;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-
-import org.mskcc.cbio.portal.model.ExtendedMutation;
-import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
-
+import java.io.*;
 import java.util.*;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
 import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
+import org.mskcc.cbio.portal.model.ExtendedMutation;
+import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
 
 /**
  *

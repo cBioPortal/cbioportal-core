@@ -1,11 +1,13 @@
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.collections4.map.MultiKeyMap;
-import org.cbioportal.legacy.model.ResourceType;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoResourceData;
@@ -16,22 +18,11 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.ResourceDefinition;
 import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.shared.ResourceType;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MissingValues;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class ImportResourceData extends ConsoleRunnable {
 

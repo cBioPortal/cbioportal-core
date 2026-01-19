@@ -32,13 +32,16 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.*;
-import org.mskcc.cbio.portal.util.InternalIdUtil;
-
-import org.apache.commons.lang3.StringUtils;
-
 import java.sql.*;
 import java.util.*;
+import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.ClinicalAttribute;
+import org.mskcc.cbio.portal.model.ClinicalData;
+import org.mskcc.cbio.portal.model.ClinicalParameterMap;
+import org.mskcc.cbio.portal.model.Patient;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.util.InternalIdUtil;
 
 /**
  * Data Access Object for `clinical` table

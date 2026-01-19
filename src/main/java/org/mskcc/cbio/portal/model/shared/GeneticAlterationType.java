@@ -30,7 +30,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package org.mskcc.cbio.portal.model;
+package org.mskcc.cbio.portal.model.shared;
 
 // Copied to org.cbioportal.legacy.model.MolecularProfile.GeneticAlterationType, if you alter this,
 // don't forget to change the other one too

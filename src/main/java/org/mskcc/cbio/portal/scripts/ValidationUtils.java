@@ -23,12 +23,10 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.IOException;
-
+import java.io.*;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.model.CancerStudy;
-
 
 /**
  * Utility validation methods shared by different importers.

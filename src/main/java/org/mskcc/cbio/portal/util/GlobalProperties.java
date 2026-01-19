@@ -32,16 +32,13 @@
 
 package org.mskcc.cbio.portal.util;
 
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
 
 /**
  * Utility class for getting / setting global properties.
@@ -50,20 +47,20 @@ public class GlobalProperties {
 
     public static final String HOME_DIR = "PORTAL_HOME";
     private static final String PORTAL_PROPERTIES_FILE_NAME = "application.properties";
-    private static final String MAVEN_PROPERTIES_FILE_NAME = "maven.properties";
+    private static final String POM_RESOURCE_PATH = "META-INF/maven/org.mskcc.cbio/core/pom.xml";
+    private static final String DEFAULT_DB_VERSION = "0";
+    private static final Pattern DB_VERSION_PATTERN =
+        Pattern.compile("<db\\.version>\\s*([^<]+)\\s*</db\\.version>");
 
-    public static final String APP_VERSION = "app.version";
     public static final String DB_VERSION = "db.version";
     public static final String SPECIES = "species";
     public static final String DEFAULT_SPECIES = "human";
-    public static final String NCBI_BUILD = "ncbi.build";
-    public static final String DEFAULT_NCBI_BUILD = "37";
     public static final String UCSC_BUILD = "ucsc.build";
     public static final String DEFAULT_UCSC_BUILD = "hg19";
 
     private static Logger LOG = LoggerFactory.getLogger(GlobalProperties.class);
     private static ConfigPropertyResolver portalProperties = new ConfigPropertyResolver();
-    private static Properties mavenProperties = initializeProperties(MAVEN_PROPERTIES_FILE_NAME);
+    private static volatile String cachedDbVersion;
 
     /**
      * Minimal portal property resolver that takes system property overrides.
@@ -166,39 +163,77 @@ public class GlobalProperties {
         return properties;
     }
 
+    private static InputStream getPomResourceStream()
+    {
+        InputStream pomStream =
+            GlobalProperties.class.getClassLoader().getResourceAsStream(POM_RESOURCE_PATH);
+        if (pomStream != null) {
+            return pomStream;
+        }
+
+        return null;
+    }
+
+    private static String readDbVersionFromPom()
+    {
+        try (InputStream pomStream = getPomResourceStream()) {
+            if (pomStream == null) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Unable to locate pom.xml for db.version lookup. " +
+                        "Checked classpath resource " + POM_RESOURCE_PATH);
+                }
+                return null;
+            }
+
+            String pomContents = new String(pomStream.readAllBytes(), StandardCharsets.UTF_8);
+            Matcher matcher = DB_VERSION_PATTERN.matcher(pomContents);
+            if (matcher.find()) {
+                return matcher.group(1).trim();
+            }
+
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("db.version was not found in pom.xml.");
+            }
+        }
+        catch (IOException e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error reading pom.xml for db.version: " + e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
 	public static String getProperty(String property)
 	{
 		return (portalProperties.containsKey(property)) ? portalProperties.getProperty(property) : null;
 	}
 
-    public static String getAppVersion()
-    {
-        String appVersion = mavenProperties.getProperty(APP_VERSION);
-        return (appVersion == null) ? "1.0" : appVersion;
-    }
-    
     public static String getSpecies(){
     	String species = portalProperties.getProperty(SPECIES);
     	return species == null ? DEFAULT_SPECIES : species;
     	}
 
     public static String getDbVersion() {
-        String version = mavenProperties.getProperty(DB_VERSION);
-        if (version == null)
-        {
-            return "0";
+        String override = System.getProperty(DB_VERSION);
+        if (override != null) {
+            return override;
         }
-        return version;
+
+        if (cachedDbVersion == null) {
+            synchronized (GlobalProperties.class) {
+                if (cachedDbVersion == null) {
+                    String version = readDbVersionFromPom();
+                    cachedDbVersion = version == null ? DEFAULT_DB_VERSION : version;
+                }
+            }
+        }
+
+        return cachedDbVersion;
     }
 
     public static String getReferenceGenomeName() {
         return portalProperties.getProperty(UCSC_BUILD, DEFAULT_UCSC_BUILD);
     }
-    
-    public static void main(String[] args)
-    {
-        System.out.println(getAppVersion());    
-    }
-
 
 }

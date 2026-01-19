@@ -1,10 +1,9 @@
-package org.cbioportal.legacy.model.util;
+package org.mskcc.cbio.portal.util;
 
 import org.junit.Test;
-
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mskcc.cbio.portal.util.TsvUtil.ensureHeaderAndRowMatch;
-import static org.junit.Assert.assertThrows;
 
 public class TsvUtilTest {
 

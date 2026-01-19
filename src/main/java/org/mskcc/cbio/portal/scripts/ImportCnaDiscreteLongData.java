@@ -25,6 +25,9 @@ package org.mskcc.cbio.portal.scripts;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
@@ -35,8 +38,9 @@ import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
@@ -44,21 +48,8 @@ import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
-import static org.cbioportal.legacy.model.MolecularProfile.DataType.DISCRETE;
-import static org.cbioportal.legacy.model.MolecularProfile.ImportType.DISCRETE_LONG;
 
 public class ImportCnaDiscreteLongData {
 
@@ -90,7 +81,7 @@ public class ImportCnaDiscreteLongData {
         this.cnaFile = cnaFile;
         this.geneticProfileId = geneticProfileId;
         this.geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-        if (!Set.of(DISCRETE.name(), DISCRETE_LONG.name()).contains(geneticProfile.getDatatype())) {
+        if (!Set.of(MolecularProfileDataType.DISCRETE, MolecularProfileDataType.DISCRETE_LONG).contains(geneticProfile.getDatatype())) {
             throw new IllegalStateException("Platform "
                     + geneticProfileId
                     + " has not supported datatype: "
@@ -166,7 +157,7 @@ public class ImportCnaDiscreteLongData {
         }
 
         // Once the CNA import is done, update DISCRETE_LONG input datatype into resulting DISCRETE datatype:
-        geneticProfile.setDatatype(DISCRETE.name());
+        geneticProfile.setDatatype(MolecularProfileDataType.DISCRETE);
         DaoGeneticProfile.updateDatatype(geneticProfile.getGeneticProfileId(), geneticProfile.getDatatype());
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
@@ -256,8 +247,7 @@ public class ImportCnaDiscreteLongData {
                 }
                 return "" + event
                     .cnaEvent
-                    .getAlteration()
-                    .getCode();
+                    .getAlteration();
             })
             .toArray(String[]::new);
 

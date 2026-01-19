@@ -32,10 +32,9 @@
 
 package org.mskcc.cbio.portal.util;
 
-import org.mskcc.cbio.portal.model.Sample;
-
 import java.util.*;
 import java.util.regex.*;
+import org.mskcc.cbio.portal.model.Sample;
 
 public class StableIdUtil
 {

@@ -32,12 +32,11 @@
 
 package org.mskcc.cbio.portal.dao;
 
+import java.sql.*;
+import java.util.*;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.Sample;
-
-import java.sql.*;
-import java.util.*;
 
 /**
  *
@@ -107,7 +106,7 @@ public final class DaoCnaEvent {
                             "`ALTERATION` )" +
                             " VALUES(?,?)", Statement.RETURN_GENERATED_KEYS);
             pstmt.setLong(1, cnaEvent.getEntrezGeneId());
-            pstmt.setShort(2, cnaEvent.getAlteration().getCode());
+            pstmt.setInt(2, cnaEvent.getAlteration());
             pstmt.executeUpdate();
             rs = pstmt.getGeneratedKeys();
             rs.next();
@@ -190,7 +189,7 @@ public final class DaoCnaEvent {
         }
     }
     
-    public static List<CnaEvent> getCnaEvents(List<Integer> sampleIds, Collection<Long> entrezGeneIds , int profileId, Collection<Short> cnaLevels) throws DaoException {
+    public static List<CnaEvent> getCnaEvents(List<Integer> sampleIds, Collection<Long> entrezGeneIds , int profileId, Collection<Integer> cnaLevels) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -259,7 +258,7 @@ public final class DaoCnaEvent {
                     CnaEvent.Event event = new CnaEvent.Event();
                     event.setEventId(rs.getLong("CNA_EVENT_ID"));
                     event.setEntrezGeneId(rs.getLong("ENTREZ_GENE_ID"));
-                    event.setAlteration(rs.getShort("ALTERATION"));
+                    event.setAlteration(rs.getInt("ALTERATION"));
                     events.add(event);
                 } catch (IllegalArgumentException e) {
                     e.printStackTrace();

@@ -28,7 +28,7 @@
 package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
-import org.mskcc.cbio.portal.model.*;
+import org.mskcc.cbio.portal.model.GeneticProfileLink;
 
 public class DaoGeneticProfileLink {
 	

@@ -17,22 +17,18 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.util.*;
+import java.util.stream.Collectors;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import jakarta.validation.constraints.NotNull;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.util.Arrays;
-import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Command Line Tool to Remove Patients in Cancer Studies
@@ -118,7 +114,6 @@ public class RemovePatients extends ConsoleRunnable {
         this.patientIds = parseCsvAsSet(options.valueOf(patientIdsOpt));
     }
 
-    @NotNull
     private Set<String> parseCsvAsSet(String s) {
         return Arrays.stream(s.trim().split(COMMA)).filter(val -> !"".equals(val)).collect(Collectors.toUnmodifiableSet());
     }

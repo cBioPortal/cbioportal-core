@@ -20,22 +20,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.StructuralVariant;
-import org.mskcc.cbio.portal.util.*;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.GeneticProfileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.StructuralVariantUtil;
+import org.mskcc.cbio.portal.util.TsvUtil;
 
 /**
  * Imports a structural variant file.

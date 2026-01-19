@@ -17,20 +17,21 @@
 
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
+import java.io.*;
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mskcc.cbio.portal.dao.*;
-import org.mskcc.cbio.portal.model.*;
+import org.junit.Test;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoException;
+import org.mskcc.cbio.portal.dao.DaoSampleList;
+import org.mskcc.cbio.portal.model.SampleList;
 import org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.File;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests Incremental Import of Case Lists.

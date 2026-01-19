@@ -32,12 +32,6 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.CancerStudyTags;
-import org.mskcc.cbio.portal.model.ReferenceGenome;
-import org.mskcc.cbio.portal.model.TypeOfCancer;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -50,6 +44,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.CancerStudyTags;
+import org.mskcc.cbio.portal.model.ReferenceGenome;
+import org.mskcc.cbio.portal.model.TypeOfCancer;
 
 /**
  * Analogous to and replaces the old DaoCancerType. A CancerStudy has a NAME and

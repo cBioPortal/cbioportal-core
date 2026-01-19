@@ -32,9 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Enumeration for Patient List Controlled Vocabulary (CV) Category.

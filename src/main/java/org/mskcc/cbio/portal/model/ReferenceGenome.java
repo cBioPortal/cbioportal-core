@@ -17,8 +17,8 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.Date;
-import org.mskcc.cbio.portal.util.*;
+import java.util.*;
+import org.mskcc.cbio.portal.util.EqualsUtil;
 
 /**
  * This represents the reference genome used by molecular profiling

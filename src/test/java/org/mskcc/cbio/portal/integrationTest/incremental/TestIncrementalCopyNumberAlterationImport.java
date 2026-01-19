@@ -17,12 +17,14 @@
 
 package org.mskcc.cbio.portal.integrationTest.incremental;
 
-import org.cbioportal.legacy.model.CNA;
+import java.io.*;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -31,29 +33,17 @@ import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.model.CnaEvent;
+import org.mskcc.cbio.portal.model.CopyNumberStatus;
 import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestContextManager;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
-
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
+import org.springframework.transaction.TransactionStatus;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertNoChange;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertPriorDataState;
 
@@ -123,7 +113,12 @@ public class TestIncrementalCopyNumberAlterationImport {
             }
         }
 
-        List<Short> allCnaLevels = Arrays.stream(CNA.values()).map(CNA::getCode).toList();
+        List<Integer> allCnaLevels = List.of(
+                CopyNumberStatus.COPY_NUMBER_AMPLIFICATION,
+                CopyNumberStatus.COPY_NUMBER_GAIN,
+                CopyNumberStatus.NO_CHANGE,
+                CopyNumberStatus.HEMIZYGOUS_DELETION,
+                CopyNumberStatus.HOMOZYGOUS_DELETION);
         Set<Integer> beforeCnaEventsSampleIds = Set.of(4, 13, 14, updateSampleId);
         List<CnaEvent> beforeSampleCnaEvents = DaoCnaEvent.getCnaEvents(afterSampleIds.stream().toList(),
                 null,
@@ -175,32 +170,32 @@ public class TestIncrementalCopyNumberAlterationImport {
             Set<CnaEvent.Event> afterCnaEvents = afterSampleIdToSampleCnaEvents.get(sampleId).stream().map(CnaEvent::getEvent).collect(Collectors.toSet());
             assertEquals("CNA events for sample_id=" + sampleId + " must not change.", beforeCnaEvents, afterCnaEvents);
         });
-        Map<Long, CNA> newSampleEntrezGeneIdToCnaAlteration = afterSampleIdToSampleCnaEvents.get(newSampleId).stream()
+        Map<Long, Integer> newSampleEntrezGeneIdToCnaAlteration = afterSampleIdToSampleCnaEvents.get(newSampleId).stream()
                 .map(CnaEvent::getEvent)
                 .collect(Collectors.toMap(
                         event -> event.getGene().getEntrezGeneId(),
                         CnaEvent.Event::getAlteration));
         assertEquals(Map.of(
-                        208l, CNA.HOMDEL,
-                        3265l, CNA.AMP,
-                        4893l, CNA.HOMDEL,
-                        672l, CNA.AMP,
-                        673l, CNA.AMP,
-                        675l, CNA.HOMDEL,
-                        newGeneEntrezId, CNA.HOMDEL
+                        208l, CopyNumberStatus.HOMOZYGOUS_DELETION,
+                        3265l, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION,
+                        4893l, CopyNumberStatus.HOMOZYGOUS_DELETION,
+                        672l, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION,
+                        673l, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION,
+                        675l, CopyNumberStatus.HOMOZYGOUS_DELETION,
+                        newGeneEntrezId, CopyNumberStatus.HOMOZYGOUS_DELETION
                 ),
                 newSampleEntrezGeneIdToCnaAlteration);
-        Map<Long, CNA> updatedSampleEntrezGeneIdToCnaAlteration = afterSampleIdToSampleCnaEvents.get(updateSampleId).stream()
+        Map<Long, Integer> updatedSampleEntrezGeneIdToCnaAlteration = afterSampleIdToSampleCnaEvents.get(updateSampleId).stream()
                 .map(CnaEvent::getEvent)
                 .collect(Collectors.toMap(
                         event -> event.getGene().getEntrezGeneId(),
                         CnaEvent.Event::getAlteration));
         assertEquals(Map.of(
-                        10000l, CNA.HOMDEL,
-                        207l, CNA.AMP,
-                        3845l, CNA.AMP,
-                        673l, CNA.HOMDEL,
-                        newGeneEntrezId, CNA.AMP
+                        10000l, CopyNumberStatus.HOMOZYGOUS_DELETION,
+                        207l, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION,
+                        3845l, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION,
+                        673l, CopyNumberStatus.HOMOZYGOUS_DELETION,
+                        newGeneEntrezId, CopyNumberStatus.COPY_NUMBER_AMPLIFICATION
                 ),
                 updatedSampleEntrezGeneIdToCnaAlteration);
 

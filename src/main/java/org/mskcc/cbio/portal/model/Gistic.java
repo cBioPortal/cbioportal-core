@@ -32,7 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.ArrayList;
+import java.util.*;
 
 /**
  * This represents Gistic information for a particular ROI (region of interest)

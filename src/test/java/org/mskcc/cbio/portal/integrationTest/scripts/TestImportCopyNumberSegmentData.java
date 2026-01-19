@@ -23,11 +23,12 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
-import org.junit.Before;
+import java.io.*;
+import java.util.*;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
@@ -37,21 +38,10 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData;
-import org.mskcc.cbio.portal.util.SpringUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Test the import of Segment data into database.
@@ -63,21 +53,10 @@ import java.util.List;
 @Transactional
 public class TestImportCopyNumberSegmentData {
 
-	@Autowired
-	ApplicationContext applicationContext;
-	
 	//To use in test cases where we expect an exception:
 	@Rule
 	public ExpectedException exception = ExpectedException.none();
     
-	
-	@Before 
-	public void setUp() throws DaoException
-	{
-		//set it, to avoid this being set to the runtime (not for testing) application context:
-		SpringUtil.setApplicationContext(applicationContext);
-	}
-	
 	/**
      * Test importing of Clinical Data File.
      *

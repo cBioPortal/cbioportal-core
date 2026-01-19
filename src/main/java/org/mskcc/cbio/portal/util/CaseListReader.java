@@ -2,12 +2,8 @@ package org.mskcc.cbio.portal.util;
 
 import org.mskcc.cbio.portal.scripts.TrimmedProperties;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.io.*;
+import java.util.*;
 
 public class CaseListReader {
 

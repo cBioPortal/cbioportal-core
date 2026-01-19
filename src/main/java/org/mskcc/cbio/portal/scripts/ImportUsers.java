@@ -32,8 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-// imports
-
+import java.io.*;
+import java.util.*;
 import org.mskcc.cbio.portal.dao.DaoUser;
 import org.mskcc.cbio.portal.dao.DaoUserAuthorities;
 import org.mskcc.cbio.portal.model.User;
@@ -41,12 +41,6 @@ import org.mskcc.cbio.portal.model.UserAuthorities;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.TsvUtil;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * Import a file of users and their authorities.

@@ -32,6 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
@@ -47,11 +49,6 @@ import org.mskcc.cbio.portal.util.CaseListReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.validate.CaseListValidator;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Command Line tool to Import Sample Lists.

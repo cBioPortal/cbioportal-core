@@ -32,8 +32,7 @@
 
 package org.mskcc.cbio.portal.model;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 
 /**
  * A HashMap of ExtendedMutation Objects, indexed by Gene and Sample ID.

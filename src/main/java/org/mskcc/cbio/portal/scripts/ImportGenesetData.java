@@ -40,8 +40,9 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import joptsimple.*;
-
-import org.mskcc.cbio.portal.dao.*;
+import org.mskcc.cbio.portal.dao.DaoGeneset;
+import org.mskcc.cbio.portal.dao.DaoInfo;
+import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 

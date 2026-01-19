@@ -32,6 +32,9 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.io.*;
+import java.util.*;
+import java.util.regex.*;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
@@ -50,7 +53,7 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
-import org.mskcc.cbio.portal.model.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
@@ -60,21 +63,6 @@ import org.mskcc.cbio.portal.util.GlobalProperties;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Import an extended mutation file.

@@ -23,6 +23,7 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.util.*;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
@@ -31,9 +32,6 @@ import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.SampleList;
 import org.mskcc.cbio.portal.model.SampleListCategory;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Command Line tool to Add new case lists by generating them based on some rules.
