@@ -68,20 +68,25 @@ This section guides you through the process of running integration tests by sett
 
 ### Preparing the cbioportal test database
 
-1. **Download the cBioPortal Database Schema**: To begin, you need to download the database schema for the version of cBioPortal you are interested in testing.
-Locate the pom.xml file in your project directory and check the values of `<db.version>` and `<cbioportal.version>` to determine the correct version.
-Replace `v6.4.1` in the command below with your desired cBioPortal version:
+The integration-test phase now prepares the test database automatically. When you run `mvn integration-test`, Maven executes `scripts/start_test_db.sh`, which:
+
+- downloads `cgds.sql` for the `cbioportal.version` in `pom.xml` into `target/test-db/`
+- starts a MySQL 5.7 container pre-loaded with `cgds.sql` and `src/test/resources/seed_mini.sql`
+
+Maven then runs `scripts/stop_test_db.sh` after the integration tests to clean up the container.
+
+To use an existing MySQL instance instead, set `CBIOPORTAL_TEST_DB_SKIP=true` and ensure your `application.properties` points at the database.
+If the build exits early and the test container is still running, stop it with:
 ```
-curl -o cgds.sql https://raw.githubusercontent.com/cBioPortal/cbioportal/v6.4.1/src/main/resources/db-scripts/cgds.sql
+scripts/stop_test_db.sh
 ```
 
-2. **Launch the MySQL Server Container**: Use Docker to start a MySQL server pre-loaded with the cBioPortal schema. Execute the following command from the root of your project directory.
-It is recommended to open a separate terminal tab or window for this operation as it will occupy the console until stopped:
+Optional manual startup (matches the script, assuming `target/test-db/cgds.sql` exists; see `scripts/start_test_db.sh` for the download URL):
 
 ```
 docker run -p 3306:3306 \
 -v $(pwd)/src/test/resources/seed_mini.sql:/docker-entrypoint-initdb.d/seed.sql:ro \
--v $(pwd)/cgds.sql:/docker-entrypoint-initdb.d/cgds.sql:ro \
+-v $(pwd)/target/test-db/cgds.sql:/docker-entrypoint-initdb.d/cgds.sql:ro \
 -e MYSQL_ROOT_PASSWORD=root \
 -e MYSQL_USER=cbio_user \
 -e MYSQL_PASSWORD=somepassword \
@@ -171,4 +176,3 @@ The script will search for `core-*.jar` in the root of the project:
 ```bash
 python scripts/importer/metaImport.py -s tests/test_data/study_es_0 -p tests/test_data/api_json_unit_tests -o
 ```
-
