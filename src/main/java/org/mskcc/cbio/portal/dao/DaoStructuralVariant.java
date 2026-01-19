@@ -39,52 +39,52 @@ public class DaoStructuralVariant {
      */
 
     public static void addStructuralVariantToBulkLoader(StructuralVariant structuralVariant) throws DaoException {
-        MySQLbulkLoader bl =  MySQLbulkLoader.getMySQLbulkLoader("structural_variant");
+        ClickHouseBulkLoader bl =  ClickHouseBulkLoader.getClickHouseBulkLoader("structural_variant");
         String[] fieldNames = new String[]{
-            "INTERNAL_ID",
-            "GENETIC_PROFILE_ID",
-            "SAMPLE_ID",
-            "SITE1_ENTREZ_GENE_ID",
-            "SITE1_ENSEMBL_TRANSCRIPT_ID",
-            "SITE1_CHROMOSOME",
-            "SITE1_POSITION",
-            "SITE1_CONTIG",
-            "SITE1_REGION",
-            "SITE1_REGION_NUMBER",
-            "SITE1_DESCRIPTION",
-            "SITE2_ENTREZ_GENE_ID",
-            "SITE2_ENSEMBL_TRANSCRIPT_ID",
-            "SITE2_CHROMOSOME",
-            "SITE2_POSITION",
-            "SITE2_CONTIG",
-            "SITE2_REGION",
-            "SITE2_REGION_NUMBER",
-            "SITE2_DESCRIPTION",
-            "SITE2_EFFECT_ON_FRAME",
-            "NCBI_BUILD",
-            "DNA_SUPPORT",
-            "RNA_SUPPORT",
-            "NORMAL_READ_COUNT",
-            "TUMOR_READ_COUNT",
-            "NORMAL_VARIANT_COUNT",
-            "TUMOR_VARIANT_COUNT",
-            "NORMAL_PAIRED_END_READ_COUNT",
-            "TUMOR_PAIRED_END_READ_COUNT",
-            "NORMAL_SPLIT_READ_COUNT",
-            "TUMOR_SPLIT_READ_COUNT",
-            "ANNOTATION",
-            "BREAKPOINT_TYPE",
-            "CONNECTION_TYPE",
-            "EVENT_INFO",
-            "CLASS",
-            "LENGTH",
-            "COMMENTS",
-            "SV_STATUS",
-            "ANNOTATION_JSON"
+            "internal_id",
+            "genetic_profile_id",
+            "sample_id",
+            "site1_entrez_gene_id",
+            "site1_ensembl_transcript_id",
+            "site1_chromosome",
+            "site1_position",
+            "site1_contig",
+            "site1_region",
+            "site1_region_number",
+            "site1_description",
+            "site2_entrez_gene_id",
+            "site2_ensembl_transcript_id",
+            "site2_chromosome",
+            "site2_position",
+            "site2_contig",
+            "site2_region",
+            "site2_region_number",
+            "site2_description",
+            "site2_effect_on_frame",
+            "ncbi_build",
+            "dna_support",
+            "rna_support",
+            "normal_read_count",
+            "tumor_read_count",
+            "normal_variant_count",
+            "tumor_variant_count",
+            "normal_paired_end_read_count",
+            "tumor_paired_end_read_count",
+            "normal_split_read_count",
+            "tumor_split_read_count",
+            "annotation",
+            "breakpoint_type",
+            "connection_type",
+            "event_info",
+            "class",
+            "length",
+            "comments",
+            "sv_status",
+            "annotation_json"
         };
         bl.setFieldNames(fieldNames);
 
-        // write to the temp file maintained by the MySQLbulkLoader
+        // write to the temp file maintained by the ClickHouseBulkLoader
         bl.insertRecord(
             Long.toString(structuralVariant.getInternalId()),
             Integer.toString(structuralVariant.getGeneticProfileId()),
@@ -135,7 +135,7 @@ public class DaoStructuralVariant {
             (structuralVariant.getDriverTiersFilter() != null
             && !structuralVariant.getDriverTiersFilter().isEmpty()
             && !structuralVariant.getDriverTiersFilter().toLowerCase().equals("na"))) {
-            MySQLbulkLoader.getMySQLbulkLoader("alteration_driver_annotation").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("alteration_driver_annotation").insertRecord(
                 Long.toString(structuralVariant.getInternalId()),
                 Integer.toString(structuralVariant.getGeneticProfileId()),
                 Integer.toString(structuralVariant.getSampleIdInternal()),
@@ -153,15 +153,22 @@ public class DaoStructuralVariant {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGene.class);
-            pstmt = con.prepareStatement("DELETE structural_variant, alteration_driver_annotation" +
-                    " FROM structural_variant" +
-                    " LEFT JOIN alteration_driver_annotation" +
-                    " ON alteration_driver_annotation.GENETIC_PROFILE_ID = structural_variant.GENETIC_PROFILE_ID" +
-                    " AND alteration_driver_annotation.SAMPLE_ID = structural_variant.SAMPLE_ID" +
-                    " WHERE structural_variant.GENETIC_PROFILE_ID=? AND structural_variant.SAMPLE_ID IN ("
-                    + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
-                    + ")");
+            if (sampleIds.isEmpty()) {
+                return;
+            }
+            String placeholders = String.join(",", Collections.nCopies(sampleIds.size(), "?"));
+            pstmt = con.prepareStatement("DELETE FROM alteration_driver_annotation " +
+                    "WHERE genetic_profile_id=? AND sample_id IN (" + placeholders + ")");
             int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, geneticProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
+            pstmt.close();
+            pstmt = con.prepareStatement("DELETE FROM structural_variant " +
+                    "WHERE genetic_profile_id=? AND sample_id IN (" + placeholders + ")");
+            parameterIndex = 1;
             pstmt.setInt(parameterIndex++, geneticProfileId);
             for (Integer sampleId : sampleIds) {
                 pstmt.setInt(parameterIndex++, sampleId);
@@ -180,7 +187,7 @@ public class DaoStructuralVariant {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement("SELECT MAX(`INTERNAL_ID`) FROM `structural_variant`");
+            pstmt = con.prepareStatement("SELECT max(`internal_id`) FROM `structural_variant`");
             rs = pstmt.executeQuery();
             return rs.next() ? rs.getLong(1) : 0;
         } catch (SQLException e) {
@@ -205,9 +212,9 @@ public class DaoStructuralVariant {
             pstmt = con.prepareStatement(
                 "SELECT * FROM structural_variant" +
                     " LEFT JOIN alteration_driver_annotation ON" +
-                    "  structural_variant.GENETIC_PROFILE_ID = alteration_driver_annotation.GENETIC_PROFILE_ID" +
-                    "  and structural_variant.SAMPLE_ID = alteration_driver_annotation.SAMPLE_ID" +
-                    "  and structural_variant.INTERNAL_ID = alteration_driver_annotation.ALTERATION_EVENT_ID");
+                    "  structural_variant.genetic_profile_id = alteration_driver_annotation.genetic_profile_id" +
+                    "  and structural_variant.sample_id = alteration_driver_annotation.sample_id" +
+                    "  and structural_variant.internal_id = alteration_driver_annotation.alteration_event_id");
             rs = pstmt.executeQuery();
 
             while (rs.next()) {
@@ -230,49 +237,49 @@ public class DaoStructuralVariant {
      */
     private static StructuralVariant extractStructuralVariant(ResultSet rs) throws SQLException {
         StructuralVariant structuralVariant = new StructuralVariant();
-        structuralVariant.setGeneticProfileId(rs.getInt("GENETIC_PROFILE_ID"));
-        structuralVariant.setSampleIdInternal(rs.getInt("SAMPLE_ID"));
-        structuralVariant.setSite1EntrezGeneId(rs.getLong("SITE1_ENTREZ_GENE_ID"));
-        structuralVariant.setSite1EnsemblTranscriptId(rs.getString("SITE1_ENSEMBL_TRANSCRIPT_ID"));
-        structuralVariant.setSite1Chromosome(rs.getString("SITE1_CHROMOSOME"));
-        structuralVariant.setSite1Position(rs.getInt("SITE1_POSITION"));
-        structuralVariant.setSite1Contig(rs.getString("SITE1_CONTIG"));
-        structuralVariant.setSite1Region(rs.getString("SITE1_REGION"));
-        structuralVariant.setSite1RegionNumber(rs.getInt("SITE1_REGION_NUMBER"));
-        structuralVariant.setSite1Description(rs.getString("SITE1_DESCRIPTION"));
-        structuralVariant.setSite2EntrezGeneId(rs.getLong("SITE2_ENTREZ_GENE_ID"));
-        structuralVariant.setSite2EnsemblTranscriptId(rs.getString("SITE2_ENSEMBL_TRANSCRIPT_ID"));
-        structuralVariant.setSite2Chromosome(rs.getString("SITE2_CHROMOSOME"));
-        structuralVariant.setSite2Position(rs.getInt("SITE2_POSITION"));
-        structuralVariant.setSite2Contig(rs.getString("SITE2_CONTIG"));
-        structuralVariant.setSite2Region(rs.getString("SITE2_REGION"));
-        structuralVariant.setSite2RegionNumber(rs.getInt("SITE2_REGION_NUMBER"));
-        structuralVariant.setSite2Description(rs.getString("SITE2_DESCRIPTION"));
-        structuralVariant.setSite2EffectOnFrame(rs.getString("SITE2_EFFECT_ON_FRAME"));
-        structuralVariant.setNcbiBuild(rs.getString("NCBI_BUILD"));
-        structuralVariant.setDnaSupport(rs.getString("DNA_SUPPORT"));
-        structuralVariant.setRnaSupport(rs.getString("RNA_SUPPORT"));
-        structuralVariant.setNormalReadCount(rs.getInt("NORMAL_READ_COUNT"));
-        structuralVariant.setTumorReadCount(rs.getInt("TUMOR_READ_COUNT"));
-        structuralVariant.setNormalVariantCount(rs.getInt("NORMAL_VARIANT_COUNT"));
-        structuralVariant.setTumorVariantCount(rs.getInt("TUMOR_VARIANT_COUNT"));
-        structuralVariant.setNormalPairedEndReadCount(rs.getInt("NORMAL_PAIRED_END_READ_COUNT"));
-        structuralVariant.setTumorPairedEndReadCount(rs.getInt("TUMOR_PAIRED_END_READ_COUNT"));
-        structuralVariant.setNormalSplitReadCount(rs.getInt("NORMAL_SPLIT_READ_COUNT"));
-        structuralVariant.setTumorSplitReadCount(rs.getInt("TUMOR_SPLIT_READ_COUNT"));
-        structuralVariant.setAnnotation(rs.getString("ANNOTATION"));
-        structuralVariant.setBreakpointType(rs.getString("BREAKPOINT_TYPE"));
-        structuralVariant.setConnectionType(rs.getString("CONNECTION_TYPE"));
-        structuralVariant.setEventInfo(rs.getString("EVENT_INFO"));
-        structuralVariant.setVariantClass(rs.getString("CLASS"));
-        structuralVariant.setLength(rs.getInt("LENGTH"));
-        structuralVariant.setComments(rs.getString("COMMENTS"));
-        structuralVariant.setDriverFilter(rs.getString("DRIVER_FILTER"));
-        structuralVariant.setDriverFilterAnn(rs.getString("DRIVER_FILTER_ANNOTATION"));
-        structuralVariant.setDriverTiersFilter(rs.getString("DRIVER_TIERS_FILTER"));
-        structuralVariant.setDriverTiersFilterAnn(rs.getString("DRIVER_TIERS_FILTER_ANNOTATION"));
-        structuralVariant.setSvStatus(rs.getString("SV_STATUS"));
-        structuralVariant.setAnnotationJson(rs.getString("ANNOTATION_JSON"));
+        structuralVariant.setGeneticProfileId(rs.getInt("genetic_profile_id"));
+        structuralVariant.setSampleIdInternal(rs.getInt("sample_id"));
+        structuralVariant.setSite1EntrezGeneId(rs.getLong("site1_entrez_gene_id"));
+        structuralVariant.setSite1EnsemblTranscriptId(rs.getString("site1_ensembl_transcript_id"));
+        structuralVariant.setSite1Chromosome(rs.getString("site1_chromosome"));
+        structuralVariant.setSite1Position(rs.getInt("site1_position"));
+        structuralVariant.setSite1Contig(rs.getString("site1_contig"));
+        structuralVariant.setSite1Region(rs.getString("site1_region"));
+        structuralVariant.setSite1RegionNumber(rs.getInt("site1_region_number"));
+        structuralVariant.setSite1Description(rs.getString("site1_description"));
+        structuralVariant.setSite2EntrezGeneId(rs.getLong("site2_entrez_gene_id"));
+        structuralVariant.setSite2EnsemblTranscriptId(rs.getString("site2_ensembl_transcript_id"));
+        structuralVariant.setSite2Chromosome(rs.getString("site2_chromosome"));
+        structuralVariant.setSite2Position(rs.getInt("site2_position"));
+        structuralVariant.setSite2Contig(rs.getString("site2_contig"));
+        structuralVariant.setSite2Region(rs.getString("site2_region"));
+        structuralVariant.setSite2RegionNumber(rs.getInt("site2_region_number"));
+        structuralVariant.setSite2Description(rs.getString("site2_description"));
+        structuralVariant.setSite2EffectOnFrame(rs.getString("site2_effect_on_frame"));
+        structuralVariant.setNcbiBuild(rs.getString("ncbi_build"));
+        structuralVariant.setDnaSupport(rs.getString("dna_support"));
+        structuralVariant.setRnaSupport(rs.getString("rna_support"));
+        structuralVariant.setNormalReadCount(rs.getInt("normal_read_count"));
+        structuralVariant.setTumorReadCount(rs.getInt("tumor_read_count"));
+        structuralVariant.setNormalVariantCount(rs.getInt("normal_variant_count"));
+        structuralVariant.setTumorVariantCount(rs.getInt("tumor_variant_count"));
+        structuralVariant.setNormalPairedEndReadCount(rs.getInt("normal_paired_end_read_count"));
+        structuralVariant.setTumorPairedEndReadCount(rs.getInt("tumor_paired_end_read_count"));
+        structuralVariant.setNormalSplitReadCount(rs.getInt("normal_split_read_count"));
+        structuralVariant.setTumorSplitReadCount(rs.getInt("tumor_split_read_count"));
+        structuralVariant.setAnnotation(rs.getString("annotation"));
+        structuralVariant.setBreakpointType(rs.getString("breakpoint_type"));
+        structuralVariant.setConnectionType(rs.getString("connection_type"));
+        structuralVariant.setEventInfo(rs.getString("event_info"));
+        structuralVariant.setVariantClass(rs.getString("class"));
+        structuralVariant.setLength(rs.getInt("length"));
+        structuralVariant.setComments(rs.getString("comments"));
+        structuralVariant.setDriverFilter(rs.getString("driver_filter"));
+        structuralVariant.setDriverFilterAnn(rs.getString("driver_filter_annotation"));
+        structuralVariant.setDriverTiersFilter(rs.getString("driver_tiers_filter"));
+        structuralVariant.setDriverTiersFilterAnn(rs.getString("driver_tiers_filter_annotation"));
+        structuralVariant.setSvStatus(rs.getString("sv_status"));
+        structuralVariant.setAnnotationJson(rs.getString("annotation_json"));
         return structuralVariant;
     }
 }

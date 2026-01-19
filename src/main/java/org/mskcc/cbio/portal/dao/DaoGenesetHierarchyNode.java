@@ -31,7 +31,9 @@ import java.sql.*;
 import org.mskcc.cbio.portal.model.GenesetHierarchy;
 
 public class DaoGenesetHierarchyNode {
-	
+
+    private static final String GENESET_HIERARCHY_SEQUENCE = "seq_geneset_hierarchy_node";
+
 	private DaoGenesetHierarchyNode() {
 	}
     
@@ -42,7 +44,6 @@ public class DaoGenesetHierarchyNode {
 	public static void addGenesetHierarchy(GenesetHierarchy genesetHierarchy) throws DaoException {
         Connection connection = null;
         PreparedStatement preparedStatement = null;
-        ResultSet resultSet = null;
         
         try {
         	// Open connection to database
@@ -50,29 +51,28 @@ public class DaoGenesetHierarchyNode {
 	        
 	        // Prepare SQL statement
             preparedStatement = connection.prepareStatement("INSERT INTO geneset_hierarchy_node "
-	                + "(`NODE_NAME`, `PARENT_ID`) VALUES(?,?)", Statement.RETURN_GENERATED_KEYS);
+	                + "(`node_id`, `node_name`, `parent_id`) VALUES(?,?,?)");
+            long nodeId = ClickHouseAutoIncrement.nextId(GENESET_HIERARCHY_SEQUENCE);
+            preparedStatement.setLong(1, nodeId);
 	        
             // Fill in statement
-            preparedStatement.setString(1, genesetHierarchy.getNodeName());
+            preparedStatement.setString(2, genesetHierarchy.getNodeName());
             
             if (genesetHierarchy.getParentId() == 0) {
-                preparedStatement.setNull(2, java.sql.Types.INTEGER);
+                preparedStatement.setNull(3, java.sql.Types.INTEGER);
             } else {
-                preparedStatement.setInt(2, genesetHierarchy.getParentId());
+                preparedStatement.setInt(3, genesetHierarchy.getParentId());
             }
             
             // Execute statement
             preparedStatement.executeUpdate();
 
             // Get the auto generated key, which is the Node ID:
-            resultSet = preparedStatement.getGeneratedKeys();
-            if (resultSet.next()) {
-            	genesetHierarchy.setNodeId(resultSet.getInt(1));	
-            }       
+            genesetHierarchy.setNodeId((int) nodeId);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoGenesetHierarchyNode.class, connection, preparedStatement, resultSet);
+            JdbcUtil.closeAll(DaoGenesetHierarchyNode.class, connection, preparedStatement, null);
         }
 	}
 
@@ -118,7 +118,7 @@ public class DaoGenesetHierarchyNode {
         ResultSet resultSet = null;
         try {
         	connection = JdbcUtil.getDbConnection(DaoGenesetHierarchyNode.class);
-        	preparedStatement = connection.prepareStatement("DELETE FROM geneset_hierarchy_node");
+        	preparedStatement = connection.prepareStatement("TRUNCATE TABLE geneset_hierarchy_node");
         	preparedStatement.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

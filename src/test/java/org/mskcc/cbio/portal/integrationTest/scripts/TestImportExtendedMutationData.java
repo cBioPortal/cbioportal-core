@@ -37,6 +37,7 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
@@ -46,7 +47,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
@@ -61,10 +61,8 @@ import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static com.google.common.collect.Sets.newHashSet;
 import static org.junit.Assert.assertEquals;
@@ -76,8 +74,6 @@ import static org.junit.Assert.assertNull;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/integrationTestScript.xml", "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportExtendedMutationData extends IntegrationTestBase {
 
     @Autowired
@@ -120,13 +116,13 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
 	@Test
     public void testImportExtendedMutationDataExtended() throws IOException, DaoException {
 		
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         
 		// TBD: change this to use getResourceAsStream()
         File file = new File("src/test/resources/data_mutations_extended.txt");
         ImportExtendedMutationData parser = new ImportExtendedMutationData(file, geneticProfileId, null);
         parser.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         ConsoleUtil.showMessages();
         
         int sampleId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, "TCGA-AA-3664-01").getInternalId();
@@ -149,7 +145,7 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
         File file = new File("src/test/resources/data_mutations_oncotated.txt");
         ImportExtendedMutationData parser = new ImportExtendedMutationData(file, geneticProfileId, null);
         parser.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         
         ArrayList<ExtendedMutation> mutationList = DaoMutation.getAllMutations(geneticProfileId);
 
@@ -172,13 +168,13 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
    @Test
    public void testImportExtendedMutationDataExtendedCustomFiltering() throws IOException, DaoException {
 
-       MySQLbulkLoader.bulkLoadOn();
+       ClickHouseBulkLoader.bulkLoadOn();
 
        File file = new File("src/test/resources/data_mutations_extended.txt");
        Set<String> customFiltering = new HashSet<String>(Arrays.asList("Missense_Mutation", "Nonsense_Mutation"));
        ImportExtendedMutationData parser = new ImportExtendedMutationData(file, geneticProfileId, null, customFiltering, null);
        parser.importData();
-       MySQLbulkLoader.flushAll();
+       ClickHouseBulkLoader.flushAll();
        ConsoleUtil.showMessages();
 
        rejectMissenseAndNonsenseMutations();
@@ -192,13 +188,13 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
    @Test
    public void testImportExtendedMutationDataExtendedNoFiltering() throws IOException, DaoException {
 
-       MySQLbulkLoader.bulkLoadOn();
+       ClickHouseBulkLoader.bulkLoadOn();
 
        File file = new File("src/test/resources/data_mutations_extended.txt");
        Set<String> customFiltering = new HashSet<String>(Arrays.asList(""));
        ImportExtendedMutationData parser = new ImportExtendedMutationData(file, geneticProfileId, null, customFiltering, null);
        parser.importData();
-       MySQLbulkLoader.flushAll();
+       ClickHouseBulkLoader.flushAll();
        ConsoleUtil.showMessages();
 
        acceptAllMutationTypes();
@@ -309,7 +305,7 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
 	    daoGene.addGene(new CanonicalGene(2322L, "FLT3"));
 	    daoGene.addGene(new CanonicalGene(867L, "CBL"));
             
-            MySQLbulkLoader.flushAll();
+            ClickHouseBulkLoader.flushAll();
     }
 
     /**
@@ -367,11 +363,11 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
     @Test
     public void testImportExtendedMutationDataExtendedWithSharedMutationEvent() throws IOException, DaoException {
         // import maf
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         File file = new File("src/test/resources/data_mutations_extended_duplicate_events.txt");
         ImportExtendedMutationData parser = new ImportExtendedMutationData(file, testGeneticProfileId, null);
         parser.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         ConsoleUtil.showMessages();
         // fetch mutations for test genetic profile
         int geneticProfileId = DaoGeneticProfile.getGeneticProfileByStableId("test_importer_id").getGeneticProfileId();
@@ -389,13 +385,13 @@ public class TestImportExtendedMutationData extends IntegrationTestBase {
     @Test
     public void testImportExtendedMutationDataExtendedWithoutNamespacesResultsInNull() throws IOException, DaoException {
         // import maf
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         File file = new File("src/test/resources/data_mutations_extended_without_namespaces.txt");
         ImportExtendedMutationData parser = new ImportExtendedMutationData(
             file, testGeneticProfileId, null, null, newHashSet("foo-namespace", "bar-namespace")
         );
         parser.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         ConsoleUtil.showMessages();
         // fetch mutations for test genetic profile
         int geneticProfileId = DaoGeneticProfile.getGeneticProfileByStableId("test_importer_id").getGeneticProfileId();

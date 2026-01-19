@@ -38,19 +38,17 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.StructuralVariant;
 import org.mskcc.cbio.portal.scripts.ImportStructuralVariantData;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.rules.SpringClassRule;
 import org.springframework.test.context.junit4.rules.SpringMethodRule;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static com.google.common.collect.Sets.newHashSet;
 import static org.junit.Assert.assertEquals;
@@ -62,8 +60,6 @@ import static org.junit.Assert.assertEquals;
 @Ignore
 
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportStructuralVariantData extends IntegrationTestBase {
     int studyId;
     int geneticProfileId;
@@ -90,7 +86,7 @@ public class TestImportStructuralVariantData extends IntegrationTestBase {
         File file = new File("src/test/resources/data_structural_variants.txt");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, noNamespaces, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         List<StructuralVariant> structuralVariants = DaoStructuralVariant.getAllStructuralVariants();
         assertEquals("KIAA1549-BRAF.K16B10.COSF509_2", structuralVariants.get(0).getSite2Description());
@@ -132,7 +128,7 @@ public class TestImportStructuralVariantData extends IntegrationTestBase {
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         List<StructuralVariant> all = DaoStructuralVariant
             .getAllStructuralVariants();
@@ -158,7 +154,7 @@ public class TestImportStructuralVariantData extends IntegrationTestBase {
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         List<StructuralVariant> all = DaoStructuralVariant
             .getAllStructuralVariants();
@@ -181,7 +177,7 @@ public class TestImportStructuralVariantData extends IntegrationTestBase {
         Set<String> namespacesToImport = newHashSet("StructVarNamespace", "StructVarNamespace2");
         ImportStructuralVariantData importer = new ImportStructuralVariantData(file, geneticProfileId, null, namespacesToImport, false);
         importer.importData();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         List<StructuralVariant> all = DaoStructuralVariant
             .getAllStructuralVariants();

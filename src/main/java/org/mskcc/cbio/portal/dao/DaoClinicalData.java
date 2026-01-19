@@ -53,12 +53,12 @@ public final class DaoClinicalData {
     public static final String SAMPLE_ATTRIBUTES_TABLE = "clinical_sample";
     public static final String PATIENT_ATTRIBUTES_TABLE = "clinical_patient";
 
-    private static final String SAMPLE_ATTRIBUTES_INSERT = "INSERT INTO " + SAMPLE_ATTRIBUTES_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
-    private static final String PATIENT_ATTRIBUTES_INSERT = "INSERT INTO " + PATIENT_ATTRIBUTES_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
+    private static final String SAMPLE_ATTRIBUTES_INSERT = "INSERT INTO " + SAMPLE_ATTRIBUTES_TABLE + "(`internal_id`,`attr_id`,`attr_value`) VALUES(?,?,?)";
+    private static final String PATIENT_ATTRIBUTES_INSERT = "INSERT INTO " + PATIENT_ATTRIBUTES_TABLE + "(`internal_id`,`attr_id`,`attr_value`) VALUES(?,?,?)";
 
-    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `INTERNAL_ID` = ?";
+    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `internal_id` = ?";
 
-    private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `INTERNAL_ID` = ?";
+    private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `internal_id` = ?";
     private static final Map<String, String> sampleAttributes = new HashMap<String, String>();
     private static final Map<String, String> patientAttributes = new HashMap<String, String>();
 
@@ -87,7 +87,7 @@ public final class DaoClinicalData {
             pstmt = con.prepareStatement("SELECT * FROM " + table);
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                cache.put(rs.getString("ATTR_ID"), rs.getString("ATTR_ID"));
+                cache.put(rs.getString("attr_id"), rs.getString("attr_id"));
             }
         }
         catch (SQLException e) {
@@ -113,8 +113,8 @@ public final class DaoClinicalData {
     public static int addDatum(String query, String tableName,
                                int internalId, String attrId, String attrVal) throws DaoException
     {
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.getMySQLbulkLoader(tableName).insertRecord(Integer.toString(internalId),
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.getClickHouseBulkLoader(tableName).insertRecord(Integer.toString(internalId),
                 attrId,
                 attrVal);
             return 1;
@@ -191,7 +191,7 @@ public final class DaoClinicalData {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
 
             pstmt = con.prepareStatement("SELECT * FROM " + table +
-                " WHERE INTERNAL_ID=? AND ATTR_ID=?");
+                " WHERE internal_id=? AND attr_id=?");
             pstmt.setInt(1, internalId);
             pstmt.setString(2, attrId);
 
@@ -225,7 +225,7 @@ public final class DaoClinicalData {
         ResultSet rs = null;
 
         List<ClinicalData> clinicals = new ArrayList<ClinicalData>();
-        String sql = ("SELECT * FROM " + table + " WHERE `INTERNAL_ID` IN " +
+        String sql = ("SELECT * FROM " + table + " WHERE `internal_id` IN " +
             "(" + generateIdsSql(internalIds) + ")");
 
         try {
@@ -404,9 +404,12 @@ public final class DaoClinicalData {
         Connection con = null;
         PreparedStatement pstmt = null;
         try {
+            if (sampleInternalIds.isEmpty()) {
+                return;
+            }
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
             pstmt = con.prepareStatement("DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE
-                    + " WHERE `ATTR_ID` = ? AND `INTERNAL_ID` IN ("
+                    + " WHERE `attr_id` = ? AND `internal_id` IN ("
                     + String.join(",", Collections.nCopies(sampleInternalIds.size(), "?"))
                     + ")");
             int parameterIndex = 1;
@@ -452,9 +455,9 @@ public final class DaoClinicalData {
 
         List<ClinicalData> clinicals = new ArrayList<ClinicalData>();
 
-        String sql = ("SELECT * FROM " + table + " WHERE `INTERNAL_ID` IN " +
+        String sql = ("SELECT * FROM " + table + " WHERE `internal_id` IN " +
             "(" + generateIdsSql(internalIds) + ") " +
-            " AND ATTR_ID IN ('"+ StringUtils.join(attributeIds, "','")+"') ");
+            " AND attr_id IN ('"+ StringUtils.join(attributeIds, "','")+"') ");
 
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
@@ -484,13 +487,13 @@ public final class DaoClinicalData {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
 
             pstmt = con.prepareStatement("SELECT * FROM clinical_patient WHERE" +
-                " ATTR_ID IN ('" + StringUtils.join(attributeIds, "','") +"') ");
+                " attr_id IN ('" + StringUtils.join(attributeIds, "','") +"') ");
 
             List<Integer> patients = getPatientIdsByCancerStudy(internalCancerStudyId);
 
             rs = pstmt.executeQuery();
             while(rs.next()) {
-                Integer patientId = rs.getInt("INTERNAL_ID");
+                Integer patientId = rs.getInt("internal_id");
                 if (patients.contains(patientId)) {
                     clinicals.add(extract(PATIENT_ATTRIBUTES_TABLE, internalCancerStudyId, rs));
                 }
@@ -508,11 +511,11 @@ public final class DaoClinicalData {
 
     private static ClinicalData extract(String table, int internalCancerStudyId, ResultSet rs) throws SQLException {
         // get 
-        String stableId = getStableIdFromInternalId(table, rs.getInt("INTERNAL_ID"));
+        String stableId = getStableIdFromInternalId(table, rs.getInt("internal_id"));
         return new ClinicalData(internalCancerStudyId,
             stableId,
-            rs.getString("ATTR_ID"),
-            rs.getString("ATTR_VALUE"));
+            rs.getString("attr_id"),
+            rs.getString("attr_value"));
     }
 
     private static String getStableIdFromInternalId(String table, int internalId)
@@ -664,8 +667,8 @@ public final class DaoClinicalData {
 
         try{
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            pstmt = con.prepareStatement ("SELECT INTERNAL_ID FROM `" + tableName + "`"
-                + " WHERE ATTR_ID=? AND ATTR_VALUE=?");
+            pstmt = con.prepareStatement ("SELECT internal_id FROM `" + tableName + "`"
+                + " WHERE attr_id=? AND attr_value=?");
             pstmt.setString(1, paramName);
             pstmt.setString(2, paramValue);
             rs = pstmt.executeQuery();
@@ -674,7 +677,7 @@ public final class DaoClinicalData {
 
             while (rs.next())
             {
-                ids.add(rs.getInt("INTERNAL_ID"));
+                ids.add(rs.getInt("internal_id"));
             }
 
             return ids;
@@ -695,10 +698,10 @@ public final class DaoClinicalData {
         try{
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
             pstmt = con.prepareStatement("select " +
-                "distinct ATTR_VALUE as attributeValue, " +
-                "ATTR_ID as attributeID from clinical_sample " +
-                "where ATTR_ID in (?, ?) and INTERNAL_ID in (" +
-                "select INTERNAL_ID from sample where STABLE_ID in ('"
+                "distinct attr_value as attributeValue, " +
+                "attr_id as attributeID from clinical_sample " +
+                "where attr_id in (?, ?) and internal_id in (" +
+                "select internal_id from sample where stable_id in ('"
                 + StringUtils.join(samplesList,"','")+"'))");
             pstmt.setString(1, ClinicalAttribute.CANCER_TYPE);
             pstmt.setString(2, ClinicalAttribute.CANCER_TYPE_DETAILED);

@@ -13,56 +13,67 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.testcontainers.containers.MySQLContainer;
+
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
+import org.springframework.test.annotation.DirtiesContext;
+import org.testcontainers.clickhouse.ClickHouseContainer;
+import org.testcontainers.containers.Container;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 public abstract class IntegrationTestBase {
     private static final Object LOCK = new Object();
     private static final String DB_NAME = "cgds_test";
     private static final String DB_USER = "cbio_user";
     private static final String DB_PASSWORD = "somepassword";
-    private static final String ROOT_PASSWORD = "root";
-    private static final String MYSQL_IMAGE = "mysql:5.7";
+    private static final int CLICKHOUSE_HTTP_PORT = 8123;
+    private static final String CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:24.3";
     private static final String SKIP_ENV = "CBIOPORTAL_TEST_DB_SKIP";
     private static final String TARGET_DIR = "target/test-db";
     private static final String VERSION_FILE = "cbioportal.version";
-    private static final String CGDS_SQL_FILE = "cgds.sql";
+    private static final String CGDS_SQL_FILE = "clickhouse_cgds.sql";
+    private static final String SEED_SQL_FILE = "seed_mini.sql";
     private static final String CGDS_URL_TEMPLATE =
-        "https://raw.githubusercontent.com/cBioPortal/cbioportal/%s/src/main/resources/db-scripts/cgds.sql";
+        "https://raw.githubusercontent.com/cBioPortal/cbioportal/%s/src/test/resources/clickhouse_cgds.sql";
     private static final Pattern CBIOPORTAL_VERSION_PATTERN =
         Pattern.compile("<cbioportal\\.version>\\s*([^<]+)\\s*</cbioportal\\.version>");
 
-    private static MySQLContainer<?> container;
+    private static ClickHouseContainer container;
 
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(IntegrationTestBase::stopContainer));
-        ensureStarted();
     }
 
-    protected static void ensureStarted() {
-        getOrStartContainer();
+    @BeforeClass
+    public static void setupTestDatabase() {
+        startContainer();
     }
 
-    protected static void restartTestDb() {
-        synchronized (LOCK) {
-            if (shouldSkip()) {
-                return;
-            }
-            stopContainer();
-            container = startContainer();
-        }
+    @After
+    public void resetDatabase() {
+        recreateContainer();
+        ClickHouseAutoIncrement.resetCounters();
     }
 
-    private static MySQLContainer<?> getOrStartContainer() {
+    @AfterClass
+    public static void teardownTestDatabase() {
+        stopContainer();
+    }
+
+    private static void startContainer() {
         synchronized (LOCK) {
             if (container == null && !shouldSkip()) {
-                container = startContainer();
+                container = startAndInitializeContainer();
             }
-            return container;
         }
     }
 
@@ -73,6 +84,11 @@ public abstract class IntegrationTestBase {
                 container = null;
             }
         }
+    }
+
+    private static void recreateContainer() {
+        stopContainer();
+        startContainer();
     }
 
     private static boolean shouldSkip() {
@@ -87,29 +103,25 @@ public abstract class IntegrationTestBase {
         return "1".equals(normalized) || "true".equals(normalized);
     }
 
-    private static MySQLContainer<?> startContainer() {
+    private static ClickHouseContainer startAndInitializeContainer() {
         Path cgdsPath = ensureCgdsSql();
-        MySQLContainer<?> mysql = new MySQLContainer<>(DockerImageName.parse(MYSQL_IMAGE))
-            .withDatabaseName(DB_NAME)
+        Path seedPath = ensureSeedSql();
+        ClickHouseContainer clickhouse = new ClickHouseContainer(DockerImageName.parse(CLICKHOUSE_IMAGE))
             .withUsername(DB_USER)
             .withPassword(DB_PASSWORD)
-            .withEnv("MYSQL_ROOT_PASSWORD", ROOT_PASSWORD)
-            .withStartupTimeout(Duration.ofMinutes(5))
-            .withCopyFileToContainer(
-                MountableFile.forClasspathResource("seed_mini.sql"),
-                "/docker-entrypoint-initdb.d/seed.sql")
-            .withCopyFileToContainer(
-                MountableFile.forHostPath(cgdsPath),
-                "/docker-entrypoint-initdb.d/cgds.sql");
-        mysql.start();
-        setSystemProperties(mysql);
-        waitForSchema(mysql);
-        return mysql;
+            .withEnv("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
+            .withStartupTimeout(Duration.ofMinutes(5));
+        clickhouse.start();
+        applySchema(clickhouse, cgdsPath);
+        applySeed(clickhouse, seedPath);
+        setSystemProperties(clickhouse);
+        waitForSchema(clickhouse);
+        return clickhouse;
     }
 
-    private static void setSystemProperties(MySQLContainer<?> mysql) {
-        String host = mysql.getHost();
-        String port = Integer.toString(mysql.getMappedPort(3306));
+    private static void setSystemProperties(ClickHouseContainer clickhouse) {
+        String host = clickhouse.getHost();
+        String port = Integer.toString(clickhouse.getMappedPort(CLICKHOUSE_HTTP_PORT));
         String jdbcUrl = buildJdbcUrl(host, port, DB_NAME);
 
         System.setProperty("db.test.host", host);
@@ -121,17 +133,24 @@ public abstract class IntegrationTestBase {
         System.setProperty("spring.datasource.url", jdbcUrl);
         System.setProperty("spring.datasource.username", DB_USER);
         System.setProperty("spring.datasource.password", DB_PASSWORD);
-        System.setProperty("spring.datasource.driver-class-name", "com.mysql.jdbc.Driver");
+        System.setProperty("spring.datasource.driver-class-name", "com.clickhouse.jdbc.ClickHouseDriver");
     }
 
-    private static void waitForSchema(MySQLContainer<?> mysql) {
-        String jdbcUrl = buildJdbcUrl(mysql.getHost(), Integer.toString(mysql.getMappedPort(3306)), DB_NAME);
+    private static void waitForSchema(ClickHouseContainer clickhouse) {
+        String jdbcUrl = buildJdbcUrl(
+            clickhouse.getHost(),
+            Integer.toString(clickhouse.getMappedPort(CLICKHOUSE_HTTP_PORT)),
+            DB_NAME);
         long deadline = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
+        String schemaQuery = String.format("SELECT count(*) FROM %s.info", DB_NAME);
         while (System.currentTimeMillis() < deadline) {
             try (Connection connection = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASSWORD);
                  Statement statement = connection.createStatement();
-                 ResultSet result = statement.executeQuery("SELECT 1 FROM cancer_study LIMIT 1")) {
+                 ResultSet result = statement.executeQuery(schemaQuery)) {
                 if (result.next()) {
+                    if (result.getInt(1) < 1) {
+                        continue;
+                    }
                     return;
                 }
             } catch (Exception ex) {
@@ -148,13 +167,76 @@ public abstract class IntegrationTestBase {
 
     private static String buildJdbcUrl(String host, String port, String database) {
         return String.format(
-            "jdbc:mysql://%s:%s/%s?allowPublicKeyRetrieval=true&allowLoadLocalInfile=true&useSSL=false",
+            "jdbc:clickhouse://%s:%s/%s",
             host,
             port,
             database);
     }
 
+    private static void applySchema(ClickHouseContainer clickhouse, Path schemaPath) {
+        String containerSchemaPath = "/tmp/" + CGDS_SQL_FILE;
+        clickhouse.copyFileToContainer(MountableFile.forHostPath(schemaPath), containerSchemaPath);
+
+        executeClickHouseQuery(clickhouse, "CREATE DATABASE IF NOT EXISTS " + DB_NAME);
+
+        applySqlFile(clickhouse, containerSchemaPath);
+    }
+
+    private static void applySeed(ClickHouseContainer clickhouse, Path seedPath) {
+        String containerSeedPath = "/tmp/" + SEED_SQL_FILE;
+        clickhouse.copyFileToContainer(MountableFile.forHostPath(seedPath), containerSeedPath);
+
+        applySqlFile(clickhouse, containerSeedPath);
+    }
+
+    private static void applySqlFile(ClickHouseContainer clickhouse, String containerSeedPath) {
+        List<String> command = baseClickHouseCommand();
+        command.add("--database");
+        command.add(DB_NAME);
+        command.add("--multiquery");
+        command.add("--queries-file");
+        command.add(containerSeedPath);
+        executeClickHouseCommand(clickhouse, command);
+    }
+
+    private static void executeClickHouseQuery(ClickHouseContainer clickhouse, String query) {
+        List<String> command = baseClickHouseCommand();
+        command.add("--query");
+        command.add(query);
+        executeClickHouseCommand(clickhouse, command);
+    }
+
+    private static List<String> baseClickHouseCommand() {
+        List<String> command = new ArrayList<>();
+        command.add("clickhouse-client");
+        command.add("--user");
+        command.add(DB_USER);
+        command.add("--password");
+        command.add(DB_PASSWORD);
+        return command;
+    }
+
+    private static void executeClickHouseCommand(ClickHouseContainer clickhouse, List<String> command) {
+        try {
+            Container.ExecResult result = clickhouse.execInContainer(command.toArray(new String[0]));
+            if (result.getExitCode() != 0) {
+                String error = result.getStderr();
+                if (error == null || error.isBlank()) {
+                    error = result.getStdout();
+                }
+                throw new IllegalStateException("ClickHouse command failed: " + error);
+            }
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to execute ClickHouse command", ex);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while executing ClickHouse command", ex);
+        }
+    }
+
     private static Path ensureCgdsSql() {
+        //FIXME Uncomment when cbioportal contains the complete clickhouse_cgds.sql for the current version
+        /*
         String cbioportalVersion = readCbioportalVersion();
         Path targetDir = Paths.get(System.getProperty("user.dir"), TARGET_DIR);
         Path cgdsPath = targetDir.resolve(CGDS_SQL_FILE);
@@ -167,9 +249,19 @@ public abstract class IntegrationTestBase {
                 Files.writeString(versionPath, cbioportalVersion, StandardCharsets.UTF_8);
             }
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to prepare cgds.sql for integration tests", ex);
+            throw new IllegalStateException("Failed to prepare clickhouse_cgds.sql for integration tests", ex);
         }
+        */
+        Path cgdsPath = Paths.get(System.getProperty("user.dir"), "src", "test", "resources", CGDS_SQL_FILE);
         return cgdsPath;
+    }
+
+    private static Path ensureSeedSql() {
+        Path seedPath = Paths.get(System.getProperty("user.dir"), "src", "test", "resources", SEED_SQL_FILE);
+        if (!Files.exists(seedPath)) {
+            throw new IllegalStateException("seed_mini.sql not found at " + seedPath);
+        }
+        return seedPath;
     }
 
     private static String readCbioportalVersion() {
@@ -192,7 +284,7 @@ public abstract class IntegrationTestBase {
 
     private static void downloadCgdsSql(String version, Path destination) throws IOException {
         String url = String.format(CGDS_URL_TEMPLATE, version);
-        System.out.println("Downloading cgds.sql for " + version + "...");
+        System.out.println("Downloading clickhouse_cgds.sql for " + version + "...");
         try (InputStream input = new URL(url).openStream()) {
             Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING);
         }

@@ -26,9 +26,9 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.lang3.StringUtils;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
@@ -141,11 +141,11 @@ public class ImportReferenceGenome extends ConsoleRunnable {
                 numLines = FileUtil.getNumLines(referenceFile);
                 System.out.println(" --> total number of lines:  " + numLines);
                 ProgressMonitor.setMaxValue(numLines);
-                MySQLbulkLoader.bulkLoadOn();
+                ClickHouseBulkLoader.bulkLoadOn();
                 ImportReferenceGenome.importData(referenceFile);
             }
 
-            MySQLbulkLoader.flushAll();
+            ClickHouseBulkLoader.flushAll();
             System.err.println("Done. Restart tomcat to make sure the cache is replaced with the new data.");
 
         }

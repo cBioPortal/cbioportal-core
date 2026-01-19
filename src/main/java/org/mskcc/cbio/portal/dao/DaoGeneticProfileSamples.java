@@ -67,8 +67,8 @@ public final class DaoGeneticProfileSamples
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfileSamples.class);
             pstmt = con.prepareStatement
-                    ("INSERT INTO genetic_profile_samples (`GENETIC_PROFILE_ID`, " +
-                    "`ORDERED_SAMPLE_LIST`) "+ "VALUES (?,?)");
+                    ("INSERT INTO genetic_profile_samples (`genetic_profile_id`, " +
+                    "`ordered_sample_list`) "+ "VALUES (?,?)");
             pstmt.setInt(1, geneticProfileId);
             pstmt.setString(2, orderedSampleListBuf.toString());
             return pstmt.executeUpdate();
@@ -93,8 +93,7 @@ public final class DaoGeneticProfileSamples
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfileSamples.class);
-            pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_profile_samples WHERE GENETIC_PROFILE_ID=?");
+            pstmt = con.prepareStatement("DELETE from genetic_profile_samples WHERE genetic_profile_id=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -117,11 +116,11 @@ public final class DaoGeneticProfileSamples
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticProfileSamples.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM genetic_profile_samples WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM genetic_profile_samples WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             if  (rs.next()) {
-                String orderedSampleList = rs.getString("ORDERED_SAMPLE_LIST");
+                String orderedSampleList = rs.getString("ordered_sample_list");
 
                 //  Split, based on DELIM token
                 String[] parts = orderedSampleList.split(DELIM);

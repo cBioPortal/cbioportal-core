@@ -20,8 +20,9 @@
 		<cbioportal.version>v6.4.1</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
 
-		<mysql_driver.version>8.0.28</mysql_driver.version>
-		<mysql_commons_lang3.version>3.13.0</mysql_commons_lang3.version>
+		<commons_lang3.version>3.13.0</commons_lang3.version>
+		<clickhouse_jdbc.version>0.6.4</clickhouse_jdbc.version>
+		<lz4.version>1.8.0</lz4.version>
 
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
 		<commons_io.version>2.14.0</commons_io.version>
@@ -37,7 +38,7 @@
 		<easymock.version>4.3</easymock.version>
 		<junitparams.version>1.1.0</junitparams.version>
 		<byte_buddy.version>1.18.3</byte_buddy.version>
-		<testcontainers.version>1.19.8</testcontainers.version>
+		<testcontainers.version>1.21.4</testcontainers.version>
 	</properties>
 
 	<dependencies>
@@ -52,7 +53,7 @@
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
-			<version>${mysql_commons_lang3.version}</version>
+			<version>${commons_lang3.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
@@ -171,9 +172,16 @@
 			<version>${byte_buddy.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
-			<version>${mysql_driver.version}</version>
+			<groupId>com.clickhouse</groupId>
+			<artifactId>clickhouse-jdbc</artifactId>
+			<version>${clickhouse_jdbc.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.lz4</groupId>
+			<artifactId>lz4-java</artifactId>
+			<version>${lz4.version}</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.skyscreamer</groupId>
@@ -183,7 +191,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
-			<artifactId>mysql</artifactId>
+			<artifactId>clickhouse</artifactId>
 			<version>${testcontainers.version}</version>
 			<scope>test</scope>
 		</dependency>

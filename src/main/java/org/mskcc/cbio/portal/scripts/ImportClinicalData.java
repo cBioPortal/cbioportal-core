@@ -40,13 +40,13 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.collections4.map.MultiKeyMap;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.Patient;
@@ -161,10 +161,10 @@ public class ImportClinicalData extends ConsoleRunnable {
         // code has to be added to check whether
         // a clinical attribute update should be
         // perform instead of an insert
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         
         if(relaxed) {
-            MySQLbulkLoader.relaxedModeOn();
+            ClickHouseBulkLoader.relaxedModeOn();
         }    
         
         FileReader reader =  new FileReader(clinicalDataFile);
@@ -194,9 +194,9 @@ public class ImportClinicalData extends ConsoleRunnable {
             DaoPatient.createSampleCountClinicalData(cancerStudy.getInternalId());
         }
         
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-            MySQLbulkLoader.relaxedModeOff();
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
+            ClickHouseBulkLoader.relaxedModeOff();
         }
     }
 
@@ -415,7 +415,7 @@ public class ImportClinicalData extends ConsoleRunnable {
             if (isPatientAttribute && internalPatientId != -1) {
                 // The attributeMap keeps track what  patient/attribute to value pairs are being added to the DB. If there are duplicates,
                 // (which can happen in a MIXED_ATTRIBUTES type clinical file), we need to make sure that the value for the same
-                // attributes are consistent. This prevents duplicate entries in the temp file that the MySqlBulkLoader uses.
+                // attributes are consistent. This prevents duplicate entries in the temp file that the ClickHouseBulkLoader uses.
                 if(!attributeMap.containsKey(internalPatientId, columnAttrs.get(lc).getAttrId())) {
                     addDatum(internalPatientId, columnAttrs.get(lc).getAttrId(), fields[lc],
                         ClinicalAttribute.PATIENT_ATTRIBUTE);
@@ -489,6 +489,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         	//in case of PATIENT data import, there are some special checks:
         	if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES) {
         		//if clinical data is already there, then something has gone wrong (e.g. patient is duplicated in file), abort:
+                //TODO we migth want to optimize this for ClickHouse
         		if (patient != null && DaoClinicalData.getDataByPatientId(cancerStudy.getInternalId(), patientId).size() > 0) {
         			throw new RuntimeException("Something has gone wrong. Patient " + patientId + " already has clinical data loaded.");
         		}

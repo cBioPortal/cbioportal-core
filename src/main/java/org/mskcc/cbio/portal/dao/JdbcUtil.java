@@ -145,7 +145,7 @@ public class JdbcUtil {
                 }
             }
         } catch (Exception e) {
-            logMessage("Problem Closed a MySQL connection from " + requester + ": " + activeConnectionCount.toString());
+            logMessage("Problem closing a database connection from " + requester + ": " + activeConnectionCount.toString());
             e.printStackTrace();
         }
     }
@@ -235,34 +235,5 @@ public class JdbcUtil {
     static Long readLongFromResultSet(ResultSet rs, String column) throws SQLException {
         long l = rs.getInt(column);
         return rs.wasNull() ? null : l;
-    }
-
-    static Double readDoubleFromResultSet(ResultSet rs, String column) throws SQLException {
-        double d = rs.getDouble(column);
-        return rs.wasNull() ? null : d;
-    }
-
-    /**
-     * Tells the database to ignore foreign key constraints, effective only for current session.
-     * Useful when you want to truncate a table that has foreign key constraints. Note that this
-     * may create orphan records in child tables.
-     * @param con Database connection
-     * @throws SQLException
-     */
-    public static void disableForeignKeyCheck(Connection con) throws SQLException {
-        Statement stmt = con.createStatement();
-        stmt.execute("SET FOREIGN_KEY_CHECKS=0");
-        stmt.close();
-    }
-
-    /**
-     * Reverses the effect of disableForeignKeyCheck method.
-     * @param con Database Connection
-     * @throws SQLException
-     */
-    public static void enableForeignKeyCheck(Connection con) throws SQLException {
-        Statement stmt = con.createStatement();
-        stmt.execute("SET FOREIGN_KEY_CHECKS=1");
-        stmt.close();
     }
 }

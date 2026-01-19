@@ -22,6 +22,7 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGenePanel;
@@ -29,22 +30,18 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.StructuralVariant;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
 
 /**
  * Tests Incremental Import of Structural Variants Data.
@@ -54,8 +51,6 @@ import static org.mskcc.cbio.portal.dao.DaoMutation.getMutations;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestIncrementalStructuralVariantsImport extends IntegrationTestBase {
 
     public static final String STUDY_ID = "study_tcga_pub";
@@ -87,7 +82,7 @@ public class TestIncrementalStructuralVariantsImport extends IntegrationTestBase
         structuralVariant.setSite2RegionNumber(2);
         structuralVariant.setComments("This record has to be overwritten");
         DaoStructuralVariant.addStructuralVariantToBulkLoader(structuralVariant);
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         DaoSampleProfile.upsertSampleToProfileMapping(List.of(
                 new DaoSampleProfile.SampleProfileTuple(svGeneticProfile.getGeneticProfileId(), svDataSample.getInternalId(), null)));
 

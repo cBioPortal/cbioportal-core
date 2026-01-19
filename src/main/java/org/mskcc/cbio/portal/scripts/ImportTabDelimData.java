@@ -38,6 +38,7 @@ import java.util.regex.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
@@ -46,7 +47,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.Geneset;
@@ -296,7 +296,7 @@ public class ImportTabDelimData {
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
             if (isDiscretizedCnaProfile) {
                 existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
-                MySQLbulkLoader.bulkLoadOn();
+                ClickHouseBulkLoader.bulkLoadOn();
             }
 
             // load entities map from database
@@ -375,8 +375,8 @@ public class ImportTabDelimData {
             }
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
             geneticAlterationImporter.finalize();
-            if (MySQLbulkLoader.isBulkLoad()) {
-                MySQLbulkLoader.flushAll();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader.flushAll();
             }
 
             if (isRppaProfile) {
