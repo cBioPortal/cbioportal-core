@@ -19,11 +19,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-public class TestDumpPortalInfoApproval {
+public class TestDumpPortalInfoApproval extends IntegrationTestBase {
 
     private static final List<String> PORTAL_INFO_FILES = Arrays.asList(
         "cancer-types.json",

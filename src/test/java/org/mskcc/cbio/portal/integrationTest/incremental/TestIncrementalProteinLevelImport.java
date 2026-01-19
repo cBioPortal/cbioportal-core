@@ -32,6 +32,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertNoChange;
@@ -47,7 +48,7 @@ import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlteratio
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
 @Rollback
 @Transactional
-public class TestIncrementalProteinLevelImport {
+public class TestIncrementalProteinLevelImport extends IntegrationTestBase {
 
     /**
      * Test incremental upload of PROTEIN_LEVEL

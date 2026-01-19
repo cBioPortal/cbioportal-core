@@ -37,6 +37,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
@@ -54,7 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
 @Rollback
 @Transactional
-public class TestRemovePatients {
+public class TestRemovePatients extends IntegrationTestBase {
 
     @Test
     public void testRemovePatients() throws DaoException {

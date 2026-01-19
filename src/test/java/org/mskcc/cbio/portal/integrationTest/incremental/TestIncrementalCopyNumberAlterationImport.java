@@ -42,6 +42,7 @@ import org.springframework.test.context.TestContextManager;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
+import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertNoChange;
@@ -55,7 +56,7 @@ import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlteratio
  */
 @RunWith(Parameterized.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
-public class TestIncrementalCopyNumberAlterationImport {
+public class TestIncrementalCopyNumberAlterationImport extends IntegrationTestBase {
 
     // Hugo_Symbol: CDK1
     final long newGeneEntrezId = 983l;
