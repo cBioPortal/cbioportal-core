@@ -62,6 +62,14 @@ For instance, uploading study metadata, resources, or GSVA data incrementally is
 
 This method ensures efficient updates without the need for complete study reuploads, saving time and computational resources.
 
+### Patching Study Metadata
+
+It is possible to update study name, description, citation or pmid without reloading the whole study. Below is an example of such command:
+
+```bash
+java -cp core-*.jar org.mskcc.cbio.portal.scripts.PatchCancerStudyMetadata meta_study.txt
+```
+
 ## How to run integration tests
 
 This section guides you through the process of running integration tests by setting up a cBioPortal MySQL database environment using Docker. Please follow these steps carefully to ensure your testing environment is configured correctly.
