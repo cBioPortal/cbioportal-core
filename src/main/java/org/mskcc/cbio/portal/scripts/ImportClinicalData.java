@@ -188,15 +188,14 @@ public class ImportClinicalData extends ConsoleRunnable {
                     " in file. Please check your file format and try again.");
         }
         importData(buff, columnAttrs);
-        
-        if (getAttributesType() == ImportClinicalData.AttributeTypes.SAMPLE_ATTRIBUTES ||
-            getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES) {
-            DaoPatient.createSampleCountClinicalData(cancerStudy.getInternalId());
-        }
-        
+
         if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();
             ClickHouseBulkLoader.relaxedModeOff();
+        }
+        if (getAttributesType() == ImportClinicalData.AttributeTypes.SAMPLE_ATTRIBUTES ||
+            getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES) {
+            DaoPatient.createSampleCountClinicalData(cancerStudy.getInternalId());
         }
     }
 

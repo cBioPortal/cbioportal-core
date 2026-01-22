@@ -191,45 +191,28 @@ public class DaoPatient {
     public static void createSampleCountClinicalData(int cancerStudyId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         Map<Integer, Integer> sampleCounts = new LinkedHashMap<>();
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "SELECT patient.`internal_id` AS internal_id, count(*) AS sample_count FROM sample " +
+                    "INSERT INTO clinical_patient(`internal_id`, `attr_id`, `attr_value`) " +
+                            "SELECT patient.`internal_id` AS internal_id, ? as attr_id, CAST(COUNT(*) AS CHAR) AS sample_count FROM sample " +
                             "INNER JOIN patient ON sample.`patient_id` = patient.`internal_id` " +
                             "WHERE patient.`cancer_study_id`=? " +
                             "GROUP BY patient.`internal_id`");
-            pstmt.setInt(1, cancerStudyId);
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                sampleCounts.put(rs.getInt("internal_id"), rs.getInt("sample_count"));
-            }
-            if (sampleCounts.isEmpty()) {
-                return;
-            }
+            pstmt.setString(1, SAMPLE_COUNT_ATTR_ID);
+            pstmt.setInt(2, cancerStudyId);
+            pstmt.executeUpdate();
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(SAMPLE_COUNT_ATTR_ID, cancerStudyId);
             if (clinicalAttribute == null) {
                 ClinicalAttribute attr = new ClinicalAttribute(SAMPLE_COUNT_ATTR_ID, "Number of Samples Per Patient", 
                     "Number of Samples Per Patient", "STRING", true, "1", cancerStudyId);
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
-            String placeholders = String.join(",", Collections.nCopies(sampleCounts.size(), "?"));
-            pstmt.close();
-            pstmt = con.prepareStatement("DELETE FROM clinical_patient WHERE attr_id=? AND internal_id IN (" + placeholders + ")");
-            pstmt.setString(1, SAMPLE_COUNT_ATTR_ID);
-            int parameterIndex = 2;
-            for (Integer patientId : sampleCounts.keySet()) {
-                pstmt.setInt(parameterIndex++, patientId);
-            }
-            pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
-        }
-        for (Map.Entry<Integer, Integer> entry : sampleCounts.entrySet()) {
-            DaoClinicalData.addPatientDatum(entry.getKey(), SAMPLE_COUNT_ATTR_ID, Integer.toString(entry.getValue()));
+            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, null);
         }
     }
 

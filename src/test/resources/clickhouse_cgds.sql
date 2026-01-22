@@ -184,12 +184,12 @@ ORDER BY (event_type, patient_unique_id, cancer_study_identifier);
 
 CREATE TABLE clinical_patient
 (
-    `internal_id` Nullable(Int64),
-    `attr_id` Nullable(String),
-    `attr_value` Nullable(String)
+    `internal_id` Int64,
+    `attr_id` String,
+    `attr_value` String
 )
-    ENGINE = MergeTree
-ORDER BY tuple();
+    ENGINE = ReplacingMergeTree
+ORDER BY tuple(`internal_id`, `attr_id`);
 
 CREATE TABLE clinical_sample
 (
