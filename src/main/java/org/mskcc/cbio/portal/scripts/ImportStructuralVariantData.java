@@ -190,10 +190,10 @@ public class ImportStructuralVariantData {
             }
         }
 
-        DaoSampleProfile.upsertSampleToProfileMapping(sampleIds, geneticProfileId, genePanelId);
         if (isIncrementalUpdateMode) {
             DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
         }
+        DaoSampleProfile.upsertSampleToProfileMapping(sampleIds, geneticProfileId, genePanelId);
 
         buf.close();
         ClickHouseBulkLoader.flushAll();
