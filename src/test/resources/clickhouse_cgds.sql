@@ -193,12 +193,12 @@ ORDER BY tuple(`internal_id`, `attr_id`);
 
 CREATE TABLE clinical_sample
 (
-    `internal_id` Nullable(Int64),
-    `attr_id` Nullable(String),
-    `attr_value` Nullable(String)
+    `internal_id` Int64,
+    `attr_id` String,
+    `attr_value` String
 )
-    ENGINE = MergeTree
-ORDER BY tuple();
+    ENGINE = ReplacingMergeTree
+ORDER BY tuple(`internal_id`, `attr_id`);
 
 CREATE TABLE cna_event
 (

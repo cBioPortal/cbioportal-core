@@ -150,7 +150,7 @@ public class TestImportClinicalData extends IntegrationTestBase {
         importClinicalData.setFile(cancerStudy, clinicalFile, "PATIENT_ATTRIBUTES", false);
         
         exception.expect(RuntimeException.class);
-        exception.expectMessage("Duplicated patient");
+        exception.expectMessage("Error: Duplicated patient TEST-BH-A1F0 and SUBTYPE attribute pair in the clinical file.");
         importClinicalData.importData();
         ConsoleUtil.showWarnings();
 	}
@@ -420,12 +420,13 @@ public class TestImportClinicalData extends IntegrationTestBase {
 	 */
 	@Test
 	public void testImportClinicalData_CorrectFileTwice1() throws Exception {
-		checkCorrectFileTwice("PATIENT");
+		checkCorrectFileTwice("PATIENT", "Error: The following patient internal id and attribute entries already exist in the database:");
 	}
+    @Test
 	public void testImportClinicalData_CorrectFileTwice2() throws Exception {
-		checkCorrectFileTwice("SAMPLE");
+		checkCorrectFileTwice("SAMPLE", "Error: Sample TEST-A2-A04P is already in the database.");
 	}	
-	private void checkCorrectFileTwice(String type) throws Exception {
+	private void checkCorrectFileTwice(String type, String errorMessage) throws Exception {
         File clinicalFile = new File("src/test/resources/clinical_data_small_" + type + ".txt");
         // initialize an ImportClinicalData instance without args to parse
         ImportClinicalData importClinicalData = new ImportClinicalData(null);
@@ -433,11 +434,8 @@ public class TestImportClinicalData extends IntegrationTestBase {
         importClinicalData.setFile(cancerStudy, clinicalFile, type + "_ATTRIBUTES", false);
         importClinicalData.importData();
         // loading twice should also give error
-        exception.expect(DaoException.class);
-        // it is not a specific "duplication" error message but a general DB error since the 
-        // validation only gives specific error when in same file (maybe at some point we want to support clinical data 
-        // in multiple PATIENT and SAMPLE files(?) ):
-        exception.expectMessage("DB Error");
+        exception.expect(RuntimeException.class);
+        exception.expectMessage(errorMessage);
         importClinicalData.importData();
 	}
 

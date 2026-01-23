@@ -191,7 +191,6 @@ public class DaoPatient {
     public static void createSampleCountClinicalData(int cancerStudyId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        Map<Integer, Integer> sampleCounts = new LinkedHashMap<>();
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
@@ -209,6 +208,8 @@ public class DaoPatient {
                     "Number of Samples Per Patient", "STRING", true, "1", cancerStudyId);
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
+            // Forces ClickHouse to finalize the data insertion causing removing of duplicates in ReplacingMergeTree engine. Expensive operation.
+            con.prepareStatement("OPTIMIZE TABLE clinical_patient FINAL").executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
