@@ -172,6 +172,7 @@ public class ImportTabDelimData {
      *
      */
     public void importData() {
+        //FXIME ClickHouse does not support transactions. Find a way to compensate for this.
        JdbcUtil.getTransactionTemplate().execute(status -> {
             try {
                 doImportData();

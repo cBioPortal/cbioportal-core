@@ -65,15 +65,29 @@ public final class DaoSampleProfile {
     public record SampleProfileTuple(int geneticProfileId, int sampleId, Integer panelId) {}
 
     public static void upsertSampleToProfileMapping(Collection<SampleProfileTuple> idTuples) throws DaoException {
-        long ts = System.currentTimeMillis();
         if (idTuples.isEmpty()) {
             return;
         }
         if (ClickHouseBulkLoader.isBulkLoad()) {
             upsertWithBulkLoader(idTuples);
+            ClickHouseBulkLoader.flushAll();
+            optimizeSampleProfileTable();
             return;
         }
         upsertWithJdbcBatch(idTuples);
+        optimizeSampleProfileTable();
+    }
+
+    private static void optimizeSampleProfileTable() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
+            con.prepareStatement("OPTIMIZE TABLE sample_profile FINAL").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, null, null);
+        }
     }
 
     private static void upsertWithJdbcBatch(Collection<SampleProfileTuple> idTuples) throws DaoException {
