@@ -21,8 +21,10 @@ import java.util.regex.Pattern;
 
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.clickhouse.ClickHouseContainer;
 import org.testcontainers.containers.Container;
@@ -56,6 +58,11 @@ public abstract class IntegrationTestBase {
     @BeforeClass
     public static void setupTestDatabase() {
         startContainer();
+    }
+
+    @Before
+    public void reCache() {
+        DaoCancerStudy.reCacheAll();
     }
 
     @After

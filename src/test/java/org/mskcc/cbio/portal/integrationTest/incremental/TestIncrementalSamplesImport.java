@@ -20,6 +20,8 @@ package org.mskcc.cbio.portal.integrationTest.incremental;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
