@@ -101,7 +101,7 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
         List<ClinicalData> clinicalData = DaoClinicalData.getSampleData(cancerStudy.getInternalId(), Set.of(segSampleId));
         ClinicalData fractionGenomeAltered = clinicalData.stream()
                 .filter(cd -> "FRACTION_GENOME_ALTERED".equals(cd.getAttrId())).findFirst().get();
-        assertEquals("0.0000", fractionGenomeAltered.getAttrVal());
+        assertEquals("0.0", fractionGenomeAltered.getAttrVal());
     }
 
     public static final String STUDY_ID = "study_tcga_pub";
