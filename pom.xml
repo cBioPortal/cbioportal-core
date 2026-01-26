@@ -48,6 +48,11 @@
 			<artifactId>maf</artifactId>
 			<version>${maf.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>com.clickhouse</groupId>
+			<artifactId>clickhouse-jdbc</artifactId>
+			<version>${clickhouse_jdbc.version}</version>
+		</dependency>
 
 		<!-- Apache Commons -->
 		<dependency>
@@ -170,12 +175,6 @@
 			<groupId>net.bytebuddy</groupId>
 			<artifactId>byte-buddy</artifactId>
 			<version>${byte_buddy.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.clickhouse</groupId>
-			<artifactId>clickhouse-jdbc</artifactId>
-			<version>${clickhouse_jdbc.version}</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.lz4</groupId>
