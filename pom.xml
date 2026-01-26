@@ -53,6 +53,11 @@
 			<artifactId>clickhouse-jdbc</artifactId>
 			<version>${clickhouse_jdbc.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.lz4</groupId>
+			<artifactId>lz4-java</artifactId>
+			<version>${lz4.version}</version>
+		</dependency>
 
 		<!-- Apache Commons -->
 		<dependency>
@@ -175,12 +180,6 @@
 			<groupId>net.bytebuddy</groupId>
 			<artifactId>byte-buddy</artifactId>
 			<version>${byte_buddy.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.lz4</groupId>
-			<artifactId>lz4-java</artifactId>
-			<version>${lz4.version}</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.skyscreamer</groupId>
