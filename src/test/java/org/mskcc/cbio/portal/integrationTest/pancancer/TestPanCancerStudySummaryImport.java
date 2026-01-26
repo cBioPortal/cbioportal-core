@@ -3,7 +3,6 @@ package org.mskcc.cbio.portal.integrationTest.pancancer;
 import java.util.*;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -31,7 +30,6 @@ import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 public class TestPanCancerStudySummaryImport extends IntegrationTestBase {
 

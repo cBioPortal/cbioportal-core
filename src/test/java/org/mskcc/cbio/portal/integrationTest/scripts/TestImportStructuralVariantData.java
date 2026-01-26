@@ -34,7 +34,6 @@ import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
 import org.junit.Test;
@@ -57,7 +56,6 @@ import static org.junit.Assert.assertEquals;
  * Test class to test functionality of ImportStructralVariantData
 */
 @RunWith(JUnitParamsRunner.class)
-@Ignore
 
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
 public class TestImportStructuralVariantData extends IntegrationTestBase {
