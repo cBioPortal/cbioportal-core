@@ -67,13 +67,16 @@ public class DaoTypeOfCancer {
    }
 
    public static TypeOfCancer getTypeOfCancerById(String typeOfCancerId) throws DaoException {
+      if (typeOfCancerId == null) {
+         return null;
+      }
       Connection con = null;
       PreparedStatement pstmt = null;
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-         pstmt = con.prepareStatement("SELECT * FROM type_of_cancer WHERE type_of_cancer_id=?");
-         pstmt.setString(1, typeOfCancerId);
+         pstmt = con.prepareStatement("SELECT * FROM type_of_cancer WHERE LOWER(type_of_cancer_id)=?");
+         pstmt.setString(1, typeOfCancerId.toLowerCase());
          rs = pstmt.executeQuery();
          if (rs.next()) {
             return extractTypeOfCancer(rs);
