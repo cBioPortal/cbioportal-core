@@ -179,20 +179,20 @@ public final class DaoMutation {
             }
 
             String mutationCountSelect =
-                "SELECT sample_profile.`sample_id`, 'mutation_count', count(DISTINCT mutation_event.`chr`, mutation_event.`start_position`, " +
+                "SELECT sample_profile.`sample_id`, 'MUTATION_COUNT', count(DISTINCT mutation_event.`chr`, mutation_event.`start_position`, " +
                     "mutation_event.`end_position`, mutation_event.`reference_allele`, mutation_event.`tumor_seq_allele`) AS MUTATION_COUNT " +
                     "FROM `sample_profile` " +
                     "LEFT JOIN mutation ON mutation.`sample_id` = sample_profile.`sample_id` " +
-                    "AND ( mutation.`mutation_status` <> 'germline' OR mutation.`mutation_status` IS NULL ) " +
+                    "AND ( UPPER(mutation.`mutation_status`) <> 'GERMLINE' OR mutation.`mutation_status` IS NULL ) " +
                     "LEFT JOIN mutation_event ON mutation.`mutation_event_id` = mutation_event.`mutation_event_id` " +
                     "INNER JOIN genetic_profile ON genetic_profile.`genetic_profile_id` = sample_profile.`genetic_profile_id` " +
-                    "WHERE genetic_profile.`genetic_alteration_type` = 'mutation_extended' " +
+                    "WHERE genetic_profile.`genetic_alteration_type` = 'MUTATION_EXTENDED' " +
                     "AND genetic_profile.`genetic_profile_id`=? " +
                     "GROUP BY sample_profile.`genetic_profile_id` , sample_profile.`sample_id`";
 
             deleteStmt = con.prepareStatement(
                 "ALTER TABLE clinical_sample "
-                    + "DELETE WHERE attr_id = 'mutation_count' "
+                    + "DELETE WHERE attr_id = 'MUTATION_COUNT' "
                     + "AND internal_id IN (SELECT sample_id FROM sample_profile WHERE genetic_profile_id = ?) "
             );
             deleteStmt.setInt(1, geneticProfile.getGeneticProfileId());
