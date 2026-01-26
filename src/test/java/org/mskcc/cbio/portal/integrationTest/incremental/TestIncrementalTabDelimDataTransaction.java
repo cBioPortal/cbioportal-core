@@ -20,6 +20,7 @@ package org.mskcc.cbio.portal.integrationTest.incremental;
 import java.io.*;
 import java.util.*;
 import org.junit.Before;
+import org.junit.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.runner.RunWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -54,6 +55,7 @@ public class TestIncrementalTabDelimDataTransaction extends IntegrationTestBase 
      * Test transaction
      */
     @ExtendWith(MockitoExtension.class)
+    @Test
     //FIXME will pass when transaction substitution for ClickHouse is implemented
     public void testTransaction() throws Exception {
         GeneticProfile mrnaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mrna");
