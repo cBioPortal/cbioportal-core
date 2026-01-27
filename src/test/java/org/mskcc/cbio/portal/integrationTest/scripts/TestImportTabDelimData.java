@@ -135,7 +135,7 @@ public class TestImportTabDelimData extends IntegrationTestBase {
         runImportCnaData();
     }
     
-    private void runImportCnaData() throws DaoException, IOException{
+    private void runImportCnaData() throws Exception {
 
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
@@ -210,7 +210,7 @@ public class TestImportTabDelimData extends IntegrationTestBase {
         runImportCnaData2();
     }
     
-    private void runImportCnaData2() throws DaoException, IOException{
+    private void runImportCnaData2() throws Exception {
 
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
 
@@ -271,7 +271,7 @@ public class TestImportTabDelimData extends IntegrationTestBase {
         runImportRnaData1();
     }
     
-    private void runImportRnaData1() throws DaoException, IOException{
+    private void runImportRnaData1() throws Exception {
 
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
