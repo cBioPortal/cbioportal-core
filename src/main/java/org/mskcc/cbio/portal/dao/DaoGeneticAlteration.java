@@ -45,7 +45,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
+
 import org.mskcc.cbio.portal.model.CanonicalGene;
 
 /**
@@ -78,6 +78,31 @@ public class DaoGeneticAlteration {
         return daoGeneticAlteration;
     }
 
+    private static void cloneGeneticAlterationTable() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
+            con.prepareStatement("DROP TABLE IF EXISTS _genetic_alteration;").executeUpdate();
+            con.prepareStatement("CREATE TABLE _genetic_alteration AS genetic_alteration;").executeUpdate();
+            con.prepareStatement("INSERT INTO _genetic_alteration SELECT * FROM genetic_alteration;").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
+        }
+    }
+
+    public static void swapResults() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
+            con.prepareStatement("EXCHANGE TABLES genetic_alteration AND _genetic_alteration;").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
+        }
+    }
     public static interface AlterationProcesser {
         ObjectNode process(
             long entrezGeneId,
@@ -113,7 +138,7 @@ public class DaoGeneticAlteration {
         
        if (ClickHouseBulkLoader.isBulkLoad() ) {
           //  write to the temp file maintained by the ClickHouseBulkLoader
-          ClickHouseBulkLoader.getClickHouseBulkLoader("genetic_alteration").insertRecord(Integer.toString( geneticProfileId ),
+          ClickHouseBulkLoader.getClickHouseBulkLoader("_genetic_alteration").insertRecord(Integer.toString( geneticProfileId ),
         		  Integer.toString( geneticEntityId ), valueBuffer.toString());
           // return 1 because normal insert will return 1 if no error occurs
           return 1;
@@ -126,7 +151,7 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement(
-                    "INSERT INTO genetic_alteration (genetic_profile_id, genetic_entity_id, `values`) "
+                    "INSERT INTO _genetic_alteration (genetic_profile_id, genetic_entity_id, `values`) "
                             + "VALUES (?,?,?)");
             pstmt.setInt(1, geneticProfileId);
             pstmt.setLong(2, geneticEntityId);
@@ -274,14 +299,12 @@ public class DaoGeneticAlteration {
     /**
      * Process SQL result alteration data
      * @param geneticProfileId  Genetic Profile ID.
-     * @param entrezGeneIds      Entrez Gene IDs.
      * @param processor         Implementation of AlterationProcesser Interface
      * @return ArrayList<ObjectNode>
      * @throws DaoException Database Error, MathException
      */
     public static ArrayList<ObjectNode> getProcessedAlterationData(
             int geneticProfileId,               //queried profile internal id (num)
-            //Set<Long> entrezGeneIds,            //list of genes in calculation gene pool (all genes or only cancer genes)
             int offSet,                         //OFFSET for LIMIT (to get only one segment of the genes)
             AlterationProcesser processor       //implemented interface
     ) throws DaoException {
@@ -453,7 +476,7 @@ public class DaoGeneticAlteration {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            pstmt = con.prepareStatement("DELETE from genetic_alteration WHERE genetic_profile_id=?");
+            pstmt = con.prepareStatement("DELETE from _genetic_alteration WHERE genetic_profile_id=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -474,7 +497,7 @@ public class DaoGeneticAlteration {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            pstmt = con.prepareStatement("TRUNCATE TABLE genetic_alteration");
+            pstmt = con.prepareStatement("TRUNCATE TABLE _genetic_alteration");
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
