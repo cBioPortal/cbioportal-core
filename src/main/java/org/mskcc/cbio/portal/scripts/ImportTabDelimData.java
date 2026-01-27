@@ -46,7 +46,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneset;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.Geneset;
@@ -171,52 +170,34 @@ public class ImportTabDelimData {
      * Import the Copy Number Alteration, mRNA Expression, protein RPPA, GSVA or generic_assay data
      *
      */
-    public void importData() {
-        //FXIME ClickHouse does not support transactions. Find a way to compensate for this.
-       JdbcUtil.getTransactionTemplate().execute(status -> {
-            try {
-                doImportData();
-            } catch (Throwable e) {
-                status.setRollbackOnly();
-                throw new RuntimeException(e);
-            }
-            return null;
-        });
-    }
-    private void doImportData() throws IOException, DaoException {
-        try {
-            this.numLines = FileUtil.getNumLines(dataFile);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public void importData() throws Exception {
+        this.numLines = FileUtil.getNumLines(dataFile);
         ProgressMonitor.setMaxValue(numLines);
-        FileReader reader = new FileReader(dataFile);
-        BufferedReader buf = new BufferedReader(reader);
-        String headerLine = buf.readLine();
-        String[] headerParts = TsvUtil.splitTsvLine(headerLine);
+        try (FileReader reader = new FileReader(dataFile);
+            BufferedReader buf = new BufferedReader(reader)) {
+            String headerLine = buf.readLine();
+            String[] headerParts = TsvUtil.splitTsvLine(headerLine);
+            //Whether data regards CNA or RPPA:
+            boolean isDiscretizedCnaProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
+                && geneticProfile.showProfileInAnalysisTab();
+            boolean isRppaProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.PROTEIN_LEVEL
+                && "Composite.Element.Ref".equalsIgnoreCase(headerParts[0]);
+            boolean isGsvaProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE
+                && headerParts[0].equalsIgnoreCase("geneset_id");
+            boolean isGenericAssayProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY
+                && headerParts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
 
-        //Whether data regards CNA or RPPA:
-        boolean isDiscretizedCnaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
-            && geneticProfile.showProfileInAnalysisTab();
-        boolean isRppaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.PROTEIN_LEVEL
-            && "Composite.Element.Ref".equalsIgnoreCase(headerParts[0]);
-        boolean isGsvaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE
-            && headerParts[0].equalsIgnoreCase("geneset_id");
-        boolean isGenericAssayProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY
-            && headerParts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
+            long typesDetected = List.of(isDiscretizedCnaProfile, isRppaProfile, isGsvaProfile, isGenericAssayProfile).stream().filter(Boolean::booleanValue).count();
+            if (typesDetected > 1) {
+                throw new IllegalStateException("More then one data type is detected.");
+            }
 
-        long typesDetected = List.of(isDiscretizedCnaProfile, isRppaProfile, isGsvaProfile, isGenericAssayProfile).stream().filter(Boolean::booleanValue).count();
-        if (typesDetected > 1) {
-            throw new IllegalStateException("More then one data type is detected.");
-        }
-
-        int numRecordsToAdd = 0;
-        int samplesSkipped = 0;
-        try {
+            int numRecordsToAdd = 0;
+            int samplesSkipped = 0;
             int hugoSymbolIndex = getHugoSymbolIndex(headerParts);
             int entrezGeneIdIndex = getEntrezGeneIdIndex(headerParts);
             int rppaGeneRefIndex = getRppaGeneRefIndex(headerParts);
@@ -391,9 +372,6 @@ public class ImportTabDelimData {
                 throw new DaoException("Something has gone wrong!  I did not save any records" +
                     " to the database!");
             }
-        }
-        finally {
-            buf.close();
         }
     }
 
