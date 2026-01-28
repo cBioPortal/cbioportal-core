@@ -3491,10 +3491,27 @@ class TimelineValidator(Validator):
         'EVENT_TYPE']
     REQUIRE_COLUMN_ORDER = True
     ALLOW_BLANKS = True
+    SPECIMEN_EVENT_TYPES = ('SPECIMEN', 'SAMPLE ACQUISITION', 'SEQUENCING')
+
+    def __init__(self, *args, **kwargs):
+        """Initialize TimelineValidator with duplicate SAMPLE_ID tracking."""
+        super(TimelineValidator, self).__init__(*args, **kwargs)
+        self.seen_sample_ids = {}  # {sample_id: (line_number, event_type)}
+        self.has_sample_id_column = False
+
+    def checkHeader(self, data):
+        """Check header and detect if SAMPLE_ID column exists."""
+        num_errors = super(TimelineValidator, self).checkHeader(data)
+        self.has_sample_id_column = 'SAMPLE_ID' in self.cols
+        return num_errors
 
     def checkLine(self, data):
+        """Validate timeline event line including duplicate SAMPLE_ID detection."""
         super(TimelineValidator, self).checkLine(data)
-        # TODO check the values
+        
+        # Check for duplicate SAMPLE_IDs in specimen-related event types
+        self._check_duplicate_sample_id(data)
+        
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3522,6 +3539,49 @@ class TimelineValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
+
+    def _check_duplicate_sample_id(self, data):
+        """Check for duplicate SAMPLE_IDs in specimen-related event types.
+        
+        Per cBioPortal documentation, events of type SPECIMEN, SAMPLE ACQUISITION,
+        or SEQUENCING are rendered as numbered discs on the timeline. Each SAMPLE_ID
+        should only appear once across these event types to avoid ambiguity.
+        """
+        if not self.has_sample_id_column:
+            return
+        
+        try:
+            event_type_idx = self.cols.index('EVENT_TYPE')
+            sample_id_idx = self.cols.index('SAMPLE_ID')
+        except (ValueError, AttributeError):
+            return  
+        
+        if len(data) <= max(event_type_idx, sample_id_idx):
+            return
+        
+        event_type = data[event_type_idx].strip().upper()
+        sample_id = data[sample_id_idx].strip()
+        
+        if not sample_id or sample_id.upper() in ('NA', 'N/A', '[NOT AVAILABLE]'):
+            return
+        
+        if event_type in self.SPECIMEN_EVENT_TYPES:
+            if sample_id in self.seen_sample_ids:
+                first_line, first_event_type = self.seen_sample_ids[sample_id]
+                self.logger.warning(
+                    'Duplicate SAMPLE_ID in timeline file',
+                    extra={
+                        'line_number': self.line_number,
+                        'cause': '%s (already defined on line %d for EVENT_TYPE %s)' % (
+                            sample_id, 
+                            first_line,
+                            first_event_type
+                        )
+                    }
+                )
+            else:
+                self.seen_sample_ids[sample_id] = (self.line_number, event_type)
+
 
 class CancerTypeValidator(Validator):
 
