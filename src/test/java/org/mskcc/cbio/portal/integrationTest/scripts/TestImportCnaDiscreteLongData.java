@@ -38,6 +38,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -47,7 +48,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.CopyNumberStatus;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -55,10 +55,8 @@ import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCnaDiscreteLongData;
 import org.mskcc.cbio.portal.util.StableIdUtil;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
@@ -70,8 +68,6 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
-@Rollback
-@Transactional
 public class TestImportCnaDiscreteLongData extends IntegrationTestBase {
     int studyId;
     GeneticProfile geneticProfile;
@@ -89,7 +85,7 @@ public class TestImportCnaDiscreteLongData extends IntegrationTestBase {
 
     @After
     public void cleanUp() throws DaoException {
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 
     /**
@@ -556,10 +552,10 @@ public class TestImportCnaDiscreteLongData extends IntegrationTestBase {
     
     private String getGeneticProfileDatatype(long geneticProfileId) throws DaoException {
         return runSelectQuery(
-            "select DATATYPE " +
+            "select datatype " +
                 "FROM genetic_profile " +
-                "WHERE GENETIC_PROFILE_ID=" + geneticProfileId + " ;",
-            (ResultSet rs) -> rs.getString("DATATYPE")
+                "WHERE genetic_profile_id=" + geneticProfileId + " ;",
+            (ResultSet rs) -> rs.getString("datatype")
         ).get(0);
     }
 
@@ -573,18 +569,18 @@ public class TestImportCnaDiscreteLongData extends IntegrationTestBase {
 
     private List<NamespaceAnnotationJson> getAnnotationJsonBy(long geneticProfileId) throws DaoException {
         return runSelectQuery(
-            "select cna_event.CNA_EVENT_ID, SAMPLE_ID, STABLE_ID, GENETIC_PROFILE_ID, ENTREZ_GENE_ID, ANNOTATION_JSON " +
+            "select cna_event.cna_event_id as cna_event_id, sample_id, stable_id, genetic_profile_id, entrez_gene_id, annotation_json " +
                 "FROM sample_cna_event " +
-                "LEFT JOIN sample ON sample.INTERNAL_ID = sample_cna_event.SAMPLE_ID " +
-                "LEFT JOIN cna_event ON cna_event.CNA_EVENT_ID = sample_cna_event.CNA_EVENT_ID " +
-                "WHERE GENETIC_PROFILE_ID=" + geneticProfileId + " ;",
+                "LEFT JOIN sample ON sample.internal_id = sample_cna_event.sample_id " +
+                "LEFT JOIN cna_event ON cna_event.cna_event_id = sample_cna_event.cna_event_id " +
+                "WHERE genetic_profile_id=" + geneticProfileId + " ;",
             (ResultSet rs) -> {
                 NamespaceAnnotationJson result = new NamespaceAnnotationJson();
-                result.cnaEventId = rs.getInt("CNA_EVENT_ID");
-                result.sampleId = rs.getInt("SAMPLE_ID");
-                result.stableId = rs.getString("STABLE_ID");
-                result.entrezGeneId = rs.getInt("ENTREZ_GENE_ID");
-                result.annotationJson = rs.getString("ANNOTATION_JSON");
+                result.cnaEventId = rs.getInt("cna_event_id");
+                result.sampleId = rs.getInt("sample_id");
+                result.stableId = rs.getString("stable_id");
+                result.entrezGeneId = rs.getInt("entrez_gene_id");
+                result.annotationJson = rs.getString("annotation_json");
                 return result;
             });
     }
@@ -593,13 +589,13 @@ public class TestImportCnaDiscreteLongData extends IntegrationTestBase {
         List<String> pkStrings = new ArrayList<>();
         for (TestPdAnnotationPK pk : pks) {
             pkStrings.add(String.format(
-                "( ALTERATION_EVENT_ID=%d AND GENETIC_PROFILE_ID=%d AND SAMPLE_ID=%d )",
+                "( alteration_event_id=%d AND genetic_profile_id=%d AND sample_id=%d )",
                 pk.alterationEventId, pk.geneticProfileId, pk.sampleId
             ));
         }
         
-        String q = "SELECT DRIVER_TIERS_FILTER_ANNOTATION, DRIVER_TIERS_FILTER, DRIVER_FILTER_ANNOTATION, DRIVER_FILTER, "
-            + "ALTERATION_EVENT_ID, GENETIC_PROFILE_ID, SAMPLE_ID "
+        String q = "SELECT driver_tiers_filter_annotation, driver_tiers_filter, driver_filter_annotation, driver_filter, "
+            + "alteration_event_id, genetic_profile_id, sample_id "
             + "FROM alteration_driver_annotation ";
         if (pks.size() > 0) {
             q += "WHERE " + String.join(" OR ", pkStrings);
@@ -609,62 +605,62 @@ public class TestImportCnaDiscreteLongData extends IntegrationTestBase {
             q,
             (ResultSet rs) -> {
                 TestPdAnnotation line = new TestPdAnnotation();
-                line.driverFilter = rs.getString("DRIVER_FILTER");
-                line.driverTiersFilter = rs.getString("DRIVER_TIERS_FILTER");
-                line.driverFilterAnnotation = rs.getString("DRIVER_FILTER_ANNOTATION");
-                line.driverTiersFilterAnnotation = rs.getString("DRIVER_TIERS_FILTER_ANNOTATION");
+                line.driverFilter = rs.getString("driver_filter");
+                line.driverTiersFilter = rs.getString("driver_tiers_filter");
+                line.driverFilterAnnotation = rs.getString("driver_filter_annotation");
+                line.driverTiersFilterAnnotation = rs.getString("driver_tiers_filter_annotation");
 
                 line.pk = new TestPdAnnotationPK();
-                line.pk.alterationEventId = rs.getInt("ALTERATION_EVENT_ID");
-                line.pk.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
-                line.pk.sampleId = rs.getInt("SAMPLE_ID");
+                line.pk.alterationEventId = rs.getInt("alteration_event_id");
+                line.pk.geneticProfileId = rs.getInt("genetic_profile_id");
+                line.pk.sampleId = rs.getInt("sample_id");
 
                 return line;
             });
     }
 
     private List<TestGeneticAlteration> getAllGeneticAlterations() throws DaoException {
-        return runSelectQuery("SELECT ga.*, g.HUGO_GENE_SYMBOL FROM genetic_alteration as ga left join gene as g on ga.GENETIC_ENTITY_ID=g.GENETIC_ENTITY_ID", (ResultSet rs) -> {
+        return runSelectQuery("SELECT ga.*, g.hugo_gene_symbol FROM genetic_alteration as ga left join gene as g on ga.genetic_entity_id=g.genetic_entity_id", (ResultSet rs) -> {
             TestGeneticAlteration line = new TestGeneticAlteration();
-            line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
-            line.geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
-            line.values = rs.getString("VALUES");
-            line.hugoGeneSymbol = rs.getString("HUGO_GENE_SYMBOL");
+            line.geneticProfileId = rs.getInt("genetic_profile_id");
+            line.geneticEntityId = rs.getInt("genetic_entity_id");
+            line.values = rs.getString("values");
+            line.hugoGeneSymbol = rs.getString("hugo_gene_symbol");
             return line;
         });
     }
 
     private TestGeneticAlteration getGeneticAlterationByEntrez(long entrezId) throws DaoException {
-        return runSelectQuery("SELECT ga.GENETIC_PROFILE_ID, ga.GENETIC_ENTITY_ID, ga.VALUES, g.HUGO_GENE_SYMBOL " +
+        return runSelectQuery("SELECT ga.genetic_profile_id, ga.genetic_entity_id, ga.values, g.hugo_gene_symbol " +
                 "FROM genetic_alteration AS ga " +
                 "RIGHT JOIN gene AS g " +
-                "ON g.GENETIC_ENTITY_ID = ga.GENETIC_ENTITY_ID " +
-                "WHERE g.ENTREZ_GENE_ID=" + entrezId,
+                "ON g.genetic_entity_id = ga.genetic_entity_id " +
+                "WHERE g.entrez_gene_id=" + entrezId,
             (ResultSet rs) -> {
                 TestGeneticAlteration line = new TestGeneticAlteration();
-                line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
-                line.geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
-                line.values = rs.getString("VALUES");
-                line.hugoGeneSymbol = rs.getString("HUGO_GENE_SYMBOL");
+                line.geneticProfileId = rs.getInt("genetic_profile_id");
+                line.geneticEntityId = rs.getInt("genetic_entity_id");
+                line.values = rs.getString("values");
+                line.hugoGeneSymbol = rs.getString("hugo_gene_symbol");
                 return line;
             }).get(0);
     }
 
     private TestGeneticProfileSample getGeneticProfileSample(long profileId) throws DaoException {
         return runSelectQuery(
-            "SELECT * FROM genetic_profile_samples WHERE GENETIC_PROFILE_ID=" + profileId,
+            "SELECT * FROM genetic_profile_samples WHERE genetic_profile_id=" + profileId,
             (ResultSet rs) -> {
                 TestGeneticProfileSample line = new TestGeneticProfileSample();
-                line.geneticProfileId = rs.getInt("GENETIC_PROFILE_ID");
-                line.orderedSampleList = rs.getString("ORDERED_SAMPLE_LIST");
+                line.geneticProfileId = rs.getInt("genetic_profile_id");
+                line.orderedSampleList = rs.getString("ordered_sample_list");
                 return line;
             }).get(0);
     }
 
     private String getSampleStableIdFromInternalId(Integer internalSampleId) throws DaoException {
         return runSelectQuery(
-            "select STABLE_ID from sample where INTERNAL_ID = " + internalSampleId,
-            (ResultSet rs) -> rs.getString("STABLE_ID")
+            "select stable_id from sample where internal_id = " + internalSampleId,
+            (ResultSet rs) -> rs.getString("stable_id")
         ).get(0);
     }
 

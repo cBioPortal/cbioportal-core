@@ -39,16 +39,16 @@ import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import org.apache.commons.collections4.map.MultiKeyMap;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
+import org.mskcc.cbio.portal.model.ClinicalData;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.FileUtil;
@@ -161,10 +161,10 @@ public class ImportClinicalData extends ConsoleRunnable {
         // code has to be added to check whether
         // a clinical attribute update should be
         // perform instead of an insert
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         
         if(relaxed) {
-            MySQLbulkLoader.relaxedModeOn();
+            ClickHouseBulkLoader.relaxedModeOn();
         }    
         
         FileReader reader =  new FileReader(clinicalDataFile);
@@ -188,15 +188,14 @@ public class ImportClinicalData extends ConsoleRunnable {
                     " in file. Please check your file format and try again.");
         }
         importData(buff, columnAttrs);
-        
+
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
+            ClickHouseBulkLoader.relaxedModeOff();
+        }
         if (getAttributesType() == ImportClinicalData.AttributeTypes.SAMPLE_ATTRIBUTES ||
             getAttributesType() == ImportClinicalData.AttributeTypes.MIXED_ATTRIBUTES) {
             DaoPatient.createSampleCountClinicalData(cancerStudy.getInternalId());
-        }
-        
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-            MySQLbulkLoader.relaxedModeOff();
         }
     }
 
@@ -295,15 +294,16 @@ public class ImportClinicalData extends ConsoleRunnable {
     private void importData(BufferedReader buff, List<ClinicalAttribute> columnAttrs) throws Exception
     {
         String line;
-        MultiKeyMap attributeMap = new MultiKeyMap();
+        Map<FullAttributeKey, String> alreadyParsedAttributes = new HashMap<>();
         while ((line = buff.readLine()) != null) {
             if (skipLine(line.trim())) {
                 continue;
             }
 
             String[] fieldValues = getFieldValues(line, columnAttrs);
-            addDatum(fieldValues, columnAttrs, attributeMap);
+            alreadyParsedAttributes.putAll(parseRowAttributes(fieldValues, columnAttrs, alreadyParsedAttributes));
         }
+        addClinicalDataIfNoDuplicates(alreadyParsedAttributes);
     }
 
     private boolean skipLine(String line)
@@ -338,7 +338,9 @@ public class ImportClinicalData extends ConsoleRunnable {
         return fieldValues;
     }
 
-    private boolean addDatum(String[] fields, List<ClinicalAttribute> columnAttrs, MultiKeyMap attributeMap) throws Exception
+    private record FullAttributeKey(String table, int internalId, String attrId) {}
+
+    private Map<FullAttributeKey, String> parseRowAttributes(String[] fields, List<ClinicalAttribute> columnAttrs, Map<FullAttributeKey, String> alreadyParsedAttributes) throws Exception
     {
         int sampleIdIndex = findSampleIdColumn(columnAttrs);
         String stableSampleId = (sampleIdIndex >= 0) ? fields[sampleIdIndex] : "";
@@ -360,13 +362,13 @@ public class ImportClinicalData extends ConsoleRunnable {
                 //and an ERROR in other studies. I.e. a sample should occur only once in clinical file!
                 if (stableSampleId.startsWith("TCGA-")) {
                     ProgressMonitor.logWarning("Sample " + stableSampleId + " found to be duplicated in your file. Only data of the first sample will be processed.");
-                    return false;
+                    return Collections.emptyMap();
                 }
                 if (this.isSupplementalData()) {
                     internalSampleId = sample.getInternalId();
                 } else {
                     //give error or warning if sample is already in DB and this is NOT expected (i.e. not supplemental data):
-                    throw new RuntimeException("Error: Sample " + stableSampleId + " found to be duplicated in your file.");
+                    throw new RuntimeException("Error: Sample " + stableSampleId + " is already in the database.");
                 }
             }
         }
@@ -401,6 +403,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         	numSamplesProcessed++;
         }
 
+        Map<FullAttributeKey, String> attributeRow = new HashMap<>();
         for (int lc = 0; lc < fields.length; lc++) {
             //if lc is sampleIdIndex or patientIdIndex, skip as well since these are the relational fields:
             if (lc == sampleIdIndex || lc == patientIdIndex) {
@@ -411,44 +414,42 @@ public class ImportClinicalData extends ConsoleRunnable {
             	numEmptyClinicalAttributesSkipped++;
                 continue;
             }
-            boolean isPatientAttribute = columnAttrs.get(lc).isPatientAttribute(); 
+            boolean isPatientAttribute = columnAttrs.get(lc).isPatientAttribute();
             if (isPatientAttribute && internalPatientId != -1) {
                 // The attributeMap keeps track what  patient/attribute to value pairs are being added to the DB. If there are duplicates,
                 // (which can happen in a MIXED_ATTRIBUTES type clinical file), we need to make sure that the value for the same
-                // attributes are consistent. This prevents duplicate entries in the temp file that the MySqlBulkLoader uses.
-                if(!attributeMap.containsKey(internalPatientId, columnAttrs.get(lc).getAttrId())) {
-                    addDatum(internalPatientId, columnAttrs.get(lc).getAttrId(), fields[lc],
-                        ClinicalAttribute.PATIENT_ATTRIBUTE);
-                    attributeMap.put(internalPatientId, columnAttrs.get(lc).getAttrId(), fields[lc]);
+                // attributes are consistent. This prevents duplicate entries in the temp file that the ClickHouseBulkLoader uses.
+                FullAttributeKey patientAttributeKey = new FullAttributeKey(ClinicalAttribute.PATIENT_ATTRIBUTE, internalPatientId, columnAttrs.get(lc).getAttrId());
+                if(!alreadyParsedAttributes.containsKey(patientAttributeKey)) {
+                    attributeRow.put(patientAttributeKey, fields[lc]);
                 }
                 else if (!relaxed) {
-                    throw new RuntimeException("Error: Duplicated patient in file");
+                    throw new RuntimeException("Error: Duplicated patient " + stablePatientId + " and " + columnAttrs.get(lc).getAttrId() + " attribute pair in the clinical file.");
                 }
-                // if the "relaxed" flag was given, and the new record e.g. tries to override a previously set attribute for 
-                // an existing patient (e.g. set AGE from 2 to 10...in same study, or GENDER from M to F), then the system will keep 
-                // the previous value and give a warning. NB: this is a kind of "random" harmonization strategy and is 
-                // NOT recommended! TODO - change this to an Exception instead of just a warning. 
-                else if (!attributeMap.get(internalPatientId, columnAttrs.get(lc).getAttrId()).equals(fields[lc])) {
-                    ProgressMonitor.logWarning("Error: Duplicated patient " + stablePatientId + " with different values for patient attribute " + columnAttrs.get(lc).getAttrId() + 
-                        "\n\tValues: " + attributeMap.get(internalPatientId, columnAttrs.get(lc).getAttrId()) + " " + fields[lc]);
+                // if the "relaxed" flag was given, and the new record e.g. tries to override a previously set attribute for
+                // an existing patient (e.g. set AGE from 2 to 10...in same study, or GENDER from M to F), then the system will keep
+                // the previous value and give a warning. NB: this is a kind of "random" harmonization strategy and is
+                // NOT recommended! TODO - change this to an Exception instead of just a warning.
+                else if (!alreadyParsedAttributes.get(patientAttributeKey).equals(fields[lc])) {
+                    ProgressMonitor.logWarning("Error: Duplicated patient " + stablePatientId + " with different values for patient attribute " + columnAttrs.get(lc).getAttrId() +
+                        "\n\tValues: " + alreadyParsedAttributes.get(patientAttributeKey) + " " + fields[lc]);
                 }
             }
             else if (internalSampleId != -1) {
-                if(!attributeMap.containsKey(internalSampleId, columnAttrs.get(lc).getAttrId())) {
-                    addDatum(internalSampleId, columnAttrs.get(lc).getAttrId(), fields[lc],
-                        ClinicalAttribute.SAMPLE_ATTRIBUTE);
-                    attributeMap.put(internalSampleId, columnAttrs.get(lc).getAttrId(), fields[lc]);
+                FullAttributeKey sampleAttributeKey = new FullAttributeKey(ClinicalAttribute.SAMPLE_ATTRIBUTE, internalSampleId, columnAttrs.get(lc).getAttrId());
+                if(!alreadyParsedAttributes.containsKey(sampleAttributeKey)) {
+                    attributeRow.put(sampleAttributeKey, fields[lc]);
                 }
                 else if (!relaxed) {
-                    throw new RuntimeException("Error: Duplicated sample in file");
+                    throw new RuntimeException("Error: Duplicated sample " + stableSampleId + " and " + columnAttrs.get(lc).getAttrId() + " attribute pair in the clinical file.");
                 }
-                else if (!attributeMap.get(internalSampleId, columnAttrs.get(lc).getAttrId()).equals(fields[lc])) {
+                else if (!alreadyParsedAttributes.get(sampleAttributeKey).equals(fields[lc])) {
                     ProgressMonitor.logWarning("Error: Duplicated sample " + stableSampleId + " with different values for sample attribute " + columnAttrs.get(lc).getAttrId() + 
-                        "\n\tValues: " + attributeMap.get(internalSampleId, columnAttrs.get(lc).getAttrId()) + " " + fields[lc]);
+                        "\n\tValues: " + alreadyParsedAttributes.get(sampleAttributeKey) + " " + fields[lc]);
                 }
             }
         }
-        return true;
+        return attributeRow;
     }
 
     private boolean isSupplementalData() {
@@ -489,6 +490,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         	//in case of PATIENT data import, there are some special checks:
         	if (getAttributesType() == ImportClinicalData.AttributeTypes.PATIENT_ATTRIBUTES) {
         		//if clinical data is already there, then something has gone wrong (e.g. patient is duplicated in file), abort:
+                //TODO we migth want to optimize this for ClickHouse
         		if (patient != null && DaoClinicalData.getDataByPatientId(cancerStudy.getInternalId(), patientId).size() > 0) {
         			throw new RuntimeException("Something has gone wrong. Patient " + patientId + " already has clinical data loaded.");
         		}
@@ -577,6 +579,31 @@ public class ImportClinicalData extends ConsoleRunnable {
     private boolean validSampleId(String sampleId)
     {
         return (sampleId != null && !sampleId.isEmpty());
+    }
+
+    private void addClinicalDataIfNoDuplicates(Map<FullAttributeKey, String> attributeMap) throws Exception
+    {
+        List<Map.Entry<Integer, String>> internalPatientIdAttributes = attributeMap.keySet().stream().filter(key -> ClinicalAttribute.PATIENT_ATTRIBUTE.equals(key.table)).map(k -> Map.entry(k.internalId, k.attrId)).toList();
+        if (!internalPatientIdAttributes.isEmpty()) {
+            List<Map.Entry<Integer, String>> existingInternalPatientIdAttributes = DaoClinicalData.getExistingPatientAttributes(internalPatientIdAttributes);
+            if (!existingInternalPatientIdAttributes.isEmpty()) {
+                throw new RuntimeException("Error: The following patient internal id and attribute entries already exist in the database: " +
+                        existingInternalPatientIdAttributes);
+            }
+        }
+        List<Map.Entry<Integer, String>> internalSampleIdAttributes = attributeMap.keySet().stream().filter(key -> ClinicalAttribute.SAMPLE_ATTRIBUTE.equals(key.table)).map(k -> Map.entry(k.internalId, k.attrId)).toList();
+        if (!internalSampleIdAttributes.isEmpty()) {
+            List<Map.Entry<Integer, String>> existingInternalSampleIdAttributes = DaoClinicalData.getExistingSampleAttributes(internalPatientIdAttributes);
+            if (!existingInternalSampleIdAttributes.isEmpty()) {
+                throw new RuntimeException("Error: The following sample internal id and attribute entries already exist in the database: " +
+                        existingInternalSampleIdAttributes);
+            }
+        }
+        for (Map.Entry<FullAttributeKey, String> entry : attributeMap.entrySet()) {
+            FullAttributeKey key = entry.getKey();
+            String value = entry.getValue();
+            addDatum(key.internalId, key.attrId, value, key.table);
+        }
     }
 
     private void addDatum(int internalId, String attrId, String attrVal, String attrType) throws Exception
