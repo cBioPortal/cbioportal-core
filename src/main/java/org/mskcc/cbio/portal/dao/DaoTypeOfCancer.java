@@ -52,7 +52,7 @@ public class DaoTypeOfCancer {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-         pstmt = con.prepareStatement("INSERT INTO type_of_cancer ( `TYPE_OF_CANCER_ID`, `NAME`, `DEDICATED_COLOR`, `SHORT_NAME`, `PARENT` ) VALUES (?,?,?,?,?)");
+         pstmt = con.prepareStatement("INSERT INTO type_of_cancer ( `type_of_cancer_id`, `name`, `dedicated_color`, `short_name`, `parent` ) VALUES (?,?,?,?,?)");
          pstmt.setString(1, typeOfCancer.getTypeOfCancerId());
          pstmt.setString(2, typeOfCancer.getName());
          pstmt.setString(3, typeOfCancer.getDedicatedColor());
@@ -67,13 +67,16 @@ public class DaoTypeOfCancer {
    }
 
    public static TypeOfCancer getTypeOfCancerById(String typeOfCancerId) throws DaoException {
+      if (typeOfCancerId == null) {
+         return null;
+      }
       Connection con = null;
       PreparedStatement pstmt = null;
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-         pstmt = con.prepareStatement("SELECT * FROM type_of_cancer WHERE TYPE_OF_CANCER_ID=?");
-         pstmt.setString(1, typeOfCancerId);
+         pstmt = con.prepareStatement("SELECT * FROM type_of_cancer WHERE LOWER(type_of_cancer_id)=?");
+         pstmt.setString(1, typeOfCancerId.toLowerCase());
          rs = pstmt.executeQuery();
          if (rs.next()) {
             return extractTypeOfCancer(rs);
@@ -113,7 +116,7 @@ public class DaoTypeOfCancer {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-         pstmt = con.prepareStatement("SELECT COUNT(*) FROM type_of_cancer");
+         pstmt = con.prepareStatement("SELECT count(*) FROM type_of_cancer");
          rs = pstmt.executeQuery();
          if (rs.next()) {
             return rs.getInt(1);
@@ -139,10 +142,8 @@ public class DaoTypeOfCancer {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-            JdbcUtil.disableForeignKeyCheck(con);
             pstmt = con.prepareStatement("TRUNCATE TABLE type_of_cancer");
             pstmt.executeUpdate();
-            JdbcUtil.enableForeignKeyCheck(con);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
@@ -168,7 +169,7 @@ public class DaoTypeOfCancer {
       ResultSet rs = null;
       try {
          con = JdbcUtil.getDbConnection(DaoTypeOfCancer.class);
-         pstmt = con.prepareStatement("DELETE from " + "type_of_cancer WHERE TYPE_OF_CANCER_ID=?");
+         pstmt = con.prepareStatement("DELETE from " + "type_of_cancer WHERE type_of_cancer_id=?");
          pstmt.setString(1, typeOfCancerId);
          pstmt.executeUpdate();
       } catch (SQLException e) {
@@ -181,11 +182,11 @@ public class DaoTypeOfCancer {
    private static TypeOfCancer extractTypeOfCancer(ResultSet rs) throws SQLException {
       TypeOfCancer typeOfCancer = new TypeOfCancer();
 
-      typeOfCancer.setTypeOfCancerId(rs.getString("TYPE_OF_CANCER_ID"));
-      typeOfCancer.setName(rs.getString("NAME"));
-      typeOfCancer.setDedicatedColor(rs.getString("DEDICATED_COLOR"));
-      typeOfCancer.setShortName(rs.getString("SHORT_NAME"));
-      typeOfCancer.setParentTypeOfCancerId(rs.getString("PARENT"));
+      typeOfCancer.setTypeOfCancerId(rs.getString("type_of_cancer_id"));
+      typeOfCancer.setName(rs.getString("name"));
+      typeOfCancer.setDedicatedColor(rs.getString("dedicated_color"));
+      typeOfCancer.setShortName(rs.getString("short_name"));
+      typeOfCancer.setParentTypeOfCancerId(rs.getString("parent"));
       
       return typeOfCancer;
    }

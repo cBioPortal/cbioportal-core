@@ -35,6 +35,8 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import java.util.stream.*;
+
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
@@ -42,7 +44,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
@@ -165,8 +166,8 @@ public class ImportGenericAssayPatientLevelData {
                 
                 line = buf.readLine();
             }
-            if (MySQLbulkLoader.isBulkLoad()) {
-               MySQLbulkLoader.flushAll();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+               ClickHouseBulkLoader.flushAll();
             }
             
             if (entriesSkipped > 0) {

@@ -111,30 +111,39 @@ public class DaoPatient {
         }
     }
 
+    private static final String PATIENT_SEQUENCE = "seq_patient";
+
     public static int addPatient(Patient patient) throws DaoException
     {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
-            con = JdbcUtil.getDbConnection(DaoPatient.class);
-            pstmt = con.prepareStatement("INSERT INTO patient (`STABLE_ID`, `CANCER_STUDY_ID`) VALUES (?,?)",
-                                         Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, patient.getStableId());
-            pstmt.setInt(2, patient.getCancerStudy().getInternalId());
-            pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), rs.getInt(1)), patient.getCancerStudy().getInternalId());
-                return rs.getInt(1);
+            long internalId = ClickHouseAutoIncrement.nextId(PATIENT_SEQUENCE);
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("patient");
+                loader.setFieldNames(new String[]{"internal_id", "stable_id", "cancer_study_id"});
+                loader.insertRecord(
+                    Long.toString(internalId),
+                    patient.getStableId(),
+                    Integer.toString(patient.getCancerStudy().getInternalId())
+                );
+            } else {
+                con = JdbcUtil.getDbConnection(DaoPatient.class);
+                pstmt = con.prepareStatement("INSERT INTO patient (`internal_id`, `stable_id`, `cancer_study_id`) VALUES (?,?,?)");
+                pstmt.setLong(1, internalId);
+                pstmt.setString(2, patient.getStableId());
+                pstmt.setInt(3, patient.getCancerStudy().getInternalId());
+                pstmt.executeUpdate();
             }
-            return -1;
+            cachePatient(new Patient(patient.getCancerStudy(), patient.getStableId(), (int) internalId),
+                    patient.getCancerStudy().getInternalId());
+            return (int) internalId;
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, null);
         }
     }
 
@@ -166,10 +175,8 @@ public class DaoPatient {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoPatient.class);
-            JdbcUtil.disableForeignKeyCheck(con);
             pstmt = con.prepareStatement("TRUNCATE TABLE patient");
             pstmt.executeUpdate();
-            JdbcUtil.enableForeignKeyCheck(con);
         }
         catch (SQLException e) {
             throw new DaoException(e);
@@ -184,38 +191,40 @@ public class DaoPatient {
     public static void createSampleCountClinicalData(int cancerStudyId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "REPLACE `clinical_patient`" +
-                    "SELECT patient.`INTERNAL_ID`, 'SAMPLE_COUNT', COUNT(*) FROM sample " + 
-                    "INNER JOIN patient ON sample.`PATIENT_ID` = patient.`INTERNAL_ID`" +
-                    "WHERE patient.`CANCER_STUDY_ID`=? " +
-                    "GROUP BY patient.`INTERNAL_ID`;");
-            pstmt.setInt(1, cancerStudyId);
+                    "INSERT INTO clinical_patient(`internal_id`, `attr_id`, `attr_value`) " +
+                            "SELECT patient.`internal_id` AS internal_id, ? as attr_id, CAST(COUNT(*) AS CHAR) AS sample_count FROM sample " +
+                            "INNER JOIN patient ON sample.`patient_id` = patient.`internal_id` " +
+                            "WHERE patient.`cancer_study_id`=? " +
+                            "GROUP BY patient.`internal_id`");
+            pstmt.setString(1, SAMPLE_COUNT_ATTR_ID);
+            pstmt.setInt(2, cancerStudyId);
+            pstmt.executeUpdate();
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(SAMPLE_COUNT_ATTR_ID, cancerStudyId);
             if (clinicalAttribute == null) {
                 ClinicalAttribute attr = new ClinicalAttribute(SAMPLE_COUNT_ATTR_ID, "Number of Samples Per Patient", 
                     "Number of Samples Per Patient", "STRING", true, "1", cancerStudyId);
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
-            pstmt.executeUpdate();
+            // Forces ClickHouse to finalize the data insertion causing removing of duplicates in ReplacingMergeTree engine. Expensive operation.
+            con.prepareStatement("OPTIMIZE TABLE clinical_patient FINAL").executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, null);
         }
     }
 
     private static Patient extractPatient(ResultSet rs) throws SQLException
     {
 		try {
-			CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByInternalId(rs.getInt("CANCER_STUDY_ID"));
+			CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByInternalId(rs.getInt("cancer_study_id"));
 			if (cancerStudy == null) return null;
 			return new Patient(cancerStudy,
-							   rs.getString("STABLE_ID"),
-							   rs.getInt("INTERNAL_ID"));
+							   rs.getString("stable_id"),
+							   rs.getInt("internal_id"));
 		}
 		catch (DaoException e) {
 			throw new SQLException(e);
@@ -243,23 +252,21 @@ public class DaoPatient {
         DaoSample.deleteSamples(internalStudyId, patientsSampleStableIds);
 
         Connection con = null;
-        PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoPatient.class);
-            pstmt = con.prepareStatement("DELETE FROM `patient` WHERE `INTERNAL_ID` IN ("
-                    + String.join(",", Collections.nCopies(internalPatientIds.size(), "?"))
-                    + ")");
-            int parameterIndex = 1;
-            for (Integer internalPatientId : internalPatientIds) {
-                pstmt.setInt(parameterIndex++, internalPatientId);
-            };
-            pstmt.executeUpdate();
+            List<Integer> clinicalEventIds = collectIds(con,
+                    "SELECT clinical_event_id FROM clinical_event WHERE patient_id IN ", internalPatientIds);
+            deleteByIds(con, "DELETE FROM clinical_event_data WHERE clinical_event_id IN ", clinicalEventIds);
+            deleteByIds(con, "DELETE FROM clinical_event WHERE clinical_event_id IN ", clinicalEventIds);
+            deleteByIds(con, "DELETE FROM clinical_patient WHERE internal_id IN ", internalPatientIds);
+            deleteByIds(con, "DELETE FROM resource_patient WHERE internal_id IN ", internalPatientIds);
+            deleteByIds(con, "DELETE FROM patient WHERE internal_id IN ", internalPatientIds);
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoPatient.class, con, pstmt, null);
+            JdbcUtil.closeAll(DaoPatient.class, con, null, null);
         }
         log.info("Removing {} patients from study with internal id={} done.", patientStableIds, internalStudyId);
     }
@@ -274,5 +281,43 @@ public class DaoPatient {
             internalPatientIds.add(patientByCancerStudyAndPatientId.getInternalId());
         }
         return internalPatientIds;
+    }
+
+    private static List<Integer> collectIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws SQLException {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        List<Integer> collected = new ArrayList<>();
+        try {
+            pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")");
+            int index = 1;
+            for (Integer id : ids) {
+                pstmt.setInt(index++, id);
+            }
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                collected.add(rs.getInt(1));
+            }
+        } finally {
+            JdbcUtil.closeAll(DaoPatient.class, null, pstmt, rs);
+        }
+        return collected;
+    }
+
+    private static void deleteByIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws SQLException {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")")) {
+            int index = 1;
+            for (Integer id : ids) {
+                pstmt.setInt(index++, id);
+            }
+            pstmt.executeUpdate();
+        }
     }
 }

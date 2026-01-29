@@ -43,11 +43,13 @@ import org.mskcc.cbio.portal.model.Sample;
  * @author jgao
  */
 public final class DaoCnaEvent {
+
+    private static final String CNA_EVENT_SEQUENCE = "seq_cna_event";
     private DaoCnaEvent() {}
     
     public static void addCaseCnaEvent(CnaEvent cnaEvent, boolean newCnaEvent) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert sample_cna_event");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert sample_cna_event");
         }
         else {
         	long eventId = cnaEvent.getEventId();
@@ -57,7 +59,7 @@ public final class DaoCnaEvent {
                 cnaEvent.setEventId(eventId);
             }
             
-            MySQLbulkLoader.getMySQLbulkLoader("sample_cna_event").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("sample_cna_event").insertRecord(
                     Long.toString(eventId),
                     Integer.toString(cnaEvent.getSampleId()),
                     Integer.toString(cnaEvent.getCnaProfileId()),
@@ -72,8 +74,8 @@ public final class DaoCnaEvent {
                 && !cnaEvent.getDriverTiersFilter().isEmpty()
                 && !cnaEvent.getDriverTiersFilter().toLowerCase().equals("na"))
             ) {
-                MySQLbulkLoader
-                    .getMySQLbulkLoader("alteration_driver_annotation")
+                ClickHouseBulkLoader
+                    .getClickHouseBulkLoader("alteration_driver_annotation")
                     .insertRecord(
                         Long.toString(eventId),
                         Integer.toString(cnaEvent.getCnaProfileId()),
@@ -97,25 +99,23 @@ public final class DaoCnaEvent {
     private static long addCnaEventDirectly(CnaEvent cnaEvent) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
+            long newId = ClickHouseAutoIncrement.nextId(CNA_EVENT_SEQUENCE);
             pstmt = con.prepareStatement
                     ("INSERT INTO cna_event (" +
-                            "`ENTREZ_GENE_ID`," +
-                            "`ALTERATION` )" +
-                            " VALUES(?,?)", Statement.RETURN_GENERATED_KEYS);
-            pstmt.setLong(1, cnaEvent.getEntrezGeneId());
-            pstmt.setInt(2, cnaEvent.getAlteration());
+                            "`cna_event_id`, `entrez_gene_id`," +
+                            "`alteration` )" +
+                            " VALUES(?,?,?)");
+            pstmt.setLong(1, newId);
+            pstmt.setLong(2, cnaEvent.getEntrezGeneId());
+            pstmt.setInt(3, cnaEvent.getAlteration());
             pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            rs.next();
-            long newId = rs.getLong(1);
             return newId;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, null);
         }
 	}
 
@@ -124,17 +124,29 @@ public final class DaoCnaEvent {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
+            if (sampleIds.isEmpty()) {
+                return;
+            }
+            String placeholders = String.join(",", Collections.nCopies(sampleIds.size(), "?"));
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            pstmt = con.prepareStatement
-                    ("DELETE sample_cna_event, alteration_driver_annotation" +
-                            " FROM sample_cna_event" +
-                            " LEFT JOIN alteration_driver_annotation ON alteration_driver_annotation.`ALTERATION_EVENT_ID` = sample_cna_event.`CNA_EVENT_ID`" +
-                            " AND alteration_driver_annotation.`SAMPLE_ID` = sample_cna_event.`SAMPLE_ID`" +
-                            " AND alteration_driver_annotation.`GENETIC_PROFILE_ID` = sample_cna_event.`GENETIC_PROFILE_ID`" +
-                            " WHERE sample_cna_event.`GENETIC_PROFILE_ID` = ? AND sample_cna_event.`SAMPLE_ID` IN (" +
-                            String.join(",", Collections.nCopies(sampleIds.size(), "?"))
-                            + ")");
+            pstmt = con.prepareStatement(
+                    "DELETE FROM alteration_driver_annotation " +
+                            "WHERE `genetic_profile_id` = ? AND `sample_id` IN (" + placeholders + ") " +
+                            "AND `alteration_event_id` IN (SELECT `cna_event_id` FROM sample_cna_event WHERE `genetic_profile_id` = ? AND `sample_id` IN (" + placeholders + "))");
             int parameterIndex = 1;
+            pstmt.setInt(parameterIndex++, cnaProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.setInt(parameterIndex++, cnaProfileId);
+            for (Integer sampleId : sampleIds) {
+                pstmt.setInt(parameterIndex++, sampleId);
+            }
+            pstmt.executeUpdate();
+            pstmt.close();
+            pstmt = con.prepareStatement(
+                    "DELETE FROM sample_cna_event WHERE `genetic_profile_id` = ? AND `sample_id` IN (" + placeholders + ")");
+            parameterIndex = 1;
             pstmt.setInt(parameterIndex++, cnaProfileId);
             for (Integer sampleId : sampleIds) {
                 pstmt.setInt(parameterIndex++, sampleId);
@@ -163,15 +175,15 @@ public final class DaoCnaEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
             String sql = "SELECT * FROM sample_cna_event"
-                    + " WHERE `CNA_EVENT_ID` IN ("
+                    + " WHERE `cna_event_id` IN ("
                     + concatEventIds + ")";
             pstmt = con.prepareStatement(sql);
             
             Map<Sample, Set<Long>>  map = new HashMap<Sample, Set<Long>> ();
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                Sample sample = DaoSample.getSampleById(rs.getInt("SAMPLE_ID"));
-                long eventId = rs.getLong("CNA_EVENT_ID");
+                Sample sample = DaoSample.getSampleById(rs.getInt("sample_id"));
+                long eventId = rs.getLong("cna_event_id");
                 Set<Long> events = map.get(sample);
                 if (events == null) {
                     events = new HashSet<Long>();
@@ -196,26 +208,25 @@ public final class DaoCnaEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
             pstmt = con.prepareStatement
-		("SELECT sample_cna_event.CNA_EVENT_ID,"
-                    + " sample_cna_event.SAMPLE_ID,"
-                    + " sample_cna_event.GENETIC_PROFILE_ID,"
-                    + " ENTREZ_GENE_ID,"
-                    + " ALTERATION,"
-                    + " alteration_driver_annotation.DRIVER_FILTER,"
-                    + " alteration_driver_annotation.DRIVER_FILTER_ANNOTATION,"
-                    + " alteration_driver_annotation.DRIVER_TIERS_FILTER,"
-                    + " alteration_driver_annotation.DRIVER_TIERS_FILTER_ANNOTATION"
+		("SELECT sample_cna_event.cna_event_id AS cna_event_id,"
+                    + " sample_cna_event.sample_id AS sample_id,"
+                    + " sample_cna_event.genetic_profile_id AS genetic_profile_id,"
+                    + " cna_event.entrez_gene_id AS entrez_gene_id,"
+                    + " cna_event.alteration AS alteration,"
+                    + " alteration_driver_annotation.driver_filter AS driver_filter,"
+                    + " alteration_driver_annotation.driver_filter_annotation AS driver_filter_annotation,"
+                    + " alteration_driver_annotation.driver_tiers_filter AS driver_tiers_filter,"
+                    + " alteration_driver_annotation.driver_tiers_filter_annotation AS driver_tiers_filter_annotation"
                     + " FROM sample_cna_event"
                     + " LEFT JOIN alteration_driver_annotation ON"
-                    + "  sample_cna_event.GENETIC_PROFILE_ID = alteration_driver_annotation.GENETIC_PROFILE_ID"
-                    + "  and sample_cna_event.SAMPLE_ID = alteration_driver_annotation.SAMPLE_ID"
-                    + "  and sample_cna_event.CNA_EVENT_ID = alteration_driver_annotation.ALTERATION_EVENT_ID,"
-                    + " cna_event"
-                    + " WHERE sample_cna_event.GENETIC_PROFILE_ID=?"
-                    + " AND sample_cna_event.CNA_EVENT_ID=cna_event.CNA_EVENT_ID"
-                    + (entrezGeneIds==null?"":" AND ENTREZ_GENE_ID IN(" + StringUtils.join(entrezGeneIds,",") + ")")
-                    + " AND ALTERATION IN (" + StringUtils.join(cnaLevels,",") + ")"
-                    + " AND sample_cna_event.SAMPLE_ID in ('"+StringUtils.join(sampleIds, "','")+"')");
+                    + "  sample_cna_event.genetic_profile_id = alteration_driver_annotation.genetic_profile_id"
+                    + "  and sample_cna_event.sample_id = alteration_driver_annotation.sample_id"
+                    + "  and sample_cna_event.cna_event_id = alteration_driver_annotation.alteration_event_id"
+                    + " INNER JOIN cna_event ON sample_cna_event.cna_event_id=cna_event.cna_event_id"
+                    + " WHERE sample_cna_event.genetic_profile_id=?"
+                    + (entrezGeneIds==null?"":" AND entrez_gene_id IN(" + StringUtils.join(entrezGeneIds,",") + ")")
+                    + " AND alteration IN (" + StringUtils.join(cnaLevels,",") + ")"
+                    + " AND sample_cna_event.sample_id in ('"+StringUtils.join(sampleIds, "','")+"')");
             pstmt.setInt(1, profileId);
             rs = pstmt.executeQuery();
             List<CnaEvent> events = new ArrayList<CnaEvent>();
@@ -231,15 +242,15 @@ public final class DaoCnaEvent {
     }
 
     private static CnaEvent extractCnaEvent(ResultSet rs) throws SQLException {
-        CnaEvent cnaEvent = new CnaEvent(rs.getInt("SAMPLE_ID"),
-            rs.getInt("GENETIC_PROFILE_ID"),
-            rs.getLong("ENTREZ_GENE_ID"),
-            rs.getShort("ALTERATION"));
-        cnaEvent.setEventId(rs.getLong("CNA_EVENT_ID"));
-        cnaEvent.setDriverFilter(rs.getString("DRIVER_FILTER"));
-        cnaEvent.setDriverFilterAnnotation(rs.getString("DRIVER_FILTER_ANNOTATION"));
-        cnaEvent.setDriverTiersFilter(rs.getString("DRIVER_TIERS_FILTER"));
-        cnaEvent.setDriverTiersFilterAnnotation(rs.getString("DRIVER_TIERS_FILTER_ANNOTATION"));
+        CnaEvent cnaEvent = new CnaEvent(rs.getInt("sample_id"),
+            rs.getInt("genetic_profile_id"),
+            rs.getLong("entrez_gene_id"),
+            rs.getShort("alteration"));
+        cnaEvent.setEventId(rs.getLong("cna_event_id"));
+        cnaEvent.setDriverFilter(rs.getString("driver_filter"));
+        cnaEvent.setDriverFilterAnnotation(rs.getString("driver_filter_annotation"));
+        cnaEvent.setDriverTiersFilter(rs.getString("driver_tiers_filter"));
+        cnaEvent.setDriverTiersFilterAnnotation(rs.getString("driver_tiers_filter_annotation"));
         return cnaEvent;
     }
 
@@ -256,9 +267,9 @@ public final class DaoCnaEvent {
             while (rs.next()) {
                 try {
                     CnaEvent.Event event = new CnaEvent.Event();
-                    event.setEventId(rs.getLong("CNA_EVENT_ID"));
-                    event.setEntrezGeneId(rs.getLong("ENTREZ_GENE_ID"));
-                    event.setAlteration(rs.getInt("ALTERATION"));
+                    event.setEventId(rs.getLong("cna_event_id"));
+                    event.setEntrezGeneId(rs.getLong("entrez_gene_id"));
+                    event.setAlteration(rs.getShort("alteration"));
                     events.add(event);
                 } catch (IllegalArgumentException e) {
                     e.printStackTrace();
@@ -287,13 +298,13 @@ public final class DaoCnaEvent {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            String sql = "SELECT `ENTREZ_GENE_ID`, `ALTERATION`, count(*)"
+            String sql = "SELECT `entrez_gene_id`, `alteration`, count(*)"
                     + " FROM sample_cna_event, cna_event"
-                    + " WHERE `GENETIC_PROFILE_ID`=" + profileId
-                    + " and sample_cna_event.`CNA_EVENT_ID`=cna_event.`CNA_EVENT_ID`"
-                    + " and `ENTREZ_GENE_ID` IN ("
+                    + " WHERE `genetic_profile_id`=" + profileId
+                    + " and sample_cna_event.`cna_event_id`=cna_event.`cna_event_id`"
+                    + " and `entrez_gene_id` IN ("
                     + concatEntrezGeneIds
-                    + ") GROUP BY `ENTREZ_GENE_ID`, `ALTERATION`";
+                    + ") GROUP BY `entrez_gene_id`, `alteration`";
             pstmt = con.prepareStatement(sql);
             
             Map<Long, Map<Integer, Integer>> map = new HashMap<Long, Map<Integer, Integer>>();
@@ -332,11 +343,11 @@ public final class DaoCnaEvent {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            String sql = "SELECT `CNA_EVENT_ID`, count(*) FROM sample_cna_event"
-                    + " WHERE `GENETIC_PROFILE_ID`=" + profileId
-                    + " and `CNA_EVENT_ID` IN ("
+            String sql = "SELECT `cna_event_id`, count(*) FROM sample_cna_event"
+                    + " WHERE `genetic_profile_id`=" + profileId
+                    + " and `cna_event_id` IN ("
                     + concatEventIds
-                    + ") GROUP BY `CNA_EVENT_ID`";
+                    + ") GROUP BY `cna_event_id`";
             pstmt = con.prepareStatement(sql);
             
             Map<Long, Integer> map = new HashMap<Long, Integer>();
@@ -362,8 +373,8 @@ public final class DaoCnaEvent {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            String sql = "SELECT DISTINCT ENTREZ_GENE_ID FROM cna_event "
-                    + "WHERE CNA_EVENT_ID in ("
+            String sql = "SELECT DISTINCT entrez_gene_id FROM cna_event "
+                    + "WHERE cna_event_id in ("
                     +       concatEventIds
                     + ")";
             pstmt = con.prepareStatement(sql);

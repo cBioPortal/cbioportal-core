@@ -35,14 +35,12 @@ package org.mskcc.cbio.portal.integrationTest.dao;
 import java.util.*;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 
@@ -51,8 +49,6 @@ import static org.junit.Assert.assertEquals;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestDaoGene extends IntegrationTestBase {
 
     /**
@@ -63,8 +59,8 @@ public class TestDaoGene extends IntegrationTestBase {
     public void testAddExistingGene() throws DaoException {
 
 		// save bulkload setting before turning off
-		boolean isBulkLoad = MySQLbulkLoader.isBulkLoad();
-		MySQLbulkLoader.bulkLoadOff();
+		boolean isBulkLoad = ClickHouseBulkLoader.isBulkLoad();
+		ClickHouseBulkLoader.bulkLoadOff();
 
         //  Add BRCA1 and BRCA2 Genes
         CanonicalGene gene = new CanonicalGene(672, "BRCA1",
@@ -75,7 +71,7 @@ public class TestDaoGene extends IntegrationTestBase {
 
 		// restore bulk setting
 		if (isBulkLoad) {
-			MySQLbulkLoader.bulkLoadOn();
+			ClickHouseBulkLoader.bulkLoadOn();
 		}
     }
 
@@ -87,8 +83,8 @@ public class TestDaoGene extends IntegrationTestBase {
     public void testAddNewGene() throws DaoException {
 
 		// save bulkload setting before turning off
-		boolean isBulkLoad = MySQLbulkLoader.isBulkLoad();
-		MySQLbulkLoader.bulkLoadOff();
+		boolean isBulkLoad = ClickHouseBulkLoader.isBulkLoad();
+		ClickHouseBulkLoader.bulkLoadOff();
 
         //  Add BRCA1 and BRCA2 Genes
         CanonicalGene gene = new CanonicalGene(1956, "EGFR",
@@ -99,7 +95,7 @@ public class TestDaoGene extends IntegrationTestBase {
 
 		// restore bulk setting
 		if (isBulkLoad) {
-			MySQLbulkLoader.bulkLoadOn();
+			ClickHouseBulkLoader.bulkLoadOn();
 		}
     }
 
