@@ -352,12 +352,12 @@ ORDER BY tuple();
 
 CREATE TABLE genetic_alteration
 (
-    `genetic_profile_id` Nullable(Int64),
-    `genetic_entity_id` Nullable(Int64),
+    `genetic_profile_id` Int64,
+    `genetic_entity_id` Int64,
     `values` Nullable(String)
 )
-    ENGINE = MergeTree
-ORDER BY tuple();
+    ENGINE = ReplacingMergeTree
+ORDER BY tuple(`genetic_profile_id`, `genetic_entity_id`);
 
 CREATE TABLE genetic_alteration_derived
 (
@@ -408,11 +408,11 @@ ORDER BY tuple();
 
 CREATE TABLE genetic_profile_samples
 (
-    `genetic_profile_id` Nullable(Int64),
+    `genetic_profile_id` Int64,
     `ordered_sample_list` Nullable(String)
 )
-    ENGINE = MergeTree
-ORDER BY tuple();
+    ENGINE = ReplacingMergeTree
+ORDER BY tuple(`genetic_profile_id`);
 
 CREATE TABLE genomic_event_derived
 (
