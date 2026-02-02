@@ -72,12 +72,12 @@ public class CheckReferentialIntegrity extends ConsoleRunnable {
         Map<ViolationGroupKey, ViolationGroup> grouped = new LinkedHashMap<>();
         for (ReferenceViolation violation : violations) {
             ViolationGroupKey key = new ViolationGroupKey(
-                    violation.refereeTable(),
-                    violation.refereeColumns(),
+                    violation.refererTable(),
+                    violation.refererColumns(),
                     violation.referredTable(),
                     violation.referredColumns()
             );
-            grouped.computeIfAbsent(key, unused -> new ViolationGroup()).add(violation.refereeValues());
+            grouped.computeIfAbsent(key, unused -> new ViolationGroup()).add(violation.refererValues());
         }
         return grouped;
     }

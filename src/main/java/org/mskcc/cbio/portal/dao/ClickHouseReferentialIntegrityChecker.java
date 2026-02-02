@@ -29,9 +29,9 @@ import java.util.stream.Collectors;
  */
 public class ClickHouseReferentialIntegrityChecker {
 
-    public static final String REFEREE_TABLE = "referee_table";
-    public static final String REFEREE_COLUMNS = "referee_columns";
-    public static final String REFEREE_VALUES = "referee_values";
+    public static final String REFERER_TABLE = "referer_table";
+    public static final String REFERER_COLUMNS = "referer_columns";
+    public static final String REFERER_VALUES = "referer_values";
     public static final String REFERRED_TABLE = "referred_table";
     public static final String REFERRED_COLUMNS = "referred_columns";
     private static final String REFEREE_VALUE_SEPARATOR = "|";
@@ -43,9 +43,9 @@ public class ClickHouseReferentialIntegrityChecker {
     }
 
     public record ReferenceViolation(
-            String refereeTable,
-            String refereeColumns,
-            String refereeValues,
+            String refererTable,
+            String refererColumns,
+            String refererValues,
             String referredTable,
             String referredColumns
     ) {
@@ -65,9 +65,9 @@ public class ClickHouseReferentialIntegrityChecker {
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 violations.add(new ReferenceViolation(
-                        rs.getString(REFEREE_TABLE),
-                        rs.getString(REFEREE_COLUMNS),
-                        rs.getString(REFEREE_VALUES),
+                        rs.getString(REFERER_TABLE),
+                        rs.getString(REFERER_COLUMNS),
+                        rs.getString(REFERER_VALUES),
                         rs.getString(REFERRED_TABLE),
                         rs.getString(REFERRED_COLUMNS)
                 ));
@@ -84,8 +84,8 @@ public class ClickHouseReferentialIntegrityChecker {
      * Represents one foreign-key relationship (supports composite keys).
      */
     private static final class ForeignKey {
-        private final String childTable;       // referee_table
-        private final List<String> childCols;   // referee_columns (possibly composite)
+        private final String childTable;       // referer_table
+        private final List<String> childCols;   // referer_columns (possibly composite)
         private final String parentTable;      // referred_table
         private final List<String> parentCols; // referred_columns (same arity as childCols)
 
@@ -268,9 +268,9 @@ public class ClickHouseReferentialIntegrityChecker {
 
         return ""
                 + "SELECT\n"
-                + "  '" + fk.childTable + "' AS " + REFEREE_TABLE + ",\n"
-                + "  '" + fk.childColsCsv() + "' AS " + REFEREE_COLUMNS + ",\n"
-                + "  " + valuesExpr + " AS " + REFEREE_VALUES + ",\n"
+                + "  '" + fk.childTable + "' AS " + REFERER_TABLE + ",\n"
+                + "  '" + fk.childColsCsv() + "' AS " + REFERER_COLUMNS + ",\n"
+                + "  " + valuesExpr + " AS " + REFERER_VALUES + ",\n"
                 + "  '" + fk.parentTable + "' AS " + REFERRED_TABLE + ",\n"
                 + "  '" + fk.parentColsCsv() + "' AS " + REFERRED_COLUMNS + "\n"
                 + "FROM " + fk.childTable + " " + childAlias + "\n"
