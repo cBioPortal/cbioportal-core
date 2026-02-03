@@ -23,9 +23,12 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.testcontainers.clickhouse.ClickHouseContainer;
 import org.testcontainers.containers.Container;
 import org.testcontainers.utility.DockerImageName;
@@ -141,6 +144,23 @@ public abstract class IntegrationTestBase {
         System.setProperty("spring.datasource.username", DB_USER);
         System.setProperty("spring.datasource.password", DB_PASSWORD);
         System.setProperty("spring.datasource.driver-class-name", "com.clickhouse.jdbc.ClickHouseDriver");
+
+        // Refresh the JDBC datasource to pick up the new container host/port.
+        JdbcUtil.setDataSource(buildTestDataSource(jdbcUrl));
+    }
+
+    private static TransactionAwareDataSourceProxy buildTestDataSource(String jdbcUrl) {
+        BasicDataSource dataSource = new BasicDataSource();
+        dataSource.setUsername(DB_USER);
+        dataSource.setPassword(DB_PASSWORD);
+        dataSource.setUrl(jdbcUrl);
+        dataSource.setDriverClassName("com.clickhouse.jdbc.ClickHouseDriver");
+        dataSource.setMaxTotal(50);
+        dataSource.setMaxIdle(5);
+        dataSource.setMaxWaitMillis(10000);
+        dataSource.setTestOnBorrow(true);
+        dataSource.setValidationQuery("SELECT 1");
+        return new TransactionAwareDataSourceProxy(dataSource);
     }
 
     private static void waitForSchema(ClickHouseContainer clickhouse) {
