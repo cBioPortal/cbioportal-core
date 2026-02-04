@@ -161,4 +161,31 @@ public final class DaoGeneticProfileSamples
             JdbcUtil.closeAll(DaoGeneticProfileSamples.class, con, pstmt, rs);
         }
     }
+
+    public static void backupGeneticProfileSampleTable() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
+            con.prepareStatement("DROP TABLE IF EXISTS genetic_profile_samples_backup;").executeUpdate();
+            con.prepareStatement("CREATE TABLE genetic_profile_samples_backup AS genetic_profile_samples;").executeUpdate();
+            con.prepareStatement("INSERT INTO genetic_profile_samples_backup SELECT * FROM genetic_profile_samples;").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
+        }
+    }
+
+    public static void restoreGeneticProfileSampleTableBackup() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
+            con.prepareStatement("EXCHANGE TABLES genetic_profile_samples_backup AND genetic_profile_samples;").executeUpdate();
+            con.prepareStatement("DROP TABLE IF EXISTS genetic_profile_samples_backup;").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
+        }
+    }
 }

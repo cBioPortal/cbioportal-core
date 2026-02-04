@@ -33,6 +33,8 @@
 package org.mskcc.cbio.portal.dao;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -45,8 +47,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.CanonicalGene;
 
 /**
  * Data Access Object for the Genetic Alteration Table.
@@ -480,6 +480,33 @@ public class DaoGeneticAlteration {
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(DaoGeneticAlteration.class, con, pstmt, rs);
+        }
+    }
+
+    public void backupGeneticAlterationTable() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
+            con.prepareStatement("DROP TABLE IF EXISTS genetic_alteration_backup;").executeUpdate();
+            con.prepareStatement("CREATE TABLE genetic_alteration_backup AS genetic_alteration;").executeUpdate();
+            con.prepareStatement("INSERT INTO genetic_alteration_backup SELECT * FROM genetic_alteration;").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
+        }
+    }
+
+    public void restoreGeneticAlterationTableBackup() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
+            con.prepareStatement("EXCHANGE TABLES genetic_alteration_backup AND genetic_alteration;").executeUpdate();
+            con.prepareStatement("DROP TABLE IF EXISTS genetic_alteration_backup;").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
         }
     }
 }
