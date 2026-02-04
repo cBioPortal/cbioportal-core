@@ -43,7 +43,9 @@ import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneset;
+import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -173,8 +175,14 @@ public class ImportTabDelimData {
     public void importData() throws Exception {
         this.numLines = FileUtil.getNumLines(dataFile);
         ProgressMonitor.setMaxValue(numLines);
+        DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
         try (FileReader reader = new FileReader(dataFile);
             BufferedReader buf = new BufferedReader(reader)) {
+            ProgressMonitor.setCurrentMessage("Backing up genetic_alteration and genetic_profile_samples tables...");
+            daoGeneticAlteration.backupGeneticAlterationTable();
+            ProgressMonitor.setCurrentMessage("Backing up genetic_profile_samples table...");
+            DaoGeneticProfileSamples.backupGeneticProfileSampleTable();
+
             String headerLine = buf.readLine();
             String[] headerParts = TsvUtil.splitTsvLine(headerLine);
             //Whether data regards CNA or RPPA:
@@ -372,6 +380,13 @@ public class ImportTabDelimData {
                 throw new DaoException("Something has gone wrong!  I did not save any records" +
                     " to the database!");
             }
+        } catch (Throwable t) {
+            ProgressMonitor.setCurrentMessage("Restoring genetic_alteration table from backup...");
+            daoGeneticAlteration.restoreGeneticAlterationTableBackup();
+            ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
+            DaoGeneticProfileSamples.restoreGeneticProfileSampleTableBackup();
+            ProgressMonitor.setCurrentMessage("Backup restoration complete.");
+            throw t;
         }
     }
 

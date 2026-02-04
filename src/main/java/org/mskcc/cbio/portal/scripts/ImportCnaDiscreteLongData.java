@@ -25,30 +25,39 @@ package org.mskcc.cbio.portal.scripts;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
-import java.io.*;
-import java.util.*;
-import java.util.stream.Collectors;
-
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
+import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
-import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
-import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
+import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
 import org.mskcc.cbio.portal.util.CnaUtil;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
 
@@ -115,56 +124,70 @@ public class ImportCnaDiscreteLongData {
     }
 
     private void doImportData() throws Exception {
-        FileReader reader = new FileReader(this.cnaFile);
-        BufferedReader buf = new BufferedReader(reader);
+        DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+        try (FileReader reader = new FileReader(this.cnaFile);
+             BufferedReader buf = new BufferedReader(reader)) {
 
-        // Pass first line with headers to util:
-        String line = buf.readLine();
-        int lineIndex = 1;
-        String[] headerParts = TsvUtil.splitTsvLine(line);
-        this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
+            ProgressMonitor.setCurrentMessage("Backing up genetic_alteration and genetic_profile_samples tables...");
+            daoGeneticAlteration.backupGeneticAlterationTable();
+            ProgressMonitor.setCurrentMessage("Backing up genetic_profile_samples table...");
+            DaoGeneticProfileSamples.backupGeneticProfileSampleTable();
+            ProgressMonitor.setCurrentMessage("Importing CNA discrete long data from file: " + this.cnaFile.getAbsolutePath());
 
-        boolean isDiscretizedCnaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
-            && geneticProfile.showProfileInAnalysisTab();
+            // Pass first line with headers to util:
+            String line = buf.readLine();
+            int lineIndex = 1;
+            String[] headerParts = TsvUtil.splitTsvLine(line);
+            this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
 
-        if (isDiscretizedCnaProfile) {
-            existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
-            ClickHouseBulkLoader.bulkLoadOn();
-        }
+            boolean isDiscretizedCnaProfile = geneticProfile != null
+                    && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
+                    && geneticProfile.showProfileInAnalysisTab();
 
-        CnaImportData toImport = new CnaImportData();
-
-        while ((line = buf.readLine()) != null) {
-            lineIndex++;
-            ProgressMonitor.incrementCurValue();
-            ConsoleUtil.showProgress();
-            this.extractDataToImport(geneticProfile, line, lineIndex, toImport);
-        }
-
-        orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
-        this.geneticAlterationGeneImporter = isIncrementalUpdateMode ?  new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
-                : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
-        geneticAlterationGeneImporter.initialize();
-        DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
-
-        for (Long entrezId : toImport.eventsTable.rowKeySet()) {
-            boolean added = storeGeneticAlterations(toImport, entrezId);
-            if (added) {
-                storeCnaEvents(toImport, entrezId);
-            } else {
-                ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
+            if (isDiscretizedCnaProfile) {
+                existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
+                ClickHouseBulkLoader.bulkLoadOn();
             }
+
+            CnaImportData toImport = new CnaImportData();
+
+            while ((line = buf.readLine()) != null) {
+                lineIndex++;
+                ProgressMonitor.incrementCurValue();
+                ConsoleUtil.showProgress();
+                this.extractDataToImport(geneticProfile, line, lineIndex, toImport);
+            }
+
+            orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
+            this.geneticAlterationGeneImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
+                    : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
+            geneticAlterationGeneImporter.initialize();
+            DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
+
+            for (Long entrezId : toImport.eventsTable.rowKeySet()) {
+                boolean added = storeGeneticAlterations(toImport, entrezId);
+                if (added) {
+                    storeCnaEvents(toImport, entrezId);
+                } else {
+                    ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
+                }
+            }
+
+            // Once the CNA import is done, update DISCRETE_LONG input datatype into resulting DISCRETE datatype:
+            geneticProfile.setDatatype(MolecularProfileDataType.DISCRETE);
+            DaoGeneticProfile.updateDatatype(geneticProfile.getGeneticProfileId(), geneticProfile.getDatatype());
+
+            ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
+            geneticAlterationGeneImporter.finalize();
+            ClickHouseBulkLoader.flushAll();
+        } catch (Throwable t) {
+            ProgressMonitor.setCurrentMessage("Restoring genetic_alteration table from backup...");
+            daoGeneticAlteration.restoreGeneticAlterationTableBackup();
+            ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
+            DaoGeneticProfileSamples.restoreGeneticProfileSampleTableBackup();
+            ProgressMonitor.setCurrentMessage("Backup restoration complete.");
+            throw t;
         }
-
-        // Once the CNA import is done, update DISCRETE_LONG input datatype into resulting DISCRETE datatype:
-        geneticProfile.setDatatype(MolecularProfileDataType.DISCRETE);
-        DaoGeneticProfile.updateDatatype(geneticProfile.getGeneticProfileId(), geneticProfile.getDatatype());
-
-        ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
-        buf.close();
-        geneticAlterationGeneImporter.finalize();
-        ClickHouseBulkLoader.flushAll();
     }
 
     /**
