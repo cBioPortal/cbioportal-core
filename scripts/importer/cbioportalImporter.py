@@ -12,7 +12,7 @@ import argparse
 import logging
 import re
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 # configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module
@@ -64,6 +64,11 @@ COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIS
 
 # ------------------------------------------------------------------------------
 # sub-routines
+
+def expand_data_filenames(study_directory, meta_filename, meta_dictionary) -> List[Tuple[str, str]]:
+    """Expand a possibly comma-separated data_filename into a list of (meta, data) pairs."""
+    filenames = [f.strip() for f in meta_dictionary['data_filename'].split(',')]
+    return [(meta_filename, os.path.join(study_directory, f)) for f in filenames]
 
 def import_cancer_type(jvm_args, data_filename):
     args = jvm_args.split(' ')
@@ -159,7 +164,8 @@ def import_data(jvm_args, meta_filename, data_filename, update_generic_assay_ent
                               % (meta_file_type)), file=ERROR_FILE)
         return
 
-    if not data_filename.endswith(meta_file_dictionary['data_filename']):
+    declared_filenames = [f.strip() for f in meta_file_dictionary['data_filename'].split(',')]
+    if not any(data_filename.endswith(f) for f in declared_filenames):
         print(("'data_filename' in meta file contradicts "
                               "data filename in command, skipping file"), file=ERROR_FILE)
         return
@@ -280,16 +286,16 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     study_meta_filename = None
     study_meta_dictionary = {}
     cancer_type_filepairs = []
-    sample_attr_filepair = None
-    sample_resource_filepair = None
-    resource_definition_filepair = None
+    sample_attr_filepairs = []
+    sample_resource_filepairs = []
+    resource_definition_filepairs = []
     regular_filepairs = []
-    gene_panel_matrix_filepair = None
+    gene_panel_matrix_filepairs = []
     zscore_filepairs = []
-    gsva_score_filepair = None
-    gsva_pvalue_filepair = None
-    structural_variant_filepair = None
-    cna_long_filepair = None
+    gsva_score_filepairs = []
+    gsva_pvalue_filepairs = []
+    structural_variant_filepairs = []
+    cna_long_filepairs = []
 
     # Determine meta filenames in study directory
     meta_filenames = get_meta_filenames(study_directory)
@@ -318,10 +324,15 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         # study contains because at a later stage we want to import in a
         # specific order.
 
+        # Check the type of metafile. It is to know which metafile types the
+        # study contains because at a later stage we want to import in a
+        # specific order. data_filename may be a comma-separated list, so
+        # expand_data_filenames is used to produce one pair per file.
+
         # Check for cancer type file
         if meta_file_type == MetaFileTypes.CANCER_TYPE:
-            cancer_type_filepairs.append(
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            cancer_type_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for meta study file
         elif meta_file_type == MetaFileTypes.STUDY:
             if study_meta_filename is not None:
@@ -333,54 +344,42 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
             study_meta_dictionary[study_meta_filename] = meta_dictionary
         # Check for resource definitions
         elif meta_file_type == MetaFileTypes.RESOURCES_DEFINITION:
-            if resource_definition_filepair is not None:
-                raise RuntimeError(
-                    'Multiple resource definition files found: {} and {}'.format(
-                        resource_definition_filepair[0], meta_filename))   # pylint: disable=unsubscriptable-object
-            resource_definition_filepair = (
-                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))            
+            resource_definition_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for sample attributes
         elif meta_file_type == MetaFileTypes.SAMPLE_ATTRIBUTES:
-            if sample_attr_filepair is not None:
-                raise RuntimeError(
-                    'Multiple sample attribute files found: {} and {}'.format(
-                        sample_attr_filepair[0], meta_filename))   # pylint: disable=unsubscriptable-object
-            sample_attr_filepair = (
-                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))
+            sample_attr_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         elif meta_file_type == MetaFileTypes.SAMPLE_RESOURCES:
-            if sample_resource_filepair is not None:
-                raise RuntimeError(
-                    'Multiple sample resource files found: {} and {}'.format(
-                        sample_resource_filepair[0], meta_filename))   # pylint: disable=unsubscriptable-object
-            sample_resource_filepair = (
-                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))
+            sample_resource_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for gene panel matrix
         elif meta_file_type == MetaFileTypes.GENE_PANEL_MATRIX:
-            gene_panel_matrix_filepair = (
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            gene_panel_matrix_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for z-score exression files
         elif meta_file_type == MetaFileTypes.EXPRESSION and meta_dictionary['datatype'] == "Z-SCORE":
-            zscore_filepairs.append(
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            zscore_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for GSVA scores
         elif meta_file_type == MetaFileTypes.GSVA_SCORES:
-            gsva_score_filepair = (
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            gsva_score_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for GSVA p-values
         elif meta_file_type == MetaFileTypes.GSVA_PVALUES:
-            gsva_pvalue_filepair = (
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            gsva_pvalue_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Check for structural variant data
         elif meta_file_type == MetaFileTypes.STRUCTURAL_VARIANT:
-            structural_variant_filepair = (
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            structural_variant_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         elif meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
-            cna_long_filepair = (
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            cna_long_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
         # Add all other types of data
         else:
-            regular_filepairs.append(
-                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+            regular_filepairs.extend(
+                expand_data_filenames(study_directory, meta_filename, meta_dictionary))
 
     # First, import cancer types
     for meta_filename, data_filename in cancer_type_filepairs:
@@ -395,20 +394,17 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         import_study(jvm_args, study_meta_filename)
 
     # Next, we need to import sample definitions
-    if sample_attr_filepair is None:
+    if not sample_attr_filepairs:
         raise RuntimeError('No sample attribute file found')
-    else:
-        meta_filename, data_filename = sample_attr_filepair
+    for meta_filename, data_filename in sample_attr_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Next, we need to import resource definitions for resource data
-    if resource_definition_filepair is not None:
-        meta_filename, data_filename = resource_definition_filepair
+    for meta_filename, data_filename in resource_definition_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Next, we need to import sample definitions for resource data
-    if sample_resource_filepair is not None:
-        meta_filename, data_filename = sample_resource_filepair
+    for meta_filename, data_filename in sample_resource_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Next, import everything else except gene panel, structural variant data, GSVA and
@@ -418,13 +414,11 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Import structural variant data
-    if structural_variant_filepair is not None:
-        meta_filename, data_filename = structural_variant_filepair
+    for meta_filename, data_filename in structural_variant_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Import cna data
-    if cna_long_filepair is not None:
-        meta_filename, data_filename = cna_long_filepair
+    for meta_filename, data_filename in cna_long_filepairs:
         import_data(jvm_args=jvm_args, meta_filename=meta_filename, data_filename=data_filename,
                     meta_file_dictionary=study_meta_dictionary[meta_filename])
 
@@ -433,18 +427,12 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Import GSVA genetic profiles (after expression and z-scores)
-    if gsva_score_filepair is not None:
-
-        # First import the GSVA score data
-        meta_filename, data_filename = gsva_score_filepair
+    for meta_filename, data_filename in gsva_score_filepairs:
+        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+    for meta_filename, data_filename in gsva_pvalue_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
-        # Second import the GSVA p-value data
-        meta_filename, data_filename = gsva_pvalue_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
-
-    if gene_panel_matrix_filepair is not None:
-        meta_filename, data_filename = gene_panel_matrix_filepair
+    for meta_filename, data_filename in gene_panel_matrix_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Import the case lists
@@ -495,8 +483,8 @@ def import_incremental_data(jvm_args, data_directory, update_generic_assay_entit
         meta_pairs = meta_file_type_to_meta_files[meta_file_type]
         for meta_pair in meta_pairs:
             meta_filename, meta_dictionary = meta_pair
-            data_filename = os.path.join(data_directory, meta_dictionary['data_filename'])
-            import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
+            for _, data_filename in expand_data_filenames(data_directory, meta_filename, meta_dictionary):
+                import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
 
 def update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files):
     """
