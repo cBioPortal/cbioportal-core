@@ -69,6 +69,22 @@ def _to_lines(rows: Iterable[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def build(oncotree_url: str, oncotree_version: str | None = None, output: str = DEFAULT_FILENAME) -> str:
+    """Fetch cancer types from OncoTree and write to a file. Returns the output file path."""
+    url = _build_url(oncotree_url, oncotree_version or None)
+    oncotree_data = _query_oncotree(url)
+
+    if not oncotree_data:
+        raise RuntimeError("No oncotree data returned!")
+
+    lines = _to_lines(oncotree_data)
+    output_path = Path(output)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    print(f"Wrote {len(lines)} rows to {output_path}")
+    return str(output_path)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build cancers.txt from OncoTree tumorTypes API using importer-equivalent logic."
@@ -90,18 +106,7 @@ def main() -> int:
     )
 
     args = parser.parse_args()
-
-    url = _build_url(args.oncotree_url, args.oncotree_version or None)
-    oncotree_data = _query_oncotree(url)
-
-    if not oncotree_data:
-        raise RuntimeError("No oncotree data returned!")
-
-    lines = _to_lines(oncotree_data)
-    output_path = Path(args.output)
-    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    print(f"Wrote {len(lines)} rows to {output_path}")
+    build(args.oncotree_url, args.oncotree_version or None, args.output)
     return 0
 
 
