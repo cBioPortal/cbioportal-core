@@ -11,6 +11,7 @@ import importlib
 import argparse
 import logging
 import re
+import tempfile
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -72,7 +73,9 @@ def import_cancer_type(jvm_args, data_filename=None, oncotree_url=None, oncotree
     if data_filename is not None and oncotree_url is not None:
         raise RuntimeError("import-cancer-type: --data_filename and --oncotree-url are mutually exclusive")
     if oncotree_url is not None:
-        data_filename = build_cancers_from_oncotree.build(oncotree_url, oncotree_version)
+        tmp = tempfile.NamedTemporaryFile(suffix='.txt', prefix='cancers_', delete=False)
+        tmp.close() # release fh so the other script can write to it
+        data_filename = build_cancers_from_oncotree.build(oncotree_url, oncotree_version, output=tmp.name)
     args = jvm_args.split(' ')
     args.append(IMPORT_CANCER_TYPE_CLASS)
     args.append(data_filename)
