@@ -111,9 +111,9 @@ public class DaoGeneticAlteration {
             valueBuffer.append(value).append(DELIM);
         }
         
-       if (MySQLbulkLoader.isBulkLoad() ) {
-          //  write to the temp file maintained by the MySQLbulkLoader
-          MySQLbulkLoader.getMySQLbulkLoader("genetic_alteration").insertRecord(Integer.toString( geneticProfileId ),
+       if (ClickHouseBulkLoader.isBulkLoad() ) {
+          //  write to the temp file maintained by the ClickHouseBulkLoader
+          ClickHouseBulkLoader.getClickHouseBulkLoader("genetic_alteration").insertRecord(Integer.toString( geneticProfileId ),
         		  Integer.toString( geneticEntityId ), valueBuffer.toString());
           // return 1 because normal insert will return 1 if no error occurs
           return 1;
@@ -125,10 +125,8 @@ public class DaoGeneticAlteration {
         
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            pstmt = con.prepareStatement
-                    ("INSERT INTO genetic_alteration (GENETIC_PROFILE_ID, " +
-                            " GENETIC_ENTITY_ID," +
-                            " `VALUES`) "
+            pstmt = con.prepareStatement(
+                    "INSERT INTO genetic_alteration (genetic_profile_id, genetic_entity_id, `values`) "
                             + "VALUES (?,?,?)");
             pstmt.setInt(1, geneticProfileId);
             pstmt.setLong(2, geneticEntityId);
@@ -227,19 +225,23 @@ public class DaoGeneticAlteration {
         }
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            if (geneticEntityIds == null) {
-                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                        + " GENETIC_PROFILE_ID = " + geneticProfileId);
+            if (geneticEntityIds == null || geneticEntityIds.isEmpty()) {
+                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ?");
+                pstmt.setInt(1, geneticProfileId);
             } else {
-                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                        + " GENETIC_PROFILE_ID = " + geneticProfileId
-                        + " AND GENETIC_ENTITY_ID IN ("+StringUtils.join(geneticEntityIds, ",")+")");
+                String placeholders = String.join(",", Collections.nCopies(geneticEntityIds.size(), "?"));
+                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ? AND genetic_entity_id IN (" + placeholders + ")");
+                pstmt.setInt(1, geneticProfileId);
+                int index = 2;
+                for (Integer geneticEntityId : geneticEntityIds) {
+                    pstmt.setInt(index++, geneticEntityId);
+                }
             }
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 HashMap<Integer, String> mapSampleValue = new HashMap<Integer, String>();
-                int geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
-                String values = rs.getString("VALUES");
+                int geneticEntityId = rs.getInt("genetic_entity_id");
+                String values = rs.getString("values");
                 String[] valueParts = values.split(DELIM, -1);
                 int valuesLength = valueParts.length;
                 boolean hasMeaninglessTrailingDelimiter = valuesLength - orderedSampleList.size() == 1 && valueParts[valuesLength - 1].isEmpty();
@@ -250,7 +252,7 @@ public class DaoGeneticAlteration {
                 if (valuesLength != orderedSampleList.size()) {
                     throw new IllegalStateException(
                             "Data inconsistency detected: The length of the values for genetic profile with Id = "
-                                    + geneticProfileId + " and genetic entity with ID = " + geneticEntityId
+                                    + geneticProfileId + " and genetic entity with id = " + geneticEntityId
                                     + " (" + valuesLength + " elements) does not match the expected length of the sample list ("
                                     + orderedSampleList.size() + " elements).");
                 }
@@ -299,14 +301,12 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
 
-            pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE"
-                    + " GENETIC_PROFILE_ID = " + geneticProfileId
-                    + " LIMIT 3000 OFFSET " + offSet);
-
+            pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ? LIMIT 3000 OFFSET " + offSet);
+            pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("GENETIC_ENTITY_ID"));
-                String valuesString = rs.getString("VALUES");
+                long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("genetic_entity_id"));
+                String valuesString = rs.getString("values");
                 if (valuesString.endsWith(DELIM)) {
                     valuesString = valuesString.substring(0, valuesString.length() - DELIM.length());
                 }
@@ -342,12 +342,12 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM genetic_alteration WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
 
             rs = pstmt.executeQuery();
             while  (rs.next()) {
-                Long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("GENETIC_ENTITY_ID"));
+                Long entrezGeneId = DaoGeneOptimized.getEntrezGeneId(rs.getInt("genetic_entity_id"));
                 geneList.add(daoGene.getGene(entrezGeneId));
             }
             return geneList;
@@ -373,12 +373,12 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM genetic_alteration WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
 
             rs = pstmt.executeQuery();
             while  (rs.next()) {
-            	int geneticEntityId = rs.getInt("GENETIC_ENTITY_ID");
+            	int geneticEntityId = rs.getInt("genetic_entity_id");
                 geneticEntityList.add(geneticEntityId);
             }
             return geneticEntityList;
@@ -402,7 +402,7 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement
-                    ("SELECT COUNT(*) FROM genetic_alteration WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT count(*) FROM genetic_alteration WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -428,7 +428,7 @@ public class DaoGeneticAlteration {
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
             pstmt = con.prepareStatement
-                    ("SELECT COUNT(*) FROM genetic_alteration");
+                    ("SELECT count(*) FROM genetic_alteration");
             rs = pstmt.executeQuery();
             if (rs.next()) {
                 return rs.getInt(1);
@@ -453,8 +453,7 @@ public class DaoGeneticAlteration {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            pstmt = con.prepareStatement("DELETE from " +
-                    "genetic_alteration WHERE GENETIC_PROFILE_ID=?");
+            pstmt = con.prepareStatement("DELETE from genetic_alteration WHERE genetic_profile_id=?");
             pstmt.setLong(1, geneticProfileId);
             pstmt.executeUpdate();
         } catch (SQLException e) {

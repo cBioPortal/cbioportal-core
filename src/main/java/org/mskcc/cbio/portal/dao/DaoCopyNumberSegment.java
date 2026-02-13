@@ -50,10 +50,10 @@ public final class DaoCopyNumberSegment {
     private DaoCopyNumberSegment() {}
     
     public static int addCopyNumberSegment(CopyNumberSegment seg) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert mutations");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert mutations");
         } else {
-            MySQLbulkLoader.getMySQLbulkLoader("copy_number_seg").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("copy_number_seg").insertRecord(
                     Long.toString(seg.getSegId()),
                     Integer.toString(seg.getCancerStudyId()),
                     Integer.toString(seg.getSampleId()),
@@ -83,15 +83,19 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement(
-                    "SELECT `SAMPLE_ID`, IF((SELECT SUM(`END`-`START`) FROM copy_number_seg " + 
-                    "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
-                    "ABS(c2.`SEGMENT_MEAN`) >= 0.2) IS NULL, 0, (SELECT SUM(`END`-`START`) FROM copy_number_seg " + 
-                    "AS c2 WHERE c2.`CANCER_STUDY_ID` = c1.`CANCER_STUDY_ID` AND c2.`SAMPLE_ID` = c1.`SAMPLE_ID` AND " + 
-                    "ABS(c2.`SEGMENT_MEAN`) >= 0.2) / SUM(`END`-`START`)) AS `VALUE` FROM `copy_number_seg` AS c1 , `cancer_study` " +
-                    "WHERE c1.`CANCER_STUDY_ID` = cancer_study.`CANCER_STUDY_ID` AND cancer_study.`CANCER_STUDY_ID`=? " +
-                            (sampleIds == null ? "" : ("AND `SAMPLE_ID` IN ("+ String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") "))
-                    +"GROUP BY cancer_study.`CANCER_STUDY_ID` , `SAMPLE_ID` HAVING SUM(`END`-`START`) > 0;");
+                    "SELECT c1.`sample_id`, " +
+                            "CASE WHEN SUM(c1.`end` - c1.`start`) > 0 THEN " +
+                            "ROUND(SUM(CASE WHEN ABS(c1.`segment_mean`) >= ? THEN (c1.`end` - c1.`start`) ELSE 0 END) * 1.0 / " +
+                            "SUM(c1.`end` - c1.`start`), 4) " +
+                            "ELSE 0 END AS `value` " +
+                            "FROM `copy_number_seg` AS c1 " +
+                            "INNER JOIN `cancer_study` ON c1.`cancer_study_id` = cancer_study.`cancer_study_id` " +
+                            "WHERE cancer_study.`cancer_study_id`=? " +
+                            (sampleIds == null ? "" : ("AND c1.`sample_id` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") ")) +
+                            "GROUP BY cancer_study.`cancer_study_id`, c1.`sample_id` " +
+                            "HAVING SUM(c1.`end` - c1.`start`) > 0");
             int parameterIndex = 1;
+            pstmt.setDouble(parameterIndex++, FRACTION_GENOME_ALTERED_CUTOFF);
             pstmt.setInt(parameterIndex++, cancerStudyId);
             if (sampleIds != null) {
                 for (Integer sampleId : sampleIds) {
@@ -131,7 +135,7 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
             pstmt = con.prepareStatement
-                    ("SELECT MAX(`SEG_ID`) FROM `copy_number_seg`");
+                    ("SELECT max(`seg_id`) FROM `copy_number_seg`");
             rs = pstmt.executeQuery();
             return rs.next() ? rs.getLong(1) : 0;
         } catch (SQLException e) {
@@ -161,19 +165,19 @@ public final class DaoCopyNumberSegment {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement
                     ("SELECT * FROM copy_number_seg"
-                    + " WHERE `SAMPLE_ID` IN "+ concatSampleIds
-                    + " AND `CANCER_STUDY_ID`="+cancerStudyId);
+                    + " WHERE `sample_id` IN "+ concatSampleIds
+                    + " AND `cancer_study_id`="+cancerStudyId);
             rs = pstmt.executeQuery();
             while (rs.next()) {
                 CopyNumberSegment seg = new CopyNumberSegment(
-                        rs.getInt("CANCER_STUDY_ID"),
-                        rs.getInt("SAMPLE_ID"),
-                        rs.getString("CHR"),
-                        rs.getLong("START"),
-                        rs.getLong("END"),
-                        rs.getInt("NUM_PROBES"),
-                        rs.getDouble("SEGMENT_MEAN"));
-                seg.setSegId(rs.getLong("SEG_ID"));
+                        rs.getInt("cancer_study_id"),
+                        rs.getInt("sample_id"),
+                        rs.getString("chr"),
+                        rs.getLong("start"),
+                        rs.getLong("end"),
+                        rs.getInt("num_probes"),
+                        rs.getDouble("segment_mean"));
+                seg.setSegId(rs.getLong("seg_id"));
                 segs.add(seg);
             }
             return segs;
@@ -222,18 +226,18 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             if (cutoff>0) {
-                sql = "SELECT  `SAMPLE_ID`, SUM(`END`-`START`)"
+                sql = "SELECT  `sample_id`, sum(`end`-`start`)"
                     + " FROM `copy_number_seg`"
-                    + " WHERE `CANCER_STUDY_ID`="+cancerStudyId
-                    + " AND ABS(`SEGMENT_MEAN`)>=" + cutoff
-                    + " AND `SAMPLE_ID` IN ('" + StringUtils.join(sampleIds,"','") +"')"
-                    + " GROUP BY `SAMPLE_ID`";
+                    + " WHERE `cancer_study_id`="+cancerStudyId
+                    + " AND abs(`segment_mean`)>=" + cutoff
+                    + " AND `sample_id` IN ('" + StringUtils.join(sampleIds,"','") +"')"
+                    + " GROUP BY `sample_id`";
             } else {
-                sql = "SELECT  `SAMPLE_ID`, SUM(`END`-`START`)"
+                sql = "SELECT  `sample_id`, sum(`end`-`start`)"
                     + " FROM `copy_number_seg`"
-                    + " WHERE `CANCER_STUDY_ID`="+cancerStudyId
-                    + " AND `SAMPLE_ID` IN ('" + StringUtils.join(sampleIds,"','") +"')"
-                    + " GROUP BY `SAMPLE_ID`";
+                    + " WHERE `cancer_study_id`="+cancerStudyId
+                    + " AND `sample_id` IN ('" + StringUtils.join(sampleIds,"','") +"')"
+                    + " GROUP BY `sample_id`";
             }
             
             pstmt = con.prepareStatement(sql);
@@ -264,7 +268,7 @@ public final class DaoCopyNumberSegment {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
-            pstmt = con.prepareStatement("SELECT EXISTS (SELECT 1 FROM `copy_number_seg` WHERE `CANCER_STUDY_ID`=?)");
+            pstmt = con.prepareStatement("SELECT EXISTS (SELECT 1 FROM `copy_number_seg` WHERE `cancer_study_id`=?)");
             pstmt.setInt(1, cancerStudyId);
             rs = pstmt.executeQuery();
             return rs.next() && rs.getInt(1)==1;
@@ -289,7 +293,7 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement("SELECT EXISTS(SELECT 1 FROM `copy_number_seg`"
-                + " WHERE `CANCER_STUDY_ID`=? AND `SAMPLE_ID`=?");
+                + " WHERE `cancer_study_id`=? AND `sample_id`=?");
             pstmt.setInt(1, cancerStudyId);
             pstmt.setInt(2, sampleId);
             rs = pstmt.executeQuery();
@@ -310,8 +314,8 @@ public final class DaoCopyNumberSegment {
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
             pstmt = con.prepareStatement("DELETE FROM `copy_number_seg`" +
-                    " WHERE `CANCER_STUDY_ID`= ?" +
-                    " AND `SAMPLE_ID` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
+                    " WHERE `cancer_study_id`= ?" +
+                    " AND `sample_id` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
                     + ")");
             int parameterIndex = 1;
             pstmt.setInt(parameterIndex++, cancerStudyId);

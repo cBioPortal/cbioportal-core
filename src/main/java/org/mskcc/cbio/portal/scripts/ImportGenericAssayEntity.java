@@ -249,8 +249,6 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         reader.close();
         
         ProgressMonitor.setCurrentMessage("Finished loading generic assay.\n");
-        
-        return;
     }
     
     // returns index for ENTITY_STABLE_ID column

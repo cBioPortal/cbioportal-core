@@ -56,7 +56,7 @@ public class DaoInfo {
                     ("SELECT * FROM info");
             rs = pstmt.executeQuery();
             if (rs.next()) {
-                version = rs.getString("DB_SCHEMA_VERSION");
+                version = rs.getString("db_schema_version");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -98,7 +98,7 @@ public class DaoInfo {
 	        connection = JdbcUtil.getDbConnection(DaoInfo.class);
 	        
 	        // Prepare SQL statement
-	        preparedStatement = connection.prepareStatement("UPDATE info set GENESET_VERSION = ?");
+	        preparedStatement = connection.prepareStatement("ALTER TABLE info UPDATE geneset_version = ? WHERE 1");
 	        
 	        preparedStatement.setString(1, genesetVersion);
 	        // Execute statement
@@ -132,7 +132,7 @@ public class DaoInfo {
 	
 	        // Extract version from result
 	        if (resultSet.next()) {
-	            genesetVersion = resultSet.getString("GENESET_VERSION");
+	            genesetVersion = resultSet.getString("geneset_version");
 	        }    
 	    	return genesetVersion;
 	    } catch (SQLException e) {
@@ -153,7 +153,7 @@ public class DaoInfo {
 	    try {
 	        con = JdbcUtil.getDbConnection(DaoInfo.class);
 	
-	        pstmt = con.prepareStatement("UPDATE info set GENESET_VERSION = NULL");
+	        pstmt = con.prepareStatement("ALTER TABLE info UPDATE geneset_version = NULL WHERE 1");
 	        pstmt.executeUpdate();
 	    }
 	    catch (SQLException e) {

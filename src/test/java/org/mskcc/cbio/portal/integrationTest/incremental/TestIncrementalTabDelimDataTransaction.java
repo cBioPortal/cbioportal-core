@@ -20,22 +20,19 @@ package org.mskcc.cbio.portal.integrationTest.incremental;
 import java.io.*;
 import java.util.*;
 import org.junit.Before;
+import org.junit.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.runner.RunWith;
-import org.junit.Test;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
-import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -57,10 +54,9 @@ public class TestIncrementalTabDelimDataTransaction extends IntegrationTestBase 
     /**
      * Test transaction
      */
-    @Test
     @ExtendWith(MockitoExtension.class)
-    //Mysql does not support nested transactions. That's why we disable the outer transaction.
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @Test
+    //FIXME will pass when transaction substitution for ClickHouse is implemented
     public void testTransaction() throws Exception {
         GeneticProfile mrnaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mrna");
 

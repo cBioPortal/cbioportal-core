@@ -17,8 +17,8 @@ public class DaoResourceDefinition {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
-            pstmt = con.prepareStatement("INSERT INTO resource_definition(" + "`RESOURCE_ID`," + "`DISPLAY_NAME`,"
-                    + "`DESCRIPTION`," + "`RESOURCE_TYPE`," + "`OPEN_BY_DEFAULT`," + "`PRIORITY`," + "`CANCER_STUDY_ID`," + "`CUSTOM_METADATA`)"
+            pstmt = con.prepareStatement("INSERT INTO resource_definition(" + "`resource_id`," + "`display_name`,"
+                    + "`description`," + "`resource_type`," + "`open_by_default`," + "`priority`," + "`cancer_study_id`," + "`custom_metadata`)"
                     + " VALUES(?,?,?,?,?,?,?,?)");
             pstmt.setString(1, resource.getResourceId());
             pstmt.setString(2, resource.getDisplayName());
@@ -37,9 +37,9 @@ public class DaoResourceDefinition {
     }
 
     private static ResourceDefinition unpack(ResultSet rs) throws SQLException {
-        return new ResourceDefinition(rs.getString("RESOURCE_ID"), rs.getString("DISPLAY_NAME"), rs.getString("DESCRIPTION"),
-                ResourceType.valueOf(rs.getString("RESOURCE_TYPE")), rs.getBoolean("OPEN_BY_DEFAULT"), rs.getInt("PRIORITY"),
-                rs.getInt("CANCER_STUDY_ID"), rs.getString("CUSTOM_METADATA"));
+        return new ResourceDefinition(rs.getString("resource_id"), rs.getString("display_name"), rs.getString("description"),
+                ResourceType.valueOf(rs.getString("resource_type")), rs.getBoolean("open_by_default"), rs.getInt("priority"),
+                rs.getInt("cancer_study_id"), rs.getString("custom_metadata"));
     }
 
     public static ResourceDefinition getDatum(String resourceId, Integer cancerStudyId) throws DaoException {
@@ -62,8 +62,8 @@ public class DaoResourceDefinition {
         try {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
 
-            pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE RESOURCE_ID IN ('"
-                    + StringUtils.join(resourceIds, "','") + "')  AND CANCER_STUDY_ID=" + String.valueOf(cancerStudyId));
+            pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE resource_id IN ('"
+                    + StringUtils.join(resourceIds, "','") + "')  AND cancer_study_id=" + String.valueOf(cancerStudyId));
 
             rs = pstmt.executeQuery();
 
@@ -90,7 +90,7 @@ public class DaoResourceDefinition {
         try {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
 
-            pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE RESOURCE_ID IN ('"
+            pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE resource_id IN ('"
                     + StringUtils.join(resourceIds, "','") + "')");
 
             rs = pstmt.executeQuery();
@@ -115,7 +115,7 @@ public class DaoResourceDefinition {
         try {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
 
-            pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE CANCER_STUDY_ID=" + String.valueOf(cancerStudyId));
+            pstmt = con.prepareStatement("SELECT * FROM resource_definition WHERE cancer_study_id=" + String.valueOf(cancerStudyId));
 
             rs = pstmt.executeQuery();
 

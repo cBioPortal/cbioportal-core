@@ -32,9 +32,16 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import java.sql.*;
-import java.util.*;
 import org.mskcc.cbio.portal.model.Sample;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * Data access object for sample_profile table
@@ -47,6 +54,7 @@ public final class DaoSampleProfile {
     private DaoSampleProfile() {}
 
     private static final int NO_SUCH_PROFILE_ID = -1;
+    private static final int UPSERT_BATCH_SIZE = 1_000;
 
     public static void upsertSampleToProfileMapping(Collection<Integer> sampleIds, Integer geneticProfileId, Integer panelId) throws DaoException {
         upsertSampleToProfileMapping(
@@ -60,33 +68,73 @@ public final class DaoSampleProfile {
         if (idTuples.isEmpty()) {
             return;
         }
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            upsertWithBulkLoader(idTuples);
+            ClickHouseBulkLoader.flushAll();
+            optimizeSampleProfileTable();
+            return;
+        }
+        upsertWithJdbcBatch(idTuples);
+        optimizeSampleProfileTable();
+    }
+
+    private static void optimizeSampleProfileTable() throws DaoException {
         Connection con = null;
-        PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-
-            pstmt = con.prepareStatement
-                    ("INSERT INTO sample_profile (`SAMPLE_ID`, `GENETIC_PROFILE_ID`, `PANEL_ID`)" +
-                            " VALUES" +
-                            String.join(",", Collections.nCopies(idTuples.size(), " (?,?,?)")) +
-                            " ON DUPLICATE KEY UPDATE `PANEL_ID` = VALUES(`PANEL_ID`);");
-            int parameterIndex = 1;
-            for (SampleProfileTuple idTuple : idTuples) {
-                pstmt.setInt(parameterIndex++, idTuple.sampleId());
-                pstmt.setInt(parameterIndex++, idTuple.geneticProfileId());
-                if (idTuple.panelId() != null) {
-                    pstmt.setInt(parameterIndex, idTuple.panelId());
-                } else {
-                    pstmt.setNull(parameterIndex, java.sql.Types.INTEGER);
-                }
-                parameterIndex++;
-            }
-            pstmt.executeUpdate();
+            con.prepareStatement("OPTIMIZE TABLE sample_profile FINAL").executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoSampleProfile.class, con, pstmt, null);
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, null, null);
         }
+    }
+
+    private static void upsertWithJdbcBatch(Collection<SampleProfileTuple> idTuples) throws DaoException {
+        Connection con = null;
+        PreparedStatement insertStmt = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
+            insertStmt = con.prepareStatement(
+                "INSERT INTO sample_profile (`sample_id`, `genetic_profile_id`, `panel_id`) VALUES (?,?,?)");
+
+            int batchCount = 0;
+            for (SampleProfileTuple idTuple : idTuples) {
+                bindInsert(insertStmt, idTuple);
+                if (++batchCount % UPSERT_BATCH_SIZE == 0) {
+                    insertStmt.executeBatch();
+                }
+            }
+
+            insertStmt.executeBatch();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoSampleProfile.class, con, insertStmt, null);
+        }
+    }
+
+    private static void upsertWithBulkLoader(Collection<SampleProfileTuple> idTuples) throws DaoException {
+        ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("sample_profile");
+        loader.setFieldNames(new String[]{"sample_id", "genetic_profile_id", "panel_id"});
+        for (SampleProfileTuple idTuple : idTuples) {
+            loader.insertRecord(
+                Integer.toString(idTuple.sampleId()),
+                Integer.toString(idTuple.geneticProfileId()),
+                idTuple.panelId() != null ? Integer.toString(idTuple.panelId()) : null
+            );
+        }
+    }
+
+    private static void bindInsert(PreparedStatement insertStmt, SampleProfileTuple idTuple) throws SQLException {
+        insertStmt.setInt(1, idTuple.sampleId());
+        insertStmt.setInt(2, idTuple.geneticProfileId());
+        if (idTuple.panelId() != null) {
+            insertStmt.setInt(3, idTuple.panelId());
+        } else {
+            insertStmt.setNull(3, java.sql.Types.INTEGER);
+        }
+        insertStmt.addBatch();
     }
 
     public static boolean sampleExistsInGeneticProfile(int sampleId, int geneticProfileId)
@@ -98,7 +146,7 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_profile WHERE SAMPLE_ID = ? AND GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM sample_profile WHERE sample_id = ? AND genetic_profile_id = ?");
             pstmt.setInt(1, sampleId);
             pstmt.setInt(2, geneticProfileId);
             rs = pstmt.executeQuery();
@@ -121,7 +169,7 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT PANEL_ID FROM sample_profile WHERE SAMPLE_ID = ? AND GENETIC_PROFILE_ID = ?");
+                    ("SELECT panel_id FROM sample_profile WHERE sample_id = ? AND genetic_profile_id = ?");
             pstmt.setInt(1, sampleId);
             pstmt.setInt(2, geneticProfileId);
             rs = pstmt.executeQuery();
@@ -132,7 +180,7 @@ public final class DaoSampleProfile {
                 }
                 return panelId;
             } else {
-                throw new NoSuchElementException("No sample_profile with SAMPLE_ID=" + sampleId + " and GENETIC_PROFILE_ID=" + geneticProfileId);
+                throw new NoSuchElementException("No sample_profile with SAMPLE_ID=" + sampleId + " and genetic_profile_id=" + geneticProfileId);
             }
         } catch (NoSuchElementException | SQLException e) {
             throw new DaoException(e);
@@ -148,7 +196,7 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT count(*) FROM sample_profile WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT count(*) FROM sample_profile WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -169,11 +217,11 @@ public final class DaoSampleProfile {
 
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            pstmt = con.prepareStatement("SELECT GENETIC_PROFILE_ID FROM sample_profile WHERE SAMPLE_ID = ?");
+            pstmt = con.prepareStatement("SELECT genetic_profile_id FROM sample_profile WHERE sample_id = ?");
             pstmt.setInt(1, sampleId);
             rs = pstmt.executeQuery();
             if( rs.next() ) {
-               return rs.getInt("GENETIC_PROFILE_ID");
+               return rs.getInt("genetic_profile_id");
             }else{
                return NO_SUCH_PROFILE_ID;
             }
@@ -193,13 +241,13 @@ public final class DaoSampleProfile {
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
             pstmt = con.prepareStatement
-                    ("SELECT * FROM sample_profile WHERE GENETIC_PROFILE_ID = ?");
+                    ("SELECT * FROM sample_profile WHERE genetic_profile_id = ?");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
             ArrayList<Integer> sampleIds = new ArrayList<Integer>();
             while (rs.next()) {
-                Sample sample = DaoSample.getSampleById(rs.getInt("SAMPLE_ID"));
-                sampleIds.add(rs.getInt("SAMPLE_ID"));
+                Sample sample = DaoSample.getSampleById(rs.getInt("sample_id"));
+                sampleIds.add(rs.getInt("sample_id"));
             }
             return sampleIds;
         } catch (NullPointerException e) {
@@ -222,7 +270,7 @@ public final class DaoSampleProfile {
             rs = pstmt.executeQuery();
             ArrayList<Integer> sampleIds = new ArrayList<Integer>();
             while (rs.next()) {
-                sampleIds.add(rs.getInt("SAMPLE_ID"));
+                sampleIds.add(rs.getInt("sample_id"));
             }
             return sampleIds;
         } catch (NullPointerException e) {
@@ -274,7 +322,7 @@ public final class DaoSampleProfile {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            pstmt = con.prepareStatement("select count(*) from sample_profile where PANEL_ID = ?");
+            pstmt = con.prepareStatement("select count(*) from sample_profile where panel_id = ?");
             pstmt.setInt(1, panelId);
             rs = pstmt.executeQuery();
             if (rs.next()) {

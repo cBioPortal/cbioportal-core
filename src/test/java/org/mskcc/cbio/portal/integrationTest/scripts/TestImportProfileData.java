@@ -30,6 +30,7 @@ import org.junit.Rule;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
@@ -42,7 +43,6 @@ import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
@@ -57,10 +57,8 @@ import org.mskcc.cbio.portal.model.StructuralVariant;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -72,8 +70,6 @@ import static org.junit.Assert.assertNull;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportProfileData extends IntegrationTestBase {
 
     int studyId;
@@ -450,7 +446,7 @@ public class TestImportProfileData extends IntegrationTestBase {
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
         daoGene.addGene(new CanonicalGene(999999672, "TESTBRCA1"));
         daoGene.addGene(new CanonicalGene(999999675, "TESTBRCA2"));
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         String[] args = {
                 "--data","src/test/resources/data_CNA_sample.txt",
                 "--meta","src/test/resources/meta_CNA.txt" ,
@@ -558,6 +554,6 @@ public class TestImportProfileData extends IntegrationTestBase {
         daoGene.addGene(new CanonicalGene(1952L, "CELSR2"));
         daoGene.addGene(new CanonicalGene(2322L, "FLT3"));
         daoGene.addGene(new CanonicalGene(867L, "CBL"));
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 }
