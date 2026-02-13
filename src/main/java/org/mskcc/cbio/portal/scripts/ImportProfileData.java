@@ -36,7 +36,6 @@ import java.io.*;
 import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.shared.MolecularProfileDataType;
@@ -54,7 +53,6 @@ public class ImportProfileData extends ConsoleRunnable {
 
     public void run() {
         DaoGeneOptimized daoGene;
-        DaoGeneticAlteration daoGeneticAlteration;
         daoGene = DaoGeneOptimized.getInstance();
 
         try {

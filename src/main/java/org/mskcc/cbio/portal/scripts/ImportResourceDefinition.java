@@ -6,10 +6,10 @@ import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoResourceDefinition;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ResourceDefinition;
 import org.mskcc.cbio.portal.model.shared.ResourceType;
@@ -47,10 +47,10 @@ public class ImportResourceDefinition extends ConsoleRunnable {
         // code has to be added to check whether
         // a resource data update should be
         // perform instead of an insert
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
 
         if (relaxed) {
-            MySQLbulkLoader.relaxedModeOn();
+            ClickHouseBulkLoader.relaxedModeOn();
         }
 
         FileReader reader = new FileReader(resourceDataFile);
@@ -143,9 +143,9 @@ public class ImportResourceDefinition extends ConsoleRunnable {
         }
         buff.close();
 
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
-            MySQLbulkLoader.relaxedModeOff();
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
+            ClickHouseBulkLoader.relaxedModeOff();
         }
     }
 

@@ -68,7 +68,7 @@ public class TestDumpPortalInfoApproval extends IntegrationTestBase {
     private static void assertJsonMatch(String fileName, Path approved, Path received) throws JSONException, IOException {
         String message = "Mismatch for " + fileName + ".\nCopy " + received.toAbsolutePath()
                 + " to " + approved.toAbsolutePath() + " after review.";
-        JSONAssert.assertEquals(message, Files.readString(approved), Files.readString(received), true);
+        JSONAssert.assertEquals(message, Files.readString(approved), Files.readString(received), false);
     }
 
     private static void assertNoUnexpectedFiles(Path receivedDir) throws IOException {

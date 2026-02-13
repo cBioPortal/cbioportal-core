@@ -4,10 +4,8 @@ import java.util.*;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.model.CanonicalGene;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -19,8 +17,6 @@ import static org.mskcc.cbio.portal.util.GenePanelUtil.Pair;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
-@Rollback
-@Transactional
 public class TestGenePanelUtil extends IntegrationTestBase {
 
     CanonicalGene otor = makeGene(13321, 56914, "OTOR", makeAliases("FDP", "MIAL1"));

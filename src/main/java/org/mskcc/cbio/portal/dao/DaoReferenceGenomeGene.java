@@ -44,10 +44,10 @@ public class DaoReferenceGenomeGene {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
-            MySQLbulkLoader.bulkLoadOff();
+            ClickHouseBulkLoader.bulkLoadOff();
             con = JdbcUtil.getDbConnection(DaoReferenceGenome.class);
             pstmt = con.prepareStatement
-                ("UPDATE reference_genome_gene SET `START`=?, `END`=? WHERE `ENTREZ_GENE_ID`=? AND `REFERENCE_GENOME_ID`=?");
+                ("UPDATE reference_genome_gene SET `start`=?, `end`=? WHERE `entrez_gene_id`=? AND `reference_genome_id`=?");
             pstmt.setLong(1, gene.getStart());
             pstmt.setLong(2, gene.getEnd());
             pstmt.setLong(3, gene.getEntrezGeneId());
@@ -56,7 +56,7 @@ public class DaoReferenceGenomeGene {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            MySQLbulkLoader.bulkLoadOn();
+            ClickHouseBulkLoader.bulkLoadOn();
             JdbcUtil.closeAll(DaoGene.class, con, pstmt, rs);
         }
     }
@@ -77,7 +77,7 @@ public class DaoReferenceGenomeGene {
                 //add gene, referring to this genetic entity
                 con = JdbcUtil.getDbConnection(DaoGene.class);
                 pstmt = con.prepareStatement
-                    ("INSERT INTO `reference_genome_gene` (`ENTREZ_GENE_ID`, `REFERENCE_GENOME_ID`,`CHR`,`CYTOBAND`,`START`,`END`) "
+                    ("INSERT INTO `reference_genome_gene` (`entrez_gene_id`, `reference_genome_id`,`chr`,`cytoband`,`start`,`end`) "
                         + "VALUES (?,?,?,?,?,?)");
                 pstmt.setLong(1, gene.getEntrezGeneId());
                 pstmt.setInt(2, gene.getReferenceGenomeId());
@@ -111,7 +111,7 @@ public class DaoReferenceGenomeGene {
         try {
             con = JdbcUtil.getDbConnection(DaoReferenceGenomeGene.class);
             pstmt = con.prepareStatement
-                ("SELECT * FROM `reference_genome_gene` WHERE `ENTREZ_GENE_ID` = ? AND `REFERENCE_GENOME_ID` = ?");
+                ("SELECT * FROM `reference_genome_gene` WHERE `entrez_gene_id` = ? AND `reference_genome_id` = ?");
             pstmt.setLong(1, entrezGeneId);
             pstmt.setInt(2, referenceGenomeId);
             rs = pstmt.executeQuery();
@@ -128,14 +128,14 @@ public class DaoReferenceGenomeGene {
     }
 
     private ReferenceGenomeGene extractGene(ResultSet rs) throws SQLException, DaoException {
-        int entrezGeneId = rs.getInt("ENTREZ_GENE_ID");
-        int reference_genome_id = rs.getInt("REFERENCE_GENOME_ID");
-        String cytoband = rs.getString("CYTOBAND");
+        int entrezGeneId = rs.getInt("entrez_gene_id");
+        int reference_genome_id = rs.getInt("reference_genome_id");
+        String cytoband = rs.getString("cytoband");
         ReferenceGenomeGene gene = new ReferenceGenomeGene(entrezGeneId, reference_genome_id);
-        gene.setChr(rs.getString("CHR"));
-        gene.setCytoband(rs.getString("CYTOBAND"));
-        gene.setStart(rs.getLong("START"));
-        gene.setEnd(rs.getLong("END"));
+        gene.setChr(rs.getString("chr"));
+        gene.setCytoband(rs.getString("cytoband"));
+        gene.setStart(rs.getLong("start"));
+        gene.setEnd(rs.getLong("end"));
         return gene;
     }
 
@@ -150,7 +150,7 @@ public class DaoReferenceGenomeGene {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoReferenceGenomeGene.class);
-            pstmt = con.prepareStatement("DELETE FROM `reference_genome_gene` WHERE ENTREZ_GENE_ID=? AND REFERENCE_GENOME_ID=?");
+            pstmt = con.prepareStatement("DELETE FROM `reference_genome_gene` WHERE entrez_gene_id=? AND reference_genome_id=?");
             pstmt.setLong(1, entrezGeneId);
             pstmt.setInt(2, referenceGenomeId);
             pstmt.executeUpdate();

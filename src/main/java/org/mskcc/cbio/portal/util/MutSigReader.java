@@ -33,9 +33,10 @@
 package org.mskcc.cbio.portal.util;
 
 import java.io.*;
+
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.MutSig;
 import static org.mskcc.cbio.portal.dao.DaoMutSig.addMutSig;
@@ -62,7 +63,7 @@ public class MutSigReader {
      */
     public static int loadMutSig(int internalId, File mutSigFile) throws IOException, DaoException {
         int loadedMutSigs = 0;
-        MySQLbulkLoader.bulkLoadOff();
+        ClickHouseBulkLoader.bulkLoadOff();
         FileReader reader = new FileReader(mutSigFile);
         BufferedReader buf = new BufferedReader(reader);
         try {
