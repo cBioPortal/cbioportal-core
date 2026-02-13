@@ -15,11 +15,11 @@ public final class DaoResourceData {
     public static final String RESOURCE_STUDY_TABLE = "resource_study";
 
     private static final String SAMPLE_INSERT = "INSERT INTO " + RESOURCE_SAMPLE_TABLE
-            + "(`INTERNAL_ID`,`RESOURCE_ID`,`URL` VALUES(?,?,?)";
+            + "(`internal_id`,`resource_id`,`url` VALUES(?,?,?)";
     private static final String PATIENT_INSERT = "INSERT INTO " + RESOURCE_PATIENT_TABLE
-            + "(`INTERNAL_ID`,`RESOURCE_ID`,`URL` VALUES(?,?,?)";
+            + "(`internal_id`,`resource_id`,`url` VALUES(?,?,?)";
     private static final String STUDY_INSERT = "INSERT INTO " + RESOURCE_STUDY_TABLE
-            + "(`INTERNAL_ID`,`RESOURCE_ID`,`URL` VALUES(?,?,?)";
+            + "(`internal_id`,`resource_id`,`url` VALUES(?,?,?)";
 
     private DaoResourceData() {
     }
@@ -38,8 +38,8 @@ public final class DaoResourceData {
 
     public static int addDatum(String query, String tableName, int internalId, String resourceId, String url)
             throws DaoException {
-        if (MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.getMySQLbulkLoader(tableName).insertRecord(Integer.toString(internalId), resourceId, url);
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.getClickHouseBulkLoader(tableName).insertRecord(Integer.toString(internalId), resourceId, url);
             return 1;
         }
 
@@ -76,7 +76,7 @@ public final class DaoResourceData {
         ResultSet rs = null;
 
         List<ResourceBaseData> resources = new ArrayList<ResourceBaseData>();
-        String sql = ("SELECT * FROM " + table + " WHERE `INTERNAL_ID` IN " +
+        String sql = ("SELECT * FROM " + table + " WHERE `internal_id` IN " +
             "(" + generateIdsSql(internalIds) + ")");
 
         try {
@@ -102,8 +102,8 @@ public final class DaoResourceData {
     }
 
     private static ResourceBaseData extract(String table, int internalCancerStudyId, ResultSet rs) throws SQLException {
-        String stableId = getStableIdFromInternalId(table, rs.getInt("INTERNAL_ID"));
-        return new ResourceBaseData(internalCancerStudyId, stableId, rs.getString("RESOURCE_ID"), rs.getString("URL"));
+        String stableId = getStableIdFromInternalId(table, rs.getInt("internal_id"));
+        return new ResourceBaseData(internalCancerStudyId, stableId, rs.getString("resource_id"), rs.getString("url"));
     }
 
     private static String getStableIdFromInternalId(String table, int internalId) {

@@ -37,6 +37,7 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
@@ -47,7 +48,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -56,10 +56,8 @@ import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.model.shared.GeneticEntity;
 import org.mskcc.cbio.portal.scripts.ImportGenericAssayPatientLevelData;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -69,8 +67,6 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportGenericAssayPatientLevelData extends IntegrationTestBase {
 
     private int studyId;
@@ -123,7 +119,7 @@ public class TestImportGenericAssayPatientLevelData extends IntegrationTestBase 
 	@Test
     public void testImportGenericAssayPatientLevelDataBulkLoadOff() throws Exception {
 
-        MySQLbulkLoader.bulkLoadOff();
+        ClickHouseBulkLoader.bulkLoadOff();
         runImportGenericAssayPatientLevelData();
     }
     
@@ -133,7 +129,7 @@ public class TestImportGenericAssayPatientLevelData extends IntegrationTestBase 
      */
 	@Test
     public void testImportGenericAssayPatientLevelDataBulkLoadOn() throws Exception {
-		MySQLbulkLoader.bulkLoadOn();
+		ClickHouseBulkLoader.bulkLoadOn();
         runImportGenericAssayPatientLevelData();
     }
     

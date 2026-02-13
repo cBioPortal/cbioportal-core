@@ -43,20 +43,17 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.util.GeneticProfileReader;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * JUnit test for GeneticProfileReader class.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestGeneticProfileReader extends IntegrationTestBase {
 
     @Test
@@ -71,12 +68,11 @@ public class TestGeneticProfileReader extends IntegrationTestBase {
         assertEquals("Blah Blah.", geneticProfile.getProfileDescription());
 
         CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId("study_tcga_pub");
-        ArrayList<GeneticProfile> list = DaoGeneticProfile.getAllGeneticProfiles
-                (cancerStudy.getInternalId());
-        geneticProfile = list.get(0);
-
         assertEquals(cancerStudy.getInternalId(), geneticProfile.getCancerStudyId());
-        assertEquals("Putative copy-number alterations from GISTIC", geneticProfile.getProfileName());
+
+        List<String> profileNames = DaoGeneticProfile.getAllGeneticProfiles
+                (cancerStudy.getInternalId()).stream().map(GeneticProfile::getProfileName).toList();
+        assertTrue(profileNames.contains("Putative copy-number alterations from GISTIC"));
         assertEquals(GeneticAlterationType.COPY_NUMBER_ALTERATION,
                 geneticProfile.getGeneticAlterationType());
     }

@@ -37,10 +37,8 @@ import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoUser;
 import org.mskcc.cbio.portal.model.User;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
@@ -55,8 +53,6 @@ import static org.junit.Assert.assertThat;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestDaoUser extends IntegrationTestBase {
 	
 	@Test

@@ -38,20 +38,18 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.GeneticProfile;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -61,8 +59,6 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestDaoMutation extends IntegrationTestBase {
 
     int geneticProfileId;
@@ -84,7 +80,7 @@ public class TestDaoMutation extends IntegrationTestBase {
 
     @Test
     public void testDaoMutation() throws DaoException {
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         runTheTest();
     }
 
@@ -144,8 +140,8 @@ public class TestDaoMutation extends IntegrationTestBase {
         DaoMutation.addMutation(mutation,true);
 
         // if bulkLoading, execute LOAD FILE
-        if( MySQLbulkLoader.isBulkLoad()){
-            MySQLbulkLoader.flushAll();
+        if( ClickHouseBulkLoader.isBulkLoad()){
+            ClickHouseBulkLoader.flushAll();
         }
         ArrayList<ExtendedMutation> mutationList = DaoMutation.getMutations(geneticProfileId, 1, 321);
         validateMutation(mutationList.get(0));

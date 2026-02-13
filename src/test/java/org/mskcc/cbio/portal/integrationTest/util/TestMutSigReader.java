@@ -44,18 +44,14 @@ import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.MutSig;
 import org.mskcc.cbio.portal.util.MutSigReader;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestMutSigReader extends IntegrationTestBase {
 
 	// TBD: change these to use getResourceAsStream()

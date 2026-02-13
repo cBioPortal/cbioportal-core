@@ -38,6 +38,7 @@ import java.util.regex.*;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoAlleleSpecificCopyNumber;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -47,7 +48,6 @@ import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -132,11 +132,16 @@ public class ImportExtendedMutationData {
     }
 
     public void importData() throws IOException, DaoException {
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
 
         HashSet <String> sequencedCaseSet = new HashSet<String>();
 
         Map<MutationEvent,MutationEvent> existingEvents = new HashMap<MutationEvent,MutationEvent>();
+        ProgressMonitor.setCurrentMessage("Starting to load existing mutation events...");
+        for(MutationEvent mutationEvent: DaoMutation.getAllMutationEvents()) {
+            existingEvents.put(mutationEvent, mutationEvent);
+        }
+        ProgressMonitor.setCurrentMessage("Loaded " + existingEvents.size() + " existing mutation events.");
         Set<MutationEvent> newEvents = new HashSet<MutationEvent>();
 
         Map<ExtendedMutation,ExtendedMutation> mutations = new HashMap<ExtendedMutation,ExtendedMutation>();
@@ -328,7 +333,7 @@ public class ImportExtendedMutationData {
                             !mutationType.equalsIgnoreCase("IGR")) {
                         ProgressMonitor.logWarning(
                             "Treating mutation with gene symbol 'Unknown' " +
-                            (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene ID 0") + " as intergenic ('IGR') " +
+                            (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene id 0") + " as intergenic ('IGR') " +
                             "instead of '" + mutationType + "'. Entry filtered/skipped.");
                     }
                     // treat as IGR:
@@ -426,10 +431,7 @@ public class ImportExtendedMutationData {
 
                     //  Filter out Mutations
                     if( myMutationFilter.acceptMutation( mutation, this.filteredMutations )) {
-                        MutationEvent event =
-                            existingEvents.containsKey(mutation.getEvent()) ?
-                            existingEvents.get(mutation.getEvent()) :
-                            DaoMutation.getMutationEvent(mutation.getEvent());
+                        MutationEvent event = existingEvents.get(mutation.getEvent());
                         if (event!=null) {
                             mutation.setEvent(event);
                         } else {
@@ -488,8 +490,8 @@ public class ImportExtendedMutationData {
             }
         }
 
-        if( MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
+        if( ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
         }
         // run sanity check on `mutation_event` to determine whether duplicate
         // events were introduced during current import
@@ -510,8 +512,8 @@ public class ImportExtendedMutationData {
         ProgressMonitor.setCurrentMessage("Calculating mutation counts by keyword...");
         DaoMutation.calculateMutationCountByKeyword(geneticProfileId);
 
-        if( MySQLbulkLoader.isBulkLoad()) {
-            MySQLbulkLoader.flushAll();
+        if( ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
         }
 
         if (entriesSkipped > 0) {

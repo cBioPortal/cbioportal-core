@@ -19,7 +19,7 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`GENETIC_ENTITY_ID`, `NAME`, `VALUE`) "
+            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`genetic_entity_id`, `name`, `value`) "
             + "VALUES(?,?,?)");
             if (entityId == null) {
                 return;
@@ -43,7 +43,7 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`GENETIC_ENTITY_ID`, `NAME`, `VALUE`) "
+            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`genetic_entity_id`, `name`, `value`) "
                 + "VALUES(?,?,?)");
             if (properties.size() == 0) {
                 return;
@@ -79,7 +79,7 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("SELECT * FROM generic_entity_properties WHERE GENETIC_ENTITY_ID=?");
+            pstmt = con.prepareStatement("SELECT * FROM generic_entity_properties WHERE genetic_entity_id=?");
             GeneticEntity entity = DaoGeneticEntity.getGeneticEntityByStableId(stableId);
             if (entity == null) {
                 return null;
@@ -89,7 +89,7 @@ public class DaoGenericAssay {
 
             HashMap<String, String> map = new HashMap<>();
             while(rs.next()) {
-                map.put(rs.getString("NAME"), rs.getString("VALUE"));
+                map.put(rs.getString("name"), rs.getString("value"));
             }
             GenericAssayMeta genericAssayMeta = new GenericAssayMeta(entity.getEntityType(), entity.getStableId(), map);
             return genericAssayMeta;
@@ -108,7 +108,7 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("DELETE FROM generic_entity_properties WHERE GENETIC_ENTITY_ID=?");
+            pstmt = con.prepareStatement("DELETE FROM generic_entity_properties WHERE genetic_entity_id=?");
             if (entityId == null) {
                 return;
             }
@@ -128,13 +128,13 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("SELECT DISTINCT CANCER_STUDY_ID FROM genetic_profile WHERE GENETIC_PROFILE_ID IN (SELECT GENETIC_PROFILE_ID FROM genetic_alteration WHERE GENETIC_ENTITY_ID IN (SELECT GENETIC_ENTITY_ID FROM genetic_alteration WHERE GENETIC_PROFILE_ID=?))");
+            pstmt = con.prepareStatement("SELECT DISTINCT cancer_study_id FROM genetic_profile WHERE genetic_profile_id IN (SELECT genetic_profile_id FROM genetic_alteration WHERE genetic_entity_id IN (SELECT genetic_entity_id FROM genetic_alteration WHERE genetic_profile_id=?))");
             pstmt.setInt(1, geneticProfileId);
             rs = pstmt.executeQuery();
 
             List<Integer> studies = new ArrayList<Integer>();
             while(rs.next()) {
-                studies.add(rs.getInt("CANCER_STUDY_ID"));
+                studies.add(rs.getInt("cancer_study_id"));
             }
             // check if entities only exist in single study
             return studies.size() == 1;
@@ -159,8 +159,8 @@ public class DaoGenericAssay {
 
         for (GeneticProfile profile : genericAssayProfiles) {
             if (DaoGenericAssay.geneticEntitiesOnlyExistInSingleStudy(profile.getGeneticProfileId())) {
-                deleteGenericAssayStatements.add(Pair.of(profile.getGeneticProfileId(), "DELETE FROM generic_entity_properties WHERE GENETIC_ENTITY_ID IN (SELECT GENETIC_ENTITY_ID FROM genetic_alteration WHERE GENETIC_PROFILE_ID=?)"));
-                deleteGenericAssayStatements.add(Pair.of(profile.getGeneticProfileId(), "DELETE FROM genetic_entity WHERE ID IN (SELECT GENETIC_ENTITY_ID FROM genetic_alteration WHERE GENETIC_PROFILE_ID=?)"));
+                deleteGenericAssayStatements.add(Pair.of(profile.getGeneticProfileId(), "DELETE FROM generic_entity_properties WHERE genetic_entity_id IN (SELECT genetic_entity_id FROM genetic_alteration WHERE genetic_profile_id=?)"));
+                deleteGenericAssayStatements.add(Pair.of(profile.getGeneticProfileId(), "DELETE FROM genetic_entity WHERE id IN (SELECT genetic_entity_id FROM genetic_alteration WHERE genetic_profile_id=?)"));
             }
         }
 

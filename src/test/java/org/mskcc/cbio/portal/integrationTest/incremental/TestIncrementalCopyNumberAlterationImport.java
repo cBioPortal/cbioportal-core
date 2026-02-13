@@ -20,12 +20,8 @@ package org.mskcc.cbio.portal.integrationTest.incremental;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.junit.Test;
-import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGenePanel;
@@ -38,11 +34,10 @@ import org.mskcc.cbio.portal.model.GenePanel;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.TestContextManager;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.DefaultTransactionDefinition;
-import org.springframework.transaction.TransactionStatus;
+
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlterationsTestHelper.assertNoChange;
@@ -54,7 +49,7 @@ import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlteratio
  * @author Ruslan Forostianov
  * @author Pieter Lukasse
  */
-@RunWith(Parameterized.class)
+@RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
 public class TestIncrementalCopyNumberAlterationImport extends IntegrationTestBase {
 
@@ -65,8 +60,6 @@ public class TestIncrementalCopyNumberAlterationImport extends IntegrationTestBa
     final long absentGeneEntrezId = 472l;
     final Set<Long> noChangeEntrezIds = Set.of(10000l, 207l, 208l,  3265l,  3845l,  4893l,  672l,  673l,  675l);
     final Set<Long> beforeEntrezIds = new HashSet<>(noChangeEntrezIds);
-    private final String metaFile;
-    private final String dataFile;
 
     { beforeEntrezIds.add(absentGeneEntrezId); }
 
@@ -81,24 +74,20 @@ public class TestIncrementalCopyNumberAlterationImport extends IntegrationTestBa
     final Set<Integer> afterSampleIds = new HashSet<>(beforeSampleIds);
     { afterSampleIds.add(newSampleId); }
 
-    @Parameterized.Parameters(name = "{0}")
-    public static Collection<Object[]> primeNumbers() {
-        return Arrays.asList(new Object[][] {
-                { "meta_cna_discrete.txt", "data_cna_discrete.txt" },
-                { "meta_cna_discrete_long.txt", "data_cna_discrete_long.txt" },
-        });
+    @Test
+    public void testDiscreteCNA_wide() throws DaoException {
+        testDiscreteCNA( "meta_cna_discrete.txt", "data_cna_discrete.txt");
     }
 
-    public TestIncrementalCopyNumberAlterationImport(String metaFile, String dataFile) {
-        this.metaFile = metaFile;
-        this.dataFile = dataFile;
+    @Test
+    public void testDiscreteCNA_long() throws DaoException {
+        testDiscreteCNA( "meta_cna_discrete_long.txt", "data_cna_discrete_long.txt");
     }
 
     /**
      * Test incremental upload of COPY_NUMBER_ALTERATION DISCRETE
      */
-    @Test
-    public void testDiscreteCNA() throws DaoException {
+    private void testDiscreteCNA(String metaFileName, String dataFileName) throws DaoException {
         GeneticProfile discreteCNAProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_gistic");
         assertNotNull(discreteCNAProfile);
         HashMap<Long, HashMap<Integer, String>> beforeResult = DaoGeneticAlteration.getInstance().getGeneticAlterationMap(discreteCNAProfile.getGeneticProfileId(), null);
@@ -129,8 +118,8 @@ public class TestIncrementalCopyNumberAlterationImport extends IntegrationTestBa
         assertEquals(beforeCnaEventsSampleIds, beforeSampleIdToSampleCnaEvents.keySet());
 
         File dataFolder = new File("src/test/resources/incremental/copy_number_alteration/");
-        File metaFile = new File(dataFolder, this.metaFile);
-        File dataFile = new File(dataFolder, this.dataFile);
+        File metaFile = new File(dataFolder, metaFileName);
+        File dataFile = new File(dataFolder, dataFileName);
 
         /**
          * Test
@@ -217,24 +206,5 @@ public class TestIncrementalCopyNumberAlterationImport extends IntegrationTestBa
                     genePanel.getInternalId(),
                     DaoSampleProfile.getPanelId(sampleId, discreteCNAProfile.getGeneticProfileId()));
         }
-    }
-
-    private TestContextManager testContextManager;
-
-    private PlatformTransactionManager transactionManager;
-
-    private TransactionStatus transactionStatus;
-    @Before
-    public void before() throws Exception {
-        this.testContextManager = new TestContextManager(getClass());
-        this.testContextManager.prepareTestInstance(this);
-        this.transactionManager = this.testContextManager.getTestContext().getApplicationContext().getBean(PlatformTransactionManager.class);
-        this.transactionStatus = transactionManager.getTransaction(new DefaultTransactionDefinition());
-        DaoCancerStudy.reCacheAll();
-    }
-
-    @After
-    public void after() {
-        this.transactionManager.rollback(transactionStatus);
     }
 }

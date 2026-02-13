@@ -22,23 +22,21 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegmentFile;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.ClinicalData;
 import org.mskcc.cbio.portal.model.CopyNumberSegment;
 import org.mskcc.cbio.portal.model.CopyNumberSegmentFile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -51,8 +49,6 @@ import static org.junit.Assert.assertNotNull;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestBase {
 
     /**
@@ -71,7 +67,7 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
         copyNumberSegmentFile.description = "test seg file description";
         DaoCopyNumberSegmentFile.addCopyNumberSegmentFile(copyNumberSegmentFile);
         DaoClinicalData.addSampleDatum(segDataSample.getInternalId(), "FRACTION_GENOME_ALTERED", "TEST");
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
         CopyNumberSegment copyNumberSegment = new CopyNumberSegment(
                 cancerStudy.getInternalId(),
                 segDataSample.getInternalId(),
@@ -82,7 +78,7 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
                 0.01);
         copyNumberSegment.setSegId(1L);
         DaoCopyNumberSegment.addCopyNumberSegment(copyNumberSegment);
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
         File dataFolder = new File("src/test/resources/incremental/copy_number_alteration/");
         File metaFile = new File(dataFolder, "meta_cna_seg.txt");
@@ -105,7 +101,7 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
         List<ClinicalData> clinicalData = DaoClinicalData.getSampleData(cancerStudy.getInternalId(), Set.of(segSampleId));
         ClinicalData fractionGenomeAltered = clinicalData.stream()
                 .filter(cd -> "FRACTION_GENOME_ALTERED".equals(cd.getAttrId())).findFirst().get();
-        assertEquals("0.0000", fractionGenomeAltered.getAttrVal());
+        assertEquals("0.0", fractionGenomeAltered.getAttrVal());
     }
 
     public static final String STUDY_ID = "study_tcga_pub";
