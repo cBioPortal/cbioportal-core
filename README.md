@@ -103,6 +103,16 @@ Use Maven to run the integration tests. Ensure you are in the root directory of 
 mvn integration-test
 ```
 
+## Database integrity during data update
+During data update operations, the database will go through states which are inconsistent / invalid. For instance, derived tables
+will not be updated properly to reflect changes which occur during study update, incremental update, or patient/sample removal.
+(the names of derived tables can be seen in the script
+[here](https://raw.githubusercontent.com/cBioPortal/cbioportal/refs/heads/master/src/main/resources/db-scripts/clickhouse/clickhouse.sql) )
+These derived tables will need to be reconstructed after primary updates are completed. It is recommended that websites be taken
+offline during update if only a single Clickhouse database is in use. For deployments which use two databases (blue/green) described
+in the indirect update approach [here](scripts/clickhouse_import_support/README.md), the derived table creation step will need to be
+re-run in the standby database after all updates to the standby database are completed.
+
 ## Development
 
 ### Prerequisites

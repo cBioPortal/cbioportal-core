@@ -45,7 +45,6 @@ from .cbioportal_common import run_java
 from .cbioportal_common import UPDATE_CASE_LIST_CLASS
 from .cbioportal_common import INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
 
-
 # ------------------------------------------------------------------------------
 # globals
 
@@ -115,7 +114,19 @@ def remove_samples(jvm_args, study_ids, sample_ids):
     args.append(study_ids)
     args.append("--sample_ids")
     args.append(sample_ids)
-    run_java(*args)
+    try:
+        run_java(*args)
+    except JavaRunException as jre:
+        LOGGER.error('an error occurred during the java process which removes samples from the database.')
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+        LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+        LOGGER.error('  %s' % ('-' * 70))
+        LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
+        LOGGER.error('  samples in \'profile_sample\'. Should something go wrong during this process, an effort is made to restore')
+        LOGGER.error('  the database to a consistent state. However, you may want to take the extra precaution of deleting the')
+        LOGGER.error('  entire study, and then reimporting the entire study with all needed updates included.')
+        LOGGER.error('  %s' % ('-' * 70))
+        raise jre
 
 def remove_patients(jvm_args, study_ids, patient_ids):
     args = jvm_args.split(' ')
@@ -338,7 +349,7 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
                     'Multiple resource definition files found: {} and {}'.format(
                         resource_definition_filepair[0], meta_filename))   # pylint: disable=unsubscriptable-object
             resource_definition_filepair = (
-                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))            
+                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))
         # Check for sample attributes
         elif meta_file_type == MetaFileTypes.SAMPLE_ATTRIBUTES:
             if sample_attr_filepair is not None:
@@ -496,7 +507,20 @@ def import_incremental_data(jvm_args, data_directory, update_generic_assay_entit
         for meta_pair in meta_pairs:
             meta_filename, meta_dictionary = meta_pair
             data_filename = os.path.join(data_directory, meta_dictionary['data_filename'])
-            import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
+            try:
+                import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
+            except JavaRunException as jre:
+                if meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
+                    LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
+                    LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+                    LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+                    LOGGER.error('  %s' % ('-' * 70))
+                    LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
+                    LOGGER.error('  samples in \'profile_sample\'. Should something go wrong during this process, an effort is made to restore')
+                    LOGGER.error('  the database to a consistent state. However, you may want to take the extra precaution of deleting the')
+                    LOGGER.error('  entire study, and then reimporting the entire study with all needed updates included.')
+                    LOGGER.error('  %s' % ('-' * 70))
+                raise jre
 
 def update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files):
     """
@@ -537,7 +561,6 @@ def check_args(command):
     if command not in COMMANDS:
         usage()
         sys.exit(2)
-
 
 def check_files(meta_filename, data_filename):
     if meta_filename and not os.path.exists(meta_filename):
@@ -600,7 +623,7 @@ def interface(args=None):
     add_parser_args(parser)
     parser.add_argument('-id', '--study_ids', type=str, required=False,
                         help='Cancer Study IDs for `remove-study` command, comma separated')
-    
+
     parser.add_argument('-update', '--update_generic_assay_entity', type=str, required=False,
                         help='Set as True to update the existing generic assay entities, set as False to keep the existing generic assay entities for generic assay')
     # TODO - add same argument to metaimporter
@@ -613,7 +636,6 @@ def interface(args=None):
     elif parser.subcommand is not None:
         parser.command = parser.subcommand
     return parser
-
 
 def locate_jar():
     """Locate the scripts jar file relative to this script.
@@ -633,7 +655,18 @@ def locate_jar():
             'Expected to find 1 scripts-*.jar, but found ' + str(len(jars)))
     return str(jars[0])
 
-
+def print_need_to_update_derived_tables_warning():
+    """Warns user to re-derive the derived tables."""
+    BOLD = '\033[1m'
+    END = '\033[0m'
+    rederive_warning_msg = BOLD + \
+            'The database has been altered. It is now necessary to reconstitute\n' + \
+            'the derived tables before using the database with the cBioPortal\n' + \
+            'web application. See this page for more details:\n' + \
+            'https://github.com/cBioPortal/cbioportal-core/blob/main/scripts/clickhouse_import_support/README.md' + \
+            END
+    LOGGER.warning(rederive_warning_msg)
+    
 def main(args):
     global LOGGER
 
@@ -691,6 +724,7 @@ def main(args):
             args.patient_ids if hasattr(args, 'patient_ids') else None,
             args.sample_ids if hasattr(args, 'sample_ids') else None,
             args.update_generic_assay_entity)
+        print_need_to_update_derived_tables_warning()
 
 # ------------------------------------------------------------------------------
 # ready to roll
