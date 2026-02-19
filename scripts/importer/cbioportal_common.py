@@ -4,7 +4,6 @@
 # Common components used by various cbioportal scripts.
 # ------------------------------------------------------------------------------
 
-
 import os
 import sys
 import csv
@@ -18,7 +17,6 @@ pymysql.install_as_MySQLdb()
 
 # MySQLdb import should come after the install_as_MySQLdb() line above
 import MySQLdb
-
 
 # ------------------------------------------------------------------------------
 # globals
@@ -91,6 +89,11 @@ class MetaFileTypes(object):
     STUDY_RESOURCES = 'meta_resource_study'
     RESOURCES_DEFINITION = 'meta_resource_definition'
 
+# class to hold information about a failed java process execution
+class JavaRunException(Exception):
+    def __init__(self, process_return_status, message):
+        self.process_return_status = process_return_status
+        self.message = message
 
 # fields allowed in each meta file type, maps to True if required
 META_FIELD_MAP = {
@@ -513,7 +516,6 @@ class ValidationMessageFormatter(logging.Formatter):
                 field_name)
         return attr_indicator
 
-
 class LogfileStyleFormatter(ValidationMessageFormatter):
 
     """Formatter for validation messages in a simple one-per-line format."""
@@ -530,7 +532,6 @@ class LogfileStyleFormatter(ValidationMessageFormatter):
     def format(self, record):
 
         """Generate descriptions for optional fields and format the record."""
-
 
         if not hasattr(record, 'filename_'):
             record.file_indicator = '-'
@@ -568,7 +569,6 @@ class LogfileStyleFormatter(ValidationMessageFormatter):
         self.previous_filename = current_filename
 
         return formatted_result
-
 
 class CollapsingLogMessageHandler(logging.handlers.MemoryHandler):
 
@@ -642,7 +642,6 @@ class CollapsingLogMessageHandler(logging.handlers.MemoryHandler):
         """Collapse and flush every time a debug message is emitted."""
         return (record.levelno == logging.DEBUG or
                 super(CollapsingLogMessageHandler, self).shouldFlush(record))
-
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -733,7 +732,6 @@ def get_meta_file_type(meta_dictionary, logger, filename):
         logger.error('Could not determine the file type. Did not find expected meta file fields. Please check your meta files for correct configuration.',
                          extra={'filename_': filename})
     return result
-
 
 def validate_types_and_id(meta_dictionary, logger, filename):
     """
@@ -883,7 +881,6 @@ def parse_metadata_file(filename,
         # if type could not be inferred, no further validations are possible
         if meta_file_type is None:
             return dict(meta_dictionary)
-
 
     # Check for missing fields for this specific meta file type
     missing_fields = []
@@ -1054,7 +1051,6 @@ def parse_metadata_file(filename,
 
     return meta_dictionary
 
-
 def run_java(*args):
     java_home = os.environ.get('JAVA_HOME', '')
     if java_home:
@@ -1074,16 +1070,14 @@ def run_java(*args):
     ret.append(process.returncode)
     # if cmd line parameters error:
     if process.returncode == 64 or process.returncode == 2:
-        raise RuntimeError('Aborting. Step failed due to wrong parameters passed to subprocess.')
+        raise JavaRunException(process.returncode, 'Aborting. Step failed due to wrong parameters passed to subprocess.')
     # any other error:
     elif process.returncode != 0:
-        raise RuntimeError('Aborting due to error while executing step.')
+        raise JavaRunException(process.returncode, 'Aborting due to error while executing step.')
     return ret
-
 
 def properties_error_message(display_name: str, property_name: str) -> str:
     return f"No {display_name} provided for database connection. Please set '{property_name}' in application.properties."
-
 
 class PortalProperties(object):
     """ Properties object class, just has fields for db conn """
@@ -1092,7 +1086,6 @@ class PortalProperties(object):
         self.database_user = database_user
         self.database_pw = database_pw
         self.database_url = database_url
-
 
 def get_database_properties(properties_filename: str) -> Optional[PortalProperties]:
 
@@ -1126,7 +1119,6 @@ def get_database_properties(properties_filename: str) -> Optional[PortalProperti
                             properties[PORTAL_PROPERTY_SPRING_DATABASE_PW],
                             properties[PORTAL_PROPERTY_SPRING_DATABASE_URL])
 
-
 def parse_properties_file(properties_filename: str) -> Dict[str, str]:
 
     if not os.path.exists(properties_filename):
@@ -1149,7 +1141,6 @@ def parse_properties_file(properties_filename: str) -> Dict[str, str]:
                 continue
             properties[name] = value.strip()
     return properties
-
 
 def get_db_cursor(portal_properties: PortalProperties):
 
