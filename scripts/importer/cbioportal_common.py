@@ -109,7 +109,8 @@ META_FIELD_MAP = {
         'groups': False,
         'add_global_case_list': False,
         'tags_file': False,
-        'reference_genome': False
+        'reference_genome': False,
+        'ncbi_build': False
     },
     MetaFileTypes.SAMPLE_ATTRIBUTES: {
         'cancer_study_identifier': True,

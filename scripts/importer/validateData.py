@@ -4805,6 +4805,12 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
                         meta_dictionary['add_global_case_list'].lower() == 'true'):
                     case_list_suffix_fns['all'] = filename
 
+            # Check for ncbi_build in meta file
+            if 'ncbi_build' in meta_dictionary:
+                portal_instance.ncbi_build = meta_dictionary['ncbi_build'].strip()
+                logger.info('Setting NCBI build to %s' % portal_instance.ncbi_build,
+                            extra={'filename_': filename})
+
             # if reference_genome is specified in the meta file, override the defaults in portal properties
             if 'reference_genome' in meta_dictionary:
                 if meta_dictionary['reference_genome'] not in reference_genome_map:
@@ -4816,11 +4822,21 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
                                  })
                 else:
                     genome_info = reference_genome_map[meta_dictionary['reference_genome']]
-                    logger.info('Setting reference genome to %s (%s, %s)' % genome_info,
+                    # logger.info('Setting reference genome to %s (%s, %s)' % genome_info,
+                    #             extra={'filename_': filename})
+                    portal_instance.species, map_build, portal_instance.reference_genome = genome_info
+
+                    # Only update ncbi_build if it wasn't explicitly set in step 1
+                    if 'ncbi_build' not in meta_dictionary:
+                        portal_instance.ncbi_build = map_build
+                    
+                    logger.info('Setting reference genome to %s (%s, %s)' % 
+                                (portal_instance.species, portal_instance.ncbi_build, portal_instance.reference_genome),
                                 extra={'filename_': filename})
-                    portal_instance.species, portal_instance.ncbi_build, portal_instance.reference_genome = genome_info
             else:
-                logger.info('No reference genome specified -- using default (hg19)',
+                # Use the actual values from the portal instance instead of assuming hg19
+                logger.info('No reference genome specified -- using default (%s, %s)' % 
+                            (portal_instance.ncbi_build, portal_instance.reference_genome),
                             extra={'filename_': filename})
 
             # Validate PMID field in meta_study
