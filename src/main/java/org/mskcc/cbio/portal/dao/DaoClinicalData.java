@@ -55,12 +55,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Data Access Object for `clinical` table
  *
  * @author Gideon Dresdner dresdnerg@cbio.mskcc.org
  */
 public final class DaoClinicalData {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcDataSource.class);
 
     public static final String SAMPLE_ATTRIBUTES_TABLE = "clinical_sample";
     public static final String PATIENT_ATTRIBUTES_TABLE = "clinical_patient";
@@ -764,6 +769,10 @@ public final class DaoClinicalData {
 
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+            LOG.info("" + internalPatientIdAttributes.size());
+            LOG.info("SELECT internal_id, attr_id FROM `"
+                    + tableName + "` WHERE (internal_id, attr_id) IN ("
+                    + String.join(",", Collections.nCopies(internalPatientIdAttributes.size(), "(?, ?)")) + ")");
             pstmt = con.prepareStatement("SELECT internal_id, attr_id FROM `"
                     + tableName + "` WHERE (internal_id, attr_id) IN ("
                     + String.join(",", Collections.nCopies(internalPatientIdAttributes.size(), "(?, ?)")) + ")");
