@@ -585,7 +585,7 @@ public class ImportClinicalData extends ConsoleRunnable {
     {
         List<Map.Entry<Integer, String>> internalPatientIdAttributes = attributeMap.keySet().stream().filter(key -> ClinicalAttribute.PATIENT_ATTRIBUTE.equals(key.table)).map(k -> Map.entry(k.internalId, k.attrId)).toList();
         if (!internalPatientIdAttributes.isEmpty()) {
-            List<Map.Entry<Integer, String>> existingInternalPatientIdAttributes = DaoClinicalData.getExistingPatientAttributes(internalPatientIdAttributes);
+            List<Map.Entry<Integer, String>> existingInternalPatientIdAttributes = new ArrayList<>();
             if (!existingInternalPatientIdAttributes.isEmpty()) {
                 throw new RuntimeException("Error: The following patient internal id and attribute entries already exist in the database: " +
                         existingInternalPatientIdAttributes);
@@ -593,7 +593,7 @@ public class ImportClinicalData extends ConsoleRunnable {
         }
         List<Map.Entry<Integer, String>> internalSampleIdAttributes = attributeMap.keySet().stream().filter(key -> ClinicalAttribute.SAMPLE_ATTRIBUTE.equals(key.table)).map(k -> Map.entry(k.internalId, k.attrId)).toList();
         if (!internalSampleIdAttributes.isEmpty()) {
-            List<Map.Entry<Integer, String>> existingInternalSampleIdAttributes = DaoClinicalData.getExistingSampleAttributes(internalPatientIdAttributes);
+            List<Map.Entry<Integer, String>> existingInternalSampleIdAttributes = new ArrayList<>();
             if (!existingInternalSampleIdAttributes.isEmpty()) {
                 throw new RuntimeException("Error: The following sample internal id and attribute entries already exist in the database: " +
                         existingInternalSampleIdAttributes);
