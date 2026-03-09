@@ -77,6 +77,10 @@ public final class DaoCopyNumberSegment {
      */
 
     public static void createFractionGenomeAlteredClinicalData(int cancerStudyId, Set<Integer> sampleIds, boolean updateMode) throws DaoException {
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert Fraction Genome Altered");
+        }
+
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
