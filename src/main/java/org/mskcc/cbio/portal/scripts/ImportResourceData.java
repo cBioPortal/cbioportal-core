@@ -27,12 +27,14 @@ import org.mskcc.cbio.portal.util.StableIdUtil;
 public class ImportResourceData extends ConsoleRunnable {
 
     public static final String DELIMITER = "\t";
-    public static final String METADATA_PREFIX = "#";
+    public static final String COMMENT_PREFIX = "#";
     public static final String SAMPLE_ID_COLUMN_NAME = "SAMPLE_ID";
     public static final String PATIENT_ID_COLUMN_NAME = "PATIENT_ID";
     public static final String RESOURCE_ID_COLUMN_NAME = "RESOURCE_ID";
     public static final String URL_COLUMN_NAME = "URL";
     public static final String SAMPLE_TYPE_COLUMN_NAME = "SAMPLE_TYPE";
+    public static final String METADATA_COLUMN_NAME = "METADATA";
+    public static final String GROUP_PATH_COLUMN_NAME = "GROUP_PATH";
     private int numSampleSpecificResourcesAdded = 0;
     private int numPatientSpecificResourcesAdded = 0;
     private int numStudySpecificResourcesAdded = 0;
@@ -136,7 +138,7 @@ public class ImportResourceData extends ConsoleRunnable {
     }
 
     private boolean skipLine(String line) {
-        return (line.isEmpty() || line.substring(0, 1).equals(METADATA_PREFIX));
+        return (line.isEmpty() || line.substring(0, 1).equals(COMMENT_PREFIX));
     }
 
     /**
@@ -216,24 +218,29 @@ public class ImportResourceData extends ConsoleRunnable {
             }
         }
 
+        int metadataIndex = findMetadataColumn(headerIndexMap);
+        int groupPathIndex = findGroupPathColumn(headerIndexMap);
+        String metadata = (metadataIndex >= 0 && !MissingValues.has(fields[metadataIndex])) ? fields[metadataIndex] : null;
+        String groupPath = (groupPathIndex >= 0 && !MissingValues.has(fields[groupPathIndex])) ? fields[groupPathIndex] : null;
+
         // if the resource id or url matches one of the missing values, skip this resource:
         if ((resourceIdIndex != -1 && MissingValues.has(fields[resourceIdIndex])) || (urlIndex != -1 && MissingValues.has(fields[urlIndex]))) {
             numEmptyResourcesSkipped++;
         } else {
             // if patient_id column exists and resource type is patient
             if (getResourceType() == ResourceType.PATIENT && internalPatientId != -1) {
-                validateAddDatum(internalPatientId, stablePatientId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.PATIENT, patientResourceIdSet, resourceMap);
-            } 
+                validateAddDatum(internalPatientId, stablePatientId, fields[resourceIdIndex], fields[urlIndex],
+                        ResourceType.PATIENT, patientResourceIdSet, resourceMap, metadata, groupPath);
+            }
             // if sample_id column exists and resource type is sample
             else if (getResourceType() == ResourceType.SAMPLE && internalSampleId != -1) {
-                validateAddDatum(internalSampleId, stableSampleId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap);
+                validateAddDatum(internalSampleId, stableSampleId, fields[resourceIdIndex], fields[urlIndex],
+                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap, metadata, groupPath);
             }
             // if resource type is study
             else if (getResourceType() == ResourceType.STUDY) {
-                validateAddDatum(cancerStudy.getInternalId(), cancerStudy.getCancerStudyStableId(), fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.STUDY, studyResourceIdSet, resourceMap);
+                validateAddDatum(cancerStudy.getInternalId(), cancerStudy.getCancerStudyStableId(), fields[resourceIdIndex], fields[urlIndex],
+                        ResourceType.STUDY, studyResourceIdSet, resourceMap, metadata, groupPath);
             }
         }
         return true;
@@ -265,6 +272,14 @@ public class ImportResourceData extends ConsoleRunnable {
 
     private int findSampleTypeColumn(Map<String, Integer> headerIndexMap) {
         return findColumnIndexInHeaders(SAMPLE_TYPE_COLUMN_NAME, headerIndexMap);
+    }
+
+    private int findMetadataColumn(Map<String, Integer> headerIndexMap) {
+        return findColumnIndexInHeaders(METADATA_COLUMN_NAME, headerIndexMap);
+    }
+
+    private int findGroupPathColumn(Map<String, Integer> headerIndexMap) {
+        return findColumnIndexInHeaders(GROUP_PATH_COLUMN_NAME, headerIndexMap);
     }
 
     private int findColumnIndexInHeaders(String columnHeader, Map<String, Integer> headerIndexMap) {
@@ -324,7 +339,7 @@ public class ImportResourceData extends ConsoleRunnable {
         return (sampleId != null && !sampleId.isEmpty());
     }
 
-    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap) throws Exception {
+    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap, String metadata, String groupPath) throws Exception {
         // throw exception if resource definition is not exist in the database
         if (!resourceSet.contains(resourceId)) {
             throw new RuntimeException("Error: " + resourceType.toString().toLowerCase() + " " + stableId
@@ -334,7 +349,7 @@ public class ImportResourceData extends ConsoleRunnable {
         // The resourceMap makes sure a pair of (internalId/resource_id/url) is unique
         // added to the DB if there are no duplicates,
         if (!resourceMap.containsKey(internalId, resourceId, resourceURL)) {
-            addDatum(internalId, resourceId, resourceURL,resourceType);
+            addDatum(internalId, resourceId, resourceURL, resourceType, metadata, groupPath);
             resourceMap.put(internalId, resourceId, resourceURL, resourceURL);
         }
         // handle duplicates
@@ -351,18 +366,19 @@ public class ImportResourceData extends ConsoleRunnable {
     }
 
     // add datum for patient, sample and study resources
-    private void addDatum(int internalId, String resourceId, String resourceURL, ResourceType resourceType) throws Exception {
+    private void addDatum(int internalId, String resourceId, String resourceURL, ResourceType resourceType, String metadata, String groupPath) throws Exception {
         // if bulk loading is ever turned off, we need to check if
-        // resource value exists and if so, perfom an update
+        // resource value exists and if so, perform an update
+        int cancerStudyId = cancerStudy.getInternalId();
         if (resourceType.equals(ResourceType.PATIENT)) {
             numPatientSpecificResourcesAdded++;
-            DaoResourceData.addPatientDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addPatientDatum(internalId, cancerStudyId, resourceId, resourceId, resourceURL, metadata, groupPath);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
-            DaoResourceData.addSampleDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addSampleDatum(internalId, cancerStudyId, resourceId, resourceId, resourceURL, metadata, groupPath);
         } else {
             numStudySpecificResourcesAdded++;
-            DaoResourceData.addStudyDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addStudyDatum(internalId, cancerStudyId, resourceId, resourceId, resourceURL, metadata, groupPath);
         }
     }
 
