@@ -1,0 +1,4 @@
+PATIENT_ID	RESOURCE_ID	URL	DISPLAY_NAME	TYPE	GROUP_PATH	METADATA	PRIORITY
+TCGA-A2-A04P	PATIENT_NOTES	http://url-to-patient-notes-patient1	Valid JSON	CT	2023	{"modality":"CT","slices":120}	0
+TCGA-A1-A0SK	PATIENT_NOTES	http://url-to-patient-notes-patient2	Invalid JSON	CT	2023	{"modality":"CT","slices":120,}	0
+TCGA-A2-A0CM	PATIENT_NOTES	http://url-to-patient-notes-patient3	Empty Metadata	CT	2023		0
