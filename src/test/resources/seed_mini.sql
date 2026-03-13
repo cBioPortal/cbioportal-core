@@ -704,3 +704,10 @@ INSERT INTO authorities (EMAIL,AUTHORITY) values ('Lonnie@openid.org','ROLE_USER
 INSERT INTO authorities (EMAIL,AUTHORITY) values ('Dhorak@yahoo.com','ROLE_USER');
 INSERT INTO authorities (EMAIL,AUTHORITY) values ('Dhorak@yahoo.com','ROLE_MANAGER');
 
+-- clinical_attribute_meta
+INSERT INTO clinical_attribute_meta (ATTR_ID, DISPLAY_NAME, DESCRIPTION, DATATYPE, PATIENT_ATTRIBUTE, PRIORITY, CANCER_STUDY_ID) VALUES ('MUTATION_COUNT', 'Mutation Count', 'Number of mutations in the sample', 'NUMBER', 0, 1, 1);
+INSERT INTO clinical_attribute_meta (ATTR_ID, DISPLAY_NAME, DESCRIPTION, DATATYPE, PATIENT_ATTRIBUTE, PRIORITY, CANCER_STUDY_ID) VALUES ('FRACTION_GENOME_ALTERED', 'Fraction Genome Altered', 'Fraction of the genome that is altered in the sample', 'NUMBER', 0, 1, 1);
+
+-- clinical_sample_attribute
+INSERT INTO clinical_sample(INTERNAL_ID, ATTR_ID, ATTR_VALUE) VALUES (6, 'MUTATION_COUNT', '0');
+INSERT INTO clinical_sample(INTERNAL_ID, ATTR_ID, ATTR_VALUE) VALUES (6, 'FRACTION_GENOME_ALTERED', '0');

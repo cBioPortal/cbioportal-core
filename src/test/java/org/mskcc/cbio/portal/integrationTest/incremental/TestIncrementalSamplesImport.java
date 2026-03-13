@@ -169,10 +169,13 @@ public class TestIncrementalSamplesImport {
         List<ClinicalData> clinicalData = DaoClinicalData.getSampleData(cancerStudy.getInternalId(), List.of(UPDATE_TCGA_SAMPLE_ID));
         Map<String, String> sampleAttrs = clinicalData.stream().collect(Collectors.toMap(ClinicalData::getAttrId, ClinicalData::getAttrVal));
         assertEquals(Map.of(
+                "FRACTION_GENOME_ALTERED", "0",
+                "MUTATION_COUNT", "0",
                 "OS_STATUS", "1:DECEASED",
                 "OS_MONTHS", "45.67",
                 "DFS_STATUS", "1:Recurred/Progressed",
-                "DFS_MONTHS", "123"), sampleAttrs);
+                "DFS_MONTHS", "123"
+                ), sampleAttrs);
 
         /**
          * Sub-entries stayed as they were, not removed.

@@ -53,7 +53,8 @@ public final class DaoClinicalData {
     private static final String SAMPLE_ATTRIBUTES_INSERT = "INSERT INTO " + SAMPLE_ATTRIBUTES_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
     private static final String PATIENT_ATTRIBUTES_INSERT = "INSERT INTO " + PATIENT_ATTRIBUTES_TABLE + "(`INTERNAL_ID`,`ATTR_ID`,`ATTR_VALUE`) VALUES(?,?,?)";
 
-    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `INTERNAL_ID` = ?";
+    //MUTATION_COUNT and FRACTION_GENOME_ALTERED attributes are calculated from mutation and CN segment data and should not be deleted when clinical data is updated for a sample, so we exclude them from the delete statement
+    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `INTERNAL_ID` = ? AND `ATTR_ID` NOT IN ('MUTATION_COUNT', 'FRACTION_GENOME_ALTERED')";
 
     private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `INTERNAL_ID` = ?";
     private static final Map<String, String> sampleAttributes = new HashMap<String, String>();
