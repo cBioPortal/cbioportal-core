@@ -103,6 +103,9 @@ function output_database_currently_in_production() {
 
 function main() {
     local properties_filepath=$1
+    if grep -q "^clickhouse_update_management_database" "$properties_filepath" 2>/dev/null ; then
+        exec "$(dirname "$(readlink -f "$0")")/get_database_currently_in_production_clickhouse.sh" "$properties_filepath"
+    fi
     local exit_status=0
     if ! initialize_main "$properties_filepath" ||
             ! process_state_table_is_valid ||
