@@ -17,6 +17,8 @@ unset this_script_dir
 unset my_properties
 unset update_management_database_name
 update_management_database_name=""
+unset portal_database_name
+portal_database_name=""
 unset database_currently_in_production
 database_currently_in_production=""
 declare -A my_properties
@@ -67,6 +69,12 @@ function initialize_main() {
         usage
         return 1
     fi
+    portal_database_name="${my_properties['portal_database_name']}"
+    if [ -z "$portal_database_name" ] ; then
+        echo "Error : portal_database_name not found in properties file" >&2
+        usage
+        return 1
+    fi
     if ! write_clickhouse_config_file_for_update_management ; then
         usage
         return 1
@@ -86,6 +94,7 @@ function shutdown_main_and_clean_up() {
     delete_output_stream_files
     unset my_properties
     unset update_management_database_name
+    unset portal_database_name
     unset database_currently_in_production
     unset record_count_filepath
     unset current_production_database_filepath
@@ -107,22 +116,22 @@ function process_state_table_is_valid() {
         echo "Error : could not proceed with getting production database because table 'update_status' does not exist in database : $update_management_database_name" >&2
         return 1
     fi
-    local get_record_count_statement="SELECT count(*) FROM \`$update_management_database_name\`.update_status"
+    local get_record_count_statement="SELECT count(*) FROM \`$update_management_database_name\`.update_status WHERE portal_database = '$portal_database_name'"
     if ! execute_sql_statement_via_clickhouse_client "$get_record_count_statement" "$record_count_filepath" ; then
         echo "Error : could not validate process_state table. Clickhouse statement failed : $get_record_count_statement" >&2
         return 1
     fi
     set_clickhouse_sql_data_array_from_file "$record_count_filepath" 0
     local rowcount="${sql_data_array[0]}"
-    if [[ "$rowcount" -ne 1 ]] ; then
-        echo "Error : database $update_management_database_name contains $rowcount rows instead of exactly 1 row as expected." >&2
+    if [[ "$rowcount" -eq 0 ]] ; then
+        echo "Error : no row found in $update_management_database_name.update_status for portal_database = '$portal_database_name'" >&2
         return 1
     fi
     return 0
 }
 
 function get_database_currently_in_production() {
-    local get_current_database_statement="SELECT current_database_in_production FROM \`$update_management_database_name\`.update_status LIMIT 1"
+    local get_current_database_statement="SELECT current_database_in_production FROM \`$update_management_database_name\`.update_status WHERE portal_database = '$portal_database_name' LIMIT 1"
     if ! execute_sql_statement_via_clickhouse_client "$get_current_database_statement" "$current_production_database_filepath" ; then
         echo "Error : could not retrieve the current database in production. Clickhouse statement failed : $get_current_database_statement" >&2
         return 1
