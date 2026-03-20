@@ -123,6 +123,9 @@ function set_state_in_status_table() {
 function main() {
     local properties_filepath=$1
     local state=$2
+    if grep -q "^clickhouse_update_management_database" "$properties_filepath" 2>/dev/null ; then
+        exec "$(dirname "$(readlink -f "$0")")/set_update_process_state_clickhouse.sh" "$properties_filepath" "$state"
+    fi
     local exit_status=0
     if ! initialize_main "$properties_filepath" "$state" ||
             ! process_state_table_is_valid ||
