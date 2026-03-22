@@ -219,7 +219,7 @@ function clickhouse_database_exists() {
 
 function clickhouse_database_is_empty() {
     local database_name=$1
-    local statement="SELECT COUNT(*) FROM INFORMATION_SCHEMA.tables WHERE table_schema='$database_name'"
+    local statement="SELECT COUNT(*) FROM system.tables WHERE database = '$database_name'"
     if ! execute_sql_statement_via_clickhouse_client "$statement" "$clickhouse_client_database_table_list_filepath" ; then
         echo "Warning : unable to retrieve table/view list from database $database_name using : $statement" >&2
         return 1
