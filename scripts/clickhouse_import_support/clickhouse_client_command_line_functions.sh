@@ -63,6 +63,7 @@ function shutdown_clickhouse_client_command_line_functions() {
 function execute_sql_statement_via_clickhouse_client() {
     local statement=$1
     local output_filepath=$2
+    echo "Executing clickhouse statement : $statement"
     if [ -e "$output_filepath" ] && ! rm -f "$output_filepath" ; then
         echo "Error : could not overwrite existing output file $output_filepath when executing mysql statment $statement" >&2
     fi

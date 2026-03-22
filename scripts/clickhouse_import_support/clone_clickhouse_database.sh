@@ -167,7 +167,11 @@ function copy_source_database_table_data_to_destination() {
 
 function destination_table_matches_source_table() {
     local table_name=$1
-    local statement="SELECT (SELECT count(*) FROM \`$destination_database_name\`.\`$table_name\`) = (SELECT count(*) FROM \`$source_database_name\`.\`$table_name\`)"
+    # SETTINGS select_sequential_consistency = 1 ensures that count(*) sees all
+    # inserted rows even on ClickHouse Cloud (SharedMergeTree / S3-backed), where
+    # reads are eventually consistent and a count(*) immediately after INSERT may
+    # otherwise return a stale result.
+    local statement="SELECT (SELECT count(*) FROM \`$destination_database_name\`.\`$table_name\`) = (SELECT count(*) FROM \`$source_database_name\`.\`$table_name\`), (SELECT count(*) FROM \`$source_database_name\`.\`$table_name\`), (SELECT count(*) FROM \`$destination_database_name\`.\`$table_name\`) SETTINGS select_sequential_consistency = 1"
     if ! execute_sql_statement_via_clickhouse_client "$statement" "$record_count_comparison_filepath" ; then
         echo "Warning : failed to execute clickhouse statement : $statement" >&2
         return 1
@@ -175,7 +179,13 @@ function destination_table_matches_source_table() {
     unset sql_data_array
     set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 0
     if [[ "${sql_data_array[0]}" -ne 1 ]] ; then
-        echo "Error : when cloning data from table $table_name, source database and destination database tables contain different record counts" >&2
+        local source_count
+        local destination_count
+        set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 1
+        source_count="${sql_data_array[0]}"
+        set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 2
+        destination_count="${sql_data_array[0]}"
+        echo "Error : when cloning data from table $table_name, source database and destination database tables contain different record counts (source: $source_count, destination: $destination_count)" >&2
         return 1
     fi
     return 0
