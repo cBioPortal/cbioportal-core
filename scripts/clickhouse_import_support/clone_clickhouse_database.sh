@@ -172,6 +172,7 @@ function destination_table_matches_source_table() {
         echo "Warning : failed to execute clickhouse statement : $statement" >&2
         return 1
     fi
+    unset sql_data_array
     set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 0
     if [[ "${sql_data_array[0]}" -ne 1 ]] ; then
         echo "Error : when cloning data from table $table_name, source database and destination database tables contain different record counts" >&2
