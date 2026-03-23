@@ -205,6 +205,9 @@ function clone_all_source_database_tables_to_destination_database() {
             echo "Error : could not copy data from table $table_name into destination database" >&2
             return 1
         fi
+        # cbioportal_sequence_state is backed by a SharedReplacingMergeTree and
+        # INSERT INTO ... SELECT * FROM ... may not always yield the same record count
+        # because of deduplication.
         if [ "$table_name" != "cbioportal_sequence_state" ] ; then
             if ! destination_table_matches_source_table "$table_name" ; then
                 echo "Cloning operation canceled" >&2
