@@ -158,7 +158,7 @@ function create_destination_database_table_schema_only() {
 
 function copy_source_database_table_data_to_destination() {
     local table_name=$1
-    local statement="INSERT INTO \`$destination_database_name\`.\`$table_name\` SELECT * FROM \`$source_database_name\`.\`$table_name\` FINAL SETTINGS insert_deduplicate = 0"
+    local statement="INSERT INTO \`$destination_database_name\`.\`$table_name\` SELECT * FROM \`$source_database_name\`.\`$table_name\`"
     if ! execute_sql_statement_via_clickhouse_client "$statement" "$insert_table_data_result_filepath" ; then
         return 1
     fi
@@ -205,9 +205,11 @@ function clone_all_source_database_tables_to_destination_database() {
             echo "Error : could not copy data from table $table_name into destination database" >&2
             return 1
         fi
-        if ! destination_table_matches_source_table "$table_name" ; then
-            echo "Cloning operation canceled" >&2
-            return 1
+        if [ "$table_name" != "cbioportal_sequence_state" ] ; then
+            if ! destination_table_matches_source_table "$table_name" ; then
+                echo "Cloning operation canceled" >&2
+                return 1
+            fi
         fi
         pos=$(($pos+1))
     done
