@@ -60,7 +60,7 @@
 			<version>${cbioportal.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.cbioportal</groupId>
+			<groupId>io.github.cbioportal</groupId>
 			<artifactId>maf</artifactId>
 			<version>${maf.version}</version>
 		</dependency>
@@ -339,12 +339,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
-
-	<repositories>
-		<repository>
-			<id>jitpack.io</id>
-			<url>https://jitpack.io</url>
-		</repository>
-	</repositories>
 </project>
