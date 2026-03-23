@@ -158,7 +158,7 @@ function create_destination_database_table_schema_only() {
 
 function copy_source_database_table_data_to_destination() {
     local table_name=$1
-    local statement="INSERT INTO \`$destination_database_name\`.\`$table_name\` SELECT * FROM \`$source_database_name\`.\`$table_name\`"
+    local statement="INSERT INTO \`$destination_database_name\`.\`$table_name\` SELECT * FROM \`$source_database_name\`.\`$table_name\` FINAL SETTINGS insert_deduplicate = 0"
     if ! execute_sql_statement_via_clickhouse_client "$statement" "$insert_table_data_result_filepath" ; then
         return 1
     fi
