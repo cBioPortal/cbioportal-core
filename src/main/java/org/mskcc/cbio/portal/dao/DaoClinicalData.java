@@ -65,8 +65,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class DaoClinicalData {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JdbcDataSource.class);
-
     public static final String SAMPLE_ATTRIBUTES_TABLE = "clinical_sample";
     public static final String PATIENT_ATTRIBUTES_TABLE = "clinical_patient";
 
@@ -769,10 +767,6 @@ public final class DaoClinicalData {
 
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            LOG.info("" + internalPatientIdAttributes.size());
-            LOG.info("SELECT internal_id, attr_id FROM `"
-                    + tableName + "` WHERE (internal_id, attr_id) IN ("
-                    + String.join(",", Collections.nCopies(internalPatientIdAttributes.size(), "(?, ?)")) + ")");
             pstmt = con.prepareStatement("SELECT internal_id, attr_id FROM `"
                     + tableName + "` WHERE (internal_id, attr_id) IN ("
                     + String.join(",", Collections.nCopies(internalPatientIdAttributes.size(), "(?, ?)")) + ")");
