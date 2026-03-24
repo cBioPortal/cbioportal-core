@@ -146,7 +146,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             ClickHouseBulkLoader.bulkLoadOn();
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
-            ClickHouseBulkLoader.flushAll();
             DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
             ClickHouseBulkLoader.flushAll();
             ClickHouseBulkLoader.bulkLoadOff();
