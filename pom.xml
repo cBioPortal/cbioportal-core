@@ -321,14 +321,4 @@
 			</plugin>
 		</plugins>
 	</build>
-<<<<<<< HEAD
-
-	<repositories>
-		<repository>
-			<id>jitpack.io</id>
-			<url>https://jitpack.io</url>
-		</repository>
-	</repositories>
-=======
->>>>>>> c91f056 (Change GAV of MAF dependency from jitpack to mvn central)
 </project>
