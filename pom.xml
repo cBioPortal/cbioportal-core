@@ -18,10 +18,10 @@
 		<!-- THIS SHOULD BE KEPT IN SYNC TO VERSION IN CGDS.SQL -->
 		<db.version>2.14.5</db.version>
 		<cbioportal.version>v6.4.1</cbioportal.version>
+		<maf.version>1.0.0</maf.version>
 
 		<commons_lang3.version>3.13.0</commons_lang3.version>
 		<clickhouse_jdbc.version>0.6.4</clickhouse_jdbc.version>
-		<maf.version>1.0.0</maf.version>
 		<lz4.version>1.8.0</lz4.version>
 
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
@@ -44,6 +44,11 @@
 	<dependencies>
 		<!-- cBioPortal Projects -->
 		<dependency>
+			<groupId>io.github.cbioportal</groupId>
+			<artifactId>maf</artifactId>
+			<version>${maf.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>com.clickhouse</groupId>
 			<artifactId>clickhouse-jdbc</artifactId>
 			<version>${clickhouse_jdbc.version}</version>
@@ -52,11 +57,6 @@
 			<groupId>org.lz4</groupId>
 			<artifactId>lz4-java</artifactId>
 			<version>${lz4.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.github.cbioportal</groupId>
-			<artifactId>maf</artifactId>
-			<version>${maf.version}</version>
 		</dependency>
 
 		<!-- Apache Commons -->
@@ -143,12 +143,6 @@
 			<groupId>au.com.bytecode</groupId>
 			<artifactId>opencsv</artifactId>
 			<version>${opencsv.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>net.sf.jopt-simple</groupId>
-			<artifactId>jopt-simple</artifactId>
-			<version>5.0.4</version>
 		</dependency>
 
 		<!-- Testing -->
