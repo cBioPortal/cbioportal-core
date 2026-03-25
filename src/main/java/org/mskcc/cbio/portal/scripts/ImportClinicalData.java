@@ -303,7 +303,7 @@ public class ImportClinicalData extends ConsoleRunnable {
             String[] fieldValues = getFieldValues(line, columnAttrs);
             alreadyParsedAttributes.putAll(parseRowAttributes(fieldValues, columnAttrs, alreadyParsedAttributes));
         }
-        addClinicalDataIfNoDuplicates(alreadyParsedAttributes);
+        addClinicalData(alreadyParsedAttributes);
     }
 
     private boolean skipLine(String line)
@@ -581,24 +581,8 @@ public class ImportClinicalData extends ConsoleRunnable {
         return (sampleId != null && !sampleId.isEmpty());
     }
 
-    private void addClinicalDataIfNoDuplicates(Map<FullAttributeKey, String> attributeMap) throws Exception
+    private void addClinicalData(Map<FullAttributeKey, String> attributeMap) throws Exception
     {
-        List<Map.Entry<Integer, String>> internalPatientIdAttributes = attributeMap.keySet().stream().filter(key -> ClinicalAttribute.PATIENT_ATTRIBUTE.equals(key.table)).map(k -> Map.entry(k.internalId, k.attrId)).toList();
-        if (!internalPatientIdAttributes.isEmpty()) {
-            List<Map.Entry<Integer, String>> existingInternalPatientIdAttributes = new ArrayList<>();
-            if (!existingInternalPatientIdAttributes.isEmpty()) {
-                throw new RuntimeException("Error: The following patient internal id and attribute entries already exist in the database: " +
-                        existingInternalPatientIdAttributes);
-            }
-        }
-        List<Map.Entry<Integer, String>> internalSampleIdAttributes = attributeMap.keySet().stream().filter(key -> ClinicalAttribute.SAMPLE_ATTRIBUTE.equals(key.table)).map(k -> Map.entry(k.internalId, k.attrId)).toList();
-        if (!internalSampleIdAttributes.isEmpty()) {
-            List<Map.Entry<Integer, String>> existingInternalSampleIdAttributes = new ArrayList<>();
-            if (!existingInternalSampleIdAttributes.isEmpty()) {
-                throw new RuntimeException("Error: The following sample internal id and attribute entries already exist in the database: " +
-                        existingInternalSampleIdAttributes);
-            }
-        }
         for (Map.Entry<FullAttributeKey, String> entry : attributeMap.entrySet()) {
             FullAttributeKey key = entry.getKey();
             String value = entry.getValue();
