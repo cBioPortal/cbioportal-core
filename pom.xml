@@ -21,6 +21,7 @@
 
 		<commons_lang3.version>3.13.0</commons_lang3.version>
 		<clickhouse_jdbc.version>0.6.4</clickhouse_jdbc.version>
+		<maf.version>1.0.0</maf.version>
 		<lz4.version>1.8.0</lz4.version>
 
 		<commons_dbcp2.version>2.10.0</commons_dbcp2.version>
