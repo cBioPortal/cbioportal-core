@@ -50,6 +50,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Analogous to and replaces the old DaoCancerType. A CancerStudy has a NAME and
@@ -74,6 +76,8 @@ public final class DaoCancerStudy {
     private static final Map<String,CancerStudy> byStableId = new HashMap<String,CancerStudy>();
     private static final Map<Integer,CancerStudy> byInternalId = new HashMap<Integer,CancerStudy>();
     private static final String CANCER_STUDY_SEQUENCE = "seq_cancer_study";
+
+    private static final Logger LOG = LoggerFactory.getLogger(ClickHouseAutoIncrement.class);
 
     static {
         reCacheAll();
@@ -624,7 +628,8 @@ public final class DaoCancerStudy {
         }
     }
 
-    private static void deleteByIds(Connection con, String sqlPrefix, List<Integer> ids) throws SQLException {
+    private static void deleteByIds(Connection con, String deleteSqlPrefix, List<Integer> ids) throws SQLException {
+        ResultSet rs = null;
         if (ids.isEmpty()) {
             return;
         }
@@ -632,12 +637,36 @@ public final class DaoCancerStudy {
             int end = Math.min(start + DELETE_BATCH_SIZE, ids.size());
             List<Integer> chunk = ids.subList(start, end);
             String placeholders = String.join(",", Collections.nCopies(chunk.size(), "?"));
-            try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")")) {
+            // First determine the count of records about to be deleted
+            String countSqlPrefix = deleteSqlPrefix.replaceFirst("DELETE", "SELECT COUNT(*)");
+            int recordsInBatch = -1;
+            try (PreparedStatement pstmt = con.prepareStatement(countSqlPrefix + "(" + placeholders + ")")) {
                 int idx = 1;
                 for (Integer id : chunk) {
                     pstmt.setInt(idx++, id);
                 }
-                pstmt.executeUpdate();
+                rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    recordsInBatch = rs.getInt(1);
+                }
+            
+            }
+            if (recordsInBatch > 0) {
+                try (PreparedStatement pstmt = con.prepareStatement(deleteSqlPrefix + "(" + placeholders + ")")) {
+                    int idx = 1;
+                    for (Integer id : chunk) {
+                        pstmt.setInt(idx++, id);
+                    }
+                    int recordsDeleted = pstmt.executeUpdate();
+                    if (recordsInBatch == -1) {
+                        LOG.warn("Could not determine count of records expected to be deleted during execution of statement beginning with " + deleteSqlPrefix);
+                        return;
+                    }
+                    if (recordsDeleted != recordsInBatch) {
+                        LOG.warn("Count of records expected to be deleted during execution of statement beginning with '" + deleteSqlPrefix + "' was " + recordsInBatch + " in one of the batches. However, actual count of records deleted in the batch was " + recordsDeleted + ".");
+                        return;
+                    }
+                }
             }
         }
     }

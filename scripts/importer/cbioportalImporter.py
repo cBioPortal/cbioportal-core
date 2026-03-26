@@ -115,7 +115,18 @@ def remove_samples(jvm_args, study_ids, sample_ids):
     args.append(study_ids)
     args.append("--sample_ids")
     args.append(sample_ids)
-    run_java(*args)
+    try:
+        run_java(*args)
+    except JavaRunException as jre:
+        LOGGER.error('an error occurred during the java process which removes samples from the database.')
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+        LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+        LOGGER.error('  %s' % ('-' * 70))
+        LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of samples in \'profile_sample\'.')
+        LOGGER.error('  Errors which occur after partial updates have been made may leave the database in an inconsistent or incomplete state.')
+        LOGGER.error('  The safest path forward would be to delete the entire study, and then reimport the entire study with all needed updates included.')
+        LOGGER.error('  %s' % ('-' * 70))
+        raise jre
 
 def remove_patients(jvm_args, study_ids, patient_ids):
     args = jvm_args.split(' ')
@@ -496,7 +507,20 @@ def import_incremental_data(jvm_args, data_directory, update_generic_assay_entit
         for meta_pair in meta_pairs:
             meta_filename, meta_dictionary = meta_pair
             data_filename = os.path.join(data_directory, meta_dictionary['data_filename'])
-            import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
+            try:
+                import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
+            except JavaRunException as jre:
+                if meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
+                    LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
+                    LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+                    LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+                    LOGGER.error('  %s' % ('-' * 70))
+                    LOGGER.error('  Errors which occur after partial updates have been made may leave the database in an inconsistent state.')
+                    LOGGER.error('  In particular, tables \'genetic_alteration\' and \'profile_sample\' may contain lists of events or lists of samples which are not consistent with the study\'s sample count.')
+                    LOGGER.error('  The safest path forward would be to delete the entire study, and then reimport the entire study with all needed updates included.')
+                    LOGGER.error('  Alternatively, a scan could be done by running a data integrity validation pass and insuring that the database is in a valid state. In that case, deletion and re-import might not be needed')
+                    LOGGER.error('  %s' % ('-' * 70))
+                raise jre
 
 def update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files):
     """
