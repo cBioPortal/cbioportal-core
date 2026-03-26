@@ -26,6 +26,9 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
 
     @Test
     public void testForeignKeyViolations() throws Exception {
+        assertTrue("Expected no FK violations on clean data",
+                ClickHouseConstraintChecker.findForeignKeyViolations().isEmpty());
+
         applySqlResource(FK_VIOLATIONS_SQL, List.of());
 
         List<ForeignKeyViolation> violations = ClickHouseConstraintChecker.findForeignKeyViolations();
@@ -42,10 +45,16 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
         Set<String> missing = new LinkedHashSet<>(expected);
         missing.removeAll(actual);
         assertTrue("Missing foreign-key violations: " + missing, missing.isEmpty());
+        Set<String> unexpected = new LinkedHashSet<>(actual);
+        unexpected.removeAll(expected);
+        assertTrue("Unexpected foreign-key violations: " + unexpected, unexpected.isEmpty());
     }
 
     @Test
     public void testUniqueKeyViolations() throws Exception {
+        assertTrue("Expected no unique-key violations on clean data",
+                ClickHouseConstraintChecker.findUniqueKeyViolations().isEmpty());
+
         // ReplacingMergeTree tables can collapse duplicate keys during merges.
         setMergesEnabled(false);
         try {
@@ -61,13 +70,12 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
             Set<String> missing = new LinkedHashSet<>(expected);
             missing.removeAll(actual);
             assertTrue("Missing unique-key violations: " + missing, missing.isEmpty());
+            Set<String> unexpected = new LinkedHashSet<>(actual);
+            unexpected.removeAll(expected);
+            assertTrue("Unexpected unique-key violations: " + unexpected, unexpected.isEmpty());
         } finally {
             setMergesEnabled(true);
         }
-    }
-
-    private static void applySqlResource(String resourceName) throws Exception {
-        applySqlResource(resourceName, List.of());
     }
 
     private static void applySqlResource(String resourceName, List<String> preludeStatements) throws Exception {
