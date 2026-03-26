@@ -34,7 +34,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -111,19 +110,7 @@ public class ImportCnaDiscreteLongData {
     ) {
        this(cnaFile, geneticProfileId, genePanel, daoGene, namespaces, false);
     }
-    public void importData() {
-        JdbcUtil.getTransactionTemplate().execute(status -> {
-            try {
-                doImportData();
-            } catch (Throwable e) {
-                status.setRollbackOnly();
-                throw new RuntimeException(e);
-            }
-            return null;
-        });
-    }
-
-    private void doImportData() throws Exception {
+    public void importData() throws Exception {
         DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
         boolean alterationBackedUp = false;
         boolean samplesBackedUp = false;

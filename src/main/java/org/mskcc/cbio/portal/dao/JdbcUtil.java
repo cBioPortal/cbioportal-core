@@ -37,9 +37,7 @@ import java.util.*;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Connection Utility for JDBC.
@@ -51,9 +49,6 @@ public class JdbcUtil {
     private static DataSource dataSource;
     private static Map<String,Integer> activeConnectionCount = new HashMap<String,Integer>(); // keep track of the number of active connection per class/requester
     private static final Logger LOG = LoggerFactory.getLogger(JdbcUtil.class);
-    private static DataSourceTransactionManager transactionManager;
-    private static TransactionTemplate transactionTemplate;
-
     /**
      * Gets the data source
      * @return the data source
@@ -61,14 +56,8 @@ public class JdbcUtil {
     public static DataSource getDataSource() {
         if (dataSource == null) {
             dataSource = new TransactionAwareDataSourceProxy(new JdbcDataSource());
-            setupTransactionManagement();
         }
         return dataSource;
-    }
-
-    private static void setupTransactionManagement() {
-        transactionManager = new DataSourceTransactionManager(dataSource);
-        transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
@@ -77,14 +66,6 @@ public class JdbcUtil {
      */
     public static void setDataSource(DataSource value) {
         dataSource = value;
-        setupTransactionManagement();
-    }
-
-    public static TransactionTemplate getTransactionTemplate() {
-        if (transactionTemplate == null) {
-            getDataSource();
-        }
-        return transactionTemplate;
     }
 
     /**
