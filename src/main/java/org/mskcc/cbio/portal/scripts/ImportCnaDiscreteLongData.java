@@ -192,6 +192,8 @@ public class ImportCnaDiscreteLongData {
                 } catch (Throwable restoreEx) {
                     t.addSuppressed(restoreEx);
                 }
+            } else {
+                ProgressMonitor.setCurrentMessage("genetic_profile_samples table not backed up, skipping restore...");
             }
             if (alterationBackedUp) {
                 try {
@@ -200,6 +202,8 @@ public class ImportCnaDiscreteLongData {
                 } catch (Throwable restoreEx) {
                     t.addSuppressed(restoreEx);
                 }
+            } else {
+                ProgressMonitor.setCurrentMessage("genetic_alteration table not backed up, skipping restore...");
             }
             throw t;
         }

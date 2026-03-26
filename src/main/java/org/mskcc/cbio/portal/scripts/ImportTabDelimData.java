@@ -392,6 +392,8 @@ public class ImportTabDelimData {
                 } catch (Throwable restoreEx) {
                     t.addSuppressed(restoreEx);
                 }
+            } else {
+                ProgressMonitor.setCurrentMessage("genetic_profile_samples table not backed up, skipping restore...");
             }
             if (alterationBackedUp) {
                 try {
@@ -400,6 +402,8 @@ public class ImportTabDelimData {
                 } catch (Throwable restoreEx) {
                     t.addSuppressed(restoreEx);
                 }
+            } else {
+                ProgressMonitor.setCurrentMessage("genetic_alteration table not backed up, skipping restore...");
             }
             throw t;
         }
@@ -407,9 +411,7 @@ public class ImportTabDelimData {
 
     private Map<Map.Entry<String, Long>, Map<String, String>> readPdAnnotations(File pdAnnotationsFile) {
         Map<Map.Entry<String, Long>, Map<String, String>> pdAnnotations = new HashMap<>();
-        BufferedReader reader;
-        try {
-            reader = new BufferedReader(new FileReader(pdAnnotationsFile));
+        try (BufferedReader reader = new BufferedReader(new FileReader(pdAnnotationsFile))) {
             List<String> header = Arrays.asList(reader.readLine().toLowerCase().split("\t"));
             int sampleIdIndx = header.indexOf("sample_id");
             if (sampleIdIndx < 0) {
@@ -457,7 +459,6 @@ public class ImportTabDelimData {
                 pdAnnotations.put(sampleGeneKey, driverInfo);
                 line = reader.readLine();
             }
-            reader.close();
         } catch (IOException e) {
             throw new RuntimeException("Can't read PD annotation file", e);
         }
