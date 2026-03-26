@@ -194,8 +194,15 @@ function destination_table_matches_source_table() {
 function clone_all_source_database_tables_to_destination_database() {
     local pos=0
     local num_tables=${#database_table_list[@]}
+    local AUTOINCREMENT_SEQUENCE_STATE_TABLENAME="cbioportal_sequence_state"
+
     while [ "$pos" -lt "$num_tables" ] ; do
         local table_name="${database_table_list[$pos]}"
+        if [ "$table_name" == "$AUTOINCREMENT_SEQUENCE_STATE_TABLENAME" ] ; then
+            echo "skipping $table_name"
+            pos=$(($pos+1))
+            continue
+        fi
         echo "cloning $table_name"
         if ! create_destination_database_table_schema_only "$table_name" ; then
             echo "Error : could not create database table schema for $table_name in destination database" >&2
@@ -205,14 +212,9 @@ function clone_all_source_database_tables_to_destination_database() {
             echo "Error : could not copy data from table $table_name into destination database" >&2
             return 1
         fi
-        # cbioportal_sequence_state is backed by a SharedReplacingMergeTree and
-        # INSERT INTO ... SELECT * FROM ... may not always yield the same record count
-        # because of deduplication.
-        if [ "$table_name" != "cbioportal_sequence_state" ] ; then
-            if ! destination_table_matches_source_table "$table_name" ; then
-                echo "Cloning operation canceled" >&2
-                return 1
-            fi
+        if ! destination_table_matches_source_table "$table_name" ; then
+            echo "Cloning operation canceled" >&2
+            return 1
         fi
         pos=$(($pos+1))
     done
