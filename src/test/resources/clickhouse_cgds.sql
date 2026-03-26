@@ -44,9 +44,7 @@ DROP TABLE IF EXISTS patient;
 DROP TABLE IF EXISTS reference_genome;
 DROP TABLE IF EXISTS reference_genome_gene;
 DROP TABLE IF EXISTS resource_definition;
-DROP TABLE IF EXISTS resource_patient;
-DROP TABLE IF EXISTS resource_sample;
-DROP TABLE IF EXISTS resource_study;
+DROP TABLE IF EXISTS resource_node;
 DROP TABLE IF EXISTS sample;
 DROP TABLE IF EXISTS sample_cna_event;
 DROP TABLE IF EXISTS sample_derived;
@@ -602,29 +600,19 @@ CREATE TABLE resource_definition
     ENGINE = MergeTree
 ORDER BY tuple();
 
-CREATE TABLE resource_patient
+CREATE TABLE resource_node
 (
-    `internal_id` Nullable(Int64),
-    `resource_id` Nullable(String),
-    `url` Nullable(String)
-)
-    ENGINE = MergeTree
-ORDER BY tuple();
-
-CREATE TABLE resource_sample
-(
-    `internal_id` Nullable(Int64),
-    `resource_id` Nullable(String),
-    `url` Nullable(String)
-)
-    ENGINE = MergeTree
-ORDER BY tuple();
-
-CREATE TABLE resource_study
-(
-    `internal_id` Nullable(Int64),
-    `resource_id` Nullable(String),
-    `url` Nullable(String)
+    `id`                 Nullable(Int64),
+    `resource_id`        Nullable(String),
+    `cancer_study_id`    Nullable(Int64),
+    `entity_type`        Nullable(String),
+    `entity_internal_id` Nullable(Int64),
+    `display_name`       Nullable(String),
+    `url`                Nullable(String),
+    `type`               Nullable(String),
+    `metadata`           Nullable(String),
+    `group_path`         Nullable(String),
+    `priority`           Nullable(Int64)
 )
     ENGINE = MergeTree
 ORDER BY tuple();

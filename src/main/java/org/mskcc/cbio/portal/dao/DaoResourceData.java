@@ -6,40 +6,43 @@ import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.portal.model.ResourceBaseData;
 
 /**
- * Data Access Object for `resource` tables
+ * Data Access Object for `resource_node` table
  */
 public final class DaoResourceData {
 
-    public static final String RESOURCE_SAMPLE_TABLE = "resource_sample";
-    public static final String RESOURCE_PATIENT_TABLE = "resource_patient";
-    public static final String RESOURCE_STUDY_TABLE = "resource_study";
+    public static final String RESOURCE_NODE_TABLE = "resource_node";
 
-    private static final String SAMPLE_INSERT = "INSERT INTO " + RESOURCE_SAMPLE_TABLE
-            + "(`internal_id`,`resource_id`,`url` VALUES(?,?,?)";
-    private static final String PATIENT_INSERT = "INSERT INTO " + RESOURCE_PATIENT_TABLE
-            + "(`internal_id`,`resource_id`,`url` VALUES(?,?,?)";
-    private static final String STUDY_INSERT = "INSERT INTO " + RESOURCE_STUDY_TABLE
-            + "(`internal_id`,`resource_id`,`url` VALUES(?,?,?)";
+    private static final String INSERT = "INSERT INTO " + RESOURCE_NODE_TABLE
+            + "(`resource_id`,`cancer_study_id`,`entity_type`,`entity_internal_id`,`display_name`,`url`,`metadata`,`group_path`)"
+            + " VALUES(?,?,?,?,?,?,?,?)";
 
     private DaoResourceData() {
     }
 
-    public static int addSampleDatum(int internalSampleId, String resourceId, String url) throws DaoException {
-        return addDatum(SAMPLE_INSERT, RESOURCE_SAMPLE_TABLE, internalSampleId, resourceId, url);
+    public static int addSampleDatum(int internalSampleId, int cancerStudyId, String resourceId, String displayName, String url, String metadata, String groupPath) throws DaoException {
+        return addDatum(internalSampleId, cancerStudyId, "SAMPLE", resourceId, displayName, url, metadata, groupPath);
     }
 
-    public static int addPatientDatum(int internalPatientId, String resourceId, String url) throws DaoException {
-        return addDatum(PATIENT_INSERT, RESOURCE_PATIENT_TABLE, internalPatientId, resourceId, url);
+    public static int addPatientDatum(int internalPatientId, int cancerStudyId, String resourceId, String displayName, String url, String metadata, String groupPath) throws DaoException {
+        return addDatum(internalPatientId, cancerStudyId, "PATIENT", resourceId, displayName, url, metadata, groupPath);
     }
 
-    public static int addStudyDatum(int internalStudyId, String resourceId, String url) throws DaoException {
-        return addDatum(STUDY_INSERT, RESOURCE_STUDY_TABLE, internalStudyId, resourceId, url);
+    public static int addStudyDatum(int internalStudyId, int cancerStudyId, String resourceId, String displayName, String url, String metadata, String groupPath) throws DaoException {
+        return addDatum(internalStudyId, cancerStudyId, "STUDY", resourceId, displayName, url, metadata, groupPath);
     }
 
-    public static int addDatum(String query, String tableName, int internalId, String resourceId, String url)
-            throws DaoException {
+    public static int addDatum(int internalId, int cancerStudyId, String entityType,
+            String resourceId, String displayName, String url, String metadata, String groupPath) throws DaoException {
         if (ClickHouseBulkLoader.isBulkLoad()) {
-            ClickHouseBulkLoader.getClickHouseBulkLoader(tableName).insertRecord(Integer.toString(internalId), resourceId, url);
+            ClickHouseBulkLoader.getClickHouseBulkLoader(RESOURCE_NODE_TABLE).insertRecord(
+                    resourceId,
+                    Integer.toString(cancerStudyId),
+                    entityType,
+                    Integer.toString(internalId),
+                    displayName,
+                    url,
+                    metadata,
+                    groupPath);
             return 1;
         }
 
@@ -48,12 +51,23 @@ public final class DaoResourceData {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
-
-            pstmt = con.prepareStatement(query);
-            pstmt.setInt(1, internalId);
-            pstmt.setString(2, resourceId);
-            pstmt.setString(3, url);
-            
+            pstmt = con.prepareStatement(INSERT);
+            pstmt.setString(1, resourceId);
+            pstmt.setInt(2, cancerStudyId);
+            pstmt.setString(3, entityType);
+            pstmt.setInt(4, internalId);
+            pstmt.setString(5, displayName);
+            pstmt.setString(6, url);
+            if (metadata != null) {
+                pstmt.setString(7, metadata);
+            } else {
+                pstmt.setNull(7, Types.VARCHAR);
+            }
+            if (groupPath != null) {
+                pstmt.setString(8, groupPath);
+            } else {
+                pstmt.setNull(8, Types.VARCHAR);
+            }
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
@@ -62,35 +76,32 @@ public final class DaoResourceData {
         }
     }
 
-    public static List<ResourceBaseData> getDataByPatientId(int cancerStudyId, String patientId) throws DaoException
-    {
+    public static List<ResourceBaseData> getDataByPatientId(int cancerStudyId, String patientId) throws DaoException {
         List<Integer> internalIds = new ArrayList<Integer>();
         internalIds.add(DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudyId, patientId).getInternalId());
-        return getDataByInternalIds(cancerStudyId, RESOURCE_PATIENT_TABLE, internalIds);
+        return getDataByInternalIds(cancerStudyId, "PATIENT", internalIds);
     }
 
-    private static List<ResourceBaseData> getDataByInternalIds(int internalCancerStudyId, String table, List<Integer> internalIds) throws DaoException
-    {
+    private static List<ResourceBaseData> getDataByInternalIds(int internalCancerStudyId, String entityType, List<Integer> internalIds) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
 
         List<ResourceBaseData> resources = new ArrayList<ResourceBaseData>();
-        String sql = ("SELECT * FROM " + table + " WHERE `internal_id` IN " +
-            "(" + generateIdsSql(internalIds) + ")");
+        String sql = "SELECT * FROM " + RESOURCE_NODE_TABLE
+                + " WHERE `entity_type` = '" + entityType + "'"
+                + " AND `entity_internal_id` IN (" + generateIdsSql(internalIds) + ")";
 
         try {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
             pstmt = con.prepareStatement(sql);
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                resources.add(extract(table, internalCancerStudyId, rs));
+                resources.add(extract(internalCancerStudyId, entityType, rs));
             }
-        }
-        catch (SQLException e) {
+        } catch (SQLException e) {
             throw new DaoException(e);
-        }
-        finally {
+        } finally {
             JdbcUtil.closeAll(DaoResourceData.class, con, pstmt, rs);
         }
 
@@ -101,13 +112,20 @@ public final class DaoResourceData {
         return "'" + StringUtils.join(ids, "','") + "'";
     }
 
-    private static ResourceBaseData extract(String table, int internalCancerStudyId, ResultSet rs) throws SQLException {
-        String stableId = getStableIdFromInternalId(table, rs.getInt("internal_id"));
-        return new ResourceBaseData(internalCancerStudyId, stableId, rs.getString("resource_id"), rs.getString("url"));
+    private static ResourceBaseData extract(int internalCancerStudyId, String entityType, ResultSet rs) throws SQLException {
+        int internalId = rs.getInt("entity_internal_id");
+        String stableId = getStableIdFromInternalId(entityType, internalId);
+        return new ResourceBaseData(
+                internalCancerStudyId,
+                stableId,
+                rs.getString("resource_id"),
+                rs.getString("url"),
+                rs.getString("metadata"),
+                rs.getString("group_path"));
     }
 
-    private static String getStableIdFromInternalId(String table, int internalId) {
-        if (table.equals(RESOURCE_SAMPLE_TABLE)) {
+    private static String getStableIdFromInternalId(String entityType, int internalId) {
+        if ("SAMPLE".equals(entityType)) {
             return DaoSample.getSampleById(internalId).getStableId();
         } else {
             return DaoPatient.getPatientById(internalId).getStableId();
