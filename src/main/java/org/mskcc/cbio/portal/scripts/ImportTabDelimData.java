@@ -300,6 +300,10 @@ public class ImportTabDelimData {
             }
 
 
+            if (isDiscretizedCnaProfile && isIncrementalUpdateMode) {
+                DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
+            }
+
             String line = buf.readLine();
             while (line != null) {
 
@@ -656,9 +660,6 @@ public class ImportTabDelimData {
                 recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    if (isIncrementalUpdateMode) {
-                        DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
-                    }
                     long entrezGeneId = genes.get(0).getEntrezGeneId();
                     CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, entrezGeneId));
                 }

@@ -168,6 +168,9 @@ public class ImportCnaDiscreteLongData {
             geneticAlterationGeneImporter.initialize();
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
 
+            if (isIncrementalUpdateMode) {
+                DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
+            }
             for (Long entrezId : toImport.eventsTable.rowKeySet()) {
                 boolean added = storeGeneticAlterations(toImport, entrezId);
                 if (added) {
@@ -268,9 +271,6 @@ public class ImportCnaDiscreteLongData {
             .filter(v -> v.cnaEvent != null)
             .map(v -> v.cnaEvent)
             .collect(Collectors.toList());
-        if (isIncrementalUpdateMode) {
-            DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
-        }
         CnaUtil.storeCnaEvents(existingCnaEvents, events);
     }
 
