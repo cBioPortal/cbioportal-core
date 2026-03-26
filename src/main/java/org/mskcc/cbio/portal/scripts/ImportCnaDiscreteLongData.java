@@ -125,13 +125,17 @@ public class ImportCnaDiscreteLongData {
 
     private void doImportData() throws Exception {
         DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+        boolean alterationBackedUp = false;
+        boolean samplesBackedUp = false;
         try (FileReader reader = new FileReader(this.cnaFile);
              BufferedReader buf = new BufferedReader(reader)) {
 
             ProgressMonitor.setCurrentMessage("Backing up genetic_alteration and genetic_profile_samples tables...");
             daoGeneticAlteration.backupGeneticAlterationTable();
+            alterationBackedUp = true;
             ProgressMonitor.setCurrentMessage("Backing up genetic_profile_samples table...");
             DaoGeneticProfileSamples.backupGeneticProfileSampleTable();
+            samplesBackedUp = true;
             ProgressMonitor.setCurrentMessage("Importing CNA discrete long data from file: " + this.cnaFile.getAbsolutePath());
 
             // Pass first line with headers to util:
@@ -181,11 +185,22 @@ public class ImportCnaDiscreteLongData {
             ClickHouseBulkLoader.flushAll();
             geneticAlterationGeneImporter.complete();
         } catch (Throwable t) {
-            ProgressMonitor.setCurrentMessage("Restoring genetic_alteration table from backup...");
-            daoGeneticAlteration.restoreGeneticAlterationTableBackup();
-            ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
-            DaoGeneticProfileSamples.restoreGeneticProfileSampleTableBackup();
-            ProgressMonitor.setCurrentMessage("Backup restoration complete.");
+            if (samplesBackedUp) {
+                try {
+                    ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
+                    DaoGeneticProfileSamples.restoreGeneticProfileSampleTableBackup();
+                } catch (Throwable restoreEx) {
+                    t.addSuppressed(restoreEx);
+                }
+            }
+            if (alterationBackedUp) {
+                try {
+                    ProgressMonitor.setCurrentMessage("Restoring genetic_alteration table from backup...");
+                    daoGeneticAlteration.restoreGeneticAlterationTableBackup();
+                } catch (Throwable restoreEx) {
+                    t.addSuppressed(restoreEx);
+                }
+            }
             throw t;
         }
     }
