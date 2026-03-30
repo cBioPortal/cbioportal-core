@@ -65,45 +65,43 @@ public class ClickHouseBulkDeleter {
         }
 
         Connection con = null;
-        PreparedStatement stmt = null;
         try {
             con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
 
             // 1. Create temp table
-            stmt = con.prepareStatement(
-                "CREATE TEMPORARY TABLE " + tmpTable + " (id Int64) ENGINE = Memory");
-            stmt.executeUpdate();
-            stmt.close();
+            try (PreparedStatement stmt = con.prepareStatement(
+                    "CREATE TEMPORARY TABLE " + tmpTable + " (id Int64) ENGINE = Memory")) {
+                stmt.executeUpdate();
+            }
 
             // 2. Bulk-insert IDs into temp table via TSV stream
             byte[] payload = buildTsvPayload();
-            stmt = con.prepareStatement(
-                "INSERT INTO " + tmpTable + " (id) FORMAT TSVWithNames");
-            stmt.setBinaryStream(1, new ByteArrayInputStream(payload));
-            stmt.executeUpdate();
-            stmt.close();
+            try (PreparedStatement stmt = con.prepareStatement(
+                    "INSERT INTO " + tmpTable + " (id) FORMAT TSVWithNames")) {
+                stmt.setBinaryStream(1, new ByteArrayInputStream(payload));
+                stmt.executeUpdate();
+            }
 
             // 3. Execute delete
-            stmt = con.prepareStatement(
-                "DELETE FROM " + targetTable + " WHERE " + idColumn + " IN (SELECT id FROM " + tmpTable + ")");
-            int deleted = stmt.executeUpdate();
-            stmt.close();
-
-            return deleted;
+            try (PreparedStatement stmt = con.prepareStatement(
+                    "DELETE FROM " + targetTable + " WHERE " + idColumn + " IN (SELECT id FROM " + tmpTable + ")")) {
+                int deleted = stmt.executeUpdate();
+                return deleted;
+            }
         } catch (SQLException | IOException e) {
             throw new DaoException(e);
         } finally {
             // 4. Always drop temp table to avoid session state leak back into the connection pool
             try {
                 if (con != null) {
-                    PreparedStatement drop = con.prepareStatement(
-                        "DROP TEMPORARY TABLE IF EXISTS " + tmpTable);
-                    drop.executeUpdate();
-                    drop.close();
+                    try (PreparedStatement drop = con.prepareStatement(
+                            "DROP TEMPORARY TABLE IF EXISTS " + tmpTable)) {
+                        drop.executeUpdate();
+                    }
                 }
             } catch (SQLException ignored) {
             }
-            JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, stmt, null);
+            JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
             pendingIds.clear();
         }
     }
