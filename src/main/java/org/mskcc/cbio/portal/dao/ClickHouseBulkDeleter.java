@@ -14,9 +14,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Bulk deleter that buffers IDs in memory, streams them into a ClickHouse temporary
- * table, and issues a single DELETE ... WHERE id IN (SELECT id FROM tmp) statement.
- * This avoids large numbers of parameterized IN-clause round-trips.
+ * Bulk deleter that buffers IDs in memory, streams them into a ClickHouse staging
+ * table via TSVWithNames, and issues a single DELETE ... WHERE id IN (SELECT id FROM
+ * staging_table) statement. The staging table is a real MergeTree table (not temporary)
+ * so that it persists across HTTP requests on ClickHouse Cloud.
  *
  * Mirrors the structure of ClickHouseBulkLoader.
  */
@@ -26,13 +27,13 @@ public class ClickHouseBulkDeleter {
 
     private final String targetTable;
     private final String idColumn;
-    private final String tmpTable;
+    private final String stagingTable;
     private final List<Long> pendingIds = new ArrayList<>();
 
     private ClickHouseBulkDeleter(String targetTable, String idColumn) {
         this.targetTable = targetTable;
         this.idColumn = idColumn;
-        this.tmpTable = "tmp_delete_" + targetTable;
+        this.stagingTable = "staging_delete_" + targetTable;
     }
 
     public static ClickHouseBulkDeleter getBulkDeleter(String targetTable, String idColumn) {
@@ -68,34 +69,42 @@ public class ClickHouseBulkDeleter {
         try {
             con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
 
-            // 1. Create temp table
+            // Drop any leftover staging table from a previous crashed run
             try (PreparedStatement stmt = con.prepareStatement(
-                    "CREATE TEMPORARY TABLE " + tmpTable + " (id Int64) ENGINE = Memory")) {
+                    "DROP TABLE IF EXISTS " + stagingTable)) {
                 stmt.executeUpdate();
             }
 
-            // 2. Bulk-insert IDs into temp table via TSV stream
+            // Create staging table
+            try (PreparedStatement stmt = con.prepareStatement(
+                    "CREATE TABLE " + stagingTable + " (id Int64) ENGINE = MergeTree() ORDER BY id")) {
+                stmt.executeUpdate();
+            }
+
+            // Insert IDs into staging table via TSV stream
             byte[] payload = buildTsvPayload();
             try (PreparedStatement stmt = con.prepareStatement(
-                    "INSERT INTO " + tmpTable + " (id) FORMAT TSVWithNames")) {
+                    "INSERT INTO " + stagingTable + " (id) FORMAT TSVWithNames")) {
                 stmt.setBinaryStream(1, new ByteArrayInputStream(payload));
                 stmt.executeUpdate();
             }
 
-            // 3. Execute delete
+            // Execute delete via staging table
+            int deleted;
             try (PreparedStatement stmt = con.prepareStatement(
-                    "DELETE FROM " + targetTable + " WHERE " + idColumn + " IN (SELECT id FROM " + tmpTable + ")")) {
-                int deleted = stmt.executeUpdate();
-                return deleted;
+                    "DELETE FROM " + targetTable + " WHERE " + idColumn + " IN (SELECT id FROM " + stagingTable + ")")) {
+                deleted = stmt.executeUpdate();
             }
+
+            return deleted;
         } catch (SQLException | IOException e) {
             throw new DaoException(e);
         } finally {
-            // 4. Always drop temp table to avoid session state leak back into the connection pool
+            // Always drop staging table
             try {
                 if (con != null) {
                     try (PreparedStatement drop = con.prepareStatement(
-                            "DROP TEMPORARY TABLE IF EXISTS " + tmpTable)) {
+                            "DROP TABLE IF EXISTS " + stagingTable)) {
                         drop.executeUpdate();
                     }
                 }
