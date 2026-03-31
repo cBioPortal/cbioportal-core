@@ -387,17 +387,17 @@ class PatientAttrFileTestCase(PostClinicalDataFileTestCase):
         self.assertIn('sample', record.getMessage().lower())
 
     def test_patient_without_attributes(self):
-        """Test if a warning is issued for patients absent in the patient file."""
-        self.logger.setLevel(logging.WARNING)
+        """Test if an error is issued for patients absent in the patient file."""
+        self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_clin_missing_patient.txt',
                                     validateData.PatientClinicalValidator)
         self.assertEqual(1, len(record_list))
         record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(logging.ERROR, record.levelno)
         self.assertFalse(hasattr(record, 'line_number'),
                          'logrecord is about a specific line')
         self.assertEqual('TEST-PAT4', record.cause)
-        self.assertIn('missing', record.getMessage().lower())
+        self.assertIn('patient', record.getMessage().lower())
 
     def test_hardcoded_attr_values(self):
         """Test if attributes with set meanings have recognized values."""
@@ -460,6 +460,11 @@ class PatientAttrFileTestCase(PostClinicalDataFileTestCase):
     def test_date_in_nondate_column(self):
         """Test when a sample is defined twice in the same file."""
         self.logger.setLevel(logging.ERROR)
+        # Set PATIENTS_WITH_SAMPLES to only the patients present in this file
+        # to avoid triggering unrelated "patient not in patient file" errors
+        validateData.PATIENTS_WITH_SAMPLES = {
+            'TCGA-A2-A04P', 'TCGA-A1-A0SK', 'TCGA-A2-A0CM',
+            'TCGA-AR-A1AR', 'TCGA-B6-A0WX', 'TCGA-BH-A1F0', 'TCGA-B6-A0I6'}
         record_list = self.validate('data_clin_date_in_nondate_column.txt',
                                     validateData.PatientClinicalValidator)
         self.assertEqual(2, len(record_list))
