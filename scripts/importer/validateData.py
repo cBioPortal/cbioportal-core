@@ -3241,8 +3241,9 @@ class StructuralVariantValidator(CustomNamespacesValidator):
         def checkSVstatus(sv_status):
             """ Allowed values for SV_Status column are SOMATIC and GERMLINE """
             if sv_status is None:
-                self.logger.warning('No value in SV_Status, assuming the variant is SOMATIC',
-                                  extra={'line_number': self.line_number})
+                self.logger.error('Invalid SV_Status value: possible values are [SOMATIC, GERMLINE]',
+                                  extra={'line_number': self.line_number,
+                                         'cause': sv_status})
             elif sv_status.lower() == 'germline':
                 self.logger.warning('GERMLINE variant identified from the SV_Status value. If this variant is not meant for public release, please remove it.',
                                   extra={'line_number': self.line_number,
