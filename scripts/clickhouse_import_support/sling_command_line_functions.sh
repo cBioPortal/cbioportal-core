@@ -39,12 +39,12 @@ function write_selected_clickhouse_connection_to_env_file() {
     local database_to_transfer=$2
     local db_name=""
     if [ -z "$database_to_transfer" ] ; then
-        db_name="${my_properties['mysql_database_name']}"
+        db_name="${my_properties['clickhouse_database_name']}"
     else
         if [ "$database_to_transfer" == "blue" ] ; then
-            db_name="${my_properties['mysql_blue_database_name']}"
+            db_name="${my_properties['clickhouse_blue_database_name']}"
         else
-            db_name="${my_properties['mysql_green_database_name']}"
+            db_name="${my_properties['clickhouse_green_database_name']}"
         fi 
     fi
     local uname="${my_properties['clickhouse_server_username']}"
