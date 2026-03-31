@@ -491,10 +491,12 @@ class Validator(object):
             try:
                 dialect = csv.Sniffer().sniff(sample_content, delimiters='\t')
             except csv.Error:
-                self.logger.warning('Could not detect a tab separator. Confirm that the file should be single-column'
-                                    ' and else if all lines have the same number of columns, and if all separators are '
-                                    'tabs.')
-                return
+                if '\t' not in sample_content:
+                    self.logger.warning('Could not detect a tab separator. Confirm that all separators are tabs.')
+                    return
+                else:
+                    self.logger.warning('Could not reliably detect file structure. Continuing validation to check for inconsistent column counts.')
+                    dialect = csv.excel_tab
             # sniffer assumes " if no quote character exists
             if dialect.quotechar == '"' and not (
                     dialect.delimiter + '"' in sample_content or
