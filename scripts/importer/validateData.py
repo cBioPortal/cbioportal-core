@@ -3350,6 +3350,7 @@ class GenePanelMatrixValidator(Validator):
         self.mutation_profile_column = None
         self.gene_panel_sample_ids = {}
         self.mutation_stable_id_index = None
+        self.mutation_panel_by_sample = {}
 
     def checkHeader(self, data):
         num_errors = super(GenePanelMatrixValidator, self).checkHeader(data)
@@ -3413,9 +3414,11 @@ class GenePanelMatrixValidator(Validator):
 
             # If stable id is mutation and value not NA, check whether sample ID is in sequenced case list
             if self.mutation_stable_id_index is not None:
-                sample_ids_panel_dict[sample_id] = data[self.mutation_stable_id_index - 1]
+                mutation_panel = data[self.mutation_stable_id_index - 1]
+                sample_ids_panel_dict[sample_id] = mutation_panel
+                self.mutation_panel_by_sample[sample_id] = mutation_panel
                 # Sample ID has been removed from list, so subtract 1 position.
-                if data[self.mutation_stable_id_index - 1] != 'NA':
+                if mutation_panel != 'NA':
                     if mutation_sample_ids is not None and sample_id not in mutation_sample_ids:
                         self.logger.error('Sample ID has mutation gene panel, but is not in the sequenced case list',
                                           extra={'line_number': self.line_number,
@@ -3429,6 +3432,24 @@ class GenePanelMatrixValidator(Validator):
                                     'study data.',
                                     extra={'line_number': self.line_number,
                                             'cause': gene_panel_id})
+
+    def onComplete(self):
+        # Every mutation-profiled sample in the `_sequenced` case list must map
+        # to a non-NA mutation panel in the gene panel matrix.
+        if self.mutation_stable_id_index is not None and mutation_sample_ids is not None:
+            for sample_id in mutation_sample_ids:
+                if DEFINED_SAMPLE_IDS is not None and sample_id not in DEFINED_SAMPLE_IDS:
+                    continue
+                if sample_id not in self.mutation_panel_by_sample:
+                    self.logger.error(
+                        'Sample ID is in the sequenced case list but missing in the mutation column of the gene panel matrix',
+                        extra={'cause': sample_id})
+                elif self.mutation_panel_by_sample[sample_id] == 'NA':
+                    self.logger.error(
+                        'Sample ID is in the sequenced case list but has NA mutation gene panel in the gene panel matrix',
+                        extra={'cause': sample_id})
+
+        super(GenePanelMatrixValidator, self).onComplete()
 
 
 class ProteinLevelValidator(FeaturewiseFileValidator):
@@ -4717,6 +4738,9 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
                     'No meta files found in ' + directory +'. Please make sure the directory '\
                     'is the path to the folder containing the files.')
 
+    global study_meta_dictionary
+    study_meta_dictionary = {}
+
     study_id = None
     study_cancer_type = None
     study_data_types = []
@@ -5401,6 +5425,13 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global PATIENTS_WITH_SAMPLES
     global RESOURCE_DEFINITION_DICTIONARY
     global RESOURCE_PATIENTS_WITH_SAMPLES
+    global mutation_sample_ids
+    global mutation_file_sample_ids
+    global sample_ids_panel_dict
+
+    mutation_sample_ids = None
+    mutation_file_sample_ids = set()
+    sample_ids_panel_dict = {}
 
     if portal_instance.cancer_type_dict is None:
         logger.warning('Skipping validations relating to cancer types '
@@ -5606,6 +5637,13 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
 
 
 def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks):
+    global mutation_sample_ids
+    global mutation_file_sample_ids
+    global sample_ids_panel_dict
+    mutation_sample_ids = None
+    mutation_file_sample_ids = set()
+    sample_ids_panel_dict = {}
+
     # walk over the meta files in the dir and get properties of the study
     validators_by_meta_type, *_ = process_metadata_files(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
     for meta_file_type, validators in validators_by_meta_type.items():
