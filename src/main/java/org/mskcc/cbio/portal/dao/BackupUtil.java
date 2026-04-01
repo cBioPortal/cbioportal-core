@@ -1,5 +1,7 @@
 package org.mskcc.cbio.portal.dao;
 
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -14,17 +16,14 @@ public class BackupUtil {
     }
 
     public static void withBackup(List<String> tableNames, ThrowingRunnable fn) throws Exception {
-        List<String> backedUp = new ArrayList<>();
         try {
             for (String table : tableNames) {
                 backup(table);
-                backedUp.add(table);
             }
             fn.run();
         } catch (Throwable t) {
-            List<String> toRestore = new ArrayList<>(backedUp);
-            Collections.reverse(toRestore);
-            for (String table : toRestore) {
+            ProgressMonitor.setCurrentMessage("Caught exception. Restoring from backup tables...");
+            for (String table : tableNames) {
                 try {
                     restore(table);
                 } catch (Throwable restoreEx) {
@@ -33,7 +32,7 @@ public class BackupUtil {
             }
             throw t;
         } finally {
-            for (String table : backedUp) {
+            for (String table : tableNames) {
                 deleteBackup(table);
             }
         }
@@ -41,13 +40,18 @@ public class BackupUtil {
 
     public static void backup(String tableName) throws DaoException {
         String backupTable = tableName + "_backup";
+        ProgressMonitor.setCurrentMessage("Backing up " + tableName + " to " + backupTable + "...");
+
         Connection con = null;
         try {
             con = JdbcUtil.getDbConnection(BackupUtil.class);
             con.prepareStatement("DROP TABLE IF EXISTS " + backupTable + ";").executeUpdate();
             con.prepareStatement("CREATE TABLE " + backupTable + " AS " + tableName + ";").executeUpdate();
             con.prepareStatement("INSERT INTO " + backupTable + " SELECT * FROM " + tableName + ";").executeUpdate();
+            
+            ProgressMonitor.setCurrentMessage(tableName + " successfully backed up.");
         } catch (SQLException e) {
+            ProgressMonitor.logWarning("Failed to create a backup table for " + tableName);
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(BackupUtil.class, con, null, null);
@@ -56,11 +60,16 @@ public class BackupUtil {
 
     public static void restore(String tableName) throws DaoException {
         String backupTable = tableName + "_backup";
+        ProgressMonitor.setCurrentMessage("Restoring " + tableName + " from " + backupTable + "...");
+
         Connection con = null;
         try {
             con = JdbcUtil.getDbConnection(BackupUtil.class);
             con.prepareStatement("EXCHANGE TABLES " + backupTable + " AND " + tableName + ";").executeUpdate();
+
+            ProgressMonitor.setCurrentMessage(tableName + " successfully restored.");
         } catch (SQLException e) {
+            ProgressMonitor.logWarning("Failed to restore " + tableName + " from backup.");
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(BackupUtil.class, con, null, null);
@@ -69,6 +78,8 @@ public class BackupUtil {
 
     private static void deleteBackup(String tableName) {
         String backupTable = tableName + "_backup";
+        ProgressMonitor.setCurrentMessage("Deleting " + backupTable + "...");
+        
         Connection con = null;
         try {
             con = JdbcUtil.getDbConnection(BackupUtil.class);
