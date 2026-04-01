@@ -3010,9 +3010,9 @@ class PatientClinicalValidator(ClinicalValidator):
         if PATIENTS_WITH_SAMPLES:
             for patient_id in PATIENTS_WITH_SAMPLES:
                 if patient_id not in self.patient_id_lines:
-                    self.logger.warning(
-                        'Missing clinical data for a patient associated with '
-                        'samples',
+                    self.logger.error(
+                        'Patient ID defined in the clinical sample file is '
+                        'not present in the clinical patient file',
                         extra={'cause': patient_id})
         super(PatientClinicalValidator, self).onComplete()
 
