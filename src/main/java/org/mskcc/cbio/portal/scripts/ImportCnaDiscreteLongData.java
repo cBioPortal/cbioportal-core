@@ -104,7 +104,7 @@ public class ImportCnaDiscreteLongData {
        this(cnaFile, geneticProfileId, genePanel, daoGene, namespaces, false);
     }
     public void importData() throws Exception {
-        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples", "sample_cna_event"), () -> {
+        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples", "sample_cna_event", "sample_profile"), () -> {
             try (FileReader reader = new FileReader(this.cnaFile);
                  BufferedReader buf = new BufferedReader(reader)) {
 
