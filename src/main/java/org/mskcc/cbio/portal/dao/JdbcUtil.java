@@ -37,7 +37,6 @@ import java.util.*;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 
 /**
  * Connection Utility for JDBC.
@@ -55,7 +54,7 @@ public class JdbcUtil {
      */
     public static DataSource getDataSource() {
         if (dataSource == null) {
-            dataSource = new TransactionAwareDataSourceProxy(new JdbcDataSource());
+            dataSource = new JdbcDataSource();
         }
         return dataSource;
     }
