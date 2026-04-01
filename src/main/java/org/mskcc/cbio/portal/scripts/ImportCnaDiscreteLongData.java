@@ -29,6 +29,7 @@ import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
+import org.mskcc.cbio.portal.dao.BackupUtil;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
@@ -107,6 +108,7 @@ public class ImportCnaDiscreteLongData {
         DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
         boolean alterationBackedUp = false;
         boolean samplesBackedUp = false;
+        boolean sampleCnaEventBackedUp = false;
         try (FileReader reader = new FileReader(this.cnaFile);
              BufferedReader buf = new BufferedReader(reader)) {
 
@@ -116,6 +118,9 @@ public class ImportCnaDiscreteLongData {
             ProgressMonitor.setCurrentMessage("Backing up genetic_profile_samples table...");
             DaoGeneticProfileSamples.backupGeneticProfileSampleTable();
             samplesBackedUp = true;
+            ProgressMonitor.setCurrentMessage("Backing up sample_cna_event table...");
+            BackupUtil.backup("sample_cna_event");
+            sampleCnaEventBackedUp = true;
             ProgressMonitor.setCurrentMessage("Importing CNA discrete long data from file: " + this.cnaFile.getAbsolutePath());
 
             // Pass first line with headers to util:
@@ -168,6 +173,16 @@ public class ImportCnaDiscreteLongData {
             ClickHouseBulkLoader.flushAll();
             geneticAlterationGeneImporter.complete();
         } catch (Throwable t) {
+            if (sampleCnaEventBackedUp) {
+                try {
+                    ProgressMonitor.setCurrentMessage("Restoring sample_cna_event table from backup...");
+                    BackupUtil.restore("sample_cna_event");
+                } catch (Throwable restoreEx) {
+                    t.addSuppressed(restoreEx);
+                }
+            } else {
+                ProgressMonitor.setCurrentMessage("sample_cna_event table not backed up, skipping restore...");
+            }
             if (samplesBackedUp) {
                 try {
                     ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
