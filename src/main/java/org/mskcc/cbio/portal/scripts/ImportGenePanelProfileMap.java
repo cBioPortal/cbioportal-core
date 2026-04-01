@@ -141,9 +141,9 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
 
     public void importData() throws Exception {
         ProgressMonitor.setCurrentMessage("Reading data from: " + genePanelProfileMapFile.getAbsolutePath());
-        FileReader reader = new FileReader(genePanelProfileMapFile);
-        BufferedReader buff = new BufferedReader(reader);
-        
+        try (FileReader reader = new FileReader(genePanelProfileMapFile);
+             BufferedReader buff = new BufferedReader(reader)) {
+
         // Extract and parse first line which contains the profile names
         List<String> profiles = getProfilesLine(buff);
         Integer sampleIdIndex = profiles.indexOf("SAMPLE_ID");
@@ -209,6 +209,7 @@ public class ImportGenePanelProfileMap extends ConsoleRunnable {
         ProgressMonitor.logWarning("Flushing ClickHouse bulk loader.");
         ClickHouseBulkLoader.flushAll();
         ProgressMonitor.logWarning("Finished updating mutation counts for genetic profiles.");
+        } // end try-with-resources
     }
 
     private List<String> getProfilesLine(BufferedReader buff) throws Exception {
