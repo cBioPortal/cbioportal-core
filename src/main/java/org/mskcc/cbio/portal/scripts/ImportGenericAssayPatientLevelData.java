@@ -32,6 +32,7 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import org.mskcc.cbio.portal.dao.BackupUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
@@ -100,7 +101,11 @@ public class ImportGenericAssayPatientLevelData {
      * @throws IOException  IO Error.
      * @throws DaoException Database Error.
      */
-    public void importData() throws IOException, DaoException {
+    public void importData() throws Exception {
+        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples"), this::importDataInternal);
+    }
+
+    void importDataInternal() throws Exception {
         int numLines = FileUtil.getNumLines(dataFile);
 
         geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
@@ -109,18 +114,10 @@ public class ImportGenericAssayPatientLevelData {
         DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
 
         int numRecordsToAdd = 0;
-        boolean alterationBackedUp = false;
-        boolean samplesBackedUp = false;
         try (
                 FileReader reader = new FileReader(dataFile);
                 BufferedReader buf = new BufferedReader(reader);
         ) {
-            ProgressMonitor.setCurrentMessage("Backing up genetic_alteration and genetic_profile_samples tables...");
-            daoGeneticAlteration.backupGeneticAlterationTable();
-            alterationBackedUp = true;
-            ProgressMonitor.setCurrentMessage("Backing up genetic_profile_samples table...");
-            DaoGeneticProfileSamples.backupGeneticProfileSampleTable();
-            samplesBackedUp = true;
             ProgressMonitor.setCurrentMessage("Importing Generic Assay Patient Level data from file: " + dataFile.getCanonicalPath());
 
             String headerLine = buf.readLine();
@@ -195,28 +192,6 @@ public class ImportGenericAssayPatientLevelData {
                 throw new DaoException ("Something has gone wrong!  I did not save any records" +
                         " to the database!");
             }
-        } catch (Throwable t) {
-            if (samplesBackedUp) {
-                try {
-                    ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
-                    DaoGeneticProfileSamples.restoreGeneticProfileSampleTableBackup();
-                } catch (Throwable restoreEx) {
-                    t.addSuppressed(restoreEx);
-                }
-            } else {
-                ProgressMonitor.setCurrentMessage("genetic_profile_samples table not backed up, skipping restore...");
-            }
-            if (alterationBackedUp) {
-                try {
-                    ProgressMonitor.setCurrentMessage("Restoring genetic_alteration table from backup...");
-                    daoGeneticAlteration.restoreGeneticAlterationTableBackup();
-                } catch (Throwable restoreEx) {
-                    t.addSuppressed(restoreEx);
-                }
-            } else {
-                ProgressMonitor.setCurrentMessage("genetic_alteration table not backed up, skipping restore...");
-            }
-            throw t;
         }
     }
 

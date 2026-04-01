@@ -483,11 +483,5 @@ public class DaoGeneticAlteration {
         }
     }
 
-    public void backupGeneticAlterationTable() throws DaoException {
-        BackupUtil.backup("genetic_alteration");
-    }
 
-    public void restoreGeneticAlterationTableBackup() throws DaoException {
-        BackupUtil.restore("genetic_alteration");
-    }
 }

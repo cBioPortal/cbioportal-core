@@ -30,9 +30,7 @@ import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.BackupUtil;
-import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
-import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -50,6 +48,7 @@ import org.mskcc.cbio.portal.util.TsvUtil;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
@@ -105,106 +104,63 @@ public class ImportCnaDiscreteLongData {
        this(cnaFile, geneticProfileId, genePanel, daoGene, namespaces, false);
     }
     public void importData() throws Exception {
-        DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-        boolean alterationBackedUp = false;
-        boolean samplesBackedUp = false;
-        boolean sampleCnaEventBackedUp = false;
-        try (FileReader reader = new FileReader(this.cnaFile);
-             BufferedReader buf = new BufferedReader(reader)) {
+        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples", "sample_cna_event"), () -> {
+            try (FileReader reader = new FileReader(this.cnaFile);
+                 BufferedReader buf = new BufferedReader(reader)) {
 
-            ProgressMonitor.setCurrentMessage("Backing up genetic_alteration and genetic_profile_samples tables...");
-            daoGeneticAlteration.backupGeneticAlterationTable();
-            alterationBackedUp = true;
-            ProgressMonitor.setCurrentMessage("Backing up genetic_profile_samples table...");
-            DaoGeneticProfileSamples.backupGeneticProfileSampleTable();
-            samplesBackedUp = true;
-            ProgressMonitor.setCurrentMessage("Backing up sample_cna_event table...");
-            BackupUtil.backup("sample_cna_event");
-            sampleCnaEventBackedUp = true;
-            ProgressMonitor.setCurrentMessage("Importing CNA discrete long data from file: " + this.cnaFile.getAbsolutePath());
+                ProgressMonitor.setCurrentMessage("Importing CNA discrete long data from file: " + this.cnaFile.getAbsolutePath());
 
-            // Pass first line with headers to util:
-            String line = buf.readLine();
-            int lineIndex = 1;
-            String[] headerParts = TsvUtil.splitTsvLine(line);
-            this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
+                // Pass first line with headers to util:
+                String line = buf.readLine();
+                int lineIndex = 1;
+                String[] headerParts = TsvUtil.splitTsvLine(line);
+                this.cnaUtil = new CnaUtil(headerParts, this.namespaces);
 
-            boolean isDiscretizedCnaProfile = geneticProfile != null
-                    && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
-                    && geneticProfile.showProfileInAnalysisTab();
+                boolean isDiscretizedCnaProfile = geneticProfile != null
+                        && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
+                        && geneticProfile.showProfileInAnalysisTab();
 
-            if (isDiscretizedCnaProfile) {
-                existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
-                ClickHouseBulkLoader.bulkLoadOn();
-            }
-
-            CnaImportData toImport = new CnaImportData();
-
-            while ((line = buf.readLine()) != null) {
-                lineIndex++;
-                ProgressMonitor.incrementCurValue();
-                ConsoleUtil.showProgress();
-                this.extractDataToImport(geneticProfile, line, lineIndex, toImport);
-            }
-
-            orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
-            this.geneticAlterationGeneImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
-                    : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
-            geneticAlterationGeneImporter.initialize();
-            DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
-
-            if (isIncrementalUpdateMode) {
-                DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
-            }
-            for (Long entrezId : toImport.eventsTable.rowKeySet()) {
-                boolean added = storeGeneticAlterations(toImport, entrezId);
-                if (added) {
-                    storeCnaEvents(toImport, entrezId);
-                } else {
-                    ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
+                if (isDiscretizedCnaProfile) {
+                    existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
+                    ClickHouseBulkLoader.bulkLoadOn();
                 }
-            }
 
-            // Once the CNA import is done, update DISCRETE_LONG input datatype into resulting DISCRETE datatype:
-            geneticProfile.setDatatype(MolecularProfileDataType.DISCRETE);
-            DaoGeneticProfile.updateDatatype(geneticProfile.getGeneticProfileId(), geneticProfile.getDatatype());
+                CnaImportData toImport = new CnaImportData();
 
-            ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
-            ClickHouseBulkLoader.flushAll();
-            geneticAlterationGeneImporter.complete();
-        } catch (Throwable t) {
-            if (sampleCnaEventBackedUp) {
-                try {
-                    ProgressMonitor.setCurrentMessage("Restoring sample_cna_event table from backup...");
-                    BackupUtil.restore("sample_cna_event");
-                } catch (Throwable restoreEx) {
-                    t.addSuppressed(restoreEx);
+                while ((line = buf.readLine()) != null) {
+                    lineIndex++;
+                    ProgressMonitor.incrementCurValue();
+                    ConsoleUtil.showProgress();
+                    this.extractDataToImport(geneticProfile, line, lineIndex, toImport);
                 }
-            } else {
-                ProgressMonitor.setCurrentMessage("sample_cna_event table not backed up, skipping restore...");
-            }
-            if (samplesBackedUp) {
-                try {
-                    ProgressMonitor.setCurrentMessage("Restoring genetic_profile_samples table from backup...");
-                    DaoGeneticProfileSamples.restoreGeneticProfileSampleTableBackup();
-                } catch (Throwable restoreEx) {
-                    t.addSuppressed(restoreEx);
+
+                orderedSampleList = newArrayList(toImport.eventsTable.columnKeySet());
+                this.geneticAlterationGeneImporter = isIncrementalUpdateMode ? new GeneticAlterationIncrementalImporter(geneticProfileId, orderedSampleList)
+                        : new GeneticAlterationImporter(geneticProfileId, orderedSampleList);
+                geneticAlterationGeneImporter.initialize();
+                DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
+
+                if (isIncrementalUpdateMode) {
+                    DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
                 }
-            } else {
-                ProgressMonitor.setCurrentMessage("genetic_profile_samples table not backed up, skipping restore...");
-            }
-            if (alterationBackedUp) {
-                try {
-                    ProgressMonitor.setCurrentMessage("Restoring genetic_alteration table from backup...");
-                    daoGeneticAlteration.restoreGeneticAlterationTableBackup();
-                } catch (Throwable restoreEx) {
-                    t.addSuppressed(restoreEx);
+                for (Long entrezId : toImport.eventsTable.rowKeySet()) {
+                    boolean added = storeGeneticAlterations(toImport, entrezId);
+                    if (added) {
+                        storeCnaEvents(toImport, entrezId);
+                    } else {
+                        ProgressMonitor.logWarning("Values not added to gene with entrezId: " + entrezId + ". Skip creation of cna events.");
+                    }
                 }
-            } else {
-                ProgressMonitor.setCurrentMessage("genetic_alteration table not backed up, skipping restore...");
+
+                // Once the CNA import is done, update DISCRETE_LONG input datatype into resulting DISCRETE datatype:
+                geneticProfile.setDatatype(MolecularProfileDataType.DISCRETE);
+                DaoGeneticProfile.updateDatatype(geneticProfile.getGeneticProfileId(), geneticProfile.getDatatype());
+
+                ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
+                ClickHouseBulkLoader.flushAll();
+                geneticAlterationGeneImporter.complete();
             }
-            throw t;
-        }
+        });
     }
 
     /**

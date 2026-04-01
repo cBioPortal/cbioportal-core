@@ -162,11 +162,5 @@ public final class DaoGeneticProfileSamples
         }
     }
 
-    public static void backupGeneticProfileSampleTable() throws DaoException {
-        BackupUtil.backup("genetic_profile_samples");
-    }
 
-    public static void restoreGeneticProfileSampleTableBackup() throws DaoException {
-        BackupUtil.restore("genetic_profile_samples");
-    }
 }
