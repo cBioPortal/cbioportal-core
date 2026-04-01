@@ -47,15 +47,8 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.io.*;
+import java.util.*;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
