@@ -484,29 +484,10 @@ public class DaoGeneticAlteration {
     }
 
     public void backupGeneticAlterationTable() throws DaoException {
-        Connection con = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            con.prepareStatement("DROP TABLE IF EXISTS genetic_alteration_backup;").executeUpdate();
-            con.prepareStatement("CREATE TABLE genetic_alteration_backup AS genetic_alteration;").executeUpdate();
-            con.prepareStatement("INSERT INTO genetic_alteration_backup SELECT * FROM genetic_alteration;").executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
-        }
+        BackupUtil.backup("genetic_alteration");
     }
 
     public void restoreGeneticAlterationTableBackup() throws DaoException {
-        Connection con = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            con.prepareStatement("EXCHANGE TABLES genetic_alteration_backup AND genetic_alteration;").executeUpdate();
-            con.prepareStatement("DROP TABLE IF EXISTS genetic_alteration_backup;").executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
-        }
+        BackupUtil.restore("genetic_alteration");
     }
 }
