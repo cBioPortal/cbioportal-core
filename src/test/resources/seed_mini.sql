@@ -552,9 +552,9 @@ INSERT INTO geneset (`id`, `genetic_entity_id`, `external_id`, `name`, `descript
 INSERT INTO geneset (`id`, `genetic_entity_id`, `external_id`, `name`, `description`, `ref_link`) VALUES (2, 2, 'HGNC:1101', 'BRCA2', 'Breast cancer type 2 susceptibility protein', 'https://www.ncbi.nlm.nih.gov/gene/675');
 
 -- clinical_attribute_meta
-INSERT INTO clinical_attribute_meta (ATTR_ID, DISPLAY_NAME, DESCRIPTION, DATATYPE, PATIENT_ATTRIBUTE, PRIORITY, CANCER_STUDY_ID) VALUES ('MUTATION_COUNT', 'Mutation Count', 'Number of mutations in the sample', 'NUMBER', 0, 1, 1);
-INSERT INTO clinical_attribute_meta (ATTR_ID, DISPLAY_NAME, DESCRIPTION, DATATYPE, PATIENT_ATTRIBUTE, PRIORITY, CANCER_STUDY_ID) VALUES ('FRACTION_GENOME_ALTERED', 'Fraction Genome Altered', 'Fraction of the genome that is altered in the sample', 'NUMBER', 0, 1, 1);
+INSERT INTO clinical_attribute_meta (`attr_id`, `display_name`, `description`, `datatype`, `patient_attribute`, `priority`, `cancer_study_id`) VALUES ('MUTATION_COUNT', 'Mutation Count', 'Number of mutations in the sample', 'NUMBER', 0, 1, 1);
+INSERT INTO clinical_attribute_meta (`attr_id`, `display_name`, `description`, `datatype`, `patient_attribute`, `priority`, `cancer_study_id`) VALUES ('FRACTION_GENOME_ALTERED', 'Fraction Genome Altered', 'Fraction of the genome that is altered in the sample', 'NUMBER', 0, 1, 1);
 
 -- clinical_sample_attribute
-INSERT INTO clinical_sample(INTERNAL_ID, ATTR_ID, ATTR_VALUE) VALUES (6, 'MUTATION_COUNT', '0');
-INSERT INTO clinical_sample(INTERNAL_ID, ATTR_ID, ATTR_VALUE) VALUES (6, 'FRACTION_GENOME_ALTERED', '0');
+INSERT INTO clinical_sample(`internal_id`, `attr_id`, `attr_value`) VALUES (6, 'MUTATION_COUNT', '0');
+INSERT INTO clinical_sample(`internal_id`, `attr_id`, `attr_value`) VALUES (6, 'FRACTION_GENOME_ALTERED', '0');
