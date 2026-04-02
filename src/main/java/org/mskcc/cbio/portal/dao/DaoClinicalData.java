@@ -68,9 +68,9 @@ public final class DaoClinicalData {
     private static final String SAMPLE_ATTRIBUTES_INSERT = "INSERT INTO " + SAMPLE_ATTRIBUTES_TABLE + "(`internal_id`,`attr_id`,`attr_value`) VALUES(?,?,?)";
     private static final String PATIENT_ATTRIBUTES_INSERT = "INSERT INTO " + PATIENT_ATTRIBUTES_TABLE + "(`internal_id`,`attr_id`,`attr_value`) VALUES(?,?,?)";
 
-    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `internal_id` = ?";
     //MUTATION_COUNT and FRACTION_GENOME_ALTERED attributes are calculated from mutation and CN segment data and should not be deleted when clinical data is updated for a sample, so we exclude them from the delete statement
-    private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `internal_id` = ? AND `attr_id` NOT IN ('MUTATION_COUNT', 'FRACTION_GENOME_ALTERED')";
+    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `internal_id` = ? AND `attr_id` NOT IN ('MUTATION_COUNT', 'FRACTION_GENOME_ALTERED')";
+    private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `internal_id` = ?";
     private static final Map<String, String> sampleAttributes = new HashMap<String, String>();
     private static final Map<String, String> patientAttributes = new HashMap<String, String>();
 
@@ -388,6 +388,19 @@ public final class DaoClinicalData {
      * @param sampleInternalId - internal id of sample for which to remove attributes
      * @throws DaoException
      */
+    public static void optimizeTables() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+            con.prepareStatement("OPTIMIZE TABLE clinical_sample FINAL").executeUpdate();
+            con.prepareStatement("OPTIMIZE TABLE clinical_patient FINAL").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoClinicalData.class, con, null, null);
+        }
+    }
+
     public static void removeSampleAttributesData(int sampleInternalId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;

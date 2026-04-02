@@ -38,6 +38,7 @@ import java.util.*;
 import joptsimple.OptionSet;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoClinicalData;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegmentFile;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -148,6 +149,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
             DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
             ClickHouseBulkLoader.flushAll();
+            DaoClinicalData.optimizeTables();
             ClickHouseBulkLoader.bulkLoadOff();
         } catch (RuntimeException e) {
             throw e;
