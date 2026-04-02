@@ -447,18 +447,6 @@ public class DaoGeneticAlteration {
      * @param geneticProfileId Genetic Profile ID.
      * @throws DaoException Database Error.
      */
-    public void optimizeTable() throws DaoException {
-        Connection con = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            con.prepareStatement("OPTIMIZE TABLE genetic_alteration FINAL").executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
-        }
-    }
-
     public void deleteAllRecordsInGeneticProfile(long geneticProfileId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;

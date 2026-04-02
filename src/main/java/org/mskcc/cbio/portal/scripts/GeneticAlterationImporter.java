@@ -96,5 +96,5 @@ public class GeneticAlterationImporter {
             throw new RuntimeException(e);
         }
     }
-    public void complete() { }
+    public void complete() throws DaoException { }
 }

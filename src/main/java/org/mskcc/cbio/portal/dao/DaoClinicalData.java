@@ -388,19 +388,6 @@ public final class DaoClinicalData {
      * @param sampleInternalId - internal id of sample for which to remove attributes
      * @throws DaoException
      */
-    public static void optimizeTables() throws DaoException {
-        Connection con = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            con.prepareStatement("OPTIMIZE TABLE clinical_sample FINAL").executeUpdate();
-            con.prepareStatement("OPTIMIZE TABLE clinical_patient FINAL").executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoClinicalData.class, con, null, null);
-        }
-    }
-
     public static void removeSampleAttributesData(int sampleInternalId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
