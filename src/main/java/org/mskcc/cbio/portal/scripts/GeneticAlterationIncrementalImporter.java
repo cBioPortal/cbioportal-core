@@ -61,12 +61,9 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     }
 
     @Override
-    public void finalize() {
+    public void complete() {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
-        super.finalize();
-        // Need to run OPTIMIZE TABLE ... FINAL for
-        // genetic_alteration and genetic_profile_samples tables
-        // in order to ensure deduplication of existing records
+        super.complete();
         try {
             daoGeneticAlteration.optimizeTable();
             DaoGeneticProfileSamples.optimizeTable();

@@ -96,5 +96,5 @@ public class GeneticAlterationImporter {
             throw new RuntimeException(e);
         }
     }
-    public void finalize() { }
+    public void complete() { }
 }
