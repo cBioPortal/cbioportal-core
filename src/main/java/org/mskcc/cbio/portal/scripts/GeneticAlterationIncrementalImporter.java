@@ -2,7 +2,7 @@ package org.mskcc.cbio.portal.scripts;
 
 import java.util.*;
 
-import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseOptimizer;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
@@ -66,20 +66,7 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     public void complete() throws DaoException {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
         super.complete();
-
-        // Important to flush all inserts before calling OPTIMIZE TABLE .. FINAL
-        // to detect duplicates
-        // Note that the above method may have created some inserts, too
-        if (ClickHouseBulkLoader.isBulkLoad()) {
-            ClickHouseBulkLoader.flushAll();
-        }
-
-        try {
-            daoGeneticAlteration.optimizeTable();
-            DaoGeneticProfileSamples.optimizeTable();
-        } catch (DaoException e) {
-            throw new RuntimeException(e);
-        }
+        ClickHouseOptimizer.optimizeTables("genetic_alteration", "genetic_profile_samples");
     }
 
     private String[] extendValues(int geneticEntityId, String[] values) {
