@@ -164,6 +164,11 @@ public final class DaoMutation {
     }
 
     public static void createMutationCountClinicalData(GeneticProfile geneticProfile) throws DaoException {
+        // Make sure we are computing MUTATION_COUNT based off the latest changes to each table
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
+        }
+
         Connection con = null;
         PreparedStatement deleteStmt = null;
         PreparedStatement insertStmt = null;
@@ -203,6 +208,9 @@ public final class DaoMutation {
             );
             insertStmt.setInt(1, geneticProfile.getGeneticProfileId());
             insertStmt.executeUpdate();
+
+            // Necessary for deduplication
+            ClickHouseOptimizer.optimizeTables("clinical_sample");
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
