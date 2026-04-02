@@ -79,15 +79,7 @@ public final class DaoSampleProfile {
     }
 
     private static void optimizeSampleProfileTable() throws DaoException {
-        Connection con = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoSampleProfile.class);
-            con.prepareStatement("OPTIMIZE TABLE sample_profile FINAL").executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoSampleProfile.class, con, null, null);
-        }
+        ClickHouseOptimizer.optimizeTables("sample_profile");
     }
 
     private static void upsertWithJdbcBatch(Collection<SampleProfileTuple> idTuples) throws DaoException {
