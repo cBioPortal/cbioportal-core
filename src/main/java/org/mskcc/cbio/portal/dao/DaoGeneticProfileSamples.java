@@ -147,6 +147,18 @@ public final class DaoGeneticProfileSamples
      * Deletes all Records in the table.
      * @throws DaoException Database Exception.
      */
+    public static void optimizeTable() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoGeneticProfileSamples.class);
+            con.prepareStatement("OPTIMIZE TABLE genetic_profile_samples FINAL").executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoGeneticProfileSamples.class, con, null, null);
+        }
+    }
+
     public static void deleteAllRecords() throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;

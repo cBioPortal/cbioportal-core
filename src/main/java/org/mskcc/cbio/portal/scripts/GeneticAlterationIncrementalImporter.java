@@ -54,11 +54,6 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
             Set<Integer> savedSampleSet = new HashSet<>(savedOrderedSampleList);
             List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedSampleSet.contains(sampleId)).toList();
             this.orderedSampleList.addAll(newSampleIds);
-            // Delete old rows before re-inserting. ClickHouse does not enforce unique keys, so
-            // plain INSERTs would create duplicate rows. The existing data is already captured
-            // in geneticAlterationMap above, so it is safe to delete here.
-            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(geneticProfileId);
-            DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(geneticProfileId);
         } catch (DaoException e) {
             throw new RuntimeException(e);
         }
@@ -69,6 +64,15 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     public void finalize() {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
         super.finalize();
+        // Need to run OPTIMIZE TABLE ... FINAL for
+        // genetic_alteration and genetic_profile_samples tables
+        // in order to ensure deduplication of existing records
+        try {
+            daoGeneticAlteration.optimizeTable();
+            DaoGeneticProfileSamples.optimizeTable();
+        } catch (DaoException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String[] extendValues(int geneticEntityId, String[] values) {
