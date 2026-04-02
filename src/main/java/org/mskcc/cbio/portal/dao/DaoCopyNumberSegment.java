@@ -81,6 +81,10 @@ public final class DaoCopyNumberSegment {
             throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert Fraction Genome Altered");
         }
 
+        // Make sure we are seeing the latest data that has been inserted into the segment table
+        // for computing FRACTION_GENOME_ALTERED
+        ClickHouseBulkLoader.flushAll();
+
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
@@ -125,6 +129,9 @@ public final class DaoCopyNumberSegment {
             for (Map.Entry<Integer, String> fractionGenomeAltered : fractionGenomeAltereds.entrySet()) {
                 DaoClinicalData.addSampleDatum(fractionGenomeAltered.getKey(), FRACTION_GENOME_ALTERED_ATTR_ID, fractionGenomeAltered.getValue());
             }
+
+            // Necessary for deduplication
+            ClickHouseOptimizer.optimizeTables("clinical_sample");
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
