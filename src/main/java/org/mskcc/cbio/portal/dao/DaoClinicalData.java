@@ -753,45 +753,4 @@ public final class DaoClinicalData {
             JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
         }
     }
-
-    private static List<Map.Entry<Integer, String>> getExistingAttributes(String tableName, List<Map.Entry<Integer, String>> internalPatientIdAttributes) throws DaoException {
-        if (internalPatientIdAttributes.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
-        try {
-            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            pstmt = con.prepareStatement("SELECT internal_id, attr_id FROM `"
-                    + tableName + "` WHERE (internal_id, attr_id) IN ("
-                    + String.join(",", Collections.nCopies(internalPatientIdAttributes.size(), "(?, ?)")) + ")");
-            int parameterIndex = 1;
-            for (Map.Entry<Integer, String> entry : internalPatientIdAttributes) {
-                pstmt.setInt(parameterIndex++, entry.getKey());
-                pstmt.setString(parameterIndex++, entry.getValue());
-            }
-            rs = pstmt.executeQuery();
-
-            List<Map.Entry<Integer, String>> result = new ArrayList<>();
-            while (rs.next()) {
-                result.add(Map.entry(rs.getInt("internal_id"), rs.getString("attr_id")));
-            }
-
-            return result;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
-        }
-    }
-
-    public static List<Map.Entry<Integer, String>> getExistingPatientAttributes(List<Map.Entry<Integer, String>> internalPatientIdAttributes) throws DaoException {
-        return getExistingAttributes(PATIENT_ATTRIBUTES_TABLE, internalPatientIdAttributes);
-    }
-
-    public static List<Map.Entry<Integer, String>> getExistingSampleAttributes(List<Map.Entry<Integer, String>> internalPatientIdAttributes) throws DaoException {
-        return getExistingAttributes(SAMPLE_ATTRIBUTES_TABLE, internalPatientIdAttributes);
-    }
 }
