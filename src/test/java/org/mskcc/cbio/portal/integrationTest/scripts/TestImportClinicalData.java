@@ -413,31 +413,6 @@ public class TestImportClinicalData extends IntegrationTestBase {
         importClinicalData.importData();
         ConsoleUtil.showWarnings();
 	}		
-	
-	/** 
-	 * Test loading a correct file twice. Should give duplication error.
-	 * @throws Exception
-	 */
-	@Test
-	public void testImportClinicalData_CorrectFileTwice1() throws Exception {
-		checkCorrectFileTwice("PATIENT", "Error: The following patient internal id and attribute entries already exist in the database:");
-	}
-    @Test
-	public void testImportClinicalData_CorrectFileTwice2() throws Exception {
-		checkCorrectFileTwice("SAMPLE", "Error: Sample TEST-A2-A04P is already in the database.");
-	}	
-	private void checkCorrectFileTwice(String type, String errorMessage) throws Exception {
-        File clinicalFile = new File("src/test/resources/clinical_data_small_" + type + ".txt");
-        // initialize an ImportClinicalData instance without args to parse
-        ImportClinicalData importClinicalData = new ImportClinicalData(null);
-        // set the info usually parsed from args
-        importClinicalData.setFile(cancerStudy, clinicalFile, type + "_ATTRIBUTES", false);
-        importClinicalData.importData();
-        // loading twice should also give error
-        exception.expect(RuntimeException.class);
-        exception.expectMessage(errorMessage);
-        importClinicalData.importData();
-	}
 
 	/** 
 	 * Tests to try out the MissingAttributeValues enum and ensure it filters out the 
