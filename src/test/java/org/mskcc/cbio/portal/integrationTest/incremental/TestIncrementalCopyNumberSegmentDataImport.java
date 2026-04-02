@@ -66,7 +66,7 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
         copyNumberSegmentFile.filename = "test_file.seg";
         copyNumberSegmentFile.description = "test seg file description";
         DaoCopyNumberSegmentFile.addCopyNumberSegmentFile(copyNumberSegmentFile);
-        DaoClinicalData.addSampleDatum(segDataSample.getInternalId(), "FRACTION_GENOME_ALTERED", "TEST");
+        DaoClinicalData.addSampleDatum(segDataSample.getInternalId(), "FRACTION_GENOME_ALTERED", "0.0");
         ClickHouseBulkLoader.bulkLoadOn();
         CopyNumberSegment copyNumberSegment = new CopyNumberSegment(
                 cancerStudy.getInternalId(),
