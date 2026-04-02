@@ -163,8 +163,8 @@ public class ImportCnaDiscreteLongData {
 
         ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + getSamplesSkipped());
         buf.close();
-        geneticAlterationGeneImporter.finalize();
         ClickHouseBulkLoader.flushAll();
+        geneticAlterationGeneImporter.complete();
     }
 
     /**
