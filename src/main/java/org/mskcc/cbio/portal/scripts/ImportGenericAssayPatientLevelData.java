@@ -32,10 +32,7 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.*;
-import java.util.stream.*;
-
+import org.mskcc.cbio.portal.dao.BackupUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
@@ -54,6 +51,17 @@ import org.mskcc.cbio.portal.util.GeneticProfileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
 public class ImportGenericAssayPatientLevelData {
     private HashSet<Integer> importedGeneticEntitySet = new HashSet<>(); 
@@ -93,19 +101,28 @@ public class ImportGenericAssayPatientLevelData {
      * @throws IOException  IO Error.
      * @throws DaoException Database Error.
      */
-    public void importData() throws IOException, DaoException {
+    public void importData() throws Exception {
+        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples"), this::importDataInternal);
+    }
+
+    void importDataInternal() throws Exception {
         int numLines = FileUtil.getNumLines(dataFile);
 
         geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
 
-        FileReader reader = new FileReader(dataFile);
-        BufferedReader buf = new BufferedReader(reader);
-        String headerLine = buf.readLine();
-        String parts[] = headerLine.split("\t");
-        
+        //Object to insert records in the generic 'genetic_alteration' table:
+        DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+
         int numRecordsToAdd = 0;
-        int patientsSkipped = 0;
-        try {
+        try (
+                FileReader reader = new FileReader(dataFile);
+                BufferedReader buf = new BufferedReader(reader);
+        ) {
+            ProgressMonitor.setCurrentMessage("Importing Generic Assay Patient Level data from file: " + dataFile.getCanonicalPath());
+
+            String headerLine = buf.readLine();
+            String parts[] = headerLine.split("\t");
+
             int patientStartIndex = getPatientIdStartColumnIndex(parts);
             int genericAssayIdIndex = getGenericAssayIdIndex(parts);
             if (genericAssayIdIndex == -1) {
@@ -142,9 +159,6 @@ public class ImportGenericAssayPatientLevelData {
             
             DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
     
-            //Object to insert records in the generic 'genetic_alteration' table: 
-            DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-
             // load entities map from database
             Map<String, Integer> genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             
@@ -179,9 +193,6 @@ public class ImportGenericAssayPatientLevelData {
                         " to the database!");
             }
         }
-        finally {
-            buf.close();
-        }                
     }
 
     /**

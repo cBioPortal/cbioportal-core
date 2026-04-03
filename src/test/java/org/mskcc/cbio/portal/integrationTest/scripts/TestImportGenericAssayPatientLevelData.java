@@ -133,7 +133,7 @@ public class TestImportGenericAssayPatientLevelData extends IntegrationTestBase 
         runImportGenericAssayPatientLevelData();
     }
     
-    private void runImportGenericAssayPatientLevelData() throws DaoException, IOException{
+    private void runImportGenericAssayPatientLevelData() throws Exception {
 
         DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
 

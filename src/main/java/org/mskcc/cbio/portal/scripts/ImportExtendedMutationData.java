@@ -149,10 +149,10 @@ public class ImportExtendedMutationData {
 
         List<AlleleSpecificCopyNumber> ascnRecords = new ArrayList<AlleleSpecificCopyNumber>();
 
-        FileReader reader = new FileReader(mutationFile);
-        BufferedReader buf = new BufferedReader(reader);
-
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
+
+        try (FileReader reader = new FileReader(mutationFile);
+             BufferedReader buf = new BufferedReader(reader)) {
 
         // process MAF header and return line immediately following it
         String line = processMAFHeader(buf);
@@ -527,6 +527,7 @@ public class ImportExtendedMutationData {
 
         ProgressMonitor.setCurrentMessage("Filtering table:\n-----------------");
         ProgressMonitor.setCurrentMessage(myMutationFilter.getStatistics() );
+        } // end try-with-resources
     }
 
     /**
