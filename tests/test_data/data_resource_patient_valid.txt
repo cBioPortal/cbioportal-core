@@ -1,4 +1,4 @@
-PATIENT_ID	RESOURCE_ID	URL
-TCGA-A2-A04P	PATIENT_NOTES	http://url-to-patient-notes-patient1
-TCGA-A1-A0SK	PATIENT_NOTES	http://url-to-patient-notes-patient2
-TCGA-A2-A0CM	PATIENT_NOTES	http://url-to-patient-notes-patient3
+PATIENT_ID	RESOURCE_ID	URL	DISPLAY_NAME	TYPE	GROUP_PATH	METADATA	PRIORITY
+TCGA-A2-A04P	PATIENT_NOTES	http://url-to-patient-notes-patient1	Biopsy Report	PATH_REPORT	2023		0
+TCGA-A1-A0SK	PATIENT_NOTES	http://url-to-patient-notes-patient2	CT Instance	CT	CT 2023-01-15/Series 1: Axial T2	{"modality":"CT","slices":120}	0
+TCGA-A2-A0CM	PATIENT_NOTES	http://url-to-patient-notes-patient3					0
