@@ -31,6 +31,9 @@ function write_selected_mysql_connection_to_env_file() {
     echo "    password: ${my_properties['mysql_server_password']}" >> "$env_file"
     echo "    port: \"${my_properties['mysql_server_port']}\"" >> "$env_file"
     echo "    user: ${my_properties['mysql_server_username']}" >> "$env_file"
+    echo "    readTimeout: 10h" >> "$env_file"
+    echo "    writeTimeout: 10h" >> "$env_file"
+    echo "    timeout: 10h" >> "$env_file"
     echo >> "$env_file"
 }
 
@@ -82,7 +85,7 @@ function write_sling_env_file() {
     write_selected_mysql_connection_to_env_file "$env_file" "$database_to_transfer"
     write_selected_clickhouse_connection_to_env_file "$env_file" "$database_to_transfer"
     echo "variables: {}" >> "$env_file"
-    if ! [ "$(cat $env_file | wc -l)" == "22" ] ; then
+    if ! [ "$(cat $env_file | wc -l)" == "25" ] ; then
         echo "Error : could not successfully write default mysql properties to file $env_file" >&2
         return 1
     fi
