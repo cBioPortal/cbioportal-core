@@ -31,8 +31,8 @@ function write_selected_mysql_connection_to_env_file() {
     echo "    password: ${my_properties['mysql_server_password']}" >> "$env_file"
     echo "    port: \"${my_properties['mysql_server_port']}\"" >> "$env_file"
     echo "    user: ${my_properties['mysql_server_username']}" >> "$env_file"
-    echo "    readTimeout: 10h" >> "$env_file"
-    echo "    writeTimeout: 10h" >> "$env_file"
+    echo "    read_timeout: 10h" >> "$env_file"
+    echo "    write_timeout: 10h" >> "$env_file"
     echo "    timeout: 10h" >> "$env_file"
     echo >> "$env_file"
 }
