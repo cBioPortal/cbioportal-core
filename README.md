@@ -176,3 +176,26 @@ The script will search for `core-*.jar` in the root of the project:
 ```bash
 python scripts/importer/metaImport.py -s tests/test_data/study_es_0 -p tests/test_data/api_json_unit_tests -o
 ```
+
+#### Check ClickHouse constraint violations
+
+Use `org.mskcc.cbio.portal.scripts.CheckClickHouseConstraints` to report ClickHouse foreign-key and unique-key violations. The command reads database connection settings from `application.properties`.
+
+This checker is a standalone validation step. It is not run automatically as part of the normal `importer/metaImport.py` study import flow. Run it explicitly when you want to verify that the ClickHouse copy of the data is internally consistent after an import or ClickHouse refresh.
+
+Run it directly with the built jar:
+```bash
+PORTAL_HOME=$(pwd) java -cp core-*.jar org.mskcc.cbio.portal.scripts.CheckClickHouseConstraints
+```
+
+Run it from the Docker image:
+```bash
+docker run --rm -it --network <docker-network> \
+  -v $(pwd)/application.properties:/application.properties:ro \
+  cbioportal-core \
+  bash -lc 'java -cp /core-*.jar org.mskcc.cbio.portal.scripts.CheckClickHouseConstraints'
+```
+
+Omit `--network <docker-network>` if the target database is reachable without joining a Docker network. The command exits with a non-zero status when violations are found.
+
+If the checker fails, use the reported table/column pairs and sample values to determine whether the issue is caused by bad source data. If so, the typical recovery step is to fix the data and rerun the normal import process.
