@@ -33,6 +33,8 @@
 package org.mskcc.cbio.portal.dao;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.mskcc.cbio.portal.model.CanonicalGene;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -45,8 +47,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
-import org.mskcc.cbio.portal.model.CanonicalGene;
 
 /**
  * Data Access Object for the Genetic Alteration Table.
@@ -482,4 +482,6 @@ public class DaoGeneticAlteration {
             JdbcUtil.closeAll(DaoGeneticAlteration.class, con, pstmt, rs);
         }
     }
+
+
 }

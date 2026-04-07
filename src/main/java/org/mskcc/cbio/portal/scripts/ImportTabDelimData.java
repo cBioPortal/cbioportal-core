@@ -38,6 +38,7 @@ import java.util.regex.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
+import org.mskcc.cbio.portal.dao.BackupUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -173,8 +174,13 @@ public class ImportTabDelimData {
     public void importData() throws Exception {
         this.numLines = FileUtil.getNumLines(dataFile);
         ProgressMonitor.setMaxValue(numLines);
+        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples", "sample_profile"), this::importDataInternal);
+    }
+
+    void importDataInternal() throws Exception {
         try (FileReader reader = new FileReader(dataFile);
             BufferedReader buf = new BufferedReader(reader)) {
+
             String headerLine = buf.readLine();
             String[] headerParts = TsvUtil.splitTsvLine(headerLine);
             //Whether data regards CNA or RPPA:
@@ -288,6 +294,10 @@ public class ImportTabDelimData {
             }
 
 
+            if (isDiscretizedCnaProfile && isIncrementalUpdateMode) {
+                DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
+            }
+
             String line = buf.readLine();
             while (line != null) {
 
@@ -377,9 +387,7 @@ public class ImportTabDelimData {
 
     private Map<Map.Entry<String, Long>, Map<String, String>> readPdAnnotations(File pdAnnotationsFile) {
         Map<Map.Entry<String, Long>, Map<String, String>> pdAnnotations = new HashMap<>();
-        BufferedReader reader;
-        try {
-            reader = new BufferedReader(new FileReader(pdAnnotationsFile));
+        try (BufferedReader reader = new BufferedReader(new FileReader(pdAnnotationsFile))) {
             List<String> header = Arrays.asList(reader.readLine().toLowerCase().split("\t"));
             int sampleIdIndx = header.indexOf("sample_id");
             if (sampleIdIndx < 0) {
@@ -427,7 +435,6 @@ public class ImportTabDelimData {
                 pdAnnotations.put(sampleGeneKey, driverInfo);
                 line = reader.readLine();
             }
-            reader.close();
         } catch (IOException e) {
             throw new RuntimeException("Can't read PD annotation file", e);
         }
@@ -625,9 +632,6 @@ public class ImportTabDelimData {
                 recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    if (isIncrementalUpdateMode) {
-                        DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
-                    }
                     long entrezGeneId = genes.get(0).getEntrezGeneId();
                     CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, entrezGeneId));
                 }

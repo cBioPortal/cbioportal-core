@@ -49,37 +49,33 @@ public class ImportMicroRNAIDs {
 
     public static void importData(File geneFile) throws IOException, DaoException {
         ClickHouseBulkLoader.bulkLoadOff();
-        FileReader reader = new FileReader(geneFile);
-        BufferedReader buf = new BufferedReader(reader);
-        String line = buf.readLine(); // skip first line
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
-        
         List<CanonicalGene> mirnas = new ArrayList<CanonicalGene>();
-        
-        while ((line=buf.readLine()) != null) {
-            ProgressMonitor.incrementCurValue();
-            ConsoleUtil.showProgress();
-            if (!line.startsWith("#")) {
-                String parts[] = line.split("\t");
-                
-                String geneSymbol = parts[2];
-                
-                Set<String> aliases = new HashSet<String>();
-                setAliases(parts[0],aliases);
-                
-                if (!parts[0].equalsIgnoreCase(parts[1])) {
-                    setAliases(parts[1],aliases);
+
+        try (FileReader reader = new FileReader(geneFile);
+             BufferedReader buf = new BufferedReader(reader)) {
+            String line = buf.readLine(); // skip first line
+            while ((line=buf.readLine()) != null) {
+                ProgressMonitor.incrementCurValue();
+                ConsoleUtil.showProgress();
+                if (!line.startsWith("#")) {
+                    String parts[] = line.split("\t");
+                    String geneSymbol = parts[2];
+                    Set<String> aliases = new HashSet<String>();
+                    setAliases(parts[0],aliases);
+                    if (!parts[0].equalsIgnoreCase(parts[1])) {
+                        setAliases(parts[1],aliases);
+                    }
+                    CanonicalGene mirna = new CanonicalGene(geneSymbol,aliases);
+                    mirna.setType(CanonicalGene.MIRNA_TYPE);
+                    mirnas.add(mirna);
                 }
-                
-                CanonicalGene mirna = new CanonicalGene(geneSymbol,aliases);
-                mirna.setType(CanonicalGene.MIRNA_TYPE);
-                mirnas.add(mirna);
             }
         }
-        
+
         for (CanonicalGene mirna : mirnas) {
             daoGene.addGene(mirna);
-        }       
+        }
     }
     
     private static void setAliases(String hsa, Set<String> aliases) {
