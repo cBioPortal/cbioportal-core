@@ -26,6 +26,7 @@ import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
+
 import org.mskcc.cbio.portal.scripts.ImportCnaDiscreteLongData;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -53,10 +54,15 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
 
     private int profileId;
 
+    // Sample IDs known to exist in the test database for study_tcga_pub
+    private static final List<Integer> SEED_SAMPLE_IDS = List.of(2, 3, 6);
+
     @Before
     public void setUp() throws DaoException {
         DaoCancerStudy.reCacheAll();
         profileId = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_gistic").getGeneticProfileId();
+        // Seed sample_profile so the backup has real associations to verify against
+        DaoSampleProfile.upsertSampleToProfileMapping(SEED_SAMPLE_IDS, profileId, null);
     }
 
     @Override
