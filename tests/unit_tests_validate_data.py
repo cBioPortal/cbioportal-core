@@ -498,6 +498,19 @@ class TimelineValuesDataValidationTest(DataFileTestCase):
             self.assertEqual("ERROR", error.levelname)
             self.assertIn("Invalid START_DATE", error.getMessage())
 
+    def test_duplicated_timeline_lines(self):
+        """Raise an error if timeline lines are duplicated.
+        """
+        # set level according to this test case:
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_timeline_duplicated.txt',
+                                    validateData.TimelineValidator)
+        self.assertEqual(1, len(record_list))
+        for error in record_list:
+            self.assertEqual("ERROR", error.levelname)
+            self.assertIn("Duplicate entry in timeline data", error.getMessage())
+
+
         
 # TODO: make tests in this testcase check the number of properly defined types
 class CancerTypeFileValidationTestCase(DataFileTestCase):
