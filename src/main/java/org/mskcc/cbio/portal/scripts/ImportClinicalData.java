@@ -167,27 +167,28 @@ public class ImportClinicalData extends ConsoleRunnable {
             ClickHouseBulkLoader.relaxedModeOn();
         }    
         
-        FileReader reader =  new FileReader(clinicalDataFile);
-        BufferedReader buff = new BufferedReader(reader);
-        List<ClinicalAttribute> columnAttrs = grabAttrs(buff);
-        
-        int patientIdIndex = findPatientIdColumn(columnAttrs);
-        int sampleIdIndex = findSampleIdColumn(columnAttrs);
+        try (FileReader reader = new FileReader(clinicalDataFile);
+             BufferedReader buff = new BufferedReader(reader)) {
+            List<ClinicalAttribute> columnAttrs = grabAttrs(buff);
 
-        //validate required columns:
-        if (patientIdIndex < 0) {
-        	//PATIENT_ID is required in both file types:
-        	throw new RuntimeException("Aborting owing to failure to find " +
-                    PATIENT_ID_COLUMN_NAME + 
-                    " in file. Please check your file format and try again.");
+            int patientIdIndex = findPatientIdColumn(columnAttrs);
+            int sampleIdIndex = findSampleIdColumn(columnAttrs);
+
+            //validate required columns:
+            if (patientIdIndex < 0) {
+                //PATIENT_ID is required in both file types:
+                throw new RuntimeException("Aborting owing to failure to find " +
+                        PATIENT_ID_COLUMN_NAME +
+                        " in file. Please check your file format and try again.");
+            }
+            if (attributesType.toString().equals("SAMPLE") && sampleIdIndex < 0) {
+                //SAMPLE_ID is required in SAMPLE file type:
+                throw new RuntimeException("Aborting owing to failure to find " +
+                        SAMPLE_ID_COLUMN_NAME +
+                        " in file. Please check your file format and try again.");
+            }
+            importData(buff, columnAttrs);
         }
-        if (attributesType.toString().equals("SAMPLE") && sampleIdIndex < 0) {
-        	//SAMPLE_ID is required in SAMPLE file type:
-            throw new RuntimeException("Aborting owing to failure to find " +
-                    SAMPLE_ID_COLUMN_NAME +
-                    " in file. Please check your file format and try again.");
-        }
-        importData(buff, columnAttrs);
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();

@@ -56,7 +56,6 @@ public class TestIncrementalTabDelimDataTransaction extends IntegrationTestBase 
      * Test transaction
      */
     @ExtendWith(MockitoExtension.class)
-    @Ignore("FIXME: will pass when transaction substitution for ClickHouse is implemented")
     @Test
     public void testTransaction() throws Exception {
         GeneticProfile mrnaProfile = DaoGeneticProfile.getGeneticProfileByStableId("study_tcga_pub_mrna");

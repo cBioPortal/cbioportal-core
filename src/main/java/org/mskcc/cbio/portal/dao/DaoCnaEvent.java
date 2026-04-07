@@ -97,27 +97,14 @@ public final class DaoCnaEvent {
      * @throws DaoException 
      */
     private static long addCnaEventDirectly(CnaEvent cnaEvent) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            long newId = ClickHouseAutoIncrement.nextId(CNA_EVENT_SEQUENCE);
-            pstmt = con.prepareStatement
-                    ("INSERT INTO cna_event (" +
-                            "`cna_event_id`, `entrez_gene_id`," +
-                            "`alteration` )" +
-                            " VALUES(?,?,?)");
-            pstmt.setLong(1, newId);
-            pstmt.setLong(2, cnaEvent.getEntrezGeneId());
-            pstmt.setInt(3, cnaEvent.getAlteration());
-            pstmt.executeUpdate();
-            return newId;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoCnaEvent.class, con, pstmt, null);
-        }
-	}
+        long newId = ClickHouseAutoIncrement.nextId(CNA_EVENT_SEQUENCE);
+        ClickHouseBulkLoader.getClickHouseBulkLoader("cna_event").insertRecord(
+            Long.toString(newId),
+            Long.toString(cnaEvent.getEntrezGeneId()),
+            Integer.toString(cnaEvent.getAlteration())
+        );
+        return newId;
+    }
 
     public static void removeSampleCnaEvents(int cnaProfileId, List<Integer> sampleIds) throws DaoException {
         Connection con = null;
