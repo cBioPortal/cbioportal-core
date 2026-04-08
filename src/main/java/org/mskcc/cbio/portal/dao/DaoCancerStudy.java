@@ -62,8 +62,6 @@ import java.util.Set;
  */
 public final class DaoCancerStudy {
 
-    private static final int DELETE_BATCH_SIZE = 500;
-
     public static enum Status {
         UNAVAILABLE,
         AVAILABLE
@@ -526,29 +524,31 @@ public final class DaoCancerStudy {
             List<Integer> gisticIds = collectIds(con,
                 "SELECT gistic_roi_id FROM gistic WHERE cancer_study_id=?", internalCancerStudyId);
 
-            deleteByIds(con, "DELETE FROM sample_cna_event WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM genetic_alteration WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM genetic_profile_samples WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM sample_profile WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM mutation WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM alteration_driver_annotation WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM mutation_count_by_keyword WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM structural_variant WHERE genetic_profile_id IN ", geneticProfileIds);
-            deleteByIds(con, "DELETE FROM genetic_profile_link WHERE referred_genetic_profile_id IN ", geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("sample_cna_event", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("genetic_alteration", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("genetic_profile_samples", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("sample_profile", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("mutation", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("alteration_driver_annotation", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("mutation_count_by_keyword", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("structural_variant", "genetic_profile_id").addIds(geneticProfileIds);
+            ClickHouseBulkDeleter.getBulkDeleter("genetic_profile_link", "referred_genetic_profile_id").addIds(geneticProfileIds);
 
-            deleteByIds(con, "DELETE FROM gistic_to_gene WHERE gistic_roi_id IN ", gisticIds);
+            ClickHouseBulkDeleter.getBulkDeleter("gistic_to_gene", "gistic_roi_id").addIds(gisticIds);
 
-            deleteByIds(con, "DELETE FROM clinical_event_data WHERE clinical_event_id IN ", clinicalEventIds);
-            deleteByIds(con, "DELETE FROM clinical_event WHERE clinical_event_id IN ", clinicalEventIds);
+            ClickHouseBulkDeleter.getBulkDeleter("clinical_event_data", "clinical_event_id").addIds(clinicalEventIds);
+            ClickHouseBulkDeleter.getBulkDeleter("clinical_event", "clinical_event_id").addIds(clinicalEventIds);
 
-            deleteByIds(con, "DELETE FROM sample_list_list WHERE list_id IN ", sampleListIds);
+            ClickHouseBulkDeleter.getBulkDeleter("sample_list_list", "list_id").addIds(sampleListIds);
 
-            deleteByIds(con, "DELETE FROM clinical_sample WHERE internal_id IN ", sampleIds);
-            deleteByIds(con, "DELETE FROM resource_sample WHERE internal_id IN ", sampleIds);
+            ClickHouseBulkDeleter.getBulkDeleter("clinical_sample", "internal_id").addIds(sampleIds);
+            ClickHouseBulkDeleter.getBulkDeleter("resource_sample", "internal_id").addIds(sampleIds);
 
-            deleteByIds(con, "DELETE FROM sample WHERE internal_id IN ", sampleIds);
-            deleteByIds(con, "DELETE FROM clinical_patient WHERE internal_id IN ", patientIds);
-            deleteByIds(con, "DELETE FROM resource_patient WHERE internal_id IN ", patientIds);
+            ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(sampleIds);
+            ClickHouseBulkDeleter.getBulkDeleter("clinical_patient", "internal_id").addIds(patientIds);
+            ClickHouseBulkDeleter.getBulkDeleter("resource_patient", "internal_id").addIds(patientIds);
+
+            ClickHouseBulkDeleter.flushAll();
 
             deleteByStudyId(con, "DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId(con, "DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
@@ -564,6 +564,8 @@ public final class DaoCancerStudy {
             deleteByStudyId(con, "DELETE FROM cancer_study WHERE cancer_study_id=?", internalCancerStudyId);
 
             removeCancerStudyFromCache(internalCancerStudyId);
+        } catch (DaoException e) {
+            throw e;
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
@@ -621,24 +623,6 @@ public final class DaoCancerStudy {
         try (PreparedStatement pstmt = con.prepareStatement(sql)) {
             pstmt.setInt(1, cancerStudyId);
             pstmt.executeUpdate();
-        }
-    }
-
-    private static void deleteByIds(Connection con, String sqlPrefix, List<Integer> ids) throws SQLException {
-        if (ids.isEmpty()) {
-            return;
-        }
-        for (int start = 0; start < ids.size(); start += DELETE_BATCH_SIZE) {
-            int end = Math.min(start + DELETE_BATCH_SIZE, ids.size());
-            List<Integer> chunk = ids.subList(start, end);
-            String placeholders = String.join(",", Collections.nCopies(chunk.size(), "?"));
-            try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")")) {
-                int idx = 1;
-                for (Integer id : chunk) {
-                    pstmt.setInt(idx++, id);
-                }
-                pstmt.executeUpdate();
-            }
         }
     }
 
