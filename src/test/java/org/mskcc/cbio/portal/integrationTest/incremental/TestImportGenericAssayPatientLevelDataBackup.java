@@ -105,13 +105,23 @@ public class TestImportGenericAssayPatientLevelDataBackup extends AbstractBackup
 
     @Override
     protected Object captureDataState() throws DaoException {
-        return DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(profileId, null);
+        try {
+            return DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(profileId, null);
+        } catch (IllegalArgumentException e) {
+            // Profile has no samples yet (freshly created before import)
+            return new HashMap<>();
+        }
     }
 
     @Override
     protected void assertDataStateUnchanged(Object stateBefore) throws DaoException {
-        HashMap<Integer, HashMap<Integer, String>> after =
-            DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(profileId, null);
+        HashMap<Integer, HashMap<Integer, String>> after;
+        try {
+            after = DaoGeneticAlteration.getInstance().getGeneticAlterationMapForEntityIds(profileId, null);
+        } catch (IllegalArgumentException e) {
+            // Profile has no samples (restored to pre-import state)
+            after = new HashMap<>();
+        }
         assertEquals(stateBefore, after);
     }
 }
