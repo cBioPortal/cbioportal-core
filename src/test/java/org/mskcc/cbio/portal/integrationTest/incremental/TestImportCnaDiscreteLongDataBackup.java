@@ -90,7 +90,7 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
     protected Object captureDataState() throws DaoException {
         return Map.of(
             "genetic_alteration", DaoGeneticAlteration.getInstance().getGeneticAlterationMap(profileId, null),
-            "sample_cna_event",   DaoCnaEvent.getAllCnaEvents(),
+            "sample_cna_event",   Set.copyOf(DaoCnaEvent.getAllCnaEvents()),
             "sample_profile",     new ArrayList<>(DaoSampleProfile.getAllSampleIdsInProfile(profileId))
         );
     }
@@ -102,7 +102,7 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
         assertEquals(before.get("genetic_alteration"),
             DaoGeneticAlteration.getInstance().getGeneticAlterationMap(profileId, null));
         assertEquals(before.get("sample_cna_event"),
-            DaoCnaEvent.getAllCnaEvents());
+            Set.copyOf(DaoCnaEvent.getAllCnaEvents()));
         assertEquals(before.get("sample_profile"),
             new ArrayList<>(DaoSampleProfile.getAllSampleIdsInProfile(profileId)));
     }
