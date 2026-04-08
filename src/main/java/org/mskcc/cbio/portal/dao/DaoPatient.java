@@ -271,6 +271,7 @@ public class DaoPatient {
         finally {
             JdbcUtil.closeAll(DaoPatient.class, con, null, null);
         }
+        clearCache();
         log.info("Removing {} patients from study with internal id={} done.", patientStableIds, internalStudyId);
     }
 

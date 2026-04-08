@@ -308,6 +308,7 @@ public class DaoSample {
         ClickHouseBulkDeleter.getBulkDeleter("resource_sample", "internal_id").addIds(internalSampleIds);
         ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(internalSampleIds);
         ClickHouseBulkDeleter.flushAll();
+        clearCache();
         DaoCancerStudy.purgeUnreferencedRecordsAfterDeletionOfStudy();
         log.info("Removing {} samples from study with internal id={} done.", sampleStableIds, internalStudyId);
     }
