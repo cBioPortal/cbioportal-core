@@ -1,4 +1,4 @@
-PATIENT_ID	SAMPLE_ID	RESOURCE_ID	URL
-TCGA-A2-A04P	TCGA-A2-A04P-01	PATHOLOGY_SLIDE	http://url-to-slide-sample1
-TCGA-A1-A0SK	TCGA-A1-A0SK-01	PATHOLOGY_SLIDE	http://url-to-slide-sample2
-TCGA-A2-A0CM	TCGA-A2-A0CM-01	PATHOLOGY_SLIDE	http://url-to-slide-sample3
+PATIENT_ID	SAMPLE_ID	RESOURCE_ID	URL	DISPLAY_NAME	TYPE	GROUP_PATH	METADATA	PRIORITY
+TCGA-A2-A04P	TCGA-A2-A04P-01	PATHOLOGY_SLIDE	http://url-to-slide-sample1	H&E	H_AND_E	Block A – Primary Tumor	{"stain":"hematoxylin","magnification":"20x"}	0
+TCGA-A1-A0SK	TCGA-A1-A0SK-01	PATHOLOGY_SLIDE	http://url-to-slide-sample2	IHC CD3	IHC	Block A – Primary Tumor	{"antibody":"CD3","clone":"SP7"}	1
+TCGA-A2-A0CM	TCGA-A2-A0CM-01	PATHOLOGY_SLIDE	http://url-to-slide-sample3	H&E	H_AND_E			0

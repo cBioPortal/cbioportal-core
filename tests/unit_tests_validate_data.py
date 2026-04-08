@@ -3027,6 +3027,34 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         record = record_list.pop()
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('Duplicated resources found', record.getMessage())
+
+    # optional column tests
+    def test_patient_resource_invalid_metadata(self):
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATIENT_NOTES': ['PATIENT']}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_patient_invalid_metadata.txt',
+                            validateData.PatientResourceValidator)
+
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('Invalid JSON in METADATA column', record.getMessage())
+        self.assertEqual(record.cause, '{"modality":"CT","slices":120,}')
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_patient_resource_invalid_priority(self):
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATIENT_NOTES': ['PATIENT']}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_patient_invalid_priority.txt',
+                            validateData.PatientResourceValidator)
+
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('wrong value of PRIORITY', record.getMessage())
+        self.assertEqual(record.cause, 'not_an_integer')
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
 # -------------------------- end resource definition wise test ----------------------------
 
 # --------------------------- generic assay test ------------------------------
