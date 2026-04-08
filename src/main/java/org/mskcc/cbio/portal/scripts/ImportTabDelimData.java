@@ -356,10 +356,10 @@ public class ImportTabDelimData {
                 line = buf.readLine();
             }
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
-            geneticAlterationImporter.finalize();
             if (ClickHouseBulkLoader.isBulkLoad()) {
                 ClickHouseBulkLoader.flushAll();
             }
+            geneticAlterationImporter.complete();
 
             if (isRppaProfile) {
                 ProgressMonitor.setCurrentMessage(" --> total number of extra records added because of multiple genes in one line:  " + nrExtraRecords);

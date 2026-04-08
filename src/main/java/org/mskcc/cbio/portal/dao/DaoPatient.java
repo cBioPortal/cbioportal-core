@@ -208,8 +208,7 @@ public class DaoPatient {
                     "Number of Samples Per Patient", "STRING", true, "1", cancerStudyId);
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
-            // Forces ClickHouse to finalize the data insertion causing removing of duplicates in ReplacingMergeTree engine. Expensive operation.
-            con.prepareStatement("OPTIMIZE TABLE clinical_patient FINAL").executeUpdate();
+            ClickHouseOptimizer.optimizeTables("clinical_patient");
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {

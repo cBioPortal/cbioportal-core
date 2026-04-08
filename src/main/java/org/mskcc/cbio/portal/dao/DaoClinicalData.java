@@ -68,9 +68,9 @@ public final class DaoClinicalData {
     private static final String SAMPLE_ATTRIBUTES_INSERT = "INSERT INTO " + SAMPLE_ATTRIBUTES_TABLE + "(`internal_id`,`attr_id`,`attr_value`) VALUES(?,?,?)";
     private static final String PATIENT_ATTRIBUTES_INSERT = "INSERT INTO " + PATIENT_ATTRIBUTES_TABLE + "(`internal_id`,`attr_id`,`attr_value`) VALUES(?,?,?)";
 
-    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `internal_id` = ?";
     //MUTATION_COUNT and FRACTION_GENOME_ALTERED attributes are calculated from mutation and CN segment data and should not be deleted when clinical data is updated for a sample, so we exclude them from the delete statement
-    private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `internal_id` = ? AND `attr_id` NOT IN ('MUTATION_COUNT', 'FRACTION_GENOME_ALTERED')";
+    private static final String SAMPLE_ATTRIBUTES_DELETE = "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE + " WHERE `internal_id` = ? AND `attr_id` NOT IN ('MUTATION_COUNT', 'FRACTION_GENOME_ALTERED')";
+    private static final String PATIENT_ATTRIBUTES_DELETE = "DELETE FROM " + PATIENT_ATTRIBUTES_TABLE + " WHERE `internal_id` = ?";
     private static final Map<String, String> sampleAttributes = new HashMap<String, String>();
     private static final Map<String, String> patientAttributes = new HashMap<String, String>();
 
@@ -752,46 +752,5 @@ public final class DaoClinicalData {
         finally {
             JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
         }
-    }
-
-    private static List<Map.Entry<Integer, String>> getExistingAttributes(String tableName, List<Map.Entry<Integer, String>> internalPatientIdAttributes) throws DaoException {
-        if (internalPatientIdAttributes.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
-        try {
-            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            pstmt = con.prepareStatement("SELECT internal_id, attr_id FROM `"
-                    + tableName + "` WHERE (internal_id, attr_id) IN ("
-                    + String.join(",", Collections.nCopies(internalPatientIdAttributes.size(), "(?, ?)")) + ")");
-            int parameterIndex = 1;
-            for (Map.Entry<Integer, String> entry : internalPatientIdAttributes) {
-                pstmt.setInt(parameterIndex++, entry.getKey());
-                pstmt.setString(parameterIndex++, entry.getValue());
-            }
-            rs = pstmt.executeQuery();
-
-            List<Map.Entry<Integer, String>> result = new ArrayList<>();
-            while (rs.next()) {
-                result.add(Map.entry(rs.getInt("internal_id"), rs.getString("attr_id")));
-            }
-
-            return result;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
-        }
-    }
-
-    public static List<Map.Entry<Integer, String>> getExistingPatientAttributes(List<Map.Entry<Integer, String>> internalPatientIdAttributes) throws DaoException {
-        return getExistingAttributes(PATIENT_ATTRIBUTES_TABLE, internalPatientIdAttributes);
-    }
-
-    public static List<Map.Entry<Integer, String>> getExistingSampleAttributes(List<Map.Entry<Integer, String>> internalPatientIdAttributes) throws DaoException {
-        return getExistingAttributes(SAMPLE_ATTRIBUTES_TABLE, internalPatientIdAttributes);
     }
 }

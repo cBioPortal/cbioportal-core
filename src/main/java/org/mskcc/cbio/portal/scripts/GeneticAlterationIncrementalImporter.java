@@ -1,6 +1,8 @@
 package org.mskcc.cbio.portal.scripts;
 
 import java.util.*;
+
+import org.mskcc.cbio.portal.dao.ClickHouseOptimizer;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
@@ -61,9 +63,10 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     }
 
     @Override
-    public void finalize() {
+    public void complete() throws DaoException {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
-        super.finalize();
+        super.complete();
+        ClickHouseOptimizer.optimizeTables("genetic_alteration", "genetic_profile_samples");
     }
 
     private String[] extendValues(int geneticEntityId, String[] values) {
