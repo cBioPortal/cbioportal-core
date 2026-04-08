@@ -165,27 +165,50 @@ function copy_source_database_table_data_to_destination() {
     return 0
 }
 
-function destination_table_matches_source_table() {
-    local table_name=$1
-    # SETTINGS select_sequential_consistency = 1 ensures that count(*) sees all
-    # inserted rows even on ClickHouse Cloud (SharedMergeTree / S3-backed), where
-    # reads are eventually consistent and a count(*) immediately after INSERT may
-    # otherwise return a stale result.
-    local statement="SELECT (SELECT count(*) FROM \`$destination_database_name\`.\`$table_name\`) = (SELECT count(*) FROM \`$source_database_name\`.\`$table_name\`), (SELECT count(*) FROM \`$source_database_name\`.\`$table_name\`), (SELECT count(*) FROM \`$destination_database_name\`.\`$table_name\`) SETTINGS select_sequential_consistency = 1"
-    if ! execute_sql_statement_via_clickhouse_client "$statement" "$record_count_comparison_filepath" ; then
-        echo "Warning : failed to execute clickhouse statement : $statement" >&2
+function get_table_record_count() {
+    local database_name=$1
+    local table_name=$2
+    # Use FINAL for ReplacingMergeTree engines (including SharedReplacingMergeTree on
+    # ClickHouse Cloud) so that deduplication is applied at read time, giving a
+    # consistent logical row count rather than the raw unmerged storage count.
+    local engine_statement="SELECT engine FROM system.tables WHERE database = '$database_name' AND name = '$table_name'"
+    if ! execute_sql_statement_via_clickhouse_client "$engine_statement" "$record_count_comparison_filepath" ; then
+        echo "Warning : failed to get engine for table $database_name.$table_name" >&2
         return 1
     fi
     unset sql_data_array
     set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 0
-    if [[ "${sql_data_array[0]}" -ne 1 ]] ; then
-        local source_count
-        local destination_count
-        set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 1
-        source_count="${sql_data_array[0]}"
-        set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 2
-        destination_count="${sql_data_array[0]}"
-        echo "Error : when cloning data from table $table_name, source database and destination database tables contain different record counts (source: $source_count, destination: $destination_count)" >&2
+    local engine="${sql_data_array[0]}"
+    local final_clause=""
+    if [[ "$engine" == *"ReplacingMergeTree"* ]] ; then
+        final_clause=" FINAL"
+    fi
+    # SETTINGS select_sequential_consistency = 1 ensures that count(*) sees all
+    # inserted rows even on ClickHouse Cloud (SharedMergeTree / S3-backed), where
+    # reads are eventually consistent and a count(*) immediately after INSERT may
+    # otherwise return a stale result.
+    local count_statement="SELECT count(*) FROM \`$database_name\`.\`$table_name\`$final_clause SETTINGS select_sequential_consistency = 1"
+    if ! execute_sql_statement_via_clickhouse_client "$count_statement" "$record_count_comparison_filepath" ; then
+        echo "Warning : failed to get record count for table $database_name.$table_name" >&2
+        return 1
+    fi
+    unset sql_data_array
+    set_clickhouse_sql_data_array_from_file "$record_count_comparison_filepath" 0
+    echo "${sql_data_array[0]}"
+    return 0
+}
+
+function destination_table_matches_source_table() {
+    local table_name=$1
+    local src_count dst_count
+    if ! src_count=$(get_table_record_count "$source_database_name" "$table_name") ; then
+        return 1
+    fi
+    if ! dst_count=$(get_table_record_count "$destination_database_name" "$table_name") ; then
+        return 1
+    fi
+    if [[ "$src_count" -ne "$dst_count" ]] ; then
+        echo "Error : when cloning data from table $table_name, source database and destination database tables contain different record counts (source: $src_count, destination: $dst_count)" >&2
         return 1
     fi
     return 0
