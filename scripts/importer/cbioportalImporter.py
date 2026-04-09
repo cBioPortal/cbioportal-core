@@ -11,6 +11,7 @@ import importlib
 import argparse
 import logging
 import re
+import tempfile
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -27,6 +28,7 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
+from . import build_cancers_from_oncotree
 from .cbioportal_common import OUTPUT_FILE
 from .cbioportal_common import ERROR_FILE
 from .cbioportal_common import MetaFileTypes
@@ -65,11 +67,20 @@ COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIS
 # ------------------------------------------------------------------------------
 # sub-routines
 
-def import_cancer_type(jvm_args, data_filename):
+def import_cancer_type(jvm_args, data_filename=None, oncotree_url=None, oncotree_version=None, clobber=False):
+    if data_filename is None and oncotree_url is None:
+        raise RuntimeError("import-cancer-type requires either --data_filename or --oncotree-url")
+    if data_filename is not None and oncotree_url is not None:
+        raise RuntimeError("import-cancer-type: --data_filename and --oncotree-url are mutually exclusive")
+    if oncotree_url is not None:
+        tmp = tempfile.NamedTemporaryFile(suffix='.txt', prefix='cancers_', delete=False)
+        tmp.close() # release fh so the other script can write to it
+        data_filename = build_cancers_from_oncotree.build(oncotree_url, oncotree_version, output=tmp.name)
     args = jvm_args.split(' ')
     args.append(IMPORT_CANCER_TYPE_CLASS)
     args.append(data_filename)
-    args.append("false") # don't clobber existing table
+    if not clobber:
+        args.append("false") # don't clobber existing table
     args.append("--noprogress") # don't report memory usage and % progress
     run_java(*args)
 
@@ -235,9 +246,9 @@ def process_case_lists(jvm_args, case_list_dir):
         if not (case_list.startswith('.') or case_list.endswith('~')):
             import_case_list(jvm_args, os.path.join(case_list_dir, case_list))
 
-def process_command(jvm_args, command, meta_filename, data_filename, study_ids, patient_ids, sample_ids, update_generic_assay_entity = None):
+def process_command(jvm_args, command, meta_filename, data_filename, study_ids, patient_ids, sample_ids, update_generic_assay_entity=None, oncotree_url=None, oncotree_version=None):
     if command == IMPORT_CANCER_TYPE:
-        import_cancer_type(jvm_args, data_filename)
+        import_cancer_type(jvm_args, data_filename=data_filename, oncotree_url=oncotree_url, oncotree_version=oncotree_version, clobber=True)
     elif command == IMPORT_STUDY:
         import_study(jvm_args, meta_filename)
     elif command == REMOVE_STUDY:
@@ -384,7 +395,7 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
 
     # First, import cancer types
     for meta_filename, data_filename in cancer_type_filepairs:
-        import_cancer_type(jvm_args, data_filename)
+        import_cancer_type(jvm_args, data_filename, clobber=False)
 
     # Then define the study
     if study_meta_filename is None:
@@ -575,6 +586,10 @@ def interface(args=None):
     subparsers = parser.add_subparsers(title='subcommands', dest='subcommand',
                           help='Command for import. Allowed commands: ' + allowed_commands_csv)
     import_cancer_type = subparsers.add_parser('import-cancer-type', parents=[parent_parser], add_help=False)
+    import_cancer_type.add_argument('--oncotree-url', type=str, required=False,
+                        help='OncoTree base URL to fetch cancer types from (alternative to --data_filename)')
+    import_cancer_type.add_argument('--oncotree-version', type=str, required=False, default=None,
+                        help='OncoTree version (used with --oncotree-url)')
     import_study = subparsers.add_parser('import-study', parents=[parent_parser], add_help=False)
     import_study_data = subparsers.add_parser('import-study-data', parents=[parent_parser], add_help=False)
     import_case_list = subparsers.add_parser('import-case-list', parents=[parent_parser], add_help=False)
@@ -690,7 +705,9 @@ def main(args):
             args.study_ids,
             args.patient_ids if hasattr(args, 'patient_ids') else None,
             args.sample_ids if hasattr(args, 'sample_ids') else None,
-            args.update_generic_assay_entity)
+            args.update_generic_assay_entity,
+            oncotree_url=getattr(args, 'oncotree_url', None),
+            oncotree_version=getattr(args, 'oncotree_version', None))
 
 # ------------------------------------------------------------------------------
 # ready to roll
