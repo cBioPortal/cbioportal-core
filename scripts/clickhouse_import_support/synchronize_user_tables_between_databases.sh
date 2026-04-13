@@ -127,7 +127,7 @@ function clickhouse_destination_database_exists() {
 function find_records_missing_in_destination_database_users_table() {
     local source_table="\`$clickhouse_source_database_name\`.\`users\`"
     local dest_table="\`$clickhouse_destination_database_name\`.\`users\`"
-    local statement="SELECT src.email, src.name, src.enabled FROM $source_table AS src LEFT JOIN $dest_table AS dest ON src.email = dest.email WHERE dest.email IS NULL;"
+    local statement="SELECT src.email, src.name, src.enabled FROM $source_table AS src LEFT JOIN $dest_table AS dest ON src.email = dest.email WHERE dest.email = '';"
     if ! execute_sql_statement_via_clickhouse_client "$statement" "$missing_user_records_result_filepath" ; then
         return 1
     fi
@@ -137,7 +137,7 @@ function find_records_missing_in_destination_database_users_table() {
 function find_records_missing_in_destination_database_authorities_table() {
     local source_table="\`$clickhouse_source_database_name\`.\`authorities\`"
     local dest_table="\`$clickhouse_destination_database_name\`.\`authorities\`"
-    local statement="SELECT src.email, src.authority FROM $source_table AS src LEFT JOIN $dest_table AS dest ON src.email = dest.email AND src.authority = dest.authority WHERE dest.email IS NULL;"
+    local statement="SELECT src.email, src.authority FROM $source_table AS src LEFT JOIN $dest_table AS dest ON src.email = dest.email AND src.authority = dest.authority WHERE dest.email = '';"
     if ! execute_sql_statement_via_clickhouse_client "$statement" "$missing_authority_records_result_filepath" ; then
         return 1
     fi
