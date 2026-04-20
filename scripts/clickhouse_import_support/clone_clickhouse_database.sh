@@ -221,7 +221,7 @@ function clone_all_source_database_tables_to_destination_database() {
 
     while [ "$pos" -lt "$num_tables" ] ; do
         local table_name="${database_table_list[$pos]}"
-        if [ "$table_name" == "$AUTOINCREMENT_SEQUENCE_STATE_TABLENAME" ] ; then
+        if [ "$table_name" == "$AUTOINCREMENT_SEQUENCE_STATE_TABLENAME" ] || [[ "$table_name" == *_derived ]] ; then
             echo "skipping $table_name"
             pos=$(($pos+1))
             continue
