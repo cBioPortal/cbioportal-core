@@ -46,8 +46,11 @@ public abstract class AbstractBackupTransactionTest extends IntegrationTestBase 
     /** Tables passed to BackupUtil.backupIfIncrementalUpdateMode by the importer under test. */
     protected abstract List<String> getBackedUpTables();
 
-    /** Run the import to completion without errors. */
+    /** Run the import to completion without errors, with incremental update mode enabled. */
     protected abstract void runSuccessfulImport() throws Exception;
+
+    /** Run the import to completion without errors, with incremental update mode disabled. */
+    protected abstract void runNonIncrementalImport() throws Exception;
 
     /**
      * Run the import in a way that causes it to fail.
@@ -67,6 +70,12 @@ public abstract class AbstractBackupTransactionTest extends IntegrationTestBase 
     @Test
     public void testOnSuccess_noBackupTablesExist() throws Exception {
         runSuccessfulImport();
+        assertNoBackupTablesExist();
+    }
+
+    @Test
+    public void testNonIncrementalMode_noBackupTablesCreated() throws Exception {
+        runNonIncrementalImport();
         assertNoBackupTablesExist();
     }
 

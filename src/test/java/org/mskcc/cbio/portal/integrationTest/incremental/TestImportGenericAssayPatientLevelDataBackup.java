@@ -95,6 +95,12 @@ public class TestImportGenericAssayPatientLevelDataBackup extends AbstractBackup
 
     @Override
     @SuppressWarnings("deprecation")
+    protected void runNonIncrementalImport() throws Exception {
+        new ImportGenericAssayPatientLevelData(GOOD_FILE, null, profileId, null, "name,description", false).importData();
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
     protected void runFailingImport() throws Exception {
         // BAD_FILE references TCGA-XX-FAKE which is not in the study, triggering
         // RuntimeException("Unknown patient id ...") after backups are created.

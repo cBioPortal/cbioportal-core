@@ -73,6 +73,11 @@ public class TestImportTabDelimDataBackup extends AbstractBackupTransactionTest 
     }
 
     @Override
+    protected void runNonIncrementalImport() throws Exception {
+        new ImportTabDelimData(DATA_FILE, profileId, null, false, DaoGeneOptimized.getInstance()).importData();
+    }
+
+    @Override
     protected void runFailingImport() throws Exception {
         DaoGeneOptimized mockedDao = mock(DaoGeneOptimized.class);
         when(mockedDao.getGene(anyLong())).thenAnswer(invocation -> {

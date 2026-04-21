@@ -76,6 +76,11 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
     }
 
     @Override
+    protected void runNonIncrementalImport() throws Exception {
+        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, DaoGeneOptimized.getInstance(), Set.of(), false).importData();
+    }
+
+    @Override
     protected void runFailingImport() throws Exception {
         DaoGeneOptimized mockedDao = mock(DaoGeneOptimized.class);
         when(mockedDao.getGene(anyLong())).thenAnswer(invocation -> {
