@@ -72,6 +72,7 @@ public class ImportGenericAssayPatientLevelData {
     private int entriesSkipped = 0;
     private String genePanel;
     private String genericEntityProperties;
+    private boolean isIncrementalUpdateMode;
 
     private static final String ENTITY_STABLE_ID_COLUMN_NAME = "ENTITY_STABLE_ID";
 
@@ -84,15 +85,21 @@ public class ImportGenericAssayPatientLevelData {
      * @param geneticProfileId GeneticProfile ID.
      * @param genePanel        GenePanel
      * @param genericEntityProperties Generic Assay Entities.
-     * 
-     * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)? 
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
+     *
+     * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
-    public ImportGenericAssayPatientLevelData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties) {
+    public ImportGenericAssayPatientLevelData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties, boolean isIncrementalUpdateMode) {
         this.dataFile = dataFile;
         this.targetLine = targetLine;
         this.geneticProfileId = geneticProfileId;
         this.genePanel = genePanel;
         this.genericEntityProperties = genericEntityProperties;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
+    }
+
+    public ImportGenericAssayPatientLevelData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties) {
+        this(dataFile, targetLine, geneticProfileId, genePanel, genericEntityProperties, false);
     }
 
     /**
@@ -102,7 +109,7 @@ public class ImportGenericAssayPatientLevelData {
      * @throws DaoException Database Error.
      */
     public void importData() throws Exception {
-        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples"), this::importDataInternal);
+        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples"), this::importDataInternal);
     }
 
     void importDataInternal() throws Exception {

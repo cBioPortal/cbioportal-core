@@ -69,7 +69,7 @@ public class TestImportTabDelimDataBackup extends AbstractBackupTransactionTest 
 
     @Override
     protected void runSuccessfulImport() throws Exception {
-        new ImportTabDelimData(DATA_FILE, profileId, null, false, DaoGeneOptimized.getInstance()).importData();
+        new ImportTabDelimData(DATA_FILE, profileId, null, true, DaoGeneOptimized.getInstance()).importData();
     }
 
     @Override

@@ -72,7 +72,7 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
 
     @Override
     protected void runSuccessfulImport() throws Exception {
-        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, DaoGeneOptimized.getInstance(), Set.of()).importData();
+        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, DaoGeneOptimized.getInstance(), Set.of(), true).importData();
     }
 
     @Override

@@ -174,7 +174,7 @@ public class ImportTabDelimData {
     public void importData() throws Exception {
         this.numLines = FileUtil.getNumLines(dataFile);
         ProgressMonitor.setMaxValue(numLines);
-        BackupUtil.withBackup(List.of("genetic_alteration", "genetic_profile_samples", "sample_profile"), this::importDataInternal);
+        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples", "sample_profile"), this::importDataInternal);
     }
 
     void importDataInternal() throws Exception {
