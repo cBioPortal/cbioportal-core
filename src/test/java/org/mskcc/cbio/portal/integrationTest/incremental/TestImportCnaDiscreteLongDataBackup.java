@@ -87,7 +87,7 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
             assertBackupTablesExist();
             throw new RuntimeException("Simulated error");
         });
-        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, mockedDao, Set.of()).importData();
+        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, mockedDao, Set.of(), true).importData();
     }
 
     @Override

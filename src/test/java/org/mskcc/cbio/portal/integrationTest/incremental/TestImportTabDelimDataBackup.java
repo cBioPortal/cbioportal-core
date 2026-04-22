@@ -84,7 +84,7 @@ public class TestImportTabDelimDataBackup extends AbstractBackupTransactionTest 
             assertBackupTablesExist();
             throw new RuntimeException("Simulated error");
         });
-        new ImportTabDelimData(DATA_FILE, profileId, null, false, mockedDao).importData();
+        new ImportTabDelimData(DATA_FILE, profileId, null, true, mockedDao).importData();
     }
 
     @Override
