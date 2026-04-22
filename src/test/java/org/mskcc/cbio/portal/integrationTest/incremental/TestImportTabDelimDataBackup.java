@@ -69,6 +69,11 @@ public class TestImportTabDelimDataBackup extends AbstractBackupTransactionTest 
 
     @Override
     protected void runSuccessfulImport() throws Exception {
+        new ImportTabDelimData(DATA_FILE, profileId, null, true, DaoGeneOptimized.getInstance()).importData();
+    }
+
+    @Override
+    protected void runNonIncrementalImport() throws Exception {
         new ImportTabDelimData(DATA_FILE, profileId, null, false, DaoGeneOptimized.getInstance()).importData();
     }
 
@@ -79,7 +84,7 @@ public class TestImportTabDelimDataBackup extends AbstractBackupTransactionTest 
             assertBackupTablesExist();
             throw new RuntimeException("Simulated error");
         });
-        new ImportTabDelimData(DATA_FILE, profileId, null, false, mockedDao).importData();
+        new ImportTabDelimData(DATA_FILE, profileId, null, true, mockedDao).importData();
     }
 
     @Override

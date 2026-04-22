@@ -72,7 +72,12 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
 
     @Override
     protected void runSuccessfulImport() throws Exception {
-        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, DaoGeneOptimized.getInstance(), Set.of()).importData();
+        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, DaoGeneOptimized.getInstance(), Set.of(), true).importData();
+    }
+
+    @Override
+    protected void runNonIncrementalImport() throws Exception {
+        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, DaoGeneOptimized.getInstance(), Set.of(), false).importData();
     }
 
     @Override
@@ -82,7 +87,7 @@ public class TestImportCnaDiscreteLongDataBackup extends AbstractBackupTransacti
             assertBackupTablesExist();
             throw new RuntimeException("Simulated error");
         });
-        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, mockedDao, Set.of()).importData();
+        new ImportCnaDiscreteLongData(DATA_FILE, profileId, null, mockedDao, Set.of(), true).importData();
     }
 
     @Override

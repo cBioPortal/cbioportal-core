@@ -34,7 +34,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Abstract base for integration tests that verify BackupUtil.withBackup behaviour
+ * Abstract base for integration tests that verify BackupUtil.backupIfIncrementalUpdateMode behaviour
  * for a specific importer class. Subclasses declare which tables are backed up and
  * how to run / fail the import; this class supplies the shared @Test methods.
  *
@@ -43,11 +43,14 @@ import static org.junit.Assert.fail;
  */
 public abstract class AbstractBackupTransactionTest extends IntegrationTestBase {
 
-    /** Tables passed to BackupUtil.withBackup by the importer under test. */
+    /** Tables passed to BackupUtil.backupIfIncrementalUpdateMode by the importer under test. */
     protected abstract List<String> getBackedUpTables();
 
-    /** Run the import to completion without errors. */
+    /** Run the import to completion without errors, with incremental update mode enabled. */
     protected abstract void runSuccessfulImport() throws Exception;
+
+    /** Run the import to completion without errors, with incremental update mode disabled. */
+    protected abstract void runNonIncrementalImport() throws Exception;
 
     /**
      * Run the import in a way that causes it to fail.
@@ -67,6 +70,12 @@ public abstract class AbstractBackupTransactionTest extends IntegrationTestBase 
     @Test
     public void testOnSuccess_noBackupTablesExist() throws Exception {
         runSuccessfulImport();
+        assertNoBackupTablesExist();
+    }
+
+    @Test
+    public void testNonIncrementalMode_noBackupTablesCreated() throws Exception {
+        runNonIncrementalImport();
         assertNoBackupTablesExist();
     }
 

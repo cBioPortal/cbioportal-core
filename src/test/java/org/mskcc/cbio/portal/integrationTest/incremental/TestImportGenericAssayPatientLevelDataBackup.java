@@ -90,7 +90,13 @@ public class TestImportGenericAssayPatientLevelDataBackup extends AbstractBackup
     @Override
     @SuppressWarnings("deprecation")
     protected void runSuccessfulImport() throws Exception {
-        new ImportGenericAssayPatientLevelData(GOOD_FILE, null, profileId, null, "name,description").importData();
+        new ImportGenericAssayPatientLevelData(GOOD_FILE, null, profileId, null, "name,description", true).importData();
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void runNonIncrementalImport() throws Exception {
+        new ImportGenericAssayPatientLevelData(GOOD_FILE, null, profileId, null, "name,description", false).importData();
     }
 
     @Override
@@ -100,7 +106,7 @@ public class TestImportGenericAssayPatientLevelDataBackup extends AbstractBackup
         // RuntimeException("Unknown patient id ...") after backups are created.
         // No mock injection point is available, so the mid-import assertion is
         // skipped for this importer; it is covered by the tab-delim and CNA tests.
-        new ImportGenericAssayPatientLevelData(BAD_FILE, null, profileId, null, "name,description").importData();
+        new ImportGenericAssayPatientLevelData(BAD_FILE, null, profileId, null, "name,description", true).importData();
     }
 
     @Override

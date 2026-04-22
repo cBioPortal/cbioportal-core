@@ -15,7 +15,22 @@ public class BackupUtil {
         void run() throws Exception;
     }
 
-    public static void withBackup(List<String> tableNames, ThrowingRunnable fn) throws Exception {
+    public static void conditionalBackup(
+        boolean isIncrementalUpdateMode,
+        List<String> tableNames,
+        ThrowingRunnable fn
+    ) throws Exception {
+
+        // We don't need to worry about backing up tables
+        // if we're not running in incremental update mode--
+        // the new data will be uploaded in a single SQL query,
+        // and even if there is an interruption mid-import the data
+        // should not be left in an inconsistent state.
+        if (!isIncrementalUpdateMode) {
+            fn.run();
+            return;
+        }
+
         try {
             for (String table : tableNames) {
                 backup(table);
