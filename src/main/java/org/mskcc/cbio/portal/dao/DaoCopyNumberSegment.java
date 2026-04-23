@@ -86,35 +86,37 @@ public final class DaoCopyNumberSegment {
         ClickHouseBulkLoader.flushAll();
 
         Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
-            pstmt = con.prepareStatement(
+            final Connection queryCon = con;
+
+            final String selectSql =
                     "SELECT c1.`sample_id`, " +
-                            "CASE WHEN SUM(c1.`end` - c1.`start`) > 0 THEN " +
-                            "ROUND(SUM(CASE WHEN ABS(c1.`segment_mean`) >= ? THEN (c1.`end` - c1.`start`) ELSE 0 END) * 1.0 / " +
-                            "SUM(c1.`end` - c1.`start`), 4) " +
-                            "ELSE 0 END AS `value` " +
-                            "FROM `copy_number_seg` AS c1 " +
-                            "INNER JOIN `cancer_study` ON c1.`cancer_study_id` = cancer_study.`cancer_study_id` " +
-                            "WHERE cancer_study.`cancer_study_id`=? " +
-                            (sampleIds == null ? "" : ("AND c1.`sample_id` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?")) + ") ")) +
-                            "GROUP BY cancer_study.`cancer_study_id`, c1.`sample_id` " +
-                            "HAVING SUM(c1.`end` - c1.`start`) > 0");
-            int parameterIndex = 1;
-            pstmt.setDouble(parameterIndex++, FRACTION_GENOME_ALTERED_CUTOFF);
-            pstmt.setInt(parameterIndex++, cancerStudyId);
-            if (sampleIds != null) {
-                for (Integer sampleId : sampleIds) {
-                    pstmt.setInt(parameterIndex++, sampleId);
+                    "CASE WHEN SUM(c1.`end` - c1.`start`) > 0 THEN " +
+                    "ROUND(SUM(CASE WHEN ABS(c1.`segment_mean`) >= ? THEN (c1.`end` - c1.`start`) ELSE 0 END) * 1.0 / " +
+                    "SUM(c1.`end` - c1.`start`), 4) " +
+                    "ELSE 0 END AS `value` " +
+                    "FROM `copy_number_seg` AS c1 " +
+                    "INNER JOIN `cancer_study` ON c1.`cancer_study_id` = cancer_study.`cancer_study_id` " +
+                    "WHERE cancer_study.`cancer_study_id`=? ";
+            final String groupSql =
+                    "GROUP BY cancer_study.`cancer_study_id`, c1.`sample_id` " +
+                    "HAVING SUM(c1.`end` - c1.`start`) > 0";
+
+            Map<Integer, String> fractionGenomeAltereds = ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
+                String inClause = stagingTable == null ? "" : "AND c1.`sample_id` IN (SELECT id FROM " + stagingTable + ") ";
+                Map<Integer, String> result = new HashMap<>();
+                try (PreparedStatement stmt = queryCon.prepareStatement(selectSql + inClause + groupSql)) {
+                    stmt.setDouble(1, FRACTION_GENOME_ALTERED_CUTOFF);
+                    stmt.setInt(2, cancerStudyId);
+                    try (ResultSet resultSet = stmt.executeQuery()) {
+                        while (resultSet.next()) {
+                            result.put(resultSet.getInt(1), resultSet.getString(2));
+                        }
+                    }
                 }
-            }
-            Map<Integer, String> fractionGenomeAltereds = new HashMap<Integer, String>();
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                fractionGenomeAltereds.put(rs.getInt(1), rs.getString(2));
-            }
+                return result;
+            });
 
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(FRACTION_GENOME_ALTERED_ATTR_ID, cancerStudyId);
             if (clinicalAttribute == null) {
@@ -135,7 +137,7 @@ public final class DaoCopyNumberSegment {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, null, null);
         }
     }
     
@@ -319,25 +321,22 @@ public final class DaoCopyNumberSegment {
     }
 
     public static void  deleteSegmentDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
-            pstmt = con.prepareStatement("DELETE FROM `copy_number_seg`" +
-                    " WHERE `cancer_study_id`= ?" +
-                    " AND `sample_id` IN (" + String.join(",", Collections.nCopies(sampleIds.size(), "?"))
-                    + ")");
-            int parameterIndex = 1;
-            pstmt.setInt(parameterIndex++, cancerStudyId);
-            for (Integer sampleId : sampleIds) {
-                pstmt.setInt(parameterIndex++, sampleId);
-            }
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
+        if (sampleIds.isEmpty()) {
+            return;
         }
+        ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
+            Connection con = null;
+            try {
+                con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
+                try (PreparedStatement pstmt = con.prepareStatement(
+                        "DELETE FROM `copy_number_seg` WHERE `cancer_study_id`=? AND `sample_id` IN (SELECT id FROM " + stagingTable + ")")) {
+                    pstmt.setInt(1, cancerStudyId);
+                    pstmt.executeUpdate();
+                }
+            } finally {
+                JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, null, null);
+            }
+            return null;
+        });
     }
 }

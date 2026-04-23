@@ -214,60 +214,52 @@ public class DaoGeneticAlteration {
      * @throws DaoException
      */
     public HashMap<Integer,HashMap<Integer, String>> getGeneticAlterationMapForEntityIds(int geneticProfileId, Collection<Integer> geneticEntityIds) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        HashMap<Integer,HashMap<Integer, String>> map = new HashMap<Integer,HashMap<Integer, String>>();
         ArrayList<Integer> orderedSampleList = DaoGeneticProfileSamples.getOrderedSampleList(geneticProfileId);
         if (orderedSampleList == null || orderedSampleList.size() ==0) {
             throw new IllegalArgumentException ("Could not find any samples for genetic" +
                     " profile ID:  " + geneticProfileId);
         }
+        Connection con = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticAlteration.class);
-            if (geneticEntityIds == null || geneticEntityIds.isEmpty()) {
-                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ?");
-                pstmt.setInt(1, geneticProfileId);
-            } else {
-                String placeholders = String.join(",", Collections.nCopies(geneticEntityIds.size(), "?"));
-                pstmt = con.prepareStatement("SELECT * FROM genetic_alteration WHERE genetic_profile_id = ? AND genetic_entity_id IN (" + placeholders + ")");
-                pstmt.setInt(1, geneticProfileId);
-                int index = 2;
-                for (Integer geneticEntityId : geneticEntityIds) {
-                    pstmt.setInt(index++, geneticEntityId);
+            final Connection queryCon = con;
+            Collection<Integer> ids = (geneticEntityIds == null || geneticEntityIds.isEmpty()) ? null : geneticEntityIds;
+            return ClickHouseBulkUploader.upload(ids, stagingTable -> {
+                String inClause = stagingTable == null ? "" : " AND genetic_entity_id IN (SELECT id FROM " + stagingTable + ")";
+                HashMap<Integer, HashMap<Integer, String>> result = new HashMap<>();
+                try (PreparedStatement stmt = queryCon.prepareStatement(
+                        "SELECT * FROM genetic_alteration WHERE genetic_profile_id = ?" + inClause)) {
+                    stmt.setInt(1, geneticProfileId);
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            HashMap<Integer, String> mapSampleValue = new HashMap<>();
+                            int geneticEntityId = rs.getInt("genetic_entity_id");
+                            String values = rs.getString("values");
+                            String[] valueParts = values.split(DELIM, -1);
+                            int valuesLength = valueParts.length;
+                            if (valuesLength - orderedSampleList.size() == 1 && valueParts[valuesLength - 1].isEmpty()) {
+                                valuesLength -= 1;
+                            }
+                            if (valuesLength != orderedSampleList.size()) {
+                                throw new IllegalStateException(
+                                        "Data inconsistency detected: The length of the values for genetic profile with Id = "
+                                                + geneticProfileId + " and genetic entity with id = " + geneticEntityId
+                                                + " (" + valuesLength + " elements) does not match the expected length of the sample list ("
+                                                + orderedSampleList.size() + " elements).");
+                            }
+                            for (int i = 0; i < orderedSampleList.size(); i++) {
+                                mapSampleValue.put(orderedSampleList.get(i), valueParts[i]);
+                            }
+                            result.put(geneticEntityId, mapSampleValue);
+                        }
+                    }
                 }
-            }
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                HashMap<Integer, String> mapSampleValue = new HashMap<Integer, String>();
-                int geneticEntityId = rs.getInt("genetic_entity_id");
-                String values = rs.getString("values");
-                String[] valueParts = values.split(DELIM, -1);
-                int valuesLength = valueParts.length;
-                boolean hasMeaninglessTrailingDelimiter = valuesLength - orderedSampleList.size() == 1 && valueParts[valuesLength - 1].isEmpty();
-                if (hasMeaninglessTrailingDelimiter) {
-                    // adjust value length to account for the trailing delimiter
-                    valuesLength -= 1;
-                }
-                if (valuesLength != orderedSampleList.size()) {
-                    throw new IllegalStateException(
-                            "Data inconsistency detected: The length of the values for genetic profile with Id = "
-                                    + geneticProfileId + " and genetic entity with id = " + geneticEntityId
-                                    + " (" + valuesLength + " elements) does not match the expected length of the sample list ("
-                                    + orderedSampleList.size() + " elements).");
-                }
-                for (int i = 0; i < orderedSampleList.size(); i++) {
-                    String value = valueParts[i];
-                    Integer sampleId = orderedSampleList.get(i);
-                    mapSampleValue.put(sampleId, value);
-                }
-                map.put(geneticEntityId, mapSampleValue);
-            }
-            return map;
+                return result;
+            });
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoGeneticAlteration.class, con, null, null);
         }
     }
 

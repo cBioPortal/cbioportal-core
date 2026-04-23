@@ -114,31 +114,24 @@ public final class DaoCnaEvent {
             if (sampleIds.isEmpty()) {
                 return;
             }
-            String placeholders = String.join(",", Collections.nCopies(sampleIds.size(), "?"));
             con = JdbcUtil.getDbConnection(DaoCnaEvent.class);
-            pstmt = con.prepareStatement(
-                    "DELETE FROM alteration_driver_annotation " +
-                            "WHERE `genetic_profile_id` = ? AND `sample_id` IN (" + placeholders + ") " +
-                            "AND `alteration_event_id` IN (SELECT `cna_event_id` FROM sample_cna_event WHERE `genetic_profile_id` = ? AND `sample_id` IN (" + placeholders + "))");
-            int parameterIndex = 1;
-            pstmt.setInt(parameterIndex++, cnaProfileId);
-            for (Integer sampleId : sampleIds) {
-                pstmt.setInt(parameterIndex++, sampleId);
-            }
-            pstmt.setInt(parameterIndex++, cnaProfileId);
-            for (Integer sampleId : sampleIds) {
-                pstmt.setInt(parameterIndex++, sampleId);
-            }
-            pstmt.executeUpdate();
-            pstmt.close();
-            pstmt = con.prepareStatement(
-                    "DELETE FROM sample_cna_event WHERE `genetic_profile_id` = ? AND `sample_id` IN (" + placeholders + ")");
-            parameterIndex = 1;
-            pstmt.setInt(parameterIndex++, cnaProfileId);
-            for (Integer sampleId : sampleIds) {
-                pstmt.setInt(parameterIndex++, sampleId);
-            }
-            pstmt.executeUpdate();
+            final Connection queryCon = con;
+            ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
+                try (PreparedStatement stmt = queryCon.prepareStatement(
+                        "DELETE FROM alteration_driver_annotation " +
+                        "WHERE `genetic_profile_id` = ? AND `sample_id` IN (SELECT id FROM " + stagingTable + ") " +
+                        "AND `alteration_event_id` IN (SELECT `cna_event_id` FROM sample_cna_event WHERE `genetic_profile_id` = ? AND `sample_id` IN (SELECT id FROM " + stagingTable + "))")) {
+                    stmt.setInt(1, cnaProfileId);
+                    stmt.setInt(2, cnaProfileId);
+                    stmt.executeUpdate();
+                }
+                try (PreparedStatement stmt = queryCon.prepareStatement(
+                        "DELETE FROM sample_cna_event WHERE `genetic_profile_id` = ? AND `sample_id` IN (SELECT id FROM " + stagingTable + ")")) {
+                    stmt.setInt(1, cnaProfileId);
+                    stmt.executeUpdate();
+                }
+                return null;
+            });
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {

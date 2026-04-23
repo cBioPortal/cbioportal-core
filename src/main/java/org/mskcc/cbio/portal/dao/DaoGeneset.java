@@ -379,35 +379,21 @@ public class DaoGeneset {
      */
 	private static void deleteGenesetGeneticProfileLinks() throws DaoException {
 		Connection connection = null;
-        ResultSet resultSet = null;
-        PreparedStatement preparedStatement = null;
         try {
         	connection = JdbcUtil.getDbConnection(DaoGeneset.class);
             List<Integer> genesetProfiles = collectGenesetProfileIds(connection);
             if (genesetProfiles.isEmpty()) {
                 return;
             }
-            final int batchSize = 500;
-            for (int start = 0; start < genesetProfiles.size(); start += batchSize) {
-                int end = Math.min(start + batchSize, genesetProfiles.size());
-                List<Integer> chunk = genesetProfiles.subList(start, end);
-                String placeholders = String.join(",", Collections.nCopies(chunk.size(), "?"));
-                JdbcUtil.closeAll(DaoGeneset.class, null, preparedStatement, null);
-                preparedStatement = connection.prepareStatement(
-                    "DELETE FROM genetic_profile_link WHERE referred_genetic_profile_id IN (" + placeholders + ")");
-                int parameterIndex = 1;
-                for (Integer id : chunk) {
-                    preparedStatement.setInt(parameterIndex++, id);
-                }
-                preparedStatement.executeUpdate();
-            }
-        } 
+            ClickHouseBulkDeleter.getBulkDeleter("genetic_profile_link", "referred_genetic_profile_id").addIds(genesetProfiles);
+            ClickHouseBulkDeleter.flushAll();
+        }
         catch (SQLException e) {
             throw new DaoException(e);
-        } 
+        }
         finally {
-            JdbcUtil.closeAll(DaoGeneset.class, connection, preparedStatement, resultSet);
-        }	
+            JdbcUtil.closeAll(DaoGeneset.class, connection, null, null);
+        }
 	}
 
     private static List<Integer> collectGenesetProfileIds(Connection connection) throws SQLException {

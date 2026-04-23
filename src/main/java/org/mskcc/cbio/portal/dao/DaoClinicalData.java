@@ -420,16 +420,16 @@ public final class DaoClinicalData {
                 return;
             }
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            pstmt = con.prepareStatement("DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE
-                    + " WHERE `attr_id` = ? AND `internal_id` IN ("
-                    + String.join(",", Collections.nCopies(sampleInternalIds.size(), "?"))
-                    + ")");
-            int parameterIndex = 1;
-            pstmt.setString(parameterIndex++, attrId);
-            for (Integer sampleInternalId : sampleInternalIds) {
-                pstmt.setInt(parameterIndex++, sampleInternalId);
-            }
-            pstmt.executeUpdate();
+            final Connection queryCon = con;
+            ClickHouseBulkUploader.upload(sampleInternalIds, stagingTable -> {
+                try (PreparedStatement stmt = queryCon.prepareStatement(
+                        "DELETE FROM " + SAMPLE_ATTRIBUTES_TABLE +
+                        " WHERE `attr_id` = ? AND `internal_id` IN (SELECT id FROM " + stagingTable + ")")) {
+                    stmt.setString(1, attrId);
+                    stmt.executeUpdate();
+                }
+                return null;
+            });
         }
         catch (SQLException e) {
             throw new DaoException(e);
