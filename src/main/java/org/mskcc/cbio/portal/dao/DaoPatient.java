@@ -287,28 +287,20 @@ public class DaoPatient {
         return internalPatientIds;
     }
 
-    private static List<Integer> collectIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws SQLException {
+    private static List<Integer> collectIds(Connection con, String sqlPrefix, Collection<Integer> ids) throws DaoException, SQLException {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
         }
-        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        List<Integer> collected = new ArrayList<>();
-        try {
-            pstmt = con.prepareStatement(sqlPrefix + "(" + placeholders + ")");
-            int index = 1;
-            for (Integer id : ids) {
-                pstmt.setInt(index++, id);
+        return ClickHouseBulkUploader.upload(ids, stagingTable -> {
+            List<Integer> collected = new ArrayList<>();
+            try (PreparedStatement pstmt = con.prepareStatement(sqlPrefix + "(SELECT id FROM " + stagingTable + ")");
+                 ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    collected.add(rs.getInt(1));
+                }
             }
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                collected.add(rs.getInt(1));
-            }
-        } finally {
-            JdbcUtil.closeAll(DaoPatient.class, null, pstmt, rs);
-        }
-        return collected;
+            return collected;
+        });
     }
 
 }
