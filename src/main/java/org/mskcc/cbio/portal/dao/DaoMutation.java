@@ -300,63 +300,29 @@ public final class DaoMutation {
      */
     public static ArrayList<ExtendedMutation> getMutations (int geneticProfileId, Collection<Integer> targetSampleList,
             long entrezGeneId) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        ArrayList <ExtendedMutation> mutationList = new ArrayList <ExtendedMutation>();
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement(
-                    "SELECT * FROM mutation " +
-                    "INNER JOIN mutation_event ON mutation.mutation_event_id=mutation_event.mutation_event_id " +
-                    "WHERE sample_id IN ('" + org.apache.commons.lang3.StringUtils.join(targetSampleList, "','") +
-                    "') AND genetic_profile_id = ? AND mutation.entrez_gene_id = ?");
-            pstmt.setInt(1, geneticProfileId);
-            pstmt.setLong(2, entrezGeneId);
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                ExtendedMutation mutation = extractMutation(rs);
-                mutationList.add(mutation);
+        return ClickHouseBulkUploader.upload(targetSampleList, stagingTable -> {
+            ArrayList<ExtendedMutation> mutationList = new ArrayList<>();
+            Connection con = null;
+            try {
+                con = JdbcUtil.getDbConnection(DaoMutation.class);
+                String inClause = stagingTable == null ? "" : " AND sample_id IN (SELECT id FROM " + stagingTable + ")";
+                try (PreparedStatement pstmt = con.prepareStatement(
+                        "SELECT * FROM mutation " +
+                        "INNER JOIN mutation_event ON mutation.mutation_event_id=mutation_event.mutation_event_id " +
+                        "WHERE genetic_profile_id = ? AND mutation.entrez_gene_id = ?" + inClause)) {
+                    pstmt.setInt(1, geneticProfileId);
+                    pstmt.setLong(2, entrezGeneId);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        while (rs.next()) {
+                            mutationList.add(extractMutation(rs));
+                        }
+                    }
+                }
+                return mutationList;
+            } finally {
+                JdbcUtil.closeAll(DaoMutation.class, con, null, null);
             }
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
-        }
-        return mutationList;
-    }
-
-    /**
-     * @deprecated  We believe that this method is no longer called by any part of the codebase, and it will soon be deleted.
-     */
-    @Deprecated
-    public static HashMap getSimplifiedMutations (int geneticProfileId, Collection<Integer> targetSampleList,
-            Collection<Long> entrezGeneIds) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        HashMap hm = new HashMap();
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement(
-                    "SELECT sample_id, entrez_gene_id FROM mutation " +
-                    //"INNER JOIN mutation_event ON mutation.mutation_event_id=mutation_event.mutation_event_id " +
-                    "WHERE sample_id IN ('" +
-                    org.apache.commons.lang3.StringUtils.join(targetSampleList, "','") +
-                    "') AND genetic_profile_id = ? AND mutation.entrez_gene_id IN ('" +
-                    org.apache.commons.lang3.StringUtils.join(entrezGeneIds, "','") + "')");
-            pstmt.setInt(1, geneticProfileId);
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                String tmpStr = new StringBuilder().append(Integer.toString(rs.getInt("sample_id"))).append(Integer.toString(rs.getInt("entrez_gene_id"))).toString();
-                hm.put(tmpStr, "");
-            }
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
-        }
-        return hm;
+        });
     }
 
     /**
@@ -487,28 +453,28 @@ public final class DaoMutation {
     }
 
     public static ArrayList<ExtendedMutation> getMutations (int geneticProfileId, List<Integer> sampleIds) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        ArrayList <ExtendedMutation> mutationList = new ArrayList <ExtendedMutation>();
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement(
-                    "SELECT * FROM mutation " +
-                    "INNER JOIN mutation_event ON mutation.mutation_event_id=mutation_event.mutation_event_id " +
-                    "WHERE genetic_profile_id = ? AND sample_id in ('"+ StringUtils.join(sampleIds, "','")+"')");
-            pstmt.setInt(1, geneticProfileId);
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                ExtendedMutation mutation = extractMutation(rs);
-                mutationList.add(mutation);
+        return ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
+            ArrayList<ExtendedMutation> mutationList = new ArrayList<>();
+            Connection con = null;
+            try {
+                con = JdbcUtil.getDbConnection(DaoMutation.class);
+                String inClause = stagingTable == null ? "" : " AND sample_id IN (SELECT id FROM " + stagingTable + ")";
+                try (PreparedStatement pstmt = con.prepareStatement(
+                        "SELECT * FROM mutation " +
+                        "INNER JOIN mutation_event ON mutation.mutation_event_id=mutation_event.mutation_event_id " +
+                        "WHERE genetic_profile_id = ?" + inClause)) {
+                    pstmt.setInt(1, geneticProfileId);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        while (rs.next()) {
+                            mutationList.add(extractMutation(rs));
+                        }
+                    }
+                }
+                return mutationList;
+            } finally {
+                JdbcUtil.closeAll(DaoMutation.class, con, null, null);
             }
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
-        }
-        return mutationList;
+        });
     }
 
     /**
@@ -812,26 +778,31 @@ public final class DaoMutation {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
             pstmt = con.prepareStatement("SET SESSION group_concat_max_len = 1000000");
             rs = pstmt.executeQuery();
-            String sql = "SELECT mutation.entrez_gene_id, group_concat(mutation.sample_id), count(*), count(*)/`length` AS count_per_nt" +
-                    " FROM mutation, gene" +
-                    " WHERE mutation.entrez_gene_id=gene.entrez_gene_id" +
-                    " AND genetic_profile_id=" + profileId +
-                    (entrezGeneIds==null?"":(" AND mutation.entrez_gene_id IN("+StringUtils.join(entrezGeneIds,",")+")")) +
-                    (selectedCaseIds==null?"":(" AND mutation.sample_id IN("+StringUtils.join(selectedCaseIds,",")+")")) +
-                    " GROUP BY mutation.entrez_gene_id" +
-                    (thresholdRecurrence>0?(" HAVING COUNT(*)>="+thresholdRecurrence):"") +
-                    " ORDER BY count_per_nt DESC" +
-                    (thresholdNumGenes>0?(" LIMIT 0,"+thresholdNumGenes):"");
-            pstmt = con.prepareStatement(sql);
-            rs = pstmt.executeQuery();
-            Map<Long, Map<String, String>> map = new HashMap();
-            while (rs.next()) {
-                Map<String, String> value = new HashMap<>();
-                value.put("caseIds", rs.getString(2));
-                value.put("count", rs.getString(3));
-                map.put(rs.getLong(1), value);
-            }
-            return map;
+            final Connection queryCon = con;
+            return ClickHouseBulkUploader.upload(entrezGeneIds, geneTable ->
+                ClickHouseBulkUploader.upload(selectedCaseIds, caseTable -> {
+                    String sql = "SELECT mutation.entrez_gene_id, group_concat(mutation.sample_id), count(*), count(*)/`length` AS count_per_nt" +
+                            " FROM mutation, gene" +
+                            " WHERE mutation.entrez_gene_id=gene.entrez_gene_id" +
+                            " AND genetic_profile_id=" + profileId +
+                            (geneTable == null ? "" : " AND mutation.entrez_gene_id IN (SELECT id FROM " + geneTable + ")") +
+                            (caseTable == null ? "" : " AND mutation.sample_id IN (SELECT id FROM " + caseTable + ")") +
+                            " GROUP BY mutation.entrez_gene_id" +
+                            (thresholdRecurrence > 0 ? " HAVING COUNT(*)>=" + thresholdRecurrence : "") +
+                            " ORDER BY count_per_nt DESC" +
+                            (thresholdNumGenes > 0 ? " LIMIT 0," + thresholdNumGenes : "");
+                    try (PreparedStatement stmt = queryCon.prepareStatement(sql);
+                         ResultSet resultSet = stmt.executeQuery()) {
+                        Map<Long, Map<String, String>> map = new HashMap<>();
+                        while (resultSet.next()) {
+                            Map<String, String> value = new HashMap<>();
+                            value.put("caseIds", resultSet.getString(2));
+                            value.put("count", resultSet.getString(3));
+                            map.put(resultSet.getLong(1), value);
+                        }
+                        return map;
+                    }
+                }));
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
@@ -992,35 +963,32 @@ public final class DaoMutation {
         if (entrezGeneIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            String sql = "SELECT `sample_id`, `genetic_profile_id`, `entrez_gene_id`" +
-                    " FROM mutation" +
-                    " WHERE `entrez_gene_id` IN ("+ StringUtils.join(entrezGeneIds,",") + ")";
-            pstmt = con.prepareStatement(sql);
-            Map<Sample, Set<Long>> map = new HashMap<Sample, Set<Long>> ();
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                Sample sample = DaoSample.getSampleById(rs.getInt("sample_id"));
-                long entrez = rs.getLong("entrez_gene_id");
-                Set<Long> genes = map.get(sample);
-                if (genes == null) {
-                    genes = new HashSet<Long>();
-                    map.put(sample, genes);
+        return ClickHouseBulkUploader.upload(entrezGeneIds, stagingTable -> {
+            Map<Sample, Set<Long>> map = new HashMap<>();
+            Connection con = null;
+            try {
+                con = JdbcUtil.getDbConnection(DaoMutation.class);
+                try (PreparedStatement pstmt = con.prepareStatement(
+                        "SELECT `sample_id`, `genetic_profile_id`, `entrez_gene_id`" +
+                        " FROM mutation" +
+                        " WHERE `entrez_gene_id` IN (SELECT id FROM " + stagingTable + ")");
+                     ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        Sample sample = DaoSample.getSampleById(rs.getInt("sample_id"));
+                        long entrez = rs.getLong("entrez_gene_id");
+                        Set<Long> genes = map.get(sample);
+                        if (genes == null) {
+                            genes = new HashSet<>();
+                            map.put(sample, genes);
+                        }
+                        genes.add(entrez);
+                    }
                 }
-                genes.add(entrez);
+                return map;
+            } finally {
+                JdbcUtil.closeAll(DaoMutation.class, con, null, null);
             }
-            return map;
-        } catch (NullPointerException e) {
-            throw new DaoException(e);
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
-        }
+        });
     }
 
     /**

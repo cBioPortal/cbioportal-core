@@ -703,37 +703,33 @@ public final class DaoClinicalData {
     // get cancerType from the clinical_sample table to determine whether we have multiple cancer types
     // for given samples
     public static Map<String, Set<String>> getCancerTypeInfoBySamples(List<String> samplesList) throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-
-        try{
-            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            pstmt = con.prepareStatement("select " +
-                "distinct attr_value as attributeValue, " +
-                "attr_id as attributeID from clinical_sample " +
-                "where attr_id in (?, ?) and internal_id in (" +
-                "select internal_id from sample where stable_id in ('"
-                + StringUtils.join(samplesList,"','")+"'))");
-            pstmt.setString(1, ClinicalAttribute.CANCER_TYPE);
-            pstmt.setString(2, ClinicalAttribute.CANCER_TYPE_DETAILED);
-            rs = pstmt.executeQuery();
-
-            // create a map for the results
-            Map<String, Set<String>> result = new LinkedHashMap<String, Set<String>>();
-            result.put( ClinicalAttribute.CANCER_TYPE, new HashSet<String>());
-            result.put( ClinicalAttribute.CANCER_TYPE_DETAILED, new HashSet<String>());
-            while (rs.next())
-            {
-                result.get(rs.getString("attributeID")).add(rs.getString("attributeValue"));
+        return ClickHouseBulkUploader.uploadStrings(samplesList, stagingTable -> {
+            String inClause = stagingTable == null
+                    ? "select internal_id from sample"
+                    : "select internal_id from sample where stable_id in (select id from " + stagingTable + ")";
+            Connection con = null;
+            try {
+                con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+                try (PreparedStatement pstmt = con.prepareStatement(
+                        "select distinct attr_value as attributeValue, attr_id as attributeID " +
+                        "from clinical_sample " +
+                        "where attr_id in (?, ?) and internal_id in (" + inClause + ")")) {
+                    pstmt.setString(1, ClinicalAttribute.CANCER_TYPE);
+                    pstmt.setString(2, ClinicalAttribute.CANCER_TYPE_DETAILED);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        Map<String, Set<String>> result = new LinkedHashMap<>();
+                        result.put(ClinicalAttribute.CANCER_TYPE, new HashSet<>());
+                        result.put(ClinicalAttribute.CANCER_TYPE_DETAILED, new HashSet<>());
+                        while (rs.next()) {
+                            result.get(rs.getString("attributeID")).add(rs.getString("attributeValue"));
+                        }
+                        return result;
+                    }
+                }
+            } finally {
+                JdbcUtil.closeAll(DaoClinicalData.class, con, null, null);
             }
-
-            return result;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
-        }
+        });
     }
 
     public static void removePatientAttributesData(int internalPatientId) throws DaoException {

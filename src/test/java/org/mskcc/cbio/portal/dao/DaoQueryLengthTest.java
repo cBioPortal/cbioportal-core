@@ -138,4 +138,78 @@ public class DaoQueryLengthTest {
 
         assertNoSqlExceedsLimit();
     }
+
+    // ── DaoCopyNumberSegment (read paths) ────────────────────────────────────────
+
+    @Test
+    public void daoCopyNumberSegment_getSegmentForSamples_sqlUnderLimit() throws DaoException {
+        Collection<Integer> sampleIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).boxed().collect(Collectors.toSet());
+
+        DaoCopyNumberSegment.getSegmentForSamples(sampleIds, 1);
+
+        assertNoSqlExceedsLimit();
+    }
+
+    @Test
+    public void daoCopyNumberSegment_getCopyNumberActeredFraction_sqlUnderLimit() throws DaoException {
+        Collection<Integer> sampleIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).boxed().collect(Collectors.toSet());
+
+        DaoCopyNumberSegment.getCopyNumberActeredFraction(sampleIds, 1, 0.2);
+
+        assertNoSqlExceedsLimit();
+    }
+
+    // ── DaoClinicalData (read paths) ─────────────────────────────────────────────
+
+    @Test
+    public void daoClinicalData_getCancerTypeInfoBySamples_sqlUnderLimit() throws DaoException {
+        List<String> sampleIds = IntStream.rangeClosed(1, LARGE_ID_COUNT)
+                .mapToObj(i -> "SAMPLE_" + i)
+                .collect(Collectors.toList());
+
+        DaoClinicalData.getCancerTypeInfoBySamples(sampleIds);
+
+        assertNoSqlExceedsLimit();
+    }
+
+    // ── DaoMutation ──────────────────────────────────────────────────────────────
+
+    @Test
+    public void daoMutation_getMutationsWithSampleCollection_sqlUnderLimit() throws DaoException {
+        Collection<Integer> sampleIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).boxed().collect(Collectors.toList());
+
+        DaoMutation.getMutations(1, sampleIds, 672L);
+
+        assertNoSqlExceedsLimit();
+    }
+
+    @Test
+    public void daoMutation_getMutationsWithSampleList_sqlUnderLimit() throws DaoException {
+        List<Integer> sampleIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).boxed().collect(Collectors.toList());
+
+        DaoMutation.getMutations(1, sampleIds);
+
+        assertNoSqlExceedsLimit();
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void daoMutation_getSMGs_sqlUnderLimit() throws DaoException {
+        Collection<Long> geneIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).mapToObj(Long::valueOf).collect(Collectors.toSet());
+        Collection<Integer> caseIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).boxed().collect(Collectors.toSet());
+
+        DaoMutation.getSMGs(1, geneIds, 0, 0, caseIds);
+
+        assertNoSqlExceedsLimit();
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void daoMutation_getSimilarSamplesWithMutatedGenes_sqlUnderLimit() throws DaoException {
+        Collection<Long> geneIds = IntStream.rangeClosed(1, LARGE_ID_COUNT).mapToObj(Long::valueOf).collect(Collectors.toSet());
+
+        DaoMutation.getSimilarSamplesWithMutatedGenes(geneIds);
+
+        assertNoSqlExceedsLimit();
+    }
 }
