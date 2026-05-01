@@ -45,6 +45,8 @@ import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.MutationKeywordUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -66,6 +68,7 @@ import java.util.regex.Pattern;
  * Data access object for Mutation table
  */
 public final class DaoMutation {
+    private static final Logger LOG = LoggerFactory.getLogger(DaoMutation.class);
     public static final String NAN = "NaN";
     private static final String MUTATION_COUNT_ATTR_ID = "MUTATION_COUNT";
     private static final String DELETE_ALTERATION_DRIVER_ANNOTATION = "DELETE from alteration_driver_annotation WHERE genetic_profile_id=? and sample_id=?";
@@ -170,8 +173,7 @@ public final class DaoMutation {
         }
 
         Connection con = null;
-        PreparedStatement deleteStmt = null;
-        PreparedStatement insertStmt = null;
+        PreparedStatement selectStmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoMutation.class);
@@ -183,8 +185,14 @@ public final class DaoMutation {
                 DaoClinicalAttributeMeta.addDatum(attr);
             }
 
-            String mutationCountSelect =
-                "SELECT sample_profile.`sample_id`, 'MUTATION_COUNT', count(DISTINCT mutation_event.`chr`, mutation_event.`start_position`, " +
+            LOG.info("createMutationCountClinicalData (bulk insert) for profile {}", geneticProfile.getGeneticProfileId());
+            // SELECT mutation counts into a map, then insert via bulk loader
+            // No prior DELETE needed: clinical_sample is ReplacingMergeTree ORDER BY (internal_id, attr_id),
+            // so OPTIMIZE TABLE FINAL will keep the latest row per key, replacing any stale values.
+            // Issuing a DELETE FROM before INSERT causes a lightweight-delete/OPTIMIZE race that silently
+            // wipes the newly inserted rows.
+            selectStmt = con.prepareStatement(
+                "SELECT sample_profile.`sample_id`, count(DISTINCT mutation_event.`chr`, mutation_event.`start_position`, " +
                     "mutation_event.`end_position`, mutation_event.`reference_allele`, mutation_event.`tumor_seq_allele`) AS MUTATION_COUNT " +
                     "FROM `sample_profile` " +
                     "LEFT JOIN mutation ON mutation.`sample_id` = sample_profile.`sample_id` " +
@@ -193,29 +201,26 @@ public final class DaoMutation {
                     "INNER JOIN genetic_profile ON genetic_profile.`genetic_profile_id` = sample_profile.`genetic_profile_id` " +
                     "WHERE genetic_profile.`genetic_alteration_type` = 'MUTATION_EXTENDED' " +
                     "AND genetic_profile.`genetic_profile_id`=? " +
-                    "GROUP BY sample_profile.`genetic_profile_id` , sample_profile.`sample_id`";
-
-            deleteStmt = con.prepareStatement(
-                "ALTER TABLE clinical_sample "
-                    + "DELETE WHERE attr_id = 'MUTATION_COUNT' "
-                    + "AND internal_id IN (SELECT sample_id FROM sample_profile WHERE genetic_profile_id = ?) "
+                    "GROUP BY sample_profile.`genetic_profile_id`, sample_profile.`sample_id`"
             );
-            deleteStmt.setInt(1, geneticProfile.getGeneticProfileId());
-            deleteStmt.executeUpdate();
+            selectStmt.setInt(1, geneticProfile.getGeneticProfileId());
+            rs = selectStmt.executeQuery();
+            Map<Integer, String> mutationCounts = new HashMap<>();
+            while (rs.next()) {
+                mutationCounts.put(rs.getInt(1), rs.getString(2));
+            }
 
-            insertStmt = con.prepareStatement(
-                "INSERT INTO clinical_sample " + mutationCountSelect
-            );
-            insertStmt.setInt(1, geneticProfile.getGeneticProfileId());
-            insertStmt.executeUpdate();
+            LOG.info("inserting MUTATION_COUNT for {} samples", mutationCounts.size());
+            for (Map.Entry<Integer, String> entry : mutationCounts.entrySet()) {
+                DaoClinicalData.addSampleDatum(entry.getKey(), MUTATION_COUNT_ATTR_ID, entry.getValue());
+            }
 
-            // Necessary for deduplication
+            // Flush inserts and force ReplacingMergeTree deduplication so the latest values are visible
             ClickHouseOptimizer.optimizeTables("clinical_sample");
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(DaoMutation.class, null, deleteStmt, null);
-            JdbcUtil.closeAll(DaoMutation.class, con, insertStmt, rs);
+            JdbcUtil.closeAll(DaoMutation.class, con, selectStmt, rs);
         }
     }
 
