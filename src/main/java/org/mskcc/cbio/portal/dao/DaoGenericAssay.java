@@ -19,14 +19,16 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`genetic_entity_id`, `name`, `value`) "
-            + "VALUES(?,?,?)");
+            long propertyId = ClickHouseAutoIncrement.nextId("seq_generic_entity_properties");
+            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`id`, `genetic_entity_id`, `name`, `value`) "
+            + "VALUES(?,?,?,?)");
             if (entityId == null) {
                 return;
             }
-            pstmt.setInt(1, entityId);
-            pstmt.setString(2, name);
-            pstmt.setString(3, value);
+            pstmt.setLong(1, propertyId);
+            pstmt.setInt(2, entityId);
+            pstmt.setString(3, name);
+            pstmt.setString(4, value);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -43,8 +45,8 @@ public class DaoGenericAssay {
 
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`genetic_entity_id`, `name`, `value`) "
-                + "VALUES(?,?,?)");
+            pstmt = con.prepareStatement("INSERT INTO generic_entity_properties (`id`, `genetic_entity_id`, `name`, `value`) "
+                + "VALUES(?,?,?,?)");
             if (properties.size() == 0) {
                 return;
             }
@@ -54,9 +56,11 @@ public class DaoGenericAssay {
             boolean preservedAutoCommitMode = con.getAutoCommit();
             con.setAutoCommit(false);
             for (GenericEntityProperty property : properties) {
-                pstmt.setInt(1, property.getEntityId());
-                pstmt.setString(2, property.getName());
-                pstmt.setString(3, property.getValue());
+                long propertyId = ClickHouseAutoIncrement.nextId("seq_generic_entity_properties");
+                pstmt.setLong(1, propertyId);
+                pstmt.setInt(2, property.getEntityId());
+                pstmt.setString(3, property.getName());
+                pstmt.setString(4, property.getValue());
                 pstmt.addBatch();
                 if (++count % batchSize == 0) {
                     pstmt.executeBatch();
