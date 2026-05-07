@@ -235,20 +235,6 @@ function sql_statement_includes_insert_into() {
     return 1
 }
 
-function append_async_settings_suffix() {
-    local sql_filepath="$1"
-    local sql_filepath_amended="$sql_filepath.amended"
-    local async_settings_suffix=" SETTINGS async_insert=1, wait_for_async_insert=1, async_insert_busy_timeout_ms=300000, async_insert_max_data_size=$clickhouse_max_memory_use_target, async_insert_max_query_number=10000;"
-    local linecount=$(cat $sql_filepath | wc -l)
-    local linecount_minus_one=$(($linecount-1))
-    head -n $linecount_minus_one $sql_filepath > $sql_filepath_amended
-    local last_line_from_file="$(tail -n 1 $sql_filepath)"
-    local line_without_semicolon="${last_line_from_file%;*}"
-    echo "$line_without_semicolon" >> $sql_filepath_amended
-    echo "$async_settings_suffix" >> $sql_filepath_amended
-    mv $sql_filepath_amended $sql_filepath
-}
-
 function create_all_derived_tables() {
     local pos=0
     while [ $pos -lt ${#derived_table_simple_sql_filepaths[@]} ] ; do
@@ -269,14 +255,16 @@ function create_all_derived_tables() {
             pos=$(($pos+1))
             continue
         fi
-        if sql_statement_includes_insert_into $sql_filepath ; then
-            append_async_settings_suffix $sql_filepath
-        fi
         if ! execute_sql_statement_from_file_via_clickhouse_client "$sql_filepath" "create_derived_table_result_filepath" ; then
             echo "Error : failure occurred during execution of sql statements in file $sql_filepath" >&2
             echo "    beginning with:" >&2
             head -n 4 $sql_filepath >&2
             return 1
+        fi
+        if grep OPTIMIZE "$sql_filepath" | grep FINAL ; then
+            WAIT_AFTER_OPTIMIZE=90
+            echo "sleeping $WAIT_AFTER_OPTIMIZE seconds after executing statement above"
+            sleep $WAIT_AFTER_OPTIMIZE
         fi
         pos=$(($pos+1))
     done
