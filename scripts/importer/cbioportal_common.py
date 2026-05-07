@@ -12,8 +12,6 @@ from collections import OrderedDict
 from subprocess import Popen, PIPE, STDOUT
 from typing import Dict, Optional
 import dsnparse
-import pymysql
-pymysql.install_as_MySQLdb()
 
 # MySQLdb import should come after the install_as_MySQLdb() line above
 import MySQLdb

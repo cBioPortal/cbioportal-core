@@ -33,7 +33,7 @@ def get_list_of_profile_ids_from_clickhouse(yaml_config_filename, get_profile_id
     profile_id_list = profile_id_list_string.splitlines()
     return profile_id_list, profile_query_result.returncode
 
-def convert_insert_to_be_async(original_insert_sql_statement, expected_where_for_profile_type, profiles_to_be_skipped, max_memory_target):
+def convert_insert(original_insert_sql_statement, expected_where_for_profile_type, profiles_to_be_skipped, max_memory_target, apply_async_settings):
     one_line_insert_sql_statement = re.sub('\s+', ' ', original_insert_sql_statement)
     if one_line_insert_sql_statement.endswith(" "):
         one_line_insert_sql_statement = one_line_insert_sql_statement.strip()
@@ -45,6 +45,8 @@ def convert_insert_to_be_async(original_insert_sql_statement, expected_where_for
         exclude_profiles_term = f"{EXCLUDE_PROFILES_CLAUSE_STRING} ({profiles_to_be_skipped_string})"
     replacement_string = f"{expected_where_for_profile_type}{exclude_profiles_term}"
     suffix_string = f" SETTINGS async_insert=1, wait_for_async_insert=1, async_insert_busy_timeout_ms=300000, async_insert_max_data_size={max_memory_target}, async_insert_max_query_number=10000;"
+    if not apply_async_settings:
+        suffix_string = f" ;"
     adjusted_insert_statement = one_line_insert_sql_statement.replace(expected_where_for_profile_type, replacement_string) + suffix_string
     return adjusted_insert_statement
 
@@ -107,7 +109,7 @@ def create_sql_insert_statement_from_clickhouse(sql_filepath, expected_insert_st
             print(f"\tExpected query start is '{expected_insert_statement_start}'", file=sys.stderr)
             print(f"\tExpected query contains '{expected_where_for_profile_type}'", file=sys.stderr)
             sys.exit(1)
-    insert_by_profile_statement = convert_insert_to_be_async(original_insert_sql_statement, expected_where_for_profile_type, profiles_to_be_skipped, max_memory_target)
+    insert_by_profile_statement = convert_insert(original_insert_sql_statement, expected_where_for_profile_type, profiles_to_be_skipped, max_memory_target, False)
     print(f"executing : {insert_by_profile_statement}")
     return insert_by_profile_statement
 
