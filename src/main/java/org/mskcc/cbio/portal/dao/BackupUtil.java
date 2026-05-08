@@ -4,8 +4,6 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class BackupUtil {
@@ -31,6 +29,10 @@ public class BackupUtil {
             return;
         }
 
+        backup(tableNames, fn);
+    }
+
+    public static void backup(List<String> tableNames, ThrowingRunnable fn) throws Exception {
         try {
             for (String table : tableNames) {
                 backup(table);
