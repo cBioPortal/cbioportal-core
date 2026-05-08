@@ -13,9 +13,6 @@ from subprocess import Popen, PIPE, STDOUT
 from typing import Dict, Optional
 import dsnparse
 
-# MySQLdb import should come after the install_as_MySQLdb() line above
-import MySQLdb
-
 # ------------------------------------------------------------------------------
 # globals
 
@@ -1140,32 +1137,35 @@ def parse_properties_file(properties_filename: str) -> Dict[str, str]:
             properties[name] = value.strip()
     return properties
 
-def get_db_cursor(portal_properties: PortalProperties):
-
-    try:
-        url_elements = dsnparse.parse(portal_properties.database_url)
-        connection_kwargs = {
-            "host": url_elements.host,
-            "port": url_elements.port if url_elements.port is not None else 3306,
-            "db": url_elements.paths[0],
-            "user": portal_properties.database_user,
-            "passwd": portal_properties.database_pw
-        }
-        if url_elements.query.get("useSSL") == "true":
-            connection_kwargs['ssl_mode'] = 'REQUIRED'
-            connection_kwargs['ssl'] = {"ssl_mode": True}
-        else:
-            if url_elements.query.get("get-server-public-key") == "true":
-                connection_kwargs['ssl'] = {
-                    'MYSQL_OPT_GET_SERVER_PUBLIC_KEY': True
-                }
-        connection = MySQLdb.connect(**connection_kwargs)
-    except MySQLdb.Error as exception:
-        print(exception, file=ERROR_FILE)
-        message = (
-            "--> Error connecting to server with URL: "
-            + portal_properties.database_url)
-        print(message, file=ERROR_FILE)
-        raise ConnectionError(message) from exception
-    if connection is not None:
-        return connection, connection.cursor()
+"""
+The following function is based on creating a connection to a mysql database, which is no longer part of the cbioportal system. In order to use similar functionality this functionality would need to be adapted to interact with a clickhouse database.
+"""
+####def get_db_cursor(portal_properties: PortalProperties):
+####
+####    try:
+####        url_elements = dsnparse.parse(portal_properties.database_url)
+####        connection_kwargs = {
+####            "host": url_elements.host,
+####            "port": url_elements.port if url_elements.port is not None else 3306,
+####            "db": url_elements.paths[0],
+####            "user": portal_properties.database_user,
+####            "passwd": portal_properties.database_pw
+####        }
+####        if url_elements.query.get("useSSL") == "true":
+####            connection_kwargs['ssl_mode'] = 'REQUIRED'
+####            connection_kwargs['ssl'] = {"ssl_mode": True}
+####        else:
+####            if url_elements.query.get("get-server-public-key") == "true":
+####                connection_kwargs['ssl'] = {
+####                    'MYSQL_OPT_GET_SERVER_PUBLIC_KEY': True
+####                }
+####        connection = MySQLdb.connect(**connection_kwargs)
+####    except MySQLdb.Error as exception:
+####        print(exception, file=ERROR_FILE)
+####        message = (
+####            "--> Error connecting to server with URL: "
+####            + portal_properties.database_url)
+####        print(message, file=ERROR_FILE)
+####        raise ConnectionError(message) from exception
+####    if connection is not None:
+####        return connection, connection.cursor()
