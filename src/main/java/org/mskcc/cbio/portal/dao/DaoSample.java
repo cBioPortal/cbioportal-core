@@ -321,17 +321,28 @@ public class DaoSample {
     }
 
     /**
-     * Removes sample in genetic alterations' data for a study
-     * @param internalStudyId - internal id of study to remove samples in genetic alterations data
-     * @param internalSampleIdsToRemove - internal ids of samples to remove
-     * @throws DaoException
+     * Removes samples from genetic alteration data for a study.
+     * <p>
+     * The affected {@code genetic_alteration} and {@code genetic_profile_samples}
+     * tables are backed up before removal starts and restored from backup if the
+     * operation fails.
+     *
+     * @param internalStudyId internal ID of the study whose genetic alteration sample data should be updated
+     * @param internalSampleIdsToRemove internal IDs of samples to remove
+     * @throws DaoException if removing samples from genetic alteration data fails
      */
     private static void removeSamplesInGeneticAlterationsForStudy(int internalStudyId, Set<Integer> internalSampleIdsToRemove) throws DaoException {
-        List<GeneticProfile> geneticProfiles = DaoGeneticProfile.getAllGeneticProfiles(internalStudyId);
-        for (GeneticProfile geneticProfile : geneticProfiles) {
-            Set<Integer> removedInternalSampleIds = removeSamplesInGeneticAlterationsForGeneticProfile(geneticProfile, internalSampleIdsToRemove);
-            log.debug("Genetic alterations data for {} sample ids ouf of {} requested have been removed for genetic profile with stable id={}",
-                    removedInternalSampleIds, internalSampleIdsToRemove, geneticProfile.getStableId());
+        try {
+            BackupUtil.backup(List.of("genetic_alteration", "genetic_profile_samples"), () -> {
+                List<GeneticProfile> geneticProfiles = DaoGeneticProfile.getAllGeneticProfiles(internalStudyId);
+                for (GeneticProfile geneticProfile : geneticProfiles) {
+                    Set<Integer> removedInternalSampleIds = removeSamplesInGeneticAlterationsForGeneticProfile(geneticProfile, internalSampleIdsToRemove);
+                    log.debug("Genetic alterations data for {} sample ids ouf of {} requested have been removed for genetic profile with stable id={}",
+                            removedInternalSampleIds, internalSampleIdsToRemove, geneticProfile.getStableId());
+                }
+            });
+        } catch (Exception e) {
+            throw new DaoException(e);
         }
     }
 
