@@ -1,34 +1,43 @@
 
 import os
 import re
-
-import urllib
+import sys
+import urllib.request
+import urllib.parse
 
 
 def rebuild_derived_tables(derived_table_sql_filepath=None):
     """Rebuild ClickHouse derived tables after a database-mutating operation.
+
+    Returns True on success, False on failure.
     """
-    if not derived_table_sql_filepath:
-        portal_home = os.environ.get('PORTAL_HOME', '')
-        if portal_home == '':
-            raise RuntimeError("PORTAL_HOME not set, could not locate derived table script")
-        derived_table_sql_filepath = os.path.join(portal_home, 'clickhouse.sql')
-        if not os.path.exists(derived_table_sql_filepath):
-            raise RuntimeError(f"Could not find derived table script at {derived_table_sql_filepath}")
+    RED = '\033[91m'
+    END = '\033[0m'
+    try:
+        if not derived_table_sql_filepath:
+            portal_home = os.environ.get('PORTAL_HOME', '')
+            if not portal_home:
+                raise RuntimeError("PORTAL_HOME not set, could not locate derived table script")
+            derived_table_sql_filepath = os.path.join(portal_home, 'clickhouse.sql')
+            if not os.path.exists(derived_table_sql_filepath):
+                raise RuntimeError(f"Could not find derived table script at {derived_table_sql_filepath}")
 
-    ch_props = {
-        'conn_str':  os.environ.get('CLICKHOUSE_CONNECTION_STRING'),
-        'host': os.environ.get('CLICKHOUSE_HOST'),
-        'port': os.environ.get('CLICKHOUSE_PORT'),
-        'user': os.environ.get('CLICKHOUSE_USER'),
-        'password': os.environ.get('CLICKHOUSE_PASSWORD'),
-        'database': os.environ.get('CLICKHOUSE_DATABASE'),
-    }
+        ch_props = {
+            'host': os.environ.get('CLICKHOUSE_HOST'),
+            'port': os.environ.get('CLICKHOUSE_PORT'),
+            'user': os.environ.get('CLICKHOUSE_USER'),
+            'password': os.environ.get('CLICKHOUSE_PASSWORD'),
+            'database': os.environ.get('CLICKHOUSE_DATABASE'),
+        }
 
-    with open(derived_table_sql_filepath, encoding='utf8') as f:
-        sql_content = f.read()
+        with open(derived_table_sql_filepath, encoding='utf8') as f:
+            sql_content = f.read()
 
-    execute_clickhouse_sql_via_http(sql_content, ch_props)
+        execute_clickhouse_sql_via_http(sql_content, ch_props)
+        return True
+    except Exception as e:
+        print(RED + f"Derived table construction failed: {e}" + END, file=sys.stderr)
+        return False
 
 def execute_clickhouse_sql_via_http(sql_content, ch_props):
     """Execute SQL statements via ClickHouse HTTP interface.

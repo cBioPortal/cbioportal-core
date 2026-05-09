@@ -12,10 +12,7 @@ import os
 import importlib
 import argparse
 import logging
-import urllib.parse
 from pathlib import Path
-
-from scripts.importer import derive_tables
 
 # configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module
@@ -34,6 +31,7 @@ from . import cbioportalImporter
 from . import importOncokbMutation
 from . import importOncokbDiscreteCNA
 from . import libImportOncokb
+from . import derive_tables
 
 
 # ----------------------------------------------------------------------------
@@ -117,20 +115,23 @@ def interface():
 # Main
 # ----------------------------------------------------------------------------
 
+def _print_need_to_update_derived_tables_warning():
+    print(
+        Color.BOLD +
+        'The database has been altered. It is now necessary to reconstitute\n'
+        'the derived tables before using the database with the cBioPortal\n'
+        'web application. Run:\n'
+        '    metaImport.py derive-tables\n' +
+        Color.END,
+        file=sys.stderr,
+    )
+
 if __name__ == '__main__':
-    # Check for derive-tables subcommand before normal parsing
-    derive_tables_only = False
     if len(sys.argv) > 1 and sys.argv[1] == 'derive-tables':
-        derive_tables_only = True
-        sys.argv.pop(1)  # remove 'derive-tables' from args
+        sys.exit(0 if derive_tables.rebuild_derived_tables() else 1)
 
     # Parse user input
     args = interface()
-
-    # Handle derive-tables subcommand (no validation, no import)
-    if derive_tables_only:
-        success = derive_tables.rebuild_derived_tables()
-        sys.exit(0 if success else 1)
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
 
@@ -236,7 +237,7 @@ if __name__ == '__main__':
                               Color.END, file=sys.stderr)
                         exitcode = 1
                 else:
-                    cbioportalImporter.print_need_to_update_derived_tables_warning()
+                    _print_need_to_update_derived_tables_warning()
             else:
                 print(Color.BOLD + "Warnings. Please fix your files or import with override warning option" + Color.END, file=sys.stderr)
                 print("#" * 71, file=sys.stderr)
@@ -258,7 +259,7 @@ if __name__ == '__main__':
                           Color.END, file=sys.stderr)
                     exitcode = 1
             else:
-                cbioportalImporter.print_need_to_update_derived_tables_warning()
+                _print_need_to_update_derived_tables_warning()
     except KeyboardInterrupt:
         print(Color.BOLD + "\nProcess interrupted. You will have to run this again to make sure study is completely loaded." + Color.END, file=sys.stderr)
         print("#" * 71, file=sys.stderr)

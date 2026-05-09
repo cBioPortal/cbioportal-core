@@ -11,13 +11,8 @@ import importlib
 import argparse
 import logging
 import re
-import urllib.request
-import urllib.parse
-import json
 from pathlib import Path
 from typing import Dict, Tuple
-
-from scripts.importer import derive_tables
 
 # configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module
@@ -661,18 +656,6 @@ def locate_jar():
     return str(jars[0])
 
 
-def print_need_to_update_derived_tables_warning():
-    """Warns user to re-derive the derived tables."""
-    BOLD = '\033[1m'
-    END = '\033[0m'
-    rederive_warning_msg = BOLD + \
-            'The database has been altered. It is now necessary to reconstitute\n' + \
-            'the derived tables before using the database with the cBioPortal\n' + \
-            'web application. Run:\n' + \
-            '    metaImport.py derive-tables\n' + \
-            END
-    LOGGER.warning(rederive_warning_msg)
-    
 def main(args):
     global LOGGER
 
