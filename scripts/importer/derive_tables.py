@@ -24,7 +24,7 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
 
         required_props = {
             'host': 'CLICKHOUSE_HOST',
-            'port': 'CLICKHOUSE_PORT',
+            'port': 'CLICKHOUSE_HTTP_PORT',
             'user': 'CLICKHOUSE_USER',
             'password': 'CLICKHOUSE_PASSWORD',
             'database': 'CLICKHOUSE_DB',
