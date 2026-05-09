@@ -22,13 +22,23 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
             if not os.path.exists(derived_table_sql_filepath):
                 raise RuntimeError(f"Could not find derived table script at {derived_table_sql_filepath}")
 
-        ch_props = {
-            'host': os.environ.get('CLICKHOUSE_HOST'),
-            'port': os.environ.get('CLICKHOUSE_PORT'),
-            'user': os.environ.get('CLICKHOUSE_USER'),
-            'password': os.environ.get('CLICKHOUSE_PASSWORD'),
-            'database': os.environ.get('CLICKHOUSE_DATABASE'),
+        required_props = {
+            'host': 'CLICKHOUSE_HOST',
+            'port': 'CLICKHOUSE_PORT',
+            'user': 'CLICKHOUSE_USER',
+            'password': 'CLICKHOUSE_PASSWORD',
+            'database': 'CLICKHOUSE_DATABASE',
         }
+        missing = []
+        ch_props = {}
+        for key, env_var in required_props.items():
+            value = os.environ.get(env_var)
+            if not value:
+                missing.append(env_var)
+            ch_props[key] = value
+        if missing:
+            raise RuntimeError(
+                f"ClickHouse properties not set: {', '.join(missing)}")
 
         with open(derived_table_sql_filepath, encoding='utf8') as f:
             sql_content = f.read()
