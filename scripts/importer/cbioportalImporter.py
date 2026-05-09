@@ -58,8 +58,9 @@ REMOVE_SAMPLES = "remove-samples"
 REMOVE_PATIENTS = "remove-patients"
 IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
+DERIVE_TABLES = "derive-tables"
 
-COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS]
+COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS, DERIVE_TABLES]
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -268,6 +269,20 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity)
     elif command == IMPORT_CASE_LIST:
         import_case_list(jvm_args, meta_filename)
+    elif command == DERIVE_TABLES:
+        # Derive tables standalone — no JVM needed
+        from . import derive_tables as dt
+        ch_props = getattr(args, 'ch_props', None)
+        sql_dir = getattr(args, 'sql_dir', None)
+        github_branch = getattr(args, 'github_branch', None)
+        # Resolve ch_props path
+        if not ch_props:
+            ch_props = os.environ.get('IMPORTER_PROPERTIES_FILEPATH',
+                                       '/cbioportal/application.properties')
+        success = dt.main_derive(ch_props, github_branch=github_branch,
+                                 sql_dir=sql_dir)
+        if not success:
+            sys.exit(1)
 
 def get_meta_filenames(data_directory):
     meta_filenames = [
@@ -617,6 +632,18 @@ def interface(args=None):
     remove_patients.add_argument('--patient_ids', type=str, required=True,
                         help='Patient ID(s). Comma separated, if multiple.')
 
+    derive_tables_parser = subparsers.add_parser('derive-tables', parents=[], add_help=True)
+    derive_tables_parser.add_argument('--ch-props', type=str,
+                        help='Path to ClickHouse application.properties. '
+                             'Default: $IMPORTER_PROPERTIES_FILEPATH or '
+                             '/cbioportal/application.properties')
+    derive_tables_parser.add_argument('--sql-dir', type=str,
+                        help='Local directory with derived table SQL files '
+                             '(default: download from GitHub).')
+    derive_tables_parser.add_argument('--github-branch', type=str,
+                        help='GitHub branch for derived table SQL '
+                             '(default: master).')
+
     parser.add_argument('-c', '--command', type=str, required=False,
                         help='This argument is outdated. Please use the listed subcommands, without the -c flag. '
                         'Command for import. Allowed commands: ' + allowed_commands_csv)
@@ -662,8 +689,12 @@ def print_need_to_update_derived_tables_warning():
     rederive_warning_msg = BOLD + \
             'The database has been altered. It is now necessary to reconstitute\n' + \
             'the derived tables before using the database with the cBioPortal\n' + \
-            'web application. See this page for more details:\n' + \
-            'https://github.com/cBioPortal/cbioportal-core/blob/main/scripts/clickhouse_import_support/README.md' + \
+            'web application. Run:\n' + \
+            '    metaImport.py derive-tables\n' + \
+            'or:\n' + \
+            '    cbioportalImporter.py derive-tables\n' + \
+            'See: https://github.com/cBioPortal/cbioportal-core/blob/main/\n' + \
+            '     scripts/clickhouse_import_support/README.md' + \
             END
     LOGGER.warning(rederive_warning_msg)
     
@@ -679,6 +710,19 @@ def main(args):
     module_logger.addHandler(error_handler)
     LOGGER = module_logger
 
+    # derive-tables doesn't need JVM — handle early
+    if getattr(args, 'command', None) == DERIVE_TABLES:
+        process_command(
+            None,  # jvm_args not needed
+            args.command,
+            args.meta_filename,
+            args.data_filename,
+            args.study_ids,
+            args.patient_ids if hasattr(args, 'patient_ids') else None,
+            args.sample_ids if hasattr(args, 'sample_ids') else None,
+            args.update_generic_assay_entity)
+        return
+
     # move jar_path to java_opts if it exists
     if args.jar_path:
         args.java_opts = f"-cp {args.jar_path} {args.java_opts}"
@@ -688,11 +732,18 @@ def main(args):
     if args.java_opts is not None and '-cp' in args.java_opts:
         locate_jar_path = False
     if locate_jar_path:
-        try:
-            jar_path = locate_jar()
-        except FileNotFoundError as e:
-            print(e)
-            sys.exit(2)
+        # Check IMPORTER_JAR_FILEPATH env var first, fall back to auto-locate
+        jar_path = os.environ.get('IMPORTER_JAR_FILEPATH')
+        if jar_path:
+            if not os.path.exists(jar_path):
+                print('IMPORTER_JAR_FILEPATH is set but file not found:', jar_path)
+                sys.exit(2)
+        else:
+            try:
+                jar_path = locate_jar()
+            except FileNotFoundError as e:
+                print(e)
+                sys.exit(2)
         print('Data loading step using', jar_path)
         print()
         if args.java_opts is None:
@@ -702,6 +753,11 @@ def main(args):
 
     # process the options
     jvm_args = "-Dspring.profiles.active=dbcp " + args.java_opts
+
+    # If IMPORTER_PROPERTIES_FILEPATH is set, add it as spring config location
+    importer_properties_filepath = os.environ.get('IMPORTER_PROPERTIES_FILEPATH')
+    if importer_properties_filepath:
+        jvm_args += f" --spring.config.location=file:{importer_properties_filepath}"
 
     # check if DB version and application version are in sync
     check_version(jvm_args)
