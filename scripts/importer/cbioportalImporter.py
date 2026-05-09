@@ -655,18 +655,7 @@ def locate_jar():
             'Expected to find 1 scripts-*.jar, but found ' + str(len(jars)))
     return str(jars[0])
 
-def print_need_to_update_derived_tables_warning():
-    """Warns user to re-derive the derived tables."""
-    BOLD = '\033[1m'
-    END = '\033[0m'
-    rederive_warning_msg = BOLD + \
-            'The database has been altered. It is now necessary to reconstitute\n' + \
-            'the derived tables before using the database with the cBioPortal\n' + \
-            'web application. See this page for more details:\n' + \
-            'https://github.com/cBioPortal/cbioportal-core/blob/main/scripts/clickhouse_import_support/README.md' + \
-            END
-    LOGGER.warning(rederive_warning_msg)
-    
+
 def main(args):
     global LOGGER
 
@@ -724,7 +713,6 @@ def main(args):
             args.patient_ids if hasattr(args, 'patient_ids') else None,
             args.sample_ids if hasattr(args, 'sample_ids') else None,
             args.update_generic_assay_entity)
-        print_need_to_update_derived_tables_warning()
 
 # ------------------------------------------------------------------------------
 # ready to roll

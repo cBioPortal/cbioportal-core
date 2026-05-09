@@ -31,6 +31,7 @@ from . import cbioportalImporter
 from . import importOncokbMutation
 from . import importOncokbDiscreteCNA
 from . import libImportOncokb
+from . import derive_tables
 
 
 # ----------------------------------------------------------------------------
@@ -104,6 +105,11 @@ def interface():
                         help='Set as True to download OncoKB annotations for Mutations and CNA and load as custom driver annotations')
     parser.add_argument('-skipimport', '--skip_db_import', action='store_true',
                         help='Perform validation and OncoKB download but do not import study into database.')
+    derive_tables_group = parser.add_mutually_exclusive_group()
+    derive_tables_group.add_argument('--no-derive-tables', action='store_true',
+                        help='Skip derived table construction after import.')
+    derive_tables_group.add_argument('--derived-table-sql', type=str, metavar='PATH',
+                        help='Path to SQL file used for derived table construction.')
     parser = parser.parse_args()
     return parser
 
@@ -112,9 +118,27 @@ def interface():
 # Main
 # ----------------------------------------------------------------------------
 
+def _print_need_to_update_derived_tables_warning():
+    print(
+        Color.BOLD +
+        'The database has been altered. It is now necessary to reconstitute\n'
+        'the derived tables before using the database with the cBioPortal\n'
+        'web application. Run:\n'
+        '    metaImport.py derive-tables\n' +
+        Color.END,
+        file=sys.stderr,
+    )
+
 if __name__ == '__main__':
+    derive_tables_only = len(sys.argv) > 1 and sys.argv[1] == 'derive-tables'
+    if derive_tables_only:
+        sys.argv.pop(1)
+
     # Parse user input
     args = interface()
+
+    if derive_tables_only:
+        sys.exit(0 if derive_tables.rebuild_derived_tables(args.derived_table_sql) else 1)
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
 
@@ -206,6 +230,21 @@ if __name__ == '__main__':
                 print("#" * 71 + "\n", file=sys.stderr)
                 cbioportalImporter.main(args)
                 exitcode = 0
+                # Rebuild derived tables after database-mutating operation
+                if not getattr(args, 'no_derive_tables', False):
+                    print("\n")
+                    print("#" * 71, file=sys.stderr)
+                    print(Color.BOLD +
+                          "Rebuilding ClickHouse derived tables..." +
+                          Color.END, file=sys.stderr)
+                    if not derive_tables.rebuild_derived_tables(args.derived_table_sql):
+                        print(Color.RED +
+                              "Derived table construction failed. "
+                              "The database may be in an inconsistent state." +
+                              Color.END, file=sys.stderr)
+                        exitcode = 1
+                else:
+                    _print_need_to_update_derived_tables_warning()
             else:
                 print(Color.BOLD + "Warnings. Please fix your files or import with override warning option" + Color.END, file=sys.stderr)
                 print("#" * 71, file=sys.stderr)
@@ -213,6 +252,21 @@ if __name__ == '__main__':
             print(Color.BOLD + "Everything looks good. Importing study now" + Color.END, file=sys.stderr)
             print("#" * 71 + "\n", file=sys.stderr)
             cbioportalImporter.main(args)
+            # Rebuild derived tables after database-mutating operation
+            if not getattr(args, 'no_derive_tables', False):
+                print("\n")
+                print("#" * 71, file=sys.stderr)
+                print(Color.BOLD +
+                      "Rebuilding ClickHouse derived tables..." +
+                      Color.END, file=sys.stderr)
+                if not derive_tables.rebuild_derived_tables(args.derived_table_sql):
+                    print(Color.RED +
+                          "Derived table construction failed. "
+                          "The database may be in an inconsistent state." +
+                          Color.END, file=sys.stderr)
+                    exitcode = 1
+            else:
+                _print_need_to_update_derived_tables_warning()
     except KeyboardInterrupt:
         print(Color.BOLD + "\nProcess interrupted. You will have to run this again to make sure study is completely loaded." + Color.END, file=sys.stderr)
         print("#" * 71, file=sys.stderr)
