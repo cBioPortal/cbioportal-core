@@ -105,8 +105,11 @@ def interface():
                         help='Set as True to download OncoKB annotations for Mutations and CNA and load as custom driver annotations')
     parser.add_argument('-skipimport', '--skip_db_import', action='store_true',
                         help='Perform validation and OncoKB download but do not import study into database.')
-    parser.add_argument('--no-derive-tables', action='store_true',
+    derive_tables_group = parser.add_mutually_exclusive_group()
+    derive_tables_group.add_argument('--no-derive-tables', action='store_true',
                         help='Skip derived table construction after import.')
+    derive_tables_group.add_argument('--derived-table-sql', type=str, metavar='PATH',
+                        help='Path to SQL file used for derived table construction.')
     parser = parser.parse_args()
     return parser
 
@@ -127,11 +130,15 @@ def _print_need_to_update_derived_tables_warning():
     )
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == 'derive-tables':
-        sys.exit(0 if derive_tables.rebuild_derived_tables() else 1)
+    derive_tables_only = len(sys.argv) > 1 and sys.argv[1] == 'derive-tables'
+    if derive_tables_only:
+        sys.argv.pop(1)
 
     # Parse user input
     args = interface()
+
+    if derive_tables_only:
+        sys.exit(0 if derive_tables.rebuild_derived_tables(args.derived_table_sql) else 1)
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
 
@@ -230,7 +237,7 @@ if __name__ == '__main__':
                     print(Color.BOLD +
                           "Rebuilding ClickHouse derived tables..." +
                           Color.END, file=sys.stderr)
-                    if not derive_tables.rebuild_derived_tables():
+                    if not derive_tables.rebuild_derived_tables(args.derived_table_sql):
                         print(Color.RED +
                               "Derived table construction failed. "
                               "The database may be in an inconsistent state." +
@@ -252,7 +259,7 @@ if __name__ == '__main__':
                 print(Color.BOLD +
                       "Rebuilding ClickHouse derived tables..." +
                       Color.END, file=sys.stderr)
-                if not derive_tables.rebuild_derived_tables():
+                if not derive_tables.rebuild_derived_tables(args.derived_table_sql):
                     print(Color.RED +
                           "Derived table construction failed. "
                           "The database may be in an inconsistent state." +
