@@ -27,7 +27,7 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
             'port': 'CLICKHOUSE_PORT',
             'user': 'CLICKHOUSE_USER',
             'password': 'CLICKHOUSE_PASSWORD',
-            'database': 'CLICKHOUSE_DATABASE',
+            'database': 'CLICKHOUSE_DB',
         }
         missing = []
         ch_props = {}
