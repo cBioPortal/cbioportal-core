@@ -235,6 +235,8 @@ if __name__ == '__main__':
                               "The database may be in an inconsistent state." +
                               Color.END, file=sys.stderr)
                         exitcode = 1
+                else:
+                    cbioportalImporter.print_need_to_update_derived_tables_warning()
             else:
                 print(Color.BOLD + "Warnings. Please fix your files or import with override warning option" + Color.END, file=sys.stderr)
                 print("#" * 71, file=sys.stderr)
@@ -255,6 +257,8 @@ if __name__ == '__main__':
                           "The database may be in an inconsistent state." +
                           Color.END, file=sys.stderr)
                     exitcode = 1
+            else:
+                cbioportalImporter.print_need_to_update_derived_tables_warning()
     except KeyboardInterrupt:
         print(Color.BOLD + "\nProcess interrupted. You will have to run this again to make sure study is completely loaded." + Color.END, file=sys.stderr)
         print("#" * 71, file=sys.stderr)

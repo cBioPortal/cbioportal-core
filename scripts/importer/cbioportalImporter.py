@@ -697,18 +697,11 @@ def main(args):
     if args.java_opts is not None and '-cp' in args.java_opts:
         locate_jar_path = False
     if locate_jar_path:
-        # Check IMPORTER_JAR_FILEPATH env var first, fall back to auto-locate
-        jar_path = os.environ.get('IMPORTER_JAR_FILEPATH')
-        if jar_path:
-            if not os.path.exists(jar_path):
-                print('IMPORTER_JAR_FILEPATH is set but file not found:', jar_path)
-                sys.exit(2)
-        else:
-            try:
-                jar_path = locate_jar()
-            except FileNotFoundError as e:
-                print(e)
-                sys.exit(2)
+        try:
+            jar_path = locate_jar()
+        except FileNotFoundError as e:
+            print(e)
+            sys.exit(2)
         print('Data loading step using', jar_path)
         print()
         if args.java_opts is None:
@@ -740,7 +733,6 @@ def main(args):
             args.patient_ids if hasattr(args, 'patient_ids') else None,
             args.sample_ids if hasattr(args, 'sample_ids') else None,
             args.update_generic_assay_entity)
-        print_need_to_update_derived_tables_warning()
 
 # ------------------------------------------------------------------------------
 # ready to roll
