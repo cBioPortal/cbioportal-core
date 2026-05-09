@@ -63,7 +63,6 @@ REMOVE_SAMPLES = "remove-samples"
 REMOVE_PATIENTS = "remove-patients"
 IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
-DERIVE_TABLES = "derive-tables"
 
 COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS]
 
@@ -671,8 +670,6 @@ def print_need_to_update_derived_tables_warning():
             'the derived tables before using the database with the cBioPortal\n' + \
             'web application. Run:\n' + \
             '    metaImport.py derive-tables\n' + \
-            'See: https://github.com/cBioPortal/cbioportal-core/blob/main/\n' + \
-            '     scripts/clickhouse_import_support/README.md' + \
             END
     LOGGER.warning(rederive_warning_msg)
     
