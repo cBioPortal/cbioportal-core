@@ -12,7 +12,10 @@ import os
 import importlib
 import argparse
 import logging
+import urllib.parse
 from pathlib import Path
+
+from scripts.importer import derive_tables
 
 # configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module
@@ -31,7 +34,6 @@ from . import cbioportalImporter
 from . import importOncokbMutation
 from . import importOncokbDiscreteCNA
 from . import libImportOncokb
-from . import derive_tables
 
 
 # ----------------------------------------------------------------------------
@@ -107,17 +109,6 @@ def interface():
                         help='Perform validation and OncoKB download but do not import study into database.')
     parser.add_argument('--no-derive-tables', action='store_true',
                         help='Skip derived table construction after import.')
-    parser.add_argument('--ch-props', type=str,
-                        help='Path to ClickHouse application.properties '
-                             '(for derived table construction). '
-                             'Default: $IMPORTER_PROPERTIES_FILEPATH or '
-                             '/cbioportal/application.properties')
-    parser.add_argument('--sql-dir', type=str,
-                        help='Local directory with derived table SQL files '
-                             '(default: download from GitHub).')
-    parser.add_argument('--github-branch', type=str,
-                        help='GitHub branch for derived table SQL '
-                             '(default: master).')
     parser = parser.parse_args()
     return parser
 
@@ -125,40 +116,6 @@ def interface():
 # ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
-
-def _resolve_ch_props_path(args):
-    """Resolve the path to ClickHouse application.properties.
-
-    Priority:
-    1. --ch-props CLI argument
-    2. $IMPORTER_PROPERTIES_FILEPATH environment variable
-    3. /cbioportal/application.properties (Docker convention)
-    """
-    if hasattr(args, 'ch_props') and args.ch_props:
-        return args.ch_props
-    env_path = os.environ.get('IMPORTER_PROPERTIES_FILEPATH')
-    if env_path:
-        return env_path
-    return '/cbioportal/application.properties'
-
-
-def _rebuild_derived_tables(args):
-    """Rebuild ClickHouse derived tables after a database-mutating operation.
-
-    Returns True on success, False on failure.
-    """
-    ch_props_path = _resolve_ch_props_path(args)
-    sql_dir = getattr(args, 'sql_dir', None)
-    github_branch = getattr(args, 'github_branch', None)
-    try:
-        return derive_tables.main_derive(
-            ch_props_path, github_branch=github_branch, sql_dir=sql_dir)
-    except Exception as e:
-        print(Color.RED +
-              f"Derived table construction failed: {e}" +
-              Color.END, file=sys.stderr)
-        return False
-
 
 if __name__ == '__main__':
     # Check for derive-tables subcommand before normal parsing
@@ -172,7 +129,7 @@ if __name__ == '__main__':
 
     # Handle derive-tables subcommand (no validation, no import)
     if derive_tables_only:
-        success = _rebuild_derived_tables(args)
+        success = derive_tables.rebuild_derived_tables()
         sys.exit(0 if success else 1)
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
@@ -272,7 +229,7 @@ if __name__ == '__main__':
                     print(Color.BOLD +
                           "Rebuilding ClickHouse derived tables..." +
                           Color.END, file=sys.stderr)
-                    if not _rebuild_derived_tables(args):
+                    if not derive_tables.rebuild_derived_tables():
                         print(Color.RED +
                               "Derived table construction failed. "
                               "The database may be in an inconsistent state." +
@@ -292,7 +249,7 @@ if __name__ == '__main__':
                 print(Color.BOLD +
                       "Rebuilding ClickHouse derived tables..." +
                       Color.END, file=sys.stderr)
-                if not _rebuild_derived_tables(args):
+                if not derive_tables.rebuild_derived_tables():
                     print(Color.RED +
                           "Derived table construction failed. "
                           "The database may be in an inconsistent state." +

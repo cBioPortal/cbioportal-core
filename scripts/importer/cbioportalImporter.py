@@ -11,8 +11,13 @@ import importlib
 import argparse
 import logging
 import re
+import urllib.request
+import urllib.parse
+import json
 from pathlib import Path
 from typing import Dict, Tuple
+
+from scripts.importer import derive_tables
 
 # configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module
@@ -60,7 +65,7 @@ IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
 DERIVE_TABLES = "derive-tables"
 
-COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS, DERIVE_TABLES]
+COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS]
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -269,20 +274,6 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity)
     elif command == IMPORT_CASE_LIST:
         import_case_list(jvm_args, meta_filename)
-    elif command == DERIVE_TABLES:
-        # Derive tables standalone — no JVM needed
-        from . import derive_tables as dt
-        ch_props = getattr(args, 'ch_props', None)
-        sql_dir = getattr(args, 'sql_dir', None)
-        github_branch = getattr(args, 'github_branch', None)
-        # Resolve ch_props path
-        if not ch_props:
-            ch_props = os.environ.get('IMPORTER_PROPERTIES_FILEPATH',
-                                       '/cbioportal/application.properties')
-        success = dt.main_derive(ch_props, github_branch=github_branch,
-                                 sql_dir=sql_dir)
-        if not success:
-            sys.exit(1)
 
 def get_meta_filenames(data_directory):
     meta_filenames = [
@@ -632,18 +623,6 @@ def interface(args=None):
     remove_patients.add_argument('--patient_ids', type=str, required=True,
                         help='Patient ID(s). Comma separated, if multiple.')
 
-    derive_tables_parser = subparsers.add_parser('derive-tables', parents=[], add_help=True)
-    derive_tables_parser.add_argument('--ch-props', type=str,
-                        help='Path to ClickHouse application.properties. '
-                             'Default: $IMPORTER_PROPERTIES_FILEPATH or '
-                             '/cbioportal/application.properties')
-    derive_tables_parser.add_argument('--sql-dir', type=str,
-                        help='Local directory with derived table SQL files '
-                             '(default: download from GitHub).')
-    derive_tables_parser.add_argument('--github-branch', type=str,
-                        help='GitHub branch for derived table SQL '
-                             '(default: master).')
-
     parser.add_argument('-c', '--command', type=str, required=False,
                         help='This argument is outdated. Please use the listed subcommands, without the -c flag. '
                         'Command for import. Allowed commands: ' + allowed_commands_csv)
@@ -682,6 +661,7 @@ def locate_jar():
             'Expected to find 1 scripts-*.jar, but found ' + str(len(jars)))
     return str(jars[0])
 
+
 def print_need_to_update_derived_tables_warning():
     """Warns user to re-derive the derived tables."""
     BOLD = '\033[1m'
@@ -691,8 +671,6 @@ def print_need_to_update_derived_tables_warning():
             'the derived tables before using the database with the cBioPortal\n' + \
             'web application. Run:\n' + \
             '    metaImport.py derive-tables\n' + \
-            'or:\n' + \
-            '    cbioportalImporter.py derive-tables\n' + \
             'See: https://github.com/cBioPortal/cbioportal-core/blob/main/\n' + \
             '     scripts/clickhouse_import_support/README.md' + \
             END
@@ -709,19 +687,6 @@ def main(args):
     error_handler.setLevel(logging.ERROR)
     module_logger.addHandler(error_handler)
     LOGGER = module_logger
-
-    # derive-tables doesn't need JVM — handle early
-    if getattr(args, 'command', None) == DERIVE_TABLES:
-        process_command(
-            None,  # jvm_args not needed
-            args.command,
-            args.meta_filename,
-            args.data_filename,
-            args.study_ids,
-            args.patient_ids if hasattr(args, 'patient_ids') else None,
-            args.sample_ids if hasattr(args, 'sample_ids') else None,
-            args.update_generic_assay_entity)
-        return
 
     # move jar_path to java_opts if it exists
     if args.jar_path:
@@ -753,11 +718,6 @@ def main(args):
 
     # process the options
     jvm_args = "-Dspring.profiles.active=dbcp " + args.java_opts
-
-    # If IMPORTER_PROPERTIES_FILEPATH is set, add it as spring config location
-    importer_properties_filepath = os.environ.get('IMPORTER_PROPERTIES_FILEPATH')
-    if importer_properties_filepath:
-        jvm_args += f" --spring.config.location=file:{importer_properties_filepath}"
 
     # check if DB version and application version are in sync
     check_version(jvm_args)
