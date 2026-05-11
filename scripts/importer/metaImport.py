@@ -31,7 +31,7 @@ from . import cbioportalImporter
 from . import importOncokbMutation
 from . import importOncokbDiscreteCNA
 from . import libImportOncokb
-from . import derive_tables
+from . import rebuild_derived_tables
 
 
 # ----------------------------------------------------------------------------
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     args = interface()
 
     if derive_tables_only:
-        sys.exit(0 if derive_tables.rebuild_derived_tables(args.derived_table_sql) else 1)
+        sys.exit(0 if rebuild_derived_tables.rebuild_derived_tables(args.derived_table_sql) else 1)
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
 
@@ -237,7 +237,7 @@ if __name__ == '__main__':
                     print(Color.BOLD +
                           "Rebuilding ClickHouse derived tables..." +
                           Color.END, file=sys.stderr)
-                    if not derive_tables.rebuild_derived_tables(args.derived_table_sql):
+                    if not rebuild_derived_tables.rebuild_derived_tables(args.derived_table_sql):
                         print(Color.RED +
                               "Derived table construction failed. "
                               "The database may be in an inconsistent state." +
@@ -259,7 +259,7 @@ if __name__ == '__main__':
                 print(Color.BOLD +
                       "Rebuilding ClickHouse derived tables..." +
                       Color.END, file=sys.stderr)
-                if not derive_tables.rebuild_derived_tables(args.derived_table_sql):
+                if not rebuild_derived_tables.rebuild_derived_tables(args.derived_table_sql):
                     print(Color.RED +
                           "Derived table construction failed. "
                           "The database may be in an inconsistent state." +
