@@ -37,6 +37,8 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
         if missing:
             raise RuntimeError(
                 f"ClickHouse properties not set: {', '.join(missing)}")
+        
+        ch_props['optimize_backoff_secs'] = os.environ.get('CLICKHOUSE_OPTIMIZE_BACKOFF_SECS', '0')
 
         execute_clickhouse_sql(derived_table_sql_filepath, ch_props)
         return True
@@ -55,6 +57,7 @@ def execute_clickhouse_sql(sql_filepath, ch_props):
         '--database', ch_props['database'],
         '--multiquery',
         '--queries-file', sql_filepath,
+        '--param_optimize_backoff_secs', ch_props['optimize_backoff_secs']
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
