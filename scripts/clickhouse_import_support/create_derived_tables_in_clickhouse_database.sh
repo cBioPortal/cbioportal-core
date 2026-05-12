@@ -91,7 +91,7 @@ function selected_database_exists() {
 }
 
 function create_all_derived_tables() {
-    if ! clickhouse client --config-file="$configured_clickhouse_config_file_path" --queries-file="$derived_table_sql_filepath" --param_optimize_backoff_secs="$CLICKHOUSE_OPTIMIZE_BACKOFF_SECS" ; then
+    if ! clickhouse client --config-file="$configured_clickhouse_config_file_path" --queries-file="$derived_table_sql_filepath" --param_optimize_backoff_secs="$CLICKHOUSE_OPTIMIZE_BACKOFF_SECS" --echo --send_logs_level=information ; then
         echo "Error : failure occurred during execution of sql statements in file $derived_table_sql_filepath" >&2
         return 1
     fi

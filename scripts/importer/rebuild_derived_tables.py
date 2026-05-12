@@ -57,7 +57,9 @@ def execute_clickhouse_sql(sql_filepath, ch_props):
         '--database', ch_props['database'],
         '--multiquery',
         '--queries-file', sql_filepath,
-        '--param_optimize_backoff_secs', ch_props['optimize_backoff_secs']
+        '--param_optimize_backoff_secs', ch_props['optimize_backoff_secs'],
+        '--echo',
+        '--send_logs_level=information'
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
