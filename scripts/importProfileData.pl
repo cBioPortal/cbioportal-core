@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
-require "../scripts/env.pl";
+use FindBin;
+require "$FindBin::Bin/env.pl";
 
 $startTime = time;
 
