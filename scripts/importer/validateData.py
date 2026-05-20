@@ -5616,6 +5616,8 @@ def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_ma
             continue
         logger.info("Validating %s", meta_file_type)
         for validator in validators:
+            if validator is None:
+                continue
             validator.validate()
     logger.info('Validation complete')
 

@@ -543,6 +543,9 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
 
     meta_file_type_to_meta_files = get_meta_filenames_by_type(data_directory)
 
+    # meta_study is not meaningful for incremental upload (study must already exist); skip it silently
+    meta_file_type_to_meta_files.pop(MetaFileTypes.STUDY, None)
+
     not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
     if not_supported_meta_types:
         raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
