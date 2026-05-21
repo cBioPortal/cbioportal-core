@@ -27,7 +27,7 @@ current_production_database_filepath="$(pwd)/gdcip_ch_current_production_databas
 table_exists_filepath="$(pwd)/gdcip_ch_table_exists.txt"
 
 function usage() {
-    echo "usage: get_database_currently_in_production_clickhouse.sh properties_filepath" >&2
+    echo "usage: get_database_currently_in_production.sh properties_filepath" >&2
 }
 
 function write_clickhouse_config_file_for_update_management() {
