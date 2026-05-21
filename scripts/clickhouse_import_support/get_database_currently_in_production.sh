@@ -7,8 +7,8 @@ if ! source "$this_script_dir/parse_property_file_functions.sh" ; then
     echo "Error : unable to load dependency : $this_script_dir/parse_property_file_functions.sh" >&2
     exit 1
 fi
-if ! source "$this_script_dir/mysql_command_line_functions.sh" ; then
-    echo "Error : unable to load dependency : $this_script_dir/mysql_command_line_functions.sh" >&2
+if ! source "$this_script_dir/clickhouse_client_command_line_functions.sh" ; then
+    echo "Error : unable to load dependency : $this_script_dir/clickhouse_client_command_line_functions.sh" >&2
     exit 1
 fi
 unset this_script_dir
@@ -17,14 +17,36 @@ unset this_script_dir
 unset my_properties
 unset update_management_database_name
 update_management_database_name=""
+unset portal_database_name
+portal_database_name=""
 unset database_currently_in_production
 database_currently_in_production=""
 declare -A my_properties
-record_count_filepath="$(pwd)/update_status_record_count.txt"
-current_production_database_filepath="$(pwd)/current_production_database.txt"
+record_count_filepath="$(pwd)/gdcip_ch_update_status_record_count.txt"
+current_production_database_filepath="$(pwd)/gdcip_ch_current_production_database.txt"
+table_exists_filepath="$(pwd)/gdcip_ch_table_exists.txt"
 
 function usage() {
-    echo "usage: get_database_currently_in_production.sh properties_filepath" >&2
+    echo "usage: get_database_currently_in_production_clickhouse.sh properties_filepath" >&2
+}
+
+function write_clickhouse_config_file_for_update_management() {
+    configured_clickhouse_config_file_path="$(pwd)/clickhouse_client_config_$(date "+%Y-%m-%d-%H-%M-%S").yaml"
+    if ! rm -f "$configured_clickhouse_config_file_path" || ! touch "$configured_clickhouse_config_file_path" ; then
+        echo "Error : unable to create clickhouse_client_config file $configured_clickhouse_config_file_path" >&2
+        return 1
+    fi
+    chmod 600 "$configured_clickhouse_config_file_path"
+    echo "user: ${my_properties['clickhouse_server_username']}" >> "$configured_clickhouse_config_file_path"
+    echo "password: ${my_properties['clickhouse_server_password']}" >> "$configured_clickhouse_config_file_path"
+    echo "host: ${my_properties['clickhouse_server_host_name']}" >> "$configured_clickhouse_config_file_path"
+    echo "port: ${my_properties['clickhouse_server_port']}" >> "$configured_clickhouse_config_file_path"
+    echo "database: $update_management_database_name" >> "$configured_clickhouse_config_file_path"
+    if ! [ "$(cat $configured_clickhouse_config_file_path | wc -l)" == "5" ] ; then
+        echo "Error : could not successfully write clickhouse_client config properties to file $configured_clickhouse_config_file_path" >&2
+        return 1
+    fi
+    return 0
 }
 
 function initialize_main() {
@@ -41,11 +63,22 @@ function initialize_main() {
         usage
         return 1
     fi
-    if ! initialize_mysql_command_line_functions ; then
+    update_management_database_name="${my_properties['clickhouse_update_management_database']}"
+    if [ -z "$update_management_database_name" ] ; then
+        echo "Error : clickhouse_update_management_database not found in properties file" >&2
         usage
         return 1
     fi
-    update_management_database_name="${my_properties['mysql_update_management_database']}"
+    portal_database_name="${my_properties['portal_database_name']}"
+    if [ -z "$portal_database_name" ] ; then
+        echo "Error : portal_database_name not found in properties file" >&2
+        usage
+        return 1
+    fi
+    if ! write_clickhouse_config_file_for_update_management ; then
+        usage
+        return 1
+    fi
     remove_credentials_from_properties my_properties # no longer needed - remove for security
     return 0
 }
@@ -53,46 +86,57 @@ function initialize_main() {
 function delete_output_stream_files() {
     rm -f "$record_count_filepath"
     rm -f "$current_production_database_filepath"
+    rm -f "$table_exists_filepath"
 }
 
 function shutdown_main_and_clean_up() {
-    shutdown_mysql_command_line_functions
+    shutdown_clickhouse_client_command_line_functions
     delete_output_stream_files
     unset my_properties
+    unset update_management_database_name
+    unset portal_database_name
+    unset database_currently_in_production
     unset record_count_filepath
     unset current_production_database_filepath
+    unset table_exists_filepath
 }
 
 function process_state_table_is_valid() {
-    if ! database_exists "$update_management_database_name" ; then
+    if ! clickhouse_database_exists "$update_management_database_name" ; then
         echo "Error : could not proceed with getting production database because database does not exist: $update_management_database_name" >&2
         return 1
     fi
-    if ! table_exists "$update_management_database_name" "update_status" ; then
+    local check_table_statement="SELECT COUNT(*) FROM system.tables WHERE database = '$update_management_database_name' AND name = 'update_status'"
+    if ! execute_sql_statement_via_clickhouse_client "$check_table_statement" "$table_exists_filepath" ; then
+        echo "Error : could not check for update_status table existence. Clickhouse statement failed : $check_table_statement" >&2
+        return 1
+    fi
+    set_clickhouse_sql_data_array_from_file "$table_exists_filepath" 0
+    if [[ "${sql_data_array[0]}" -ne 1 ]] ; then
         echo "Error : could not proceed with getting production database because table 'update_status' does not exist in database : $update_management_database_name" >&2
         return 1
     fi
-    local get_record_count_statement="SELECT count(*) AS record_count from \`$update_management_database_name\`.update_status;"
-    if ! execute_sql_statement_via_mysql "$get_record_count_statement" "$record_count_filepath" ; then
-        echo "Error : could not validate process_state table. Mysql statement failed to execute properly : $get_record_count_statement" >&2
+    local get_record_count_statement="SELECT count(*) FROM \`$update_management_database_name\`.update_status WHERE portal_database = '$portal_database_name'"
+    if ! execute_sql_statement_via_clickhouse_client "$get_record_count_statement" "$record_count_filepath" ; then
+        echo "Error : could not validate process_state table. Clickhouse statement failed : $get_record_count_statement" >&2
         return 1
     fi
-    set_mysql_sql_data_array_from_file "$record_count_filepath" 0
+    set_clickhouse_sql_data_array_from_file "$record_count_filepath" 0
     local rowcount="${sql_data_array[0]}"
-    if [[ "$rowcount" -ne 1 ]] ; then
-        echo "Error : database $update_management_database_name contains $rowcount rows instead of exactly 1 row as expected." >&2
+    if [[ "$rowcount" -eq 0 ]] ; then
+        echo "Error : no row found in $update_management_database_name.update_status for portal_database = '$portal_database_name'" >&2
         return 1
     fi
     return 0
 }
 
 function get_database_currently_in_production() {
-    local get_current_database_statement="SELECT current_database_in_production FROM \`$update_management_database_name\`.update_status;"
-    if ! execute_sql_statement_via_mysql "$get_current_database_statement" "$current_production_database_filepath" ; then
-        echo "Error : could not retrieve the current database in production. Mysql statement failed to execute properly : $get_current_database_statement" >&2
+    local get_current_database_statement="SELECT current_database_in_production FROM \`$update_management_database_name\`.update_status WHERE portal_database = '$portal_database_name' LIMIT 1"
+    if ! execute_sql_statement_via_clickhouse_client "$get_current_database_statement" "$current_production_database_filepath" ; then
+        echo "Error : could not retrieve the current database in production. Clickhouse statement failed : $get_current_database_statement" >&2
         return 1
     fi
-    set_mysql_sql_data_array_from_file "$current_production_database_filepath" 0
+    set_clickhouse_sql_data_array_from_file "$current_production_database_filepath" 0
     database_currently_in_production="${sql_data_array[0]}"
     return 0
 }
@@ -103,9 +147,6 @@ function output_database_currently_in_production() {
 
 function main() {
     local properties_filepath=$1
-    if grep -q "^clickhouse_update_management_database" "$properties_filepath" 2>/dev/null ; then
-        exec "$(dirname "$(readlink -f "$0")")/get_database_currently_in_production_clickhouse.sh" "$properties_filepath"
-    fi
     local exit_status=0
     if ! initialize_main "$properties_filepath" ||
             ! process_state_table_is_valid ||
