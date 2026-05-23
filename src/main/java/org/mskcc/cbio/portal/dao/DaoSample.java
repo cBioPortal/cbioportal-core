@@ -133,34 +133,44 @@ public class DaoSample {
         samples.put(sample.getStableId(), sample);
     }
 
+    private static final String SAMPLE_SEQUENCE = "seq_sample";
+
     public static int addSample(Sample sample) throws DaoException
     {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
-            con = JdbcUtil.getDbConnection(DaoSample.class);
-            pstmt = con.prepareStatement("INSERT INTO sample " +
-                                         "( `STABLE_ID`, `SAMPLE_TYPE`, `PATIENT_ID` ) " +
-                                         "VALUES (?,?,?)",
-                                         Statement.RETURN_GENERATED_KEYS);
-            pstmt.setString(1, sample.getStableId());
-            pstmt.setString(2, sample.getType().toString());
-            pstmt.setInt(3, sample.getInternalPatientId());
-            pstmt.executeUpdate();
-            rs = pstmt.getGeneratedKeys();
-            if (rs.next()) {
-                cacheSample(new Sample(rs.getInt(1), sample.getStableId(),
-                                       sample.getInternalPatientId()));
-                return rs.getInt(1);
+            long internalId = ClickHouseAutoIncrement.nextId(SAMPLE_SEQUENCE);
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader loader = ClickHouseBulkLoader.getClickHouseBulkLoader("sample");
+                loader.setFieldNames(new String[]{"internal_id", "stable_id", "sample_type", "patient_id"});
+                loader.insertRecord(
+                    Long.toString(internalId),
+                    sample.getStableId(),
+                    sample.getType().toString(),
+                    Integer.toString(sample.getInternalPatientId())
+                );
+            } else {
+                con = JdbcUtil.getDbConnection(DaoSample.class);
+                pstmt = con.prepareStatement("INSERT INTO sample " +
+                                             "( `internal_id`, `stable_id`, `sample_type`, `patient_id` ) " +
+                                             "VALUES (?,?,?,?)");
+                pstmt.setLong(1, internalId);
+                pstmt.setString(2, sample.getStableId());
+                pstmt.setString(3, sample.getType().toString());
+                pstmt.setInt(4, sample.getInternalPatientId());
+                pstmt.executeUpdate();
             }
-            return -1;
+            cacheSample(new Sample((int) internalId, sample.getStableId(),
+                    sample.getInternalPatientId()));
+            return (int) internalId;
         }
         catch (SQLException e) {
             throw new DaoException(e);
         }
         finally {
-            JdbcUtil.closeAll(DaoSample.class, con, pstmt, rs);
+            JdbcUtil.closeAll(DaoSample.class, con, pstmt, null);
         }
     }
 
@@ -255,10 +265,8 @@ public class DaoSample {
         PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoSample.class);
-            JdbcUtil.disableForeignKeyCheck(con);
             pstmt = con.prepareStatement("TRUNCATE TABLE sample");
             pstmt.executeUpdate();
-            JdbcUtil.enableForeignKeyCheck(con);
         }
         catch (SQLException e) {
             throw new DaoException(e);
@@ -288,47 +296,53 @@ public class DaoSample {
         Set<Integer> internalSampleIds = findInternalSampleIdsInStudy(internalStudyId, sampleStableIds);
         removeSamplesInGeneticAlterationsForStudy(internalStudyId, internalSampleIds);
 
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoSample.class);
-            pstmt = con.prepareStatement("DELETE FROM `sample` WHERE `INTERNAL_ID` IN ("
-                    + String.join(",", Collections.nCopies(internalSampleIds.size(), "?"))
-                    + ")");
-            int parameterIndex = 1;
-            for (Integer internalSampleId : internalSampleIds) {
-                pstmt.setInt(parameterIndex++, internalSampleId);
-            };
-            pstmt.executeUpdate();
-        }
-        catch (SQLException e) {
-            throw new DaoException(e);
-        }
-        finally {
-            JdbcUtil.closeAll(DaoSample.class, con, pstmt, null);
-        }
+        ClickHouseBulkDeleter.getBulkDeleter("alteration_driver_annotation", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("sample_cna_event", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("mutation", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("structural_variant", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("sample_profile", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("sample_list_list", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("copy_number_seg", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("allele_specific_copy_number", "sample_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("clinical_sample", "internal_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("resource_sample", "internal_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(internalSampleIds);
+        ClickHouseBulkDeleter.flushAll();
+        clearCache();
+        DaoCancerStudy.purgeUnreferencedRecordsAfterDeletionOfStudy();
         log.info("Removing {} samples from study with internal id={} done.", sampleStableIds, internalStudyId);
     }
 
     private static Sample extractSample(ResultSet rs) throws SQLException
     {
-        return new Sample(rs.getInt("INTERNAL_ID"),
-                          rs.getString("STABLE_ID"),
-                          rs.getInt("PATIENT_ID"));
+        return new Sample(rs.getInt("internal_id"),
+                          rs.getString("stable_id"),
+                          rs.getInt("patient_id"));
     }
 
     /**
-     * Removes sample in genetic alterations' data for a study
-     * @param internalStudyId - internal id of study to remove samples in genetic alterations data
-     * @param internalSampleIdsToRemove - internal ids of samples to remove
-     * @throws DaoException
+     * Removes samples from genetic alteration data for a study.
+     * <p>
+     * The affected {@code genetic_alteration} and {@code genetic_profile_samples}
+     * tables are backed up before removal starts and restored from backup if the
+     * operation fails.
+     *
+     * @param internalStudyId internal ID of the study whose genetic alteration sample data should be updated
+     * @param internalSampleIdsToRemove internal IDs of samples to remove
+     * @throws DaoException if removing samples from genetic alteration data fails
      */
     private static void removeSamplesInGeneticAlterationsForStudy(int internalStudyId, Set<Integer> internalSampleIdsToRemove) throws DaoException {
-        List<GeneticProfile> geneticProfiles = DaoGeneticProfile.getAllGeneticProfiles(internalStudyId);
-        for (GeneticProfile geneticProfile : geneticProfiles) {
-            Set<Integer> removedInternalSampleIds = removeSamplesInGeneticAlterationsForGeneticProfile(geneticProfile, internalSampleIdsToRemove);
-            log.debug("Genetic alterations data for {} sample ids ouf of {} requested have been removed for genetic profile with stable id={}",
-                    removedInternalSampleIds, internalSampleIdsToRemove, geneticProfile.getStableId());
+        try {
+            BackupUtil.backup(List.of("genetic_alteration", "genetic_profile_samples"), () -> {
+                List<GeneticProfile> geneticProfiles = DaoGeneticProfile.getAllGeneticProfiles(internalStudyId);
+                for (GeneticProfile geneticProfile : geneticProfiles) {
+                    Set<Integer> removedInternalSampleIds = removeSamplesInGeneticAlterationsForGeneticProfile(geneticProfile, internalSampleIdsToRemove);
+                    log.debug("Genetic alterations data for {} sample ids ouf of {} requested have been removed for genetic profile with stable id={}",
+                            removedInternalSampleIds, internalSampleIdsToRemove, geneticProfile.getStableId());
+                }
+            });
+        } catch (Exception e) {
+            throw new DaoException(e);
         }
     }
 
@@ -383,4 +397,5 @@ public class DaoSample {
         }
         return internalSampleIds;
     }
+
 }

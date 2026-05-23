@@ -26,7 +26,6 @@ import joptsimple.OptionSpec;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
-import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
@@ -40,18 +39,6 @@ public class RemovePatients extends ConsoleRunnable {
     private Set<String> patientIds;
 
     public void run() {
-        JdbcUtil.getTransactionTemplate().execute(status -> {
-            try {
-                doRun();
-            } catch (Throwable e) {
-                status.setRollbackOnly();
-                throw new RuntimeException(e);
-            }
-            return null;
-        });
-    }
-
-    private void doRun() {
         ProgressMonitor.setCurrentMessage("Start removing patient(s) from study(ies).");
         parseArgs();
         ProgressMonitor.logDebug("Reading study id(s) from the database.");

@@ -51,7 +51,7 @@ public class DaoGenesetHierarchyLeaf {
 	        
 	        // Prepare SQL statement
             preparedStatement = connection.prepareStatement("INSERT INTO geneset_hierarchy_leaf " 
-	                + "(`NODE_ID`, `GENESET_ID`) VALUES(?,?)");
+	                + "(`node_id`, `geneset_id`) VALUES(?,?)");
 	        
             // Fill in statement
             preparedStatement.setInt(1, genesetHierarchyLeaf.getNodeId());
@@ -77,7 +77,7 @@ public class DaoGenesetHierarchyLeaf {
             connection = JdbcUtil.getDbConnection(DaoGenesetHierarchyLeaf.class);
 	        
 	        // Prepare SQL statement
-            preparedStatement = connection.prepareStatement("SELECT * FROM geneset_hierarchy_leaf WHERE GENESET_ID = ?");
+            preparedStatement = connection.prepareStatement("SELECT * FROM geneset_hierarchy_leaf WHERE geneset_id = ?");
             preparedStatement.setInt(1, genesetId);
 
             // Execute statement
@@ -87,8 +87,8 @@ public class DaoGenesetHierarchyLeaf {
 
             while (resultSet.next()) {
                 GenesetHierarchyLeaf genesetHierarchyLeaf = new GenesetHierarchyLeaf();
-            	genesetHierarchyLeaf.setNodeId(resultSet.getInt("NODE_ID"));
-                genesetHierarchyLeaf.setGenesetId(resultSet.getInt("GENESET_ID"));
+            	genesetHierarchyLeaf.setNodeId(resultSet.getInt("node_id"));
+                genesetHierarchyLeaf.setGenesetId(resultSet.getInt("geneset_id"));
                 genesetHierarchyLeafs.add(genesetHierarchyLeaf);
             }
             

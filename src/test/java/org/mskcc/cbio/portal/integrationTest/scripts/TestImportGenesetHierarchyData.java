@@ -46,10 +46,8 @@ import org.mskcc.cbio.portal.model.GenesetHierarchyLeaf;
 import org.mskcc.cbio.portal.scripts.ImportGenesetData;
 import org.mskcc.cbio.portal.scripts.ImportGenesetHierarchy;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 
@@ -59,8 +57,6 @@ import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportGenesetHierarchyData extends IntegrationTestBase {
 
 	@Test
@@ -110,7 +106,7 @@ public class TestImportGenesetHierarchyData extends IntegrationTestBase {
 	        connection = JdbcUtil.getDbConnection(DaoGenesetHierarchyNode.class);
 	        
 	        // Prepare SQL statement
-	        preparedStatement = connection.prepareStatement("SELECT * FROM geneset_hierarchy_node WHERE NODE_ID = ?");
+	        preparedStatement = connection.prepareStatement("SELECT * FROM geneset_hierarchy_node WHERE node_id = ?");
 	        preparedStatement.setInt(1, nodeId);
 
 	        // Execute statement
@@ -119,9 +115,9 @@ public class TestImportGenesetHierarchyData extends IntegrationTestBase {
 	        // Extract genesetHierarchy values
 	        if (resultSet.next()) {
 	            GenesetHierarchy genesetHierarchy = new GenesetHierarchy();
-	            genesetHierarchy.setNodeId(resultSet.getInt("NODE_ID"));
-	            genesetHierarchy.setNodeName(resultSet.getString("NODE_NAME"));
-	            genesetHierarchy.setParentId(resultSet.getInt("PARENT_ID"));
+	            genesetHierarchy.setNodeId(resultSet.getInt("node_id"));
+	            genesetHierarchy.setNodeName(resultSet.getString("node_name"));
+	            genesetHierarchy.setParentId(resultSet.getInt("parent_id"));
 	            return genesetHierarchy;
 	        }
 	        

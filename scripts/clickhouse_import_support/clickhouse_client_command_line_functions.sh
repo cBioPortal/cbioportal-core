@@ -65,7 +65,7 @@ function execute_sql_statement_via_clickhouse_client() {
     local output_filepath=$2
     #echo "Executing clickhouse statement : $statement" >&2
     if [ -e "$output_filepath" ] && ! rm -f "$output_filepath" ; then
-        echo "Error : could not overwrite existing output file $output_filepath when executing mysql statment $statement" >&2
+        echo "Error : could not overwrite existing output file $output_filepath when executing clickhouse statement $statement" >&2
     fi
     (
         clickhouse client --config-file="$configured_clickhouse_config_file_path" --format=TabSeparatedWithNames <<< "$statement" > "$output_filepath"
@@ -76,7 +76,7 @@ function execute_sql_statement_from_file_via_clickhouse_client() {
     local statement_filepath=$1
     local output_filepath=$2
     if [ -e "$output_filepath" ] && ! rm -f "$output_filepath" ; then
-        echo "Error : could not overwrite existing output file $output_filepath when executing mysql statments from file $statement_filepath" >&2
+        echo "Error : could not overwrite existing output file $output_filepath when executing clickhouse statements from file $statement_filepath" >&2
     fi
     (
         clickhouse client --config-file="$configured_clickhouse_config_file_path" --format=TabSeparatedWithNames --queries-file="$statement_filepath" > "$output_filepath"
@@ -188,7 +188,7 @@ function set_clickhouse_sql_data_array_from_file() {
     local column_number=$2
     unset sql_data_array
     if ! [ -r "$filepath" ] ; then
-        echo "Error : could not read output mysql query results from file : $filepath" >&2
+        echo "Error : could not read output clickhouse query results from file : $filepath" >&2
         return 1
     fi
     local headers_have_been_parsed=0

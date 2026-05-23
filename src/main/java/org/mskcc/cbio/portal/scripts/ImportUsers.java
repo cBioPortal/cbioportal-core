@@ -65,22 +65,23 @@ public class ImportUsers {
         ProgressMonitor.setConsoleMode(true);
 
         File file = new File(args[0]);
-        FileReader reader = new FileReader(file);
-        BufferedReader buf = new BufferedReader(reader);
-        String line = buf.readLine();
         int count = 0;
-        while (line != null) {
-            ProgressMonitor.incrementCurValue();
-            ConsoleUtil.showProgress();
-            if (TsvUtil.isDataLine(line)) {
-                try {
-                    addUser(line);
-                    count++;
-                } catch (Exception e) {
-                    System.err.println("Could not add line '" + line + "'. " + e);
+        try (FileReader reader = new FileReader(file);
+             BufferedReader buf = new BufferedReader(reader)) {
+            String line = buf.readLine();
+            while (line != null) {
+                ProgressMonitor.incrementCurValue();
+                ConsoleUtil.showProgress();
+                if (TsvUtil.isDataLine(line)) {
+                    try {
+                        addUser(line);
+                        count++;
+                    } catch (Exception e) {
+                        System.err.println("Could not add line '" + line + "'. " + e);
+                    }
                 }
+                line = buf.readLine();
             }
-            line = buf.readLine();
         }
         System.err.println("Added " + count + " user access rights.");
         ConsoleUtil.showWarnings();

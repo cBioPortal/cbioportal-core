@@ -32,9 +32,8 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.*;
-import java.util.stream.*;
+import org.mskcc.cbio.portal.dao.BackupUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
@@ -42,7 +41,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
@@ -54,6 +52,17 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 import org.mskcc.cbio.portal.util.TsvUtil;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
 public class ImportGenericAssayPatientLevelData {
     private HashSet<Integer> importedGeneticEntitySet = new HashSet<>(); 
     private File dataFile;
@@ -63,6 +72,7 @@ public class ImportGenericAssayPatientLevelData {
     private int entriesSkipped = 0;
     private String genePanel;
     private String genericEntityProperties;
+    private boolean isIncrementalUpdateMode;
 
     private static final String ENTITY_STABLE_ID_COLUMN_NAME = "ENTITY_STABLE_ID";
 
@@ -75,15 +85,21 @@ public class ImportGenericAssayPatientLevelData {
      * @param geneticProfileId GeneticProfile ID.
      * @param genePanel        GenePanel
      * @param genericEntityProperties Generic Assay Entities.
-     * 
-     * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)? 
+     * @param isIncrementalUpdateMode if true, update/append data to the existing one
+     *
+     * @deprecated : TODO shall we deprecate this feature (i.e. the targetLine)?
      */
-    public ImportGenericAssayPatientLevelData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties) {
+    public ImportGenericAssayPatientLevelData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties, boolean isIncrementalUpdateMode) {
         this.dataFile = dataFile;
         this.targetLine = targetLine;
         this.geneticProfileId = geneticProfileId;
         this.genePanel = genePanel;
         this.genericEntityProperties = genericEntityProperties;
+        this.isIncrementalUpdateMode = isIncrementalUpdateMode;
+    }
+
+    public ImportGenericAssayPatientLevelData(File dataFile, String targetLine, int geneticProfileId, String genePanel, String genericEntityProperties) {
+        this(dataFile, targetLine, geneticProfileId, genePanel, genericEntityProperties, false);
     }
 
     /**
@@ -92,19 +108,28 @@ public class ImportGenericAssayPatientLevelData {
      * @throws IOException  IO Error.
      * @throws DaoException Database Error.
      */
-    public void importData() throws IOException, DaoException {
+    public void importData() throws Exception {
+        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples"), this::importDataInternal);
+    }
+
+    void importDataInternal() throws Exception {
         int numLines = FileUtil.getNumLines(dataFile);
 
         geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
 
-        FileReader reader = new FileReader(dataFile);
-        BufferedReader buf = new BufferedReader(reader);
-        String headerLine = buf.readLine();
-        String parts[] = headerLine.split("\t");
-        
+        //Object to insert records in the generic 'genetic_alteration' table:
+        DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
+
         int numRecordsToAdd = 0;
-        int patientsSkipped = 0;
-        try {
+        try (
+                FileReader reader = new FileReader(dataFile);
+                BufferedReader buf = new BufferedReader(reader);
+        ) {
+            ProgressMonitor.setCurrentMessage("Importing Generic Assay Patient Level data from file: " + dataFile.getCanonicalPath());
+
+            String headerLine = buf.readLine();
+            String parts[] = headerLine.split("\t");
+
             int patientStartIndex = getPatientIdStartColumnIndex(parts);
             int genericAssayIdIndex = getGenericAssayIdIndex(parts);
             if (genericAssayIdIndex == -1) {
@@ -141,9 +166,6 @@ public class ImportGenericAssayPatientLevelData {
             
             DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
     
-            //Object to insert records in the generic 'genetic_alteration' table: 
-            DaoGeneticAlteration daoGeneticAlteration = DaoGeneticAlteration.getInstance();
-
             // load entities map from database
             Map<String, Integer> genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             
@@ -165,8 +187,8 @@ public class ImportGenericAssayPatientLevelData {
                 
                 line = buf.readLine();
             }
-            if (MySQLbulkLoader.isBulkLoad()) {
-               MySQLbulkLoader.flushAll();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+               ClickHouseBulkLoader.flushAll();
             }
             
             if (entriesSkipped > 0) {
@@ -178,9 +200,6 @@ public class ImportGenericAssayPatientLevelData {
                         " to the database!");
             }
         }
-        finally {
-            buf.close();
-        }                
     }
 
     /**

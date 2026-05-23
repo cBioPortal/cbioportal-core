@@ -37,9 +37,6 @@ import java.util.*;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Connection Utility for JDBC.
@@ -51,24 +48,15 @@ public class JdbcUtil {
     private static DataSource dataSource;
     private static Map<String,Integer> activeConnectionCount = new HashMap<String,Integer>(); // keep track of the number of active connection per class/requester
     private static final Logger LOG = LoggerFactory.getLogger(JdbcUtil.class);
-    private static DataSourceTransactionManager transactionManager;
-    private static TransactionTemplate transactionTemplate;
-
     /**
      * Gets the data source
      * @return the data source
      */
     public static DataSource getDataSource() {
         if (dataSource == null) {
-            dataSource = new TransactionAwareDataSourceProxy(new JdbcDataSource());
-            setupTransactionManagement();
+            dataSource = new JdbcDataSource();
         }
         return dataSource;
-    }
-
-    private static void setupTransactionManagement() {
-        transactionManager = new DataSourceTransactionManager(dataSource);
-        transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
@@ -77,14 +65,6 @@ public class JdbcUtil {
      */
     public static void setDataSource(DataSource value) {
         dataSource = value;
-        setupTransactionManagement();
-    }
-
-    public static TransactionTemplate getTransactionTemplate() {
-        if (transactionTemplate == null) {
-            getDataSource();
-        }
-        return transactionTemplate;
     }
 
     /**
@@ -145,7 +125,7 @@ public class JdbcUtil {
                 }
             }
         } catch (Exception e) {
-            logMessage("Problem Closed a MySQL connection from " + requester + ": " + activeConnectionCount.toString());
+            logMessage("Problem closing a database connection from " + requester + ": " + activeConnectionCount.toString());
             e.printStackTrace();
         }
     }
@@ -235,34 +215,5 @@ public class JdbcUtil {
     static Long readLongFromResultSet(ResultSet rs, String column) throws SQLException {
         long l = rs.getInt(column);
         return rs.wasNull() ? null : l;
-    }
-
-    static Double readDoubleFromResultSet(ResultSet rs, String column) throws SQLException {
-        double d = rs.getDouble(column);
-        return rs.wasNull() ? null : d;
-    }
-
-    /**
-     * Tells the database to ignore foreign key constraints, effective only for current session.
-     * Useful when you want to truncate a table that has foreign key constraints. Note that this
-     * may create orphan records in child tables.
-     * @param con Database connection
-     * @throws SQLException
-     */
-    public static void disableForeignKeyCheck(Connection con) throws SQLException {
-        Statement stmt = con.createStatement();
-        stmt.execute("SET FOREIGN_KEY_CHECKS=0");
-        stmt.close();
-    }
-
-    /**
-     * Reverses the effect of disableForeignKeyCheck method.
-     * @param con Database Connection
-     * @throws SQLException
-     */
-    public static void enableForeignKeyCheck(Connection con) throws SQLException {
-        Statement stmt = con.createStatement();
-        stmt.execute("SET FOREIGN_KEY_CHECKS=1");
-        stmt.close();
     }
 }

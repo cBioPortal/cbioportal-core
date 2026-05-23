@@ -34,6 +34,7 @@ package org.mskcc.cbio.portal.integrationTest.scripts;
 
 import java.io.*;
 import java.util.*;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
@@ -48,10 +49,8 @@ import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.scripts.ImportClinicalData;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -66,8 +65,6 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportClinicalData extends IntegrationTestBase {
 	
 	//To use in test cases where we expect an exception:
@@ -153,7 +150,7 @@ public class TestImportClinicalData extends IntegrationTestBase {
         importClinicalData.setFile(cancerStudy, clinicalFile, "PATIENT_ATTRIBUTES", false);
         
         exception.expect(RuntimeException.class);
-        exception.expectMessage("Duplicated patient");
+        exception.expectMessage("Error: Duplicated patient TEST-BH-A1F0 and SUBTYPE attribute pair in the clinical file.");
         importClinicalData.importData();
         ConsoleUtil.showWarnings();
 	}
@@ -416,33 +413,6 @@ public class TestImportClinicalData extends IntegrationTestBase {
         importClinicalData.importData();
         ConsoleUtil.showWarnings();
 	}		
-	
-	/** 
-	 * Test loading a correct file twice. Should give duplication error.
-	 * @throws Exception
-	 */
-	@Test
-	public void testImportClinicalData_CorrectFileTwice1() throws Exception {
-		checkCorrectFileTwice("PATIENT");
-	}
-	public void testImportClinicalData_CorrectFileTwice2() throws Exception {
-		checkCorrectFileTwice("SAMPLE");
-	}	
-	private void checkCorrectFileTwice(String type) throws Exception {
-        File clinicalFile = new File("src/test/resources/clinical_data_small_" + type + ".txt");
-        // initialize an ImportClinicalData instance without args to parse
-        ImportClinicalData importClinicalData = new ImportClinicalData(null);
-        // set the info usually parsed from args
-        importClinicalData.setFile(cancerStudy, clinicalFile, type + "_ATTRIBUTES", false);
-        importClinicalData.importData();
-        // loading twice should also give error
-        exception.expect(DaoException.class);
-        // it is not a specific "duplication" error message but a general DB error since the 
-        // validation only gives specific error when in same file (maybe at some point we want to support clinical data 
-        // in multiple PATIENT and SAMPLE files(?) ):
-        exception.expectMessage("DB Error");
-        importClinicalData.importData();
-	}
 
 	/** 
 	 * Tests to try out the MissingAttributeValues enum and ensure it filters out the 

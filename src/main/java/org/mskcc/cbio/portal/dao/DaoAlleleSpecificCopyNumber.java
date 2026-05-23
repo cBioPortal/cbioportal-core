@@ -32,7 +32,7 @@
 
 package org.mskcc.cbio.portal.dao;
 
-import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
+import org.mskcc.cbio.portal.model.*;
 
 /**
  * Data access object for Mutation table
@@ -40,11 +40,11 @@ import org.mskcc.cbio.portal.model.AlleleSpecificCopyNumber;
 public final class DaoAlleleSpecificCopyNumber {
 
     public static int addAlleleSpecificCopyNumber(AlleleSpecificCopyNumber ascn) throws DaoException {
-        if (!MySQLbulkLoader.isBulkLoad()) {
-            throw new DaoException("You have to turn on MySQLbulkLoader in order to insert allele specific copy numbers");
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert allele specific copy numbers");
         } else {
             int result = 1;
-            MySQLbulkLoader.getMySQLbulkLoader("allele_specific_copy_number").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("allele_specific_copy_number").insertRecord(
                 resolveValueToString(ascn.getMutationEventId()),
                 resolveValueToString(ascn.getGeneticProfileId()),
                 resolveValueToString(ascn.getSampleId()),

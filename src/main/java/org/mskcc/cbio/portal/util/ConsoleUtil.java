@@ -39,7 +39,7 @@ import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.scripts.UsageException;
 
 /**
@@ -167,9 +167,9 @@ public class ConsoleUtil {
 			if( options.has( "loadMode" ) ){
 				String actionArg = (String) options.valueOf( "loadMode" );
 				if (actionArg.equalsIgnoreCase("directLoad")) {
-					MySQLbulkLoader.bulkLoadOff();
+					ClickHouseBulkLoader.bulkLoadOff();
 				} else if (actionArg.equalsIgnoreCase( "bulkLoad" )) {
-					MySQLbulkLoader.bulkLoadOn();
+					ClickHouseBulkLoader.bulkLoadOn();
 				} else {
 					throw new UsageException(progName, description, parser,
 							"Error: unknown loadMode action:  " + actionArg);
@@ -279,9 +279,9 @@ public class ConsoleUtil {
 			if( options.has( "loadMode" ) ){
 				String actionArg = (String) options.valueOf( "loadMode" );
 				if (actionArg.equalsIgnoreCase("directLoad")) {
-					MySQLbulkLoader.bulkLoadOff();
+					ClickHouseBulkLoader.bulkLoadOff();
 				} else if (actionArg.equalsIgnoreCase( "bulkLoad" )) {
-					MySQLbulkLoader.bulkLoadOn();
+					ClickHouseBulkLoader.bulkLoadOn();
 				} else {
 					throw new UsageException(progName, description, parser,
 							"Error: unknown loadMode action:  " + actionArg);

@@ -40,9 +40,9 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import joptsimple.*;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoGeneset;
 import org.mskcc.cbio.portal.dao.DaoInfo;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.Geneset;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
@@ -256,7 +256,7 @@ public class ImportGenesetData extends ConsoleRunnable {
             line = buf.readLine();
         }
         //flush bulkloader to commit geneset genes:
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
         // close file
         reader.close();
 

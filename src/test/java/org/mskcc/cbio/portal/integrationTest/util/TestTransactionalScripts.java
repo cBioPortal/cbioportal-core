@@ -7,16 +7,12 @@ import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/demoScript.xml", "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestTransactionalScripts extends IntegrationTestBase {
 
 	@Autowired

@@ -36,6 +36,7 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
@@ -43,15 +44,12 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 
@@ -60,8 +58,6 @@ import static org.junit.Assert.assertEquals;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestDaoGeneticAlteration extends IntegrationTestBase {
 	
 	CancerStudy study;
@@ -91,17 +87,17 @@ public class TestDaoGeneticAlteration extends IntegrationTestBase {
 	@Test
     public void testDaoGeneticAlterationBulkOn() throws DaoException {
         
-        // test with MySQLbulkLoader.isBulkLoad()
+        // test with ClickHouseBulkLoader.isBulkLoad()
 		runTheTest();
 	}
 
 	@Test
     public void testDaoGeneticAlterationBulkOff() throws DaoException {
         
-        // test without MySQLbulkLoader.isBulkLoad()
-        MySQLbulkLoader.bulkLoadOff();
+        // test without ClickHouseBulkLoader.isBulkLoad()
+        ClickHouseBulkLoader.bulkLoadOff();
         runTheTest();
-        MySQLbulkLoader.bulkLoadOn();
+        ClickHouseBulkLoader.bulkLoadOn();
     }
     
     private void runTheTest() throws DaoException{
@@ -118,8 +114,8 @@ public class TestDaoGeneticAlteration extends IntegrationTestBase {
         assertEquals (1, numRows);
 
         // if bulkLoading, execute LOAD FILE
-        if( MySQLbulkLoader.isBulkLoad()){
-           MySQLbulkLoader.flushAll();
+        if( ClickHouseBulkLoader.isBulkLoad()){
+           ClickHouseBulkLoader.flushAll();
         }
 
         HashMap<Integer, String> valueMap = dao.getGeneticAlterationMap(geneticProfileId, 672);

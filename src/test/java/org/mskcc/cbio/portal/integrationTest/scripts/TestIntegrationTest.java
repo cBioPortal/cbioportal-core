@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoClinicalAttributeMeta;
 import org.mskcc.cbio.portal.dao.DaoClinicalData;
@@ -49,7 +50,6 @@ import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
 import org.mskcc.cbio.portal.dao.DaoTypeOfCancer;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
@@ -69,10 +69,8 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.TransactionalScripts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -90,8 +88,6 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/integrationTestScript.xml", "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestIntegrationTest extends IntegrationTestBase {
 
     @Autowired
@@ -449,7 +445,7 @@ public class TestIntegrationTest extends IntegrationTestBase {
             daoGene.addGene(gene);
         }
 
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
 
     }
 

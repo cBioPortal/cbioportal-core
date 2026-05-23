@@ -19,19 +19,15 @@ package org.mskcc.cbio.portal.integrationTest.incremental;
 
 import java.io.*;
 import java.util.*;
-import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
-import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.scripts.ImportProfileData;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -46,8 +42,6 @@ import static org.mskcc.cbio.portal.integrationTest.incremental.GeneticAlteratio
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
-@Rollback
-@Transactional
 public class TestIncrementalMrnaExpressionImport extends IntegrationTestBase {
 
     /**

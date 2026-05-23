@@ -38,6 +38,8 @@ import java.util.regex.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.ArrayUtils;
+import org.mskcc.cbio.portal.dao.BackupUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCnaEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
@@ -45,8 +47,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneset;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.JdbcUtil;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CnaEvent;
 import org.mskcc.cbio.portal.model.Geneset;
@@ -171,51 +171,39 @@ public class ImportTabDelimData {
      * Import the Copy Number Alteration, mRNA Expression, protein RPPA, GSVA or generic_assay data
      *
      */
-    public void importData() {
-       JdbcUtil.getTransactionTemplate().execute(status -> {
-            try {
-                doImportData();
-            } catch (Throwable e) {
-                status.setRollbackOnly();
-                throw new RuntimeException(e);
-            }
-            return null;
-        });
-    }
-    private void doImportData() throws IOException, DaoException {
-        try {
-            this.numLines = FileUtil.getNumLines(dataFile);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public void importData() throws Exception {
+        this.numLines = FileUtil.getNumLines(dataFile);
         ProgressMonitor.setMaxValue(numLines);
-        FileReader reader = new FileReader(dataFile);
-        BufferedReader buf = new BufferedReader(reader);
-        String headerLine = buf.readLine();
-        String[] headerParts = TsvUtil.splitTsvLine(headerLine);
+        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples", "sample_profile"), this::importDataInternal);
+    }
 
-        //Whether data regards CNA or RPPA:
-        boolean isDiscretizedCnaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
-            && geneticProfile.showProfileInAnalysisTab();
-        boolean isRppaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.PROTEIN_LEVEL
-            && "Composite.Element.Ref".equalsIgnoreCase(headerParts[0]);
-        boolean isGsvaProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE
-            && headerParts[0].equalsIgnoreCase("geneset_id");
-        boolean isGenericAssayProfile = geneticProfile != null
-            && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY
-            && headerParts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
+    void importDataInternal() throws Exception {
+        try (FileReader reader = new FileReader(dataFile);
+            BufferedReader buf = new BufferedReader(reader)) {
 
-        long typesDetected = List.of(isDiscretizedCnaProfile, isRppaProfile, isGsvaProfile, isGenericAssayProfile).stream().filter(Boolean::booleanValue).count();
-        if (typesDetected > 1) {
-            throw new IllegalStateException("More then one data type is detected.");
-        }
+            String headerLine = buf.readLine();
+            String[] headerParts = TsvUtil.splitTsvLine(headerLine);
+            //Whether data regards CNA or RPPA:
+            boolean isDiscretizedCnaProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION
+                && geneticProfile.showProfileInAnalysisTab();
+            boolean isRppaProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.PROTEIN_LEVEL
+                && "Composite.Element.Ref".equalsIgnoreCase(headerParts[0]);
+            boolean isGsvaProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENESET_SCORE
+                && headerParts[0].equalsIgnoreCase("geneset_id");
+            boolean isGenericAssayProfile = geneticProfile != null
+                && geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY
+                && headerParts[0].equalsIgnoreCase("ENTITY_STABLE_ID");
 
-        int numRecordsToAdd = 0;
-        int samplesSkipped = 0;
-        try {
+            long typesDetected = List.of(isDiscretizedCnaProfile, isRppaProfile, isGsvaProfile, isGenericAssayProfile).stream().filter(Boolean::booleanValue).count();
+            if (typesDetected > 1) {
+                throw new IllegalStateException("More then one data type is detected.");
+            }
+
+            int numRecordsToAdd = 0;
+            int samplesSkipped = 0;
             int hugoSymbolIndex = getHugoSymbolIndex(headerParts);
             int entrezGeneIdIndex = getEntrezGeneIdIndex(headerParts);
             int rppaGeneRefIndex = getRppaGeneRefIndex(headerParts);
@@ -296,7 +284,7 @@ public class ImportTabDelimData {
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
             if (isDiscretizedCnaProfile) {
                 existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
-                MySQLbulkLoader.bulkLoadOn();
+                ClickHouseBulkLoader.bulkLoadOn();
             }
 
             // load entities map from database
@@ -305,6 +293,10 @@ public class ImportTabDelimData {
                 genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             }
 
+
+            if (isDiscretizedCnaProfile && isIncrementalUpdateMode) {
+                DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
+            }
 
             String line = buf.readLine();
             while (line != null) {
@@ -374,10 +366,10 @@ public class ImportTabDelimData {
                 line = buf.readLine();
             }
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
-            geneticAlterationImporter.finalize();
-            if (MySQLbulkLoader.isBulkLoad()) {
-                MySQLbulkLoader.flushAll();
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader.flushAll();
             }
+            geneticAlterationImporter.complete();
 
             if (isRppaProfile) {
                 ProgressMonitor.setCurrentMessage(" --> total number of extra records added because of multiple genes in one line:  " + nrExtraRecords);
@@ -391,16 +383,11 @@ public class ImportTabDelimData {
                     " to the database!");
             }
         }
-        finally {
-            buf.close();
-        }
     }
 
     private Map<Map.Entry<String, Long>, Map<String, String>> readPdAnnotations(File pdAnnotationsFile) {
         Map<Map.Entry<String, Long>, Map<String, String>> pdAnnotations = new HashMap<>();
-        BufferedReader reader;
-        try {
-            reader = new BufferedReader(new FileReader(pdAnnotationsFile));
+        try (BufferedReader reader = new BufferedReader(new FileReader(pdAnnotationsFile))) {
             List<String> header = Arrays.asList(reader.readLine().toLowerCase().split("\t"));
             int sampleIdIndx = header.indexOf("sample_id");
             if (sampleIdIndx < 0) {
@@ -448,7 +435,6 @@ public class ImportTabDelimData {
                 pdAnnotations.put(sampleGeneKey, driverInfo);
                 line = reader.readLine();
             }
-            reader.close();
         } catch (IOException e) {
             throw new RuntimeException("Can't read PD annotation file", e);
         }
@@ -646,9 +632,6 @@ public class ImportTabDelimData {
                 recordStored = this.geneticAlterationImporter.store(values, genes.get(0), geneSymbol);
                 //only add extra CNA related records if the step above worked, otherwise skip:
                 if (recordStored && isDiscretizedCnaProfile) {
-                    if (isIncrementalUpdateMode) {
-                        DaoCnaEvent.removeSampleCnaEvents(geneticProfileId, orderedSampleList);
-                    }
                     long entrezGeneId = genes.get(0).getEntrezGeneId();
                     CnaUtil.storeCnaEvents(existingCnaEvents, composeCnaEventsToAdd(values, entrezGeneId));
                 }

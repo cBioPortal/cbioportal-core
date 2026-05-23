@@ -37,6 +37,7 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
@@ -45,7 +46,6 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.CopyNumberStatus;
@@ -56,10 +56,8 @@ import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportTabDelimData;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -69,8 +67,6 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportTabDelimData extends IntegrationTestBase {
 
     private final Set<String> NON_CASE_ID_COLS = new HashSet<>(Arrays.asList(
@@ -125,7 +121,7 @@ public class TestImportTabDelimData extends IntegrationTestBase {
 	@Test
     public void testImportCnaDataBulkLoadOff() throws Exception {
 
-        MySQLbulkLoader.bulkLoadOff();
+        ClickHouseBulkLoader.bulkLoadOff();
         runImportCnaData();
     }
     
@@ -135,11 +131,11 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
 	@Test
     public void testImportCnaDataBulkLoadOn() throws Exception {
-		MySQLbulkLoader.bulkLoadOn();
+		ClickHouseBulkLoader.bulkLoadOn();
         runImportCnaData();
     }
     
-    private void runImportCnaData() throws DaoException, IOException{
+    private void runImportCnaData() throws Exception {
 
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
@@ -197,8 +193,8 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
     @Test
     public void testImportCnaData2BulkLoadOff() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-        MySQLbulkLoader.bulkLoadOff();
+        // test with both values of ClickHouseBulkLoader.isBulkLoad()
+        ClickHouseBulkLoader.bulkLoadOff();
         runImportCnaData2();
     }
     
@@ -209,12 +205,12 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
     @Test
     public void testImportCnaData2BulkLoadOn() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-    	MySQLbulkLoader.bulkLoadOn();
+        // test with both values of ClickHouseBulkLoader.isBulkLoad()
+    	ClickHouseBulkLoader.bulkLoadOn();
         runImportCnaData2();
     }
     
-    private void runImportCnaData2() throws DaoException, IOException{
+    private void runImportCnaData2() throws Exception {
 
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
 
@@ -259,8 +255,8 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
     @Test
     public void testImportmRnaData1BulkLoadOff() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-        MySQLbulkLoader.bulkLoadOff();
+        // test with both values of ClickHouseBulkLoader.isBulkLoad()
+        ClickHouseBulkLoader.bulkLoadOff();
         runImportRnaData1();
     }
     
@@ -270,12 +266,12 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
     @Test
     public void testImportmRnaData1BulkLoadOn() throws Exception {
-        // test with both values of MySQLbulkLoader.isBulkLoad()
-      	MySQLbulkLoader.bulkLoadOn();
+        // test with both values of ClickHouseBulkLoader.isBulkLoad()
+      	ClickHouseBulkLoader.bulkLoadOn();
         runImportRnaData1();
     }
     
-    private void runImportRnaData1() throws DaoException, IOException{
+    private void runImportRnaData1() throws Exception {
 
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
@@ -325,7 +321,7 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
     @Test
     public void testImportmRnaData2() throws Exception {
-       	MySQLbulkLoader.bulkLoadOn();
+       	ClickHouseBulkLoader.bulkLoadOn();
         
 
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
@@ -411,7 +407,7 @@ public class TestImportTabDelimData extends IntegrationTestBase {
      */
     @Test
     public void testImportRppaData() throws Exception {
-       	MySQLbulkLoader.bulkLoadOn();
+       	ClickHouseBulkLoader.bulkLoadOn();
         
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
         DaoGeneticAlteration dao = DaoGeneticAlteration.getInstance();
@@ -506,6 +502,6 @@ public class TestImportTabDelimData extends IntegrationTestBase {
             Integer pId = (p == null) ? DaoPatient.addPatient(new Patient(study, sampleId)) : p.getInternalId();
             DaoSample.addSample(new Sample(sampleId, pId, study.getTypeOfCancerId()));
         }
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 }

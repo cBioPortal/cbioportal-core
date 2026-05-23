@@ -36,12 +36,13 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.util.*;
 import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
+import org.mskcc.cbio.portal.dao.ClickHouseOptimizer;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
 import org.mskcc.cbio.portal.dao.DaoCopyNumberSegmentFile;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CopyNumberSegment;
 import org.mskcc.cbio.portal.model.CopyNumberSegmentFile;
@@ -143,12 +144,12 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             if (!isIncrementalUpdateMode && segmentDataExistsForCancerStudy(cancerStudy)) {
                  throw new IllegalArgumentException("Seg data for cancer study " + cancerStudy.getCancerStudyStableId() + " has already been imported: " + dataFile);
             }
-            MySQLbulkLoader.bulkLoadOn();
+            ClickHouseBulkLoader.bulkLoadOn();
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
-            MySQLbulkLoader.flushAll();
-            MySQLbulkLoader.bulkLoadOff();
             DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
+            ClickHouseOptimizer.optimizeTables("clinical_sample", "clinical_patient");
+            ClickHouseBulkLoader.bulkLoadOff();
         } catch (RuntimeException e) {
             throw e;
         } catch (IOException|DaoException e) {

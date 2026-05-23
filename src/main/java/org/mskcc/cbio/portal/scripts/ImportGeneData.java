@@ -38,11 +38,11 @@ import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoReferenceGenome;
 import org.mskcc.cbio.portal.dao.DaoReferenceGenomeGene;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.model.ReferenceGenomeGene;
@@ -659,7 +659,7 @@ public class ImportGeneData extends ConsoleRunnable {
     }
 
     static void importSuppGeneData(File suppGeneFile, String referenceGenomeBuild) throws IOException, DaoException {
-        MySQLbulkLoader.bulkLoadOff();
+        ClickHouseBulkLoader.bulkLoadOff();
         FileReader reader = new FileReader(suppGeneFile);
         BufferedReader buf = new BufferedReader(reader);
         String line;
@@ -724,9 +724,9 @@ public class ImportGeneData extends ConsoleRunnable {
                 int numLines = FileUtil.getNumLines(geneFile);
                 System.out.println(" --> total number of lines:  " + numLines);
                 ProgressMonitor.setMaxValue(numLines);
-                MySQLbulkLoader.bulkLoadOn();
+                ClickHouseBulkLoader.bulkLoadOn();
                 ImportGeneData.importData(geneFile, (String)options.valueOf("genome-build"));
-                MySQLbulkLoader.flushAll(); //Gene and gene_alias should be updated before calculating gene length (gtf)!
+                ClickHouseBulkLoader.flushAll(); //Gene and gene_alias should be updated before calculating gene length (gtf)!
             }
 
             if(options.has("hgnc")) {
@@ -735,9 +735,9 @@ public class ImportGeneData extends ConsoleRunnable {
                 int numLines = FileUtil.getNumLines(geneFile);
                 System.out.println(" --> total number of lines:  " + numLines);
                 ProgressMonitor.setMaxValue(numLines);
-                MySQLbulkLoader.bulkLoadOn();
+                ClickHouseBulkLoader.bulkLoadOn();
                 ImportGeneData.importHGNCData(geneFile, (String)options.valueOf("genome-build"));
-                MySQLbulkLoader.flushAll(); //Gene and gene_alias should be updated before calculating gene length (gtf)!
+                ClickHouseBulkLoader.flushAll(); //Gene and gene_alias should be updated before calculating gene length (gtf)!
             }
 
             if(options.has("supp-genes")) {
@@ -772,7 +772,7 @@ public class ImportGeneData extends ConsoleRunnable {
                 ImportGeneData.importGeneLength(lociFile, (String)options.valueOf("genome-build"),
                                     species, options.has("genes"));
             }
-            MySQLbulkLoader.flushAll();
+            ClickHouseBulkLoader.flushAll();
             System.err.println("Done. Restart tomcat to make sure the cache is replaced with the new data.");
 
         }

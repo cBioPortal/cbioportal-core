@@ -29,19 +29,17 @@ import org.junit.Rule;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 
 /**
@@ -50,8 +48,6 @@ import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestImportCopyNumberSegmentData extends IntegrationTestBase {
 
 	//To use in test cases where we expect an exception:
@@ -103,6 +99,6 @@ public class TestImportCopyNumberSegmentData extends IntegrationTestBase {
             Integer pId = (p == null) ? DaoPatient.addPatient(new Patient(cancerStudy, sampleId)) : p.getInternalId();
             DaoSample.addSample(new Sample(sampleId, pId, cancerStudy.getTypeOfCancerId()));
         }
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 }

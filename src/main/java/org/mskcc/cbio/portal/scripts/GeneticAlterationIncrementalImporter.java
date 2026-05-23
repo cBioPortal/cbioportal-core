@@ -1,6 +1,8 @@
 package org.mskcc.cbio.portal.scripts;
 
 import java.util.*;
+
+import org.mskcc.cbio.portal.dao.ClickHouseOptimizer;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneticAlteration;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfileSamples;
@@ -46,7 +48,7 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
                     throw new IllegalStateException("Number of samples ("
                             + sampleToValue.size() + ") for genetic entity with id "
                             + geneticEntityId + " does not match with the number in the preexisting sample list ("
-                            + initialOrderSampleListSize + ").");
+                            + initialOrderSampleListSize + "). Consider reuploading the entire study instead of doing an incremental update.");
                 }
             });
             // add all new sample ids at the end
@@ -54,8 +56,6 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
             Set<Integer> savedSampleSet = new HashSet<>(savedOrderedSampleList);
             List<Integer> newSampleIds = this.fileOrderedSampleList.stream().filter(sampleId -> !savedSampleSet.contains(sampleId)).toList();
             this.orderedSampleList.addAll(newSampleIds);
-            DaoGeneticProfileSamples.deleteAllSamplesInGeneticProfile(this.geneticProfileId);
-            daoGeneticAlteration.deleteAllRecordsInGeneticProfile(this.geneticProfileId);
         } catch (DaoException e) {
             throw new RuntimeException(e);
         }
@@ -63,9 +63,10 @@ public class GeneticAlterationIncrementalImporter extends GeneticAlterationImpor
     }
 
     @Override
-    public void finalize() {
+    public void complete() throws DaoException {
         expandRemainingGeneticEntityTabDelimitedRowsWithBlankValue();
-        super.finalize();
+        super.complete();
+        ClickHouseOptimizer.optimizeTables("genetic_alteration", "genetic_profile_samples");
     }
 
     private String[] extendValues(int geneticEntityId, String[] values) {

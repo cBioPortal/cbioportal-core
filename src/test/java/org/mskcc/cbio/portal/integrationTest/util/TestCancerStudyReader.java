@@ -38,10 +38,8 @@ import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.util.CancerStudyReader;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -51,8 +49,6 @@ import static org.junit.Assert.fail;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestCancerStudyReader extends IntegrationTestBase {
 
    @Test

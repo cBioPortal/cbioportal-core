@@ -50,7 +50,7 @@ public class DaoGeneticProfileLink {
 	        
 	        // Prepare SQL statement
             preparedStatement = connection.prepareStatement("INSERT INTO genetic_profile_link " 
-	                + "(REFERRING_GENETIC_PROFILE_ID, REFERRED_GENETIC_PROFILE_ID, REFERENCE_TYPE) VALUES(?,?,?)");	        
+	                + "(referring_genetic_profile_id, referred_genetic_profile_id, reference_type) VALUES(?,?,?)");
             
             // Fill in statement
             preparedStatement.setInt(1, geneticProfileLink.getReferringGeneticProfileId());

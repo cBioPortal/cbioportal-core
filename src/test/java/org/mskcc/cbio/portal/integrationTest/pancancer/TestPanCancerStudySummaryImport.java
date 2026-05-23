@@ -3,7 +3,6 @@ package org.mskcc.cbio.portal.integrationTest.pancancer;
 import java.util.*;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -25,18 +24,13 @@ import org.mskcc.cbio.portal.scripts.ImportProfileData;
 import org.mskcc.cbio.portal.scripts.ImportSampleList;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.transaction.annotation.Transactional;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@Ignore
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-@Rollback
-@Transactional
 public class TestPanCancerStudySummaryImport extends IntegrationTestBase {
 
     @Before

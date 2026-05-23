@@ -26,13 +26,13 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleProfile;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
-import org.mskcc.cbio.portal.dao.MySQLbulkLoader;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
@@ -190,13 +190,13 @@ public class ImportStructuralVariantData {
             }
         }
 
-        DaoSampleProfile.upsertSampleToProfileMapping(sampleIds, geneticProfileId, genePanelId);
         if (isIncrementalUpdateMode) {
             DaoStructuralVariant.deleteStructuralVariants(geneticProfileId, sampleIds);
         }
+        DaoSampleProfile.upsertSampleToProfileMapping(sampleIds, geneticProfileId, genePanelId);
 
         buf.close();
-        MySQLbulkLoader.flushAll();
+        ClickHouseBulkLoader.flushAll();
     }
 
     private CanonicalGene setCanonicalGene(long siteEntrezGeneId, String siteHugoSymbol, DaoGeneOptimized daoGene) {

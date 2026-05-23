@@ -51,11 +51,11 @@ public final class DaoClinicalEvent {
     private DaoClinicalEvent() {}
     
     public static int addClinicalEvent(ClinicalEvent clinicalEvent) {
-        if (!MySQLbulkLoader.isBulkLoad()) {
+        if (!ClickHouseBulkLoader.isBulkLoad()) {
             throw new IllegalStateException("Only bulk load mode is allowed for importing clinical events");
         }
         
-        MySQLbulkLoader.getMySQLbulkLoader("clinical_event").insertRecord(
+        ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event").insertRecord(
                 Long.toString(clinicalEvent.getClinicalEventId()),
                 Integer.toString(clinicalEvent.getPatientId()),
                 clinicalEvent.getStartDate().toString(),
@@ -68,7 +68,7 @@ public final class DaoClinicalEvent {
     private static int addClinicalEventData(ClinicalEvent clinicalEvent) {
         long eventId = clinicalEvent.getClinicalEventId();
         for (Map.Entry<String,String> entry : clinicalEvent.getEventData().entrySet()) {
-            MySQLbulkLoader.getMySQLbulkLoader("clinical_event_data").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event_data").insertRecord(
                     Long.toString(eventId),
                     entry.getKey(),
                     entry.getValue()
@@ -92,9 +92,9 @@ public final class DaoClinicalEvent {
 
             // get events first
             if (eventType==null) {
-                pstmt = con.prepareStatement("SELECT * FROM clinical_event WHERE PATIENT_ID=?");
+                pstmt = con.prepareStatement("SELECT * FROM clinical_event WHERE patient_id=?");
             } else {
-                pstmt = con.prepareStatement("SELECT * FROM clinical_event WHERE PATIENT_ID=? AND EVENT_TYPE=?");
+                pstmt = con.prepareStatement("SELECT * FROM clinical_event WHERE patient_id=? AND event_type=?");
             }
             pstmt.setInt(1, patientId);
             if (eventType!=null) {
@@ -112,13 +112,13 @@ public final class DaoClinicalEvent {
            
            // get data then
            if (!clinicalEvents.isEmpty()) {
-                pstmt = con.prepareStatement("SELECT * FROM clinical_event_data WHERE CLINICAL_EVENT_ID IN ("
+                pstmt = con.prepareStatement("SELECT * FROM clinical_event_data WHERE clinical_event_id IN ("
                         + StringUtils.join(clinicalEvents.keySet(), ",") + ")");
 
                 rs = pstmt.executeQuery();
                 while (rs.next()) {
-                   long eventId = rs.getLong("CLINICAL_EVENT_ID");
-                   clinicalEvents.get(eventId).addEventDatum(rs.getString("KEY"), rs.getString("VALUE"));
+                   long eventId = rs.getLong("clinical_event_id");
+                   clinicalEvents.get(eventId).addEventDatum(rs.getString("key"), rs.getString("value"));
                 }
             }
 
@@ -132,11 +132,11 @@ public final class DaoClinicalEvent {
     
     private static ClinicalEvent extractClinicalEvent(ResultSet rs) throws SQLException {
         ClinicalEvent clinicalEvent = new ClinicalEvent();
-        clinicalEvent.setClinicalEventId(rs.getLong("CLINICAL_EVENT_ID"));
-        clinicalEvent.setPatientId(rs.getInt("PATIENT_ID"));
-        clinicalEvent.setStartDate(JdbcUtil.readLongFromResultSet(rs, "START_DATE"));
-        clinicalEvent.setStopDate(JdbcUtil.readLongFromResultSet(rs, "STOP_DATE"));
-        clinicalEvent.setEventType(rs.getString("EVENT_TYPE"));
+        clinicalEvent.setClinicalEventId(rs.getLong("clinical_event_id"));
+        clinicalEvent.setPatientId(rs.getInt("patient_id"));
+        clinicalEvent.setStartDate(JdbcUtil.readLongFromResultSet(rs, "start_date"));
+        clinicalEvent.setStopDate(JdbcUtil.readLongFromResultSet(rs, "stop_date"));
+        clinicalEvent.setEventType(rs.getString("event_type"));
         return clinicalEvent;
     }
     
@@ -147,7 +147,7 @@ public final class DaoClinicalEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
             pstmt = con.prepareStatement
-                    ("SELECT MAX(`CLINICAL_EVENT_ID`) FROM `clinical_event`");
+                    ("SELECT max(`clinical_event_id`) FROM `clinical_event`");
             rs = pstmt.executeQuery();
             return rs.next() ? rs.getLong(1) : 0;
         } catch (SQLException e) {
@@ -170,7 +170,7 @@ public final class DaoClinicalEvent {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
-            pstmt = con.prepareStatement("SELECT EXISTS(SELECT 1 FROM `clinical_event` WHERE `PATIENT_ID`=?)");
+            pstmt = con.prepareStatement("SELECT EXISTS(SELECT 1 FROM `clinical_event` WHERE `patient_id`=?)");
             pstmt.setInt(1, patientId);
             rs = pstmt.executeQuery();
             return rs.next() && rs.getInt(1)==1;
@@ -188,12 +188,12 @@ public final class DaoClinicalEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
             
-            pstmt = con.prepareStatement("DELETE FROM clinical_event_data WHERE CLINICAL_EVENT_ID IN "
-                    + "(SELECT CLINICAL_EVENT_ID FROM clinical_event WHERE PATIENT_ID in (SELECT INTERNAL_ID FROM patient where CANCER_STUDY_ID=?))");
+            pstmt = con.prepareStatement("DELETE FROM clinical_event_data WHERE clinical_event_id IN "
+                    + "(SELECT clinical_event_id FROM clinical_event WHERE patient_id in (SELECT internal_id FROM patient where cancer_study_id=?))");
             pstmt.setInt(1, cancerStudyId);
             pstmt.executeUpdate();
             
-            pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE PATIENT_ID in (SELECT INTERNAL_ID FROM patient where CANCER_STUDY_ID=?)");
+            pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE patient_id in (SELECT internal_id FROM patient where cancer_study_id=?)");
             pstmt.setInt(1, cancerStudyId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -210,7 +210,12 @@ public final class DaoClinicalEvent {
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
 
-            pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE clinical_event.PATIENT_ID = ?");
+            pstmt = con.prepareStatement("DELETE FROM clinical_event_data WHERE clinical_event_id IN (" +
+                    "SELECT clinical_event_id FROM clinical_event WHERE patient_id = ?)");
+            pstmt.setInt(1, patientId);
+            pstmt.executeUpdate();
+            pstmt.close();
+            pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE patient_id = ?");
             pstmt.setInt(1, patientId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -226,12 +231,10 @@ public final class DaoClinicalEvent {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalData.class);
-            JdbcUtil.disableForeignKeyCheck(con);
             pstmt = con.prepareStatement("TRUNCATE TABLE clinical_event_data");
             pstmt.executeUpdate();
             pstmt = con.prepareStatement("TRUNCATE TABLE clinical_event");
             pstmt.executeUpdate();
-            JdbcUtil.enableForeignKeyCheck(con);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
