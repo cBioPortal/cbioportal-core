@@ -368,6 +368,25 @@ class ClinicalValuesTestCase(DataFileTestCase):
         self.assertEqual(record.line_number, 11)
         self.assertIn('PATIENT_ID and SAMPLE_ID can only contain letters, numbers, points, underscores and/or hyphens', record.getMessage())
 
+    def test_clinical_attribute_value_too_long(self):
+        """Test that a value exceeding the maximum length raises an error.
+
+        Clinical attribute values are stored in a varchar(255) column, so a
+        longer value would be silently truncated on load. The boundary value of
+        exactly 255 characters is accepted, while 256 characters is rejected.
+        """
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_clin_value_too_long.txt',
+                                    validateData.SampleClinicalValidator)
+        # only the 256-character value (line 7) should be flagged; the
+        # 255-character value on line 6 is allowed
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual(7, record.line_number)
+        self.assertEqual(3, record.column_number)
+        self.assertIn('maximum length', record.getMessage())
+
 
 
 class PatientAttrFileTestCase(PostClinicalDataFileTestCase):
