@@ -125,7 +125,12 @@ public class MutationFilter {
               addRejectedVariant(rejectionMap, mutation.getMutationType());
               return false;
           } else {
-              if( safeStringTest( mutation.getMutationType(), "5'Flank" ) ) {
+              // Only relabel 5'Flank mutations as "Promoter" for whitelisted genes
+              // (e.g. TERT), consistent with the default-filter branch below. A
+              // custom filtered-mutations list controls which types are excluded;
+              // it must not turn every 5'Flank mutation into a promoter mutation.
+              if( safeStringTest( mutation.getMutationType(), "5'Flank" )
+                      && whiteListGenesForPromoterMutations.contains(mutation.getEntrezGeneId()) ) {
                   mutation.setProteinChange("Promoter");
               }
               return true;
