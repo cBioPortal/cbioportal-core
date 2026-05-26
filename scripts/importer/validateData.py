@@ -3494,6 +3494,10 @@ class TimelineValidator(Validator):
     REQUIRE_COLUMN_ORDER = True
     ALLOW_BLANKS = True
 
+    def __init__(self, *args, **kwargs):
+        super(TimelineValidator, self).__init__(*args, **kwargs)
+        self.timeline_entries = {}
+
     def checkLine(self, data):
         super(TimelineValidator, self).checkLine(data)
         # TODO check the values
@@ -3524,6 +3528,17 @@ class TimelineValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
+        # validate the uniqueness of timeline records
+        timeline_entry = ", ".join(data)
+        if timeline_entry in self.timeline_entries:
+            self.logger.error(
+                'Duplicate entry in timeline data',
+                extra = {'line_number': self.line_number,
+                         'cause': '%s (already defined on line %d)' % (
+                             timeline_entry,
+                             self.timeline_entries[timeline_entry])})
+        else:
+            self.timeline_entries[timeline_entry] = self.line_number
 
 class CancerTypeValidator(Validator):
 
