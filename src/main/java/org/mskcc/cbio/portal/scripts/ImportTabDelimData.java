@@ -372,6 +372,7 @@ public class ImportTabDelimData {
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
             if (ClickHouseBulkLoader.isBulkLoad()) {
                 ClickHouseBulkLoader.flushAll();
+                ClickHouseBulkLoader.bulkLoadOff();
             }
             geneticAlterationImporter.complete();
 

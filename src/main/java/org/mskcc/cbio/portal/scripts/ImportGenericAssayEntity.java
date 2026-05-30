@@ -253,8 +253,11 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         // (e.g. GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap)
         // in the same JVM sees them. ImportProfileData runs this method
         // immediately before ImportTabDelimData for GENERIC_ASSAY profiles.
+        // bulkLoadOff() restores the global flag — ImportTabDelimData will
+        // turn it back on for the matrix import.
         if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();
+            ClickHouseBulkLoader.bulkLoadOff();
         }
 
         ProgressMonitor.setCurrentMessage("Finished loading generic assay.\n");
