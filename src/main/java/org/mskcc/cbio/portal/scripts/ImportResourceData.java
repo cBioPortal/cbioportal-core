@@ -46,6 +46,7 @@ public class ImportResourceData extends ConsoleRunnable {
     private ResourceType resourceType;
     private boolean relaxed;
     private Set<String> patientIds = new HashSet<String>();
+    private Map<String, ResourceDefinition> resourceDefinitionMap = new HashMap<>();
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -108,6 +109,9 @@ public class ImportResourceData extends ConsoleRunnable {
     private void importData(BufferedReader buff, List<ResourceDefinition> resources, Map<String, Integer> headerIndexMap) throws Exception {
         String line;
         MultiKeyMap resourceMap = new MultiKeyMap();
+        // build lookup map for resource definitions
+        this.resourceDefinitionMap = resources.stream()
+                .collect(Collectors.toMap(ResourceDefinition::getResourceId, r -> r, (a, b) -> a));
         // create resource_id set
         Set<String> patientResourceIdSet = resources
                 .stream()
@@ -334,7 +338,7 @@ public class ImportResourceData extends ConsoleRunnable {
         // The resourceMap makes sure a pair of (internalId/resource_id/url) is unique
         // added to the DB if there are no duplicates,
         if (!resourceMap.containsKey(internalId, resourceId, resourceURL)) {
-            addDatum(internalId, resourceId, resourceURL,resourceType);
+            addDatum(internalId, stableId, resourceId, resourceURL, resourceType);
             resourceMap.put(internalId, resourceId, resourceURL, resourceURL);
         }
         // handle duplicates
@@ -351,18 +355,42 @@ public class ImportResourceData extends ConsoleRunnable {
     }
 
     // add datum for patient, sample and study resources
-    private void addDatum(int internalId, String resourceId, String resourceURL, ResourceType resourceType) throws Exception {
+    private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType) throws Exception {
         // if bulk loading is ever turned off, we need to check if
         // resource value exists and if so, perfom an update
+        ResourceDefinition def = resourceDefinitionMap.get(resourceId);
+        String displayName = (def != null) ? def.getDisplayName() : null;
+        int priority = (def != null && def.getPriority() != null) ? def.getPriority() : 0;
+
         if (resourceType.equals(ResourceType.PATIENT)) {
             numPatientSpecificResourcesAdded++;
             DaoResourceData.addPatientDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addResourceDatum(
+                cancerStudy.getInternalId(), resourceId, "PATIENT",
+                stableId, null,
+                resourceURL, displayName, resourceType.toString(), priority, null);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
             DaoResourceData.addSampleDatum(internalId, resourceId, resourceURL);
+            // derive stable patient ID from the sample's internal patient linkage
+            String stablePatientId = null;
+            try {
+                int internalPatientId = DaoSample.getSampleById(internalId).getInternalPatientId();
+                stablePatientId = DaoPatient.getPatientById(internalPatientId).getStableId();
+            } catch (Exception e) {
+                ProgressMonitor.logWarning("Could not resolve patientId for sample " + stableId + ": " + e.getMessage());
+            }
+            DaoResourceData.addResourceDatum(
+                cancerStudy.getInternalId(), resourceId, "SAMPLE",
+                stablePatientId, stableId,
+                resourceURL, displayName, resourceType.toString(), priority, null);
         } else {
             numStudySpecificResourcesAdded++;
             DaoResourceData.addStudyDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addResourceDatum(
+                cancerStudy.getInternalId(), resourceId, "STUDY",
+                null, null,
+                resourceURL, displayName, resourceType.toString(), priority, null);
         }
     }
 
