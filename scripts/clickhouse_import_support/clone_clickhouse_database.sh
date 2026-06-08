@@ -158,11 +158,28 @@ function create_destination_database_table_schema_only() {
 
 function copy_source_database_table_data_to_destination() {
     local table_name=$1
+    # Retry the INSERT up to 3 times with a 30-second delay between attempts.
+    # On ClickHouse Cloud (SharedMergeTree), table drops are asynchronous in
+    # ZooKeeper — if we recreate a table and INSERT immediately, the new part
+    # metadata can collide with stale paths from the dropped table. Retrying
+    # after a brief delay gives ZooKeeper time to finish cleanup.
+    local max_attempts=3
+    local attempt=0
+    local retry_delay_seconds=30
     local statement="INSERT INTO \`$destination_database_name\`.\`$table_name\` SELECT * FROM \`$source_database_name\`.\`$table_name\`"
-    if ! execute_sql_statement_via_clickhouse_client "$statement" "$insert_table_data_result_filepath" ; then
-        return 1
-    fi
-    return 0
+    while [ "$attempt" -lt "$max_attempts" ] ; do
+        if execute_sql_statement_via_clickhouse_client "$statement" "$insert_table_data_result_filepath" ; then
+            return 0
+        fi
+        cat "$insert_table_data_result_filepath" >&2
+        attempt=$((attempt+1))
+        if [ "$attempt" -lt "$max_attempts" ] ; then
+            echo "retrying INSERT for table $table_name (attempt $attempt)" >&2
+            sleep $retry_delay_seconds
+        fi
+    done
+    echo "Error : could not copy data from table $table_name into destination database" >&2
+    return 1
 }
 
 function get_table_record_count() {
