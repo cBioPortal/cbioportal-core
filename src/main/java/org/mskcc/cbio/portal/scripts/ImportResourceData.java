@@ -33,6 +33,10 @@ public class ImportResourceData extends ConsoleRunnable {
     public static final String RESOURCE_ID_COLUMN_NAME = "RESOURCE_ID";
     public static final String URL_COLUMN_NAME = "URL";
     public static final String SAMPLE_TYPE_COLUMN_NAME = "SAMPLE_TYPE";
+    // Optional per-row columns (override resource-definition-level values)
+    public static final String DISPLAY_NAME_COLUMN_NAME = "DISPLAY_NAME";
+    public static final String TYPE_COLUMN_NAME = "TYPE";
+    public static final String METADATA_COLUMN_NAME = "METADATA";
     private int numSampleSpecificResourcesAdded = 0;
     private int numPatientSpecificResourcesAdded = 0;
     private int numStudySpecificResourcesAdded = 0;
@@ -227,17 +231,17 @@ public class ImportResourceData extends ConsoleRunnable {
             // if patient_id column exists and resource type is patient
             if (getResourceType() == ResourceType.PATIENT && internalPatientId != -1) {
                 validateAddDatum(internalPatientId, stablePatientId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.PATIENT, patientResourceIdSet, resourceMap);
+                        ResourceType.PATIENT, patientResourceIdSet, resourceMap, fields, headerIndexMap);
             } 
             // if sample_id column exists and resource type is sample
             else if (getResourceType() == ResourceType.SAMPLE && internalSampleId != -1) {
                 validateAddDatum(internalSampleId, stableSampleId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap);
+                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap, fields, headerIndexMap);
             }
             // if resource type is study
             else if (getResourceType() == ResourceType.STUDY) {
                 validateAddDatum(cancerStudy.getInternalId(), cancerStudy.getCancerStudyStableId(), fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.STUDY, studyResourceIdSet, resourceMap);
+                        ResourceType.STUDY, studyResourceIdSet, resourceMap, fields, headerIndexMap);
             }
         }
         return true;
@@ -328,7 +332,7 @@ public class ImportResourceData extends ConsoleRunnable {
         return (sampleId != null && !sampleId.isEmpty());
     }
 
-    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap) throws Exception {
+    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap, String[] fields, Map<String, Integer> headerIndexMap) throws Exception {
         // throw exception if resource definition is not exist in the database
         if (!resourceSet.contains(resourceId)) {
             throw new RuntimeException("Error: " + resourceType.toString().toLowerCase() + " " + stableId
@@ -338,7 +342,7 @@ public class ImportResourceData extends ConsoleRunnable {
         // The resourceMap makes sure a pair of (internalId/resource_id/url) is unique
         // added to the DB if there are no duplicates,
         if (!resourceMap.containsKey(internalId, resourceId, resourceURL)) {
-            addDatum(internalId, stableId, resourceId, resourceURL, resourceType);
+            addDatum(internalId, stableId, resourceId, resourceURL, resourceType, fields, headerIndexMap);
             resourceMap.put(internalId, resourceId, resourceURL, resourceURL);
         }
         // handle duplicates
@@ -354,24 +358,32 @@ public class ImportResourceData extends ConsoleRunnable {
         }
     }
 
-    // add datum for patient, sample and study resources
-    private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType) throws Exception {
-        // if bulk loading is ever turned off, we need to check if
-        // resource value exists and if so, perfom an update
+    private String getOptionalField(String[] fields, Map<String, Integer> headerIndexMap, String columnName) {
+        Integer idx = headerIndexMap.get(columnName);
+        if (idx == null || idx < 0 || idx >= fields.length) return null;
+        String val = fields[idx].trim();
+        return (val.isEmpty() || MissingValues.has(val)) ? null : val;
+    }
+
+    // add datum for patient, sample and study resources (writes only to resource_data)
+    private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, String[] fields, Map<String, Integer> headerIndexMap) throws Exception {
         ResourceDefinition def = resourceDefinitionMap.get(resourceId);
-        String displayName = (def != null) ? def.getDisplayName() : null;
+        // Per-row optional fields override resource-definition-level values when present
+        String displayName = getOptionalField(fields, headerIndexMap, DISPLAY_NAME_COLUMN_NAME);
+        if (displayName == null && def != null) displayName = def.getDisplayName();
+        String type = getOptionalField(fields, headerIndexMap, TYPE_COLUMN_NAME);
+        if (type == null) type = (def != null) ? resourceType.toString() : null;
+        String metadata = getOptionalField(fields, headerIndexMap, METADATA_COLUMN_NAME);
         int priority = (def != null && def.getPriority() != null) ? def.getPriority() : 0;
 
         if (resourceType.equals(ResourceType.PATIENT)) {
             numPatientSpecificResourcesAdded++;
-            DaoResourceData.addPatientDatum(internalId, resourceId, resourceURL);
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "PATIENT",
                 stableId, null,
-                resourceURL, displayName, resourceType.toString(), priority, null);
+                resourceURL, displayName, type, priority, metadata);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
-            DaoResourceData.addSampleDatum(internalId, resourceId, resourceURL);
             // derive stable patient ID from the sample's internal patient linkage
             String stablePatientId = null;
             try {
@@ -383,14 +395,13 @@ public class ImportResourceData extends ConsoleRunnable {
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "SAMPLE",
                 stablePatientId, stableId,
-                resourceURL, displayName, resourceType.toString(), priority, null);
+                resourceURL, displayName, type, priority, metadata);
         } else {
             numStudySpecificResourcesAdded++;
-            DaoResourceData.addStudyDatum(internalId, resourceId, resourceURL);
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "STUDY",
                 null, null,
-                resourceURL, displayName, resourceType.toString(), priority, null);
+                resourceURL, displayName, type, priority, metadata);
         }
     }
 
