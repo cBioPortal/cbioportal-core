@@ -1,4 +1,12 @@
-PATIENT_ID	RESOURCE_ID	URL
-TCGA-A2-A04P	PATIENT_NOTES	http://url-to-patient-notes-patient1
-TCGA-A1-A0SK	PATIENT_NOTES	http://url-to-patient-notes-patient2
-TCGA-A2-A0CM	PATIENT_NOTES	http://url-to-patient-notes-patient3
+PATIENT_ID	RESOURCE_ID	URL	DISPLAY_NAME	TYPE
+TCGA-A2-A04P	CT_SCAN	https://imaging.example.com/ct/TCGA-A2-A04P.dcm	CT Scan - TCGA-A2-A04P	LINK
+TCGA-A1-A0SK	CT_SCAN	https://imaging.example.com/ct/TCGA-A1-A0SK.dcm	CT Scan - TCGA-A1-A0SK	LINK
+TCGA-A2-A0CM	CT_SCAN	https://imaging.example.com/ct/TCGA-A2-A0CM.dcm	CT Scan - TCGA-A2-A0CM	LINK
+TCGA-AR-A1AR	CT_SCAN	https://imaging.example.com/ct/TCGA-AR-A1AR.dcm	CT Scan - TCGA-AR-A1AR	LINK
+TCGA-B6-A0WX	CT_SCAN	https://imaging.example.com/ct/TCGA-B6-A0WX.dcm	CT Scan - TCGA-B6-A0WX	LINK
+TCGA-BH-A1F0	CT_SCAN	https://imaging.example.com/ct/TCGA-BH-A1F0.dcm	CT Scan - TCGA-BH-A1F0	LINK
+TCGA-B6-A0I6	CT_SCAN	https://imaging.example.com/ct/TCGA-B6-A0I6.dcm	CT Scan - TCGA-B6-A0I6	LINK
+TCGA-BH-A18V	CT_SCAN	https://imaging.example.com/ct/TCGA-BH-A18V.dcm	CT Scan - TCGA-BH-A18V	LINK
+TCGA-A2-A04P	PATIENT_NOTES	http://url-to-patient-notes-tcga-a2-a04p		
+TCGA-A1-A0SK	PATIENT_NOTES	http://url-to-patient-notes-tcga-a1-a0sk		
+TCGA-A2-A0CM	PATIENT_NOTES	http://url-to-patient-notes-tcga-a2-a0cm		
