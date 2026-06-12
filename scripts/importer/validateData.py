@@ -127,6 +127,8 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.PATIENT_RESOURCES:'PatientResourceValidator',
     cbioportal_common.MetaFileTypes.STUDY_RESOURCES:'StudyResourceValidator',
     cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION:'ResourceDefinitionValidator',
+    cbioportal_common.MetaFileTypes.EMBEDDING_DEFINITION:'EmbeddingDefinitionValidator',
+    cbioportal_common.MetaFileTypes.EMBEDDING:'EmbeddingValidator',
 }
 
 
@@ -3694,6 +3696,35 @@ class CancerTypeValidator(Validator):
                 self.defined_cancer_types.append(line_cancer_type)
         finally:
             self.logger.logger.removeHandler(tracking_handler)
+
+class EmbeddingDefinitionValidator(Validator):
+    """Validator for tab-Embeddings definition files."""
+
+    REQUIRED_HEADERS = ['embedding_id', 'short_name', 'name',
+                        'entity_type', 'reduction_technique']
+    REQUIRE_COLUMN_ORDER = False
+    ALLOW_BLANKS = False
+
+    # def __init__(self, *args, **kwargs):
+    #     super(EmbeddingDefinitionValidator, self).__init__(*args, **kwargs)
+    #
+    # def checkLine(self, data):
+
+    pass
+
+class EmbeddingValidator(Validator):
+    """Validator for Embeddings data files."""
+    REQUIRED_HEADERS = [ 'PATIENT_ID', 'SAMPLE_ID', 'EMBEDDING_ID', 'X', 'Y']
+    OPTIONAL_HEADERS = ['CUSTOM_ATTRIBUTES']
+    NULL_VALUES = [""]
+
+    def __init__(self, *args, **kwargs):
+        super(EmbeddingValidator, self).__init__(*args, **kwargs)
+
+    def checkLine(self, data):
+
+
+    pass
 
 class ResourceDefinitionValidator(Validator):
     # 'RESOURCE_ID', 'RESOURCE_TYPE', 'DISPLAY_NAME' are required
