@@ -3235,6 +3235,21 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
         record_list = self.get_log_records()
         self.assertEqual('Validation complete', record_list[-1].getMessage())
 
+class EmbeddingDefinitionValidatorTestCase(PostClinicalDataFileTestCase):
+    def test_valid_embedding_definition_file(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_embedding_definition.txt',
+                                    validateData.EmbeddingDefinitionValidator)
+        self.assertEqual(0, len(record_list))
+
+class EmbeddingValidatorTestCase(PostClinicalDataFileTestCase):
+    def test_valid_embedding_file(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_embedding.txt',
+                                    validateData.EmbeddingValidator)
+        self.assertEqual(0, len(record_list))
+
+
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

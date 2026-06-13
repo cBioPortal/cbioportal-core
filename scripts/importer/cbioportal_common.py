@@ -372,11 +372,11 @@ META_FIELD_MAP = {
     },
     MetaFileTypes.EMBEDDING_DEFINITION: {
         'cancer_study_identifier': False,
-        'embedding_type': True,
+        'embedding_type': True, # Included to help the importer distinguish between definition and data file
         'data_filename': True
     },
     MetaFileTypes.EMBEDDING: {
-        'embedding_type': True,
+        'embedding_type': True, # Included to help the importer distinguish between definition and data file
         'data_filename': True
     },
 }
@@ -433,8 +433,8 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.PATIENT_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
     MetaFileTypes.STUDY_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
     MetaFileTypes.RESOURCES_DEFINITION: "org.mskcc.cbio.portal.scripts.ImportResourceDefinition",
-    # TODO create the embedding java class and also would it need the meta data
-    # MetaFileTypes.EMBEDDING:
+    MetaFileTypes.EMBEDDING_DEFINITION: "org.mskcc.cbio.portal.scripts.ImportEmbeddingDefinition",
+    MetaFileTypes.EMBEDDING: "org.mskcc.cbio.portal.scripts.ImportEmbeddingData",
 }
 
 IMPORTER_REQUIRES_METADATA = {
@@ -446,7 +446,9 @@ IMPORTER_REQUIRES_METADATA = {
     "org.mskcc.cbio.portal.scripts.ImportTimelineData" : True,
     "org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap" : False,
     "org.mskcc.cbio.portal.scripts.ImportResourceData" : True,
-    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True
+    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True,
+    "org.mskcc.cbio.portal.scripts.ImportEmbeddingData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportEmbeddingDefinition": False
 }
 
 # ------------------------------------------------------------------------------
