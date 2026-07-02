@@ -9,6 +9,7 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import org.mskcc.cbio.maf.TabDelimitedFileUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
@@ -42,6 +43,8 @@ public class ImportStructuralVariantData {
 
     private final boolean isIncrementalUpdateMode;
 
+    private static final String STRUCTURAL_VARIANT_SEQUENCE = "seq_structural_variant";
+
     public ImportStructuralVariantData(
         File structuralVariantFile, 
         int geneticProfileId, 
@@ -68,7 +71,6 @@ public class ImportStructuralVariantData {
         // Genetic profile is read in first
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
         Set<Integer> sampleIds = new HashSet<>();
-        long id = DaoStructuralVariant.getLargestInternalId();
         Set<String> uniqueSVs = new HashSet<>();
         while ((line = buf.readLine()) != null) {
             ProgressMonitor.incrementCurValue();
@@ -77,7 +79,7 @@ public class ImportStructuralVariantData {
                 recordCount++;
                 String parts[] = TsvUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
-                structuralVariant.setInternalId(++id);
+                structuralVariant.setInternalId(ClickHouseAutoIncrement.nextId(STRUCTURAL_VARIANT_SEQUENCE)); // TODO : relocate this to dao code layer
                 structuralVariant.setGeneticProfileId(geneticProfileId);
                 if (!structuralVariantUtil.hasRequiredStructuralVariantFields(structuralVariant)) {
                     ProgressMonitor.logWarning(
