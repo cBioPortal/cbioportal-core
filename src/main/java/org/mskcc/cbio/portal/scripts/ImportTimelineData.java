@@ -35,6 +35,7 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -50,6 +51,8 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
  * @author jgao, inodb
  */
 public class ImportTimelineData extends ConsoleRunnable {
+
+    private static final String CLINICAL_EVENT_SEQUENCE = "seq_clinical_event";
 
 	private static void importData(String dataFile, int cancerStudyId, boolean overwriteExisting) throws IOException, DaoException {
 		ClickHouseBulkLoader.bulkLoadOn();
@@ -75,9 +78,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 					+ "PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE");
 			}
 
-			long clinicalEventId = DaoClinicalEvent.getLargestClinicalEventId();
 			Set<Integer> processedPatientIds = new HashSet<>();
-
 			while ((line = buff.readLine()) != null) {
 				line = line.trim();
 	
@@ -97,7 +98,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 					DaoClinicalEvent.deleteByPatientId(patient.getInternalId());
 				}
 				ClinicalEvent event = new ClinicalEvent();
-				event.setClinicalEventId(++clinicalEventId);
+				event.setClinicalEventId(ClickHouseAutoIncrement.nextId(CLINICAL_EVENT_SEQUENCE)); // TODO : relocate this to dao code layer
 				event.setPatientId(patient.getInternalId());
 				event.setStartDate(Long.valueOf(fields[1]));
 				if (indexCategorySpecificField != 3 && !fields[2].isEmpty()) {

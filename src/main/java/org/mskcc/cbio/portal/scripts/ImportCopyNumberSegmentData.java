@@ -36,6 +36,7 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.util.*;
 import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.ClickHouseOptimizer;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -63,12 +64,13 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
     private boolean isIncrementalUpdateMode;
     private Set<Integer> processedSampleIds;
 
+    private static final String COPY_NUMBER_SEG_SEQUENCE = "seq_copy_number_seg";
+
     private void importData(File file, int cancerStudyId) throws IOException, DaoException {
         FileReader reader = new FileReader(file);
         BufferedReader buf = new BufferedReader(reader);
         try {
             String line = buf.readLine(); // skip header line
-            long segId = DaoCopyNumberSegment.getLargestId();
             processedSampleIds = new HashSet<>();
             while ((line=buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
@@ -107,7 +109,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                     }
                 }
                 CopyNumberSegment cns = new CopyNumberSegment(cancerStudyId, s.getInternalId(), chrom, start, end, numProbes, segMean);
-                cns.setSegId(++segId);
+                cns.setSegId(ClickHouseAutoIncrement.nextId(COPY_NUMBER_SEG_SEQUENCE)); // TODO : relocate this to dao code layer
                 DaoCopyNumberSegment.addCopyNumberSegment(cns);
                 processedSampleIds.add(s.getInternalId());
             }

@@ -38,6 +38,7 @@ import java.util.regex.*;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoAlleleSpecificCopyNumber;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -95,6 +96,8 @@ public class ImportExtendedMutationData {
 
     private final boolean overwriteExisting;
 
+    private static final String MUTATION_EVENT_SEQUENCE = "seq_mutation_event";
+
     /**
      * construct an ImportExtendedMutationData.
      * Filter mutations according to the no argument MutationFilter().
@@ -133,9 +136,7 @@ public class ImportExtendedMutationData {
 
     public void importData() throws IOException, DaoException {
         ClickHouseBulkLoader.bulkLoadOn();
-
         HashSet <String> sequencedCaseSet = new HashSet<String>();
-
         Map<MutationEvent,MutationEvent> existingEvents = new HashMap<MutationEvent,MutationEvent>();
         ProgressMonitor.setCurrentMessage("Starting to load existing mutation events...");
         for(MutationEvent mutationEvent: DaoMutation.getAllMutationEvents()) {
@@ -143,12 +144,8 @@ public class ImportExtendedMutationData {
         }
         ProgressMonitor.setCurrentMessage("Loaded " + existingEvents.size() + " existing mutation events.");
         Set<MutationEvent> newEvents = new HashSet<MutationEvent>();
-
         Map<ExtendedMutation,ExtendedMutation> mutations = new HashMap<ExtendedMutation,ExtendedMutation>();
-        long mutationEventId = DaoMutation.getLargestMutationEventId();
-
         List<AlleleSpecificCopyNumber> ascnRecords = new ArrayList<AlleleSpecificCopyNumber>();
-
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
 
         try (FileReader reader = new FileReader(mutationFile);
@@ -435,7 +432,7 @@ public class ImportExtendedMutationData {
                         if (event!=null) {
                             mutation.setEvent(event);
                         } else {
-                            mutation.setMutationEventId(++mutationEventId);
+                            mutation.setMutationEventId(ClickHouseAutoIncrement.nextId(MUTATION_EVENT_SEQUENCE)); // TODO : relocate this to dao code layer
                             existingEvents.put(mutation.getEvent(), mutation.getEvent());
                             newEvents.add(mutation.getEvent());
                         }

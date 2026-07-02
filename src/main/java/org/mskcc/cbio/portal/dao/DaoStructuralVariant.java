@@ -179,22 +179,6 @@ public class DaoStructuralVariant {
         }
     }
 
-    public static long getLargestInternalId() throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement("SELECT max(`internal_id`) FROM `structural_variant`");
-            rs = pstmt.executeQuery();
-            return rs.next() ? rs.getLong(1) : 0;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
-        }
-    }
-
     /**
      * Return all structural variants in the database.
      * @return

@@ -140,23 +140,6 @@ public final class DaoCopyNumberSegment {
         }
     }
     
-    public static long getLargestId() throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement
-                    ("SELECT max(`seg_id`) FROM `copy_number_seg`");
-            rs = pstmt.executeQuery();
-            return rs.next() ? rs.getLong(1) : 0;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
-        }
-    }
-    
     public static List<CopyNumberSegment> getSegmentForASample(
             int sampleId, int cancerStudyId) throws DaoException {
         return getSegmentForSamples(Collections.singleton(sampleId),cancerStudyId);
