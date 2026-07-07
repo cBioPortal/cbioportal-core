@@ -27,6 +27,7 @@ public class TestDaoEmbeddingDefinition extends IntegrationTestBase {
                 "umap_rna",
                 "RNA UMAP",
                 "RNA Expression UMAP Embedding",
+                "UMAP coordinates based on H&E histopathology embeddings",
                 "sample",
                 "UMAP"
         );
@@ -47,6 +48,7 @@ public class TestDaoEmbeddingDefinition extends IntegrationTestBase {
                 "umap_rna",
                 "RNA UMAP",
                 "RNA Expression UMAP Embedding",
+                "UMAP coordinates based on H&E histopathology embeddings",
                 "sample",
                 "UMAP"
         );

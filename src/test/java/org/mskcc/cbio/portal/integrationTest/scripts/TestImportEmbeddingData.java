@@ -46,10 +46,12 @@ public class TestImportEmbeddingData extends IntegrationTestBase {
 
         // Insert embedding definitions matching the IDs used in data_embedding.txt
         DaoEmbeddingDefinition.addDatum(new EmbeddingDefinition(
-                "umap_1", "UMAP 1", "UMAP Embedding", "patient", "UMAP"
+                "umap_1", "UMAP 1", "UMAP Embedding", "UMAP coordinates based on H&E histopathology embeddings",
+                "patient", "UMAP"
         ));
         DaoEmbeddingDefinition.addDatum(new EmbeddingDefinition(
-                "pca_1", "PCA 1", "PCA Embedding", "sample", "PCA"
+                "pca_1", "PCA 1", "PCA Embedding", "PCA coordinates based on H&E histopathology embeddings",
+                "sample", "PCA"
         ));
     }
 

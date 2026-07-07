@@ -22,6 +22,7 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
     public static final String NAME_COLUMN_NAME = "NAME";
     public static final String ENTITY_TYPE_COLUMN_NAME = "ENTITY_TYPE";
     public static final String REDUCTION_TECHNIQUE_COLUMN_NAME = "REDUCTION_TECHNIQUE";
+    public static final String DESCRIPTION_COLUMN_NAME = "DESCRIPTION";
 
     private File embeddingDefinitionFile;
 
@@ -53,6 +54,7 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
         int nameIndex = findAndValidateNameColumn(headerIndexMap);
         int entityTypeIndex = findAndValidateEntityTypeColumn(headerIndexMap);
         int reductionTechniqueIndex = findAndValidateReductionTechniqueColumn(headerIndexMap);
+        int descriptionIndex = findAndValidateDescriptionColumn(headerIndexMap);
         while((line = buff.readLine())!=null){
             String[] fieldValues = getFieldValues(line, headerIndexMap);
 
@@ -63,6 +65,7 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
             String name = fieldValues[nameIndex].trim();
             String entityType = fieldValues[entityTypeIndex].trim();
             String reductionTechnique = fieldValues[reductionTechniqueIndex].trim();
+            String description = fieldValues[descriptionIndex].trim();
 
             // to create embedding definition object for each line and pass it to the dao for insert
             if(DaoEmbeddingDefinition.checkDefinitionExists(embeddingId)){
@@ -71,7 +74,7 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
 
             // create and add to the database
             DaoEmbeddingDefinition.addDatum(new EmbeddingDefinition(embeddingId,
-                    shortName,name,entityType,reductionTechnique));
+                    shortName,name,description,entityType,reductionTechnique));
         }
         buff.close();
     }
@@ -81,6 +84,13 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
             throw new RuntimeException("Missing required column: " + EMBEDDING_ID_COLUMN_NAME);
         }
         return headerIndexMap.get(EMBEDDING_ID_COLUMN_NAME);
+    }
+
+    private int findAndValidateDescriptionColumn(Map<String, Integer> headerIndexMap) {
+        if (!headerIndexMap.containsKey(DESCRIPTION_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + EMBEDDING_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(DESCRIPTION_COLUMN_NAME);
     }
 
     private int findAndValidateShortNameColumn(Map<String, Integer> headerIndexMap) {

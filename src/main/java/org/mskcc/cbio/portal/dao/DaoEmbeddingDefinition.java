@@ -27,14 +27,15 @@ public final class DaoEmbeddingDefinition {
             long internalId = ClickHouseAutoIncrement.nextId(EMBEDDING_DEFINITION_SEQUENCE); // ClickHouseAutoIncrement.nextId(EMBEDDINGDEFINION_SEQUENCE)
             con = JdbcUtil.getDbConnection(DaoEmbeddingDefinition.class);
             pstmt = con.prepareStatement("INSERT INTO " +TABLE +
-                    " ( `internal_id`, `embedding_id`, `short_name`, `name`,`entity_type`,`reduction_technique`) " +
-                    "VALUES (?,?,?,?,?,?)");
+                    " ( `internal_id`, `embedding_id`, `short_name`, `name`, `description`,`entity_type`,`reduction_technique`) " +
+                    "VALUES (?,?,?,?,?,?,?)");
             pstmt.setLong(1,internalId);
             pstmt.setString(2,embeddingDefinition.getEmbeddingId());
             pstmt.setString(3,embeddingDefinition.getShortName());
             pstmt.setString(4,embeddingDefinition.getName());
-            pstmt.setString(5,embeddingDefinition.getEntityType());
-            pstmt.setString(6,embeddingDefinition.getReductionTechnique());
+            pstmt.setString(5,embeddingDefinition.getDescription());
+            pstmt.setString(6,embeddingDefinition.getEntityType());
+            pstmt.setString(7,embeddingDefinition.getReductionTechnique());
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

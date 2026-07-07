@@ -3,20 +3,21 @@ package org.mskcc.cbio.portal.model;
 import java.util.Objects;
 
 public class EmbeddingDefinition {
-
+    private Integer internalId;
     private String embeddingId;
-    private String internalId;
     private String shortName;
     private String name;
+    private String description;
     private String entityType;
     private String reductionTechnique;
 
 
     public EmbeddingDefinition(String embeddingId, String shortName, String name,
-                               String entityType, String reductionTechnique) {
+                               String description, String entityType, String reductionTechnique) {
         this.embeddingId = embeddingId;
         this.shortName = shortName;
         this.name = name;
+        this.description = description;
         this.entityType = entityType;
         this.reductionTechnique = reductionTechnique;
     }
@@ -61,12 +62,20 @@ public class EmbeddingDefinition {
         return reductionTechnique;
     }
 
-    public String getInternalId() {
+    public Integer getInternalId() {
         return internalId;
     }
 
-    public void setInternalId(String internalId) {
+    public void setInternalId(Integer internalId) {
         this.internalId = internalId;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     @Override
