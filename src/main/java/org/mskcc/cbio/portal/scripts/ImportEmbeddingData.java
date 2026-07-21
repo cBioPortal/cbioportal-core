@@ -28,7 +28,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
     public static final String SAMPLE_ID_COLUMN_NAME = "SAMPLE_ID";
     public static final String PATIENT_ID_COLUMN_NAME = "PATIENT_ID";
     public static final String EMBEDDING_ID_COLUMN_NAME = "EMBEDDING_ID";
-    public static final String CUSTOM_ATTRIBUTE_COLUMN_NAME = "CUSTOM_ATTRIBUTE";
+    public static final String CUSTOM_ATTRIBUTE_COLUMN_NAME = "CUSTOM_ATTRIBUTES";
     public static final String X__COLUMN_NAME = "X";
     public static final String Y_COLUMN_NAME = "Y";
     private static Properties properties;
