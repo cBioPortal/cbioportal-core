@@ -15,7 +15,8 @@
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 
-		<!-- THIS SHOULD BE KEPT IN SYNC WITH db.version IN cbioportal/pom.xml -->
+		<!-- THIS SHOULD BE KEPT IN SYNC WITH db.version IN cbioportal/pom.xml and
+		     info.db_schema_version IN cbioportal/src/main/resources/db-scripts/clickhouse/init/schema.sql -->
 		<db.version>3.0.0</db.version>
 		<cbioportal.version>v6.4.1</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
