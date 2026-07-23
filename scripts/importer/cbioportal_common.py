@@ -371,11 +371,11 @@ META_FIELD_MAP = {
         'data_filename': True
     },
     MetaFileTypes.EMBEDDING_DEFINITION: {
-        'cancer_study_identifier': False,
         'embedding_type': True, # Included to help the importer distinguish between definition and data file
         'data_filename': True
     },
     MetaFileTypes.EMBEDDING: {
+        'cancer_study_identifier': True,
         'embedding_type': True, # Included to help the importer distinguish between definition and data file
         'data_filename': True
     },
