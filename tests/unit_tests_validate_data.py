@@ -3246,7 +3246,7 @@ class EmbeddingValidatorTestCase(PostClinicalDataFileTestCase):
     def test_valid_embedding_file(self):
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_embedding.txt',
-                                    validateData.EmbeddingValidator)
+                                    validateData.EmbeddingDataValidator)
         self.assertEqual(0, len(record_list))
 
 
