@@ -10,6 +10,7 @@ import org.mskcc.cbio.portal.dao.DaoEmbeddingData;
 import org.mskcc.cbio.portal.dao.DaoEmbeddingDefinition;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+/**
+ * Script to import an embedding data
+ * @author leslie
+ */
 public class ImportEmbeddingData extends ConsoleRunnable{
     private static final Logger log = LoggerFactory.getLogger(ImportEmbeddingData.class);
     private CancerStudy cancerStudy;
@@ -34,6 +39,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
     private static Properties properties;
     Map<String, Integer> seenEmbeddingIds = new HashMap<>();
     public static final String TABLE = "embedding_data";
+
     /**
      * Instantiates a ConsoleRunnable to run with the given command line args.
      *
@@ -52,54 +58,66 @@ public class ImportEmbeddingData extends ConsoleRunnable{
 
     // need to pay attention to the order at which it is passed to the method  must be order
     //might delete test for adding embedding data  and the model
+    // TODO Need to be able to count the number of sample and patient embedding added to display that into the progress message
     public void importData()throws Exception{
         ClickHouseBulkLoader.bulkLoadOn();
-        FileReader reader = new FileReader(embeddingDataFile);
-        BufferedReader buff = new BufferedReader(reader);
-        String line = buff.readLine();
+        try(BufferedReader buff = new BufferedReader(new FileReader(embeddingDataFile))){
+            String line = buff.readLine();
 
-        // Get the headers to know which index belongs to which value
-        String[] headerNames = splitFields(line);
-        Map<String, Integer> headerIndexMap = makeHeaderIndexMap(headerNames);
-        // need to fix this to not be hardcoded and to be create a single point
-        // of entry a helper method to handle extracting this values
-        int embeddingIdIndex = headerIndexMap.get(EMBEDDING_ID_COLUMN_NAME);
-        int sampleIndex = headerIndexMap.get(SAMPLE_ID_COLUMN_NAME);
-        int patientIndex = headerIndexMap.get(PATIENT_ID_COLUMN_NAME);
-        int xIndex = headerIndexMap.get(X__COLUMN_NAME);
-        int yIndex = headerIndexMap.get(Y_COLUMN_NAME);
-        int customIndex = headerIndexMap.get(CUSTOM_ATTRIBUTE_COLUMN_NAME);
+            // Get the headers to know which index belongs to which value
+            String[] headerNames = splitFields(line);
+            Map<String, Integer> headerIndexMap = makeHeaderIndexMap(headerNames);
+            // need to fix this to not be hardcoded and to be create a single point
+            // of entry a helper method to handle extracting this values
+            int embeddingIdIndex = findEmbeddingIndex(headerIndexMap);
+            int sampleIndex =findSampleIndex(headerIndexMap);
+            int patientIndex = findPatientIndex(headerIndexMap);
+            int xIndex = findXIndex(headerIndexMap);
+            int yIndex = findYIndex(headerIndexMap);
+            int customIndex = findCustomAttributeIndex(headerIndexMap);
+            ProgressMonitor.setCurrentMessage("Loading embedding data into database...");
+            int recordCount = 0;
 
-        while((line = buff.readLine())!=null){
-            String[] fieldValues = getFieldValues(line, headerIndexMap);
-            String embeddingId = fieldValues[embeddingIdIndex];
-            int cancerStudyId =  cancerStudy.getInternalId();
-            String sampleId = fieldValues[sampleIndex];
-            String patientId = fieldValues[patientIndex];
-            String x = fieldValues[xIndex];
-            String y = fieldValues[yIndex];
-            String customAttribute = fieldValues[customIndex];
-            // check if we have gotten the embedding id before  by checking
-            // the hashMap else query for embedding definition for the internal id
-            Integer internalId = seenEmbeddingIds.get(embeddingId);
+            while((line = buff.readLine())!=null){
+                String[] fieldValues = getFieldValues(line, headerIndexMap);
 
-            if (internalId == null) {
-                internalId = DaoEmbeddingDefinition.getDefinitionId(embeddingId);
+                String embeddingId = fieldValues[embeddingIdIndex].trim();
+                int cancerStudyId =  cancerStudy.getInternalId();
+                String sampleId = fieldValues[sampleIndex].trim();
+                String patientId = fieldValues[patientIndex].trim();
+                String x = fieldValues[xIndex].trim();
+                String y = fieldValues[yIndex].trim();
+                String customAttribute = fieldValues[customIndex].trim();
+                // check if we have gotten the embedding id before  by checking
+                // the hashMap else query for embedding definition for the internal id
+                Integer internalId = seenEmbeddingIds.get(embeddingId);
 
-                if (internalId <= 0) {
-                    throw new IllegalArgumentException(
-                            "Embedding definition not found: " + embeddingId
-                    );
+                if (internalId == null) {
+                    internalId = DaoEmbeddingDefinition.getDefinitionId(embeddingId);
+
+                    if (internalId <= 0) {
+                        throw new IllegalArgumentException(
+                                "Embedding definition not found: " + embeddingId
+                        );
+                    }
+                    seenEmbeddingIds.put(embeddingId, internalId);
                 }
-                seenEmbeddingIds.put(embeddingId, internalId);
-            }
-            DaoEmbeddingData.addDatum(TABLE,Integer.toString(internalId), patientId,
-                    sampleId,x,y,customAttribute, cancerStudyId);
+                DaoEmbeddingData.addEmbeddingData(TABLE,Integer.toString(internalId), patientId,
+                        sampleId,x,y,customAttribute, cancerStudyId);
+                recordCount+=1;
 
-        }
-        if (ClickHouseBulkLoader.isBulkLoad()) {
-            ClickHouseBulkLoader.flushAll();
-            ClickHouseBulkLoader.relaxedModeOff();
+
+            }
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader.flushAll();
+                ClickHouseBulkLoader.relaxedModeOff();
+            }
+            ProgressMonitor.setCurrentMessage("--> records inserted into `" + TABLE + "` table: " + recordCount);
+        }finally {
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader.flushAll();
+                ClickHouseBulkLoader.relaxedModeOff();
+            }
         }
     }
 
@@ -131,6 +149,50 @@ public class ImportEmbeddingData extends ConsoleRunnable{
         }
         return headerIndexMap;
     }
+
+    private int findEmbeddingIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(EMBEDDING_ID_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + EMBEDDING_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(EMBEDDING_ID_COLUMN_NAME);
+    }
+
+    private int findSampleIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(SAMPLE_ID_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + SAMPLE_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(SAMPLE_ID_COLUMN_NAME);
+    }
+
+    private int findPatientIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(PATIENT_ID_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + PATIENT_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(PATIENT_ID_COLUMN_NAME);
+    }
+
+    private int findXIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(X__COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column for embedding point: " + X__COLUMN_NAME);
+        }
+        return headerIndexMap.get(X__COLUMN_NAME);
+    }
+
+    private int findYIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(Y_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column for embedding point: " + Y_COLUMN_NAME);
+        }
+        return headerIndexMap.get(Y_COLUMN_NAME);
+    }
+
+    private int findCustomAttributeIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(CUSTOM_ATTRIBUTE_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + CUSTOM_ATTRIBUTE_COLUMN_NAME);
+        }
+        return headerIndexMap.get(CUSTOM_ATTRIBUTE_COLUMN_NAME);
+    }
+
+
 
 
     @Override
@@ -188,6 +250,10 @@ public class ImportEmbeddingData extends ConsoleRunnable{
             if (cancerStudy == null) {
                 throw new IllegalArgumentException("Unknown cancer study: " + cancerStudyStableId);
             }
+            ProgressMonitor.setCurrentMessage("Reading data from:  " + embeddingData_f.getAbsolutePath());
+            int numLines = FileUtil.getNumLines(embeddingData_f);
+            ProgressMonitor.setCurrentMessage(" --> total number of lines:  " + numLines);
+            ProgressMonitor.setMaxValue(numLines);
 
             setFile(cancerStudy, embeddingData_f);
             importData();

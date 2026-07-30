@@ -22,9 +22,8 @@ public final class DaoEmbeddingDefinition {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
 
-        //Check if it exists
         try{
-            long internalId = ClickHouseAutoIncrement.nextId(EMBEDDING_DEFINITION_SEQUENCE); // ClickHouseAutoIncrement.nextId(EMBEDDINGDEFINION_SEQUENCE)
+            long internalId = ClickHouseAutoIncrement.nextId(EMBEDDING_DEFINITION_SEQUENCE);
             con = JdbcUtil.getDbConnection(DaoEmbeddingDefinition.class);
             pstmt = con.prepareStatement("INSERT INTO " +TABLE +
                     " ( `internal_id`, `embedding_id`, `short_name`, `name`, `description`,`entity_type`,`reduction_technique`) " +

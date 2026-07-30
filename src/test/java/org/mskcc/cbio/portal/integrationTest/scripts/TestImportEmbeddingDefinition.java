@@ -30,4 +30,16 @@ public class TestImportEmbeddingDefinition extends IntegrationTestBase {
        assertTrue(DaoEmbeddingDefinition.checkDefinitionExists("mosaic_patient"));
        assertTrue(DaoEmbeddingDefinition.checkDefinitionExists("patient_record_embedding"));
     }
+//
+//    @Test
+//    public void testDefinitionExists(){
+//        ProgressMonitor.setConsoleMode(false);
+//        String[] args = {
+//                "--data","src/test/resources/data_embedding_definition_test_with_duplicate.txt",
+//                "--noprogress"
+//        };
+//        ImportEmbeddingDefinition importEmbeddingDefinition = new ImportEmbeddingDefinition(args);
+//        importEmbeddingDefinition.run();
+//
+//    }
 }

@@ -6,6 +6,7 @@ import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.mskcc.cbio.portal.dao.DaoEmbeddingDefinition;
 import org.mskcc.cbio.portal.model.EmbeddingDefinition;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -42,41 +43,41 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
 
     //TODO need to enoforce checks so fields place correctly in the database
     public void importData() throws Exception{
-        FileReader reader = new FileReader(embeddingDefinitionFile);
-        BufferedReader buff = new BufferedReader(reader);
 
-        String line = buff.readLine();
-        String[] headerNames = splitFields(line);
-        Map<String, Integer> headerIndexMap = makeHeaderIndexMap(headerNames);
+        try(BufferedReader buff = new BufferedReader(new FileReader(embeddingDefinitionFile))) {
+            String line = buff.readLine();
+            String[] headerNames = splitFields(line);
+            Map<String, Integer> headerIndexMap = makeHeaderIndexMap(headerNames);
 
-        int embeddingIdIndex = findAndValidateEmbeddingIdColumn(headerIndexMap);
-        int shortNameIndex = findAndValidateShortNameColumn(headerIndexMap);
-        int nameIndex = findAndValidateNameColumn(headerIndexMap);
-        int entityTypeIndex = findAndValidateEntityTypeColumn(headerIndexMap);
-        int reductionTechniqueIndex = findAndValidateReductionTechniqueColumn(headerIndexMap);
-        int descriptionIndex = findAndValidateDescriptionColumn(headerIndexMap);
-        while((line = buff.readLine())!=null){
-            String[] fieldValues = getFieldValues(line, headerIndexMap);
+            int embeddingIdIndex = findAndValidateEmbeddingIdColumn(headerIndexMap);
+            int shortNameIndex = findAndValidateShortNameColumn(headerIndexMap);
+            int nameIndex = findAndValidateNameColumn(headerIndexMap);
+            int entityTypeIndex = findAndValidateEntityTypeColumn(headerIndexMap);
+            int reductionTechniqueIndex = findAndValidateReductionTechniqueColumn(headerIndexMap);
+            int descriptionIndex = findAndValidateDescriptionColumn(headerIndexMap);
+            ProgressMonitor.setCurrentMessage("Loading embedding definition(Metadata) into database...");
+            while((line = buff.readLine())!=null){
+                String[] fieldValues = getFieldValues(line, headerIndexMap);
 
-            //create a new Embedding definition
-            // Pass it to the Dao to add to the database
-            String embeddingId = fieldValues[embeddingIdIndex].trim();
-            String shortName = fieldValues[shortNameIndex].trim();
-            String name = fieldValues[nameIndex].trim();
-            String entityType = fieldValues[entityTypeIndex].trim();
-            String reductionTechnique = fieldValues[reductionTechniqueIndex].trim();
-            String description = fieldValues[descriptionIndex].trim();
 
-            // to create embedding definition object for each line and pass it to the dao for insert
-            if(DaoEmbeddingDefinition.checkDefinitionExists(embeddingId)){
-                return;
+                String embeddingId = fieldValues[embeddingIdIndex].trim();
+                String shortName = fieldValues[shortNameIndex].trim();
+                String name = fieldValues[nameIndex].trim();
+                String entityType = fieldValues[entityTypeIndex].trim();
+                String reductionTechnique = fieldValues[reductionTechniqueIndex].trim();
+                String description = fieldValues[descriptionIndex].trim();
+
+                // Definition exists skip that line
+                if(DaoEmbeddingDefinition.checkDefinitionExists(embeddingId)){
+                    ProgressMonitor.logWarning("Embedding definition already exists, skipping: " + embeddingId);
+                    continue;
+                }
+
+                // create and add to the database
+                DaoEmbeddingDefinition.addDatum(new EmbeddingDefinition(embeddingId,
+                        shortName,name,description,entityType,reductionTechnique));
             }
-
-            // create and add to the database
-            DaoEmbeddingDefinition.addDatum(new EmbeddingDefinition(embeddingId,
-                    shortName,name,description,entityType,reductionTechnique));
         }
-        buff.close();
     }
 
     private int findAndValidateEmbeddingIdColumn(Map<String, Integer> headerIndexMap) {

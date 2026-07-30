@@ -1,6 +1,8 @@
 package org.mskcc.cbio.portal.dao;
 
 import org.mskcc.cbio.portal.model.EmbeddingData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,13 +17,17 @@ public final class DaoEmbeddingData {
 
     private DaoEmbeddingData(){}
 
-    public static int addDatum(String tableName, String InternalId, String sampleId,
-                               String patientId, String x, String y,String customAttribute, int CancerStudyId){
+    public static void addEmbeddingData(String tableName, String InternalId, String sampleId,
+                                       String patientId, String x, String y, String customAttribute, int CancerStudyId)
+    throws DaoException{
 
-        ClickHouseBulkLoader.getClickHouseBulkLoader(tableName).insertRecord(
-                InternalId, sampleId, patientId, x, y, customAttribute, Integer.toString(CancerStudyId)
-        );
-        return 1;
+        if(!ClickHouseBulkLoader.isBulkLoad()){
+            throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert embedding data");
+        }else{
+            ClickHouseBulkLoader.getClickHouseBulkLoader(tableName).insertRecord(
+                    InternalId, sampleId, patientId, x, y, customAttribute, Integer.toString(CancerStudyId)
+            );
+        }
     }
 
     public static List<EmbeddingData> getEmbeddingDataByCancerStudy(int cancerStudyId) throws DaoException {
