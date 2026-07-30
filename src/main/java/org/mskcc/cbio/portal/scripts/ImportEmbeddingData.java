@@ -59,6 +59,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
     // need to pay attention to the order at which it is passed to the method  must be order
     //might delete test for adding embedding data  and the model
     // TODO Need to be able to count the number of sample and patient embedding added to display that into the progress message
+    //TODO Decide upon if there is a failure during the import process shpuld partial data be added or the whole data discarded
     public void importData()throws Exception{
         ClickHouseBulkLoader.bulkLoadOn();
         try(BufferedReader buff = new BufferedReader(new FileReader(embeddingDataFile))){
@@ -77,6 +78,8 @@ public class ImportEmbeddingData extends ConsoleRunnable{
             int customIndex = findCustomAttributeIndex(headerIndexMap);
             ProgressMonitor.setCurrentMessage("Loading embedding data into database...");
             int recordCount = 0;
+            int patientEmbedding = 0;
+            int sampleEmbedding = 0;
 
             while((line = buff.readLine())!=null){
                 String[] fieldValues = getFieldValues(line, headerIndexMap);
@@ -91,6 +94,11 @@ public class ImportEmbeddingData extends ConsoleRunnable{
                 // check if we have gotten the embedding id before  by checking
                 // the hashMap else query for embedding definition for the internal id
                 Integer internalId = seenEmbeddingIds.get(embeddingId);
+                if(sampleId.isEmpty()){
+                    patientEmbedding+=1;
+                }else{
+                    sampleEmbedding+=1;
+                }
 
                 if (internalId == null) {
                     internalId = DaoEmbeddingDefinition.getDefinitionId(embeddingId);
@@ -108,11 +116,9 @@ public class ImportEmbeddingData extends ConsoleRunnable{
 
 
             }
-            if (ClickHouseBulkLoader.isBulkLoad()) {
-                ClickHouseBulkLoader.flushAll();
-                ClickHouseBulkLoader.relaxedModeOff();
-            }
             ProgressMonitor.setCurrentMessage("--> records inserted into `" + TABLE + "` table: " + recordCount);
+            ProgressMonitor.setCurrentMessage("--> Patient embedding inserted into `" + TABLE + "` table: " + patientEmbedding);
+            ProgressMonitor.setCurrentMessage("--> Sample embedding inserted into `" + TABLE + "` table: " + sampleEmbedding);
         }finally {
             if (ClickHouseBulkLoader.isBulkLoad()) {
                 ClickHouseBulkLoader.flushAll();
