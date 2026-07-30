@@ -290,7 +290,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
 
     public static void main(String[] args){
         ConsoleRunnable runner = new ImportEmbeddingData(args);
-        runner.run();
+        runner.runInConsole();
     }
 
 }
