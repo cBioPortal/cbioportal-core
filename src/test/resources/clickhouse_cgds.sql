@@ -462,8 +462,7 @@ ORDER BY tuple();
 CREATE TABLE info
 (
     `db_schema_version` Nullable(String),
-    `geneset_version` Nullable(String),
-    `derived_table_schema_version` Nullable(String)
+    `geneset_version` Nullable(String)
 )
     ENGINE = MergeTree
 ORDER BY tuple();

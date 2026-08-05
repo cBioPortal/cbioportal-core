@@ -16,7 +16,7 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
             portal_home = os.environ.get('PORTAL_HOME', '')
             if not portal_home:
                 raise RuntimeError("PORTAL_HOME not set, could not locate derived table script")
-            derived_table_sql_filepath = os.path.join(portal_home, 'generate_derived_tables.sql')
+            derived_table_sql_filepath = os.path.join(portal_home, 'populate_derived_tables.sql')
             if not os.path.exists(derived_table_sql_filepath):
                 raise RuntimeError(f"Could not find derived table script at {derived_table_sql_filepath}")
 
