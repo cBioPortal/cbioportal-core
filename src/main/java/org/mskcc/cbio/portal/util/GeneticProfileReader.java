@@ -155,6 +155,15 @@ public class GeneticProfileReader {
 
         // Get ID
         GeneticProfile gp = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
+        if (gp == null) {
+            // Fallback: the cache may have been stale after insert; force a full reload
+            DaoGeneticProfile.reCache();
+            gp = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
+        }
+        if (gp == null) {
+            throw new DaoException("Genetic profile could not be found after insertion: "
+                    + geneticProfile.getStableId());
+        }
         geneticProfile.setGeneticProfileId(gp.getGeneticProfileId());
         return geneticProfile;
     }

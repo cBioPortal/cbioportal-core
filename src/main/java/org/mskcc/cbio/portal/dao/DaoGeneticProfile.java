@@ -157,7 +157,11 @@ public final class DaoGeneticProfile {
             JdbcUtil.closeAll(DaoGeneticProfile.class, con, pstmt, rs);
         }
         
-        reCache();
+        // Add new profile to the local cache directly rather than running a
+        // full reCache().  On ClickHouse Cloud (SharedMergeTree) a SELECT
+        // that follows an INSERT on a different connection may return a stale
+        // snapshot that does not yet contain the freshly-inserted row.
+        cacheGeneticProfile(profile);
         return rows;
     }
 
@@ -189,7 +193,12 @@ public final class DaoGeneticProfile {
             JdbcUtil.closeAll(DaoGeneticProfile.class, con, pstmt, rs);
         }
         
-        reCache();
+        // Update the in-memory cache directly instead of a full reCache()
+        GeneticProfile cached = byInternalId.get(geneticProfileId);
+        if (cached != null) {
+            cached.setProfileName(name);
+            cached.setProfileDescription(description);
+        }
         return ret;
     }    
     
@@ -217,7 +226,11 @@ public final class DaoGeneticProfile {
             JdbcUtil.closeAll(DaoGeneticProfile.class, con, pstmt, rs);
         }
 
-        reCache();
+        // Update the in-memory cache directly instead of a full reCache()
+        GeneticProfile cached = byInternalId.get(geneticProfileId);
+        if (cached != null) {
+            cached.setDatatype(datatype);
+        }
         return ret;
     }
     
@@ -237,7 +250,13 @@ public final class DaoGeneticProfile {
            JdbcUtil.closeAll(DaoGeneticProfile.class, con, pstmt, rs);
        }
        
-       reCache();
+       // Remove from in-memory cache directly instead of a full reCache()
+       byStableId.remove(profile.getStableId());
+       byInternalId.remove(profile.getGeneticProfileId());
+       List<GeneticProfile> list = byStudy.get(profile.getCancerStudyId());
+       if (list != null) {
+           list.remove(profile);
+       }
        return rows;
    }
     
