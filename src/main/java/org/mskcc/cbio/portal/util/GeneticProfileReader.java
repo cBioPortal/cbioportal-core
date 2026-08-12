@@ -148,8 +148,17 @@ public class GeneticProfileReader {
         // add genetic profile link if set
         if (geneticProfileLink != null) {
             // Set `REFERRING_GENETIC_PROFILE_ID`
-            int geneticProfileId = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId()).getGeneticProfileId();
-            geneticProfileLink.setReferringGeneticProfileId(geneticProfileId);
+            GeneticProfile gpLink = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
+            if (gpLink == null) {
+                // Fallback: concurrent reCache() may have cleared the cache since addGeneticProfile()
+                DaoGeneticProfile.reCache();
+                gpLink = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
+            }
+            if (gpLink == null) {
+                throw new DaoException("Genetic profile could not be found for link after insertion: "
+                        + geneticProfile.getStableId());
+            }
+            geneticProfileLink.setReferringGeneticProfileId(gpLink.getGeneticProfileId());
             DaoGeneticProfileLink.addGeneticProfileLink(geneticProfileLink);
         }
 
@@ -177,6 +186,17 @@ public class GeneticProfileReader {
             throw new RuntimeException("'source_stable_id' is required in meta file for " + geneticProfile.getStableId());
         }
         GeneticProfile referredGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(referredGeneticProfileStableId);
+        if (referredGeneticProfile == null) {
+            // Fallback: the referred profile may not be in the cache yet
+            DaoGeneticProfile.reCache();
+            referredGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(referredGeneticProfileStableId);
+        }
+        if (referredGeneticProfile == null) {
+            throw new RuntimeException("Referred genetic profile not found: "
+                    + referredGeneticProfileStableId
+                    + " (required by source_stable_id in meta file for "
+                    + geneticProfile.getStableId() + ")");
+        }
         geneticProfileLink.setReferredGeneticProfileId(referredGeneticProfile.getGeneticProfileId());
 
         // Decide reference type
