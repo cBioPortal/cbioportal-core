@@ -15,6 +15,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      core_branch:
+        description: 'cbioportal-core branch to build (default: current branch)'
+        required: false
+        type: string
 
 jobs:
   dispatch:
@@ -24,10 +29,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CMO_PIPELINES_DISPATCH_TOKEN }}
         run: |
+          branch="${{ inputs.core_branch || github.ref_name }}"
+          # For push events, use the exact SHA; for workflow_dispatch on a
+          # named branch, resolve its HEAD so cmo-pipelines gets a pinned ref.
+          if [ -n "${{ inputs.core_branch }}" ]; then
+            ref=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "${branch}" | cut -f1)
+          else
+            ref="${GITHUB_SHA}"
+          fi
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/knowledgesystems/cmo-pipelines/dispatches \
             -f event_type=cbioportal-core-push \
-            -f "client_payload[ref]=${GITHUB_SHA}" \
-            -f "client_payload[branch]=${GITHUB_REF_NAME}"
+            -f "client_payload[ref]=${ref}" \
+            -f "client_payload[branch]=${branch}" \
+            -f "client_payload[core_branch]=${branch}"
