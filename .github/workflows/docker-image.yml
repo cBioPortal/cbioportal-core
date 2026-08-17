@@ -5,6 +5,7 @@ on:
       - main
       - 'demo*'
     tags: '*'
+  workflow_dispatch:
 
 jobs:
   build_and_publish_image:
