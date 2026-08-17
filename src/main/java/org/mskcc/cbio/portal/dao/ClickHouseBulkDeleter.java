@@ -73,14 +73,14 @@ public class ClickHouseBulkDeleter {
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
-    private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 7 * 60;
+    private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_RETRY_CYCLE_PERIOD_SECONDS = 10;
     private static final Integer DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT = 6;
     private static final Integer CREATE_STAGING_TABLE_MAX_RETRY_SECONDS;
     private static final Integer POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS;
-    private static final Integer CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS;
     private static final Integer CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS;
+    private static final Integer CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS;
     private static final Integer RETRY_CYCLE_PERIOD_SECONDS;
     private static final Integer RETRY_CYCLE_MAX_EXCEPTION_COUNT;
 
@@ -91,12 +91,12 @@ public class ClickHouseBulkDeleter {
         POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.populate_staging_table.max_retry_seconds",
                 DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS);
-        CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
-                "bulkdeleter.confirm_delete_metadata.max_retry_seconds",
-                DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS);
         CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.confirm_delete_data.max_retry_seconds",
                 DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
+        CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
+                "bulkdeleter.confirm_delete_metadata.max_retry_seconds",
+                DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS);
         RETRY_CYCLE_PERIOD_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.retry_cycle_period_seconds",
                 DEFAULT_RETRY_CYCLE_PERIOD_SECONDS);
@@ -441,6 +441,13 @@ public class ClickHouseBulkDeleter {
         return allReplicasReportExpectedResult(getRecordCountsString, "total_rows", AllReplicaTestType.EXPECTED_VALUE, AllReplicaCriterionType.LONG, new Long(pendingIds.size()));
     }
 
+    private boolean deletionIsComplete() throws SQLException, DaoException {
+        String getUndeletedRecordCountsString = String.format(
+                "SELECT count() AS record_count FROM %s WHERE %s IN (SELECT id FROM %s)",
+                targetTable, idColumn, stagingTable);
+        return queryProducedExpectedResult(getUndeletedRecordCountsString, "record_count", 0L);
+    }
+
     private boolean allReplicasReportSameMetadataForTargetTable() throws SQLException, DaoException {
         String queryPart1 = "SELECT host, sum(record_count) AS total_rows FROM ((";
         String queryPart2 = "SELECT hostname() AS host, rows AS record_count FROM clusterAllReplicas('default', 'system', 'parts')";
@@ -497,13 +504,6 @@ public class ClickHouseBulkDeleter {
         return returnValue;
     }
 
-
-    private boolean deletionIsComplete() throws SQLException, DaoException {
-        String getUndeletedRecordCountsString = String.format(
-                "SELECT count() AS record_count FROM %s WHERE %s IN (SELECT id FROM %s)",
-                targetTable, idColumn, stagingTable);
-        return queryProducedExpectedResult(getUndeletedRecordCountsString, "record_count", 0L);
-    }
 
     // checks specified outputField in the results of running queryString and looks for expectedResult
     // only the first result (in the result set) is examined
