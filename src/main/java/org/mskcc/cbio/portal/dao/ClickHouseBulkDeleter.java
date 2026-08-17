@@ -74,11 +74,13 @@ public class ClickHouseBulkDeleter {
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
     private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
+    private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 7 * 60;
     private static final Integer DEFAULT_RETRY_CYCLE_PERIOD_SECONDS = 10;
     private static final Integer DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT = 6;
     private static final Integer CREATE_STAGING_TABLE_MAX_RETRY_SECONDS;
     private static final Integer POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS;
     private static final Integer CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS;
+    private static final Integer CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS;
     private static final Integer RETRY_CYCLE_PERIOD_SECONDS;
     private static final Integer RETRY_CYCLE_MAX_EXCEPTION_COUNT;
 
@@ -92,6 +94,9 @@ public class ClickHouseBulkDeleter {
         CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.confirm_delete_metadata.max_retry_seconds",
                 DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS);
+        CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
+                "bulkdeleter.confirm_delete_data.max_retry_seconds",
+                DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
         RETRY_CYCLE_PERIOD_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.retry_cycle_period_seconds",
                 DEFAULT_RETRY_CYCLE_PERIOD_SECONDS);
@@ -327,7 +332,7 @@ public class ClickHouseBulkDeleter {
     private long deleteRecordsReferencedInStagingTable() throws DaoException {
         long records_deleted;
         String statementString = String.format(
-                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s) SETTINGS mutations_sync = 1",
+                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)",
                 targetTable, idColumn, stagingTable);
         try {
             Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
@@ -387,7 +392,20 @@ public class ClickHouseBulkDeleter {
     }
 
     private void confirmDeletionIsComplete() throws DaoException {
+        this.confirmDeletionIsCompleteInData();
         this.confirmDeletionIsCompleteInMetadata();
+    }
+
+    private void confirmDeletionIsCompleteInData() throws DaoException {
+        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
+            String exceptionMessageString = String.format(
+                    "Failed to complete the delete operation on all replicas for table %s after retrying for %d seconds",
+                    this.targetTable,
+                    CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
+            throw new DaoException(exceptionMessageString);
+        }
+        // TODO: if condition fails a few times, we might start checking whether any
+        // mutations are still in progress -- if not, stop waiting and fail early
     }
 
     private void confirmDeletionIsCompleteInMetadata() throws DaoException {
@@ -479,6 +497,41 @@ public class ClickHouseBulkDeleter {
         return returnValue;
     }
 
+
+    private boolean deletionIsComplete() throws SQLException, DaoException {
+        String getUndeletedRecordCountsString = String.format(
+                "SELECT count() AS record_count FROM %s WHERE %s IN (SELECT id FROM %s)",
+                targetTable, idColumn, stagingTable);
+        return queryProducedExpectedResult(getUndeletedRecordCountsString, "record_count", 0L);
+    }
+
+    // checks specified outputField in the results of running queryString and looks for expectedResult
+    // only the first result (in the result set) is examined
+    private boolean queryProducedExpectedResult(String queryString, String outputField, long expectedResult) throws SQLException {
+        Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
+        try (PreparedStatement pstmt = con.prepareStatement(queryString);
+                ResultSet rs = pstmt.executeQuery()) {
+            if (!rs.next()) {
+                log.warn(String.format(
+                        "evaluation of query produced empty result set : %s",
+                        queryString));
+                return false;
+            }
+            long result = rs.getLong(outputField);
+            if (result != expectedResult) {
+                log.warn(String.format(
+                        "waiting to reach expected result for query '%s' : expected %d saw %d",
+                        queryString,
+                        expectedResult,
+                        result
+                        ));
+                return false;
+            }
+        } finally {
+            JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
+        }
+        return true;
+    }
 
     // queryString must be a SQL query which returns results which includes a field "host" with the hostname() of the replica responding. "SELECT hostname() AS host..."
     // with testType AllReplicaTestType.CONSISTENT, the expectedValue argument is ignored (pass null)
