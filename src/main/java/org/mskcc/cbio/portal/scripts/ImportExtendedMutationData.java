@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 - 2022 Memorial Sloan Kettering Cancer Center.
+ * Copyright (c) 2015 - 2026 Memorial Sloan Kettering Cancer Center.
  *
  * This library is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS
@@ -32,9 +32,20 @@
 
 package org.mskcc.cbio.portal.scripts;
 
-import java.io.*;
-import java.util.*;
-import java.util.regex.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
@@ -54,9 +65,9 @@ import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
 import org.mskcc.cbio.portal.model.ExtendedMutation;
 import org.mskcc.cbio.portal.model.ExtendedMutation.MutationEvent;
-import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.model.shared.GeneticAlterationType;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ExtendedMutationUtil;
 import org.mskcc.cbio.portal.util.GeneticProfileUtil;
@@ -85,18 +96,13 @@ public class ImportExtendedMutationData {
     private int samplesSkipped = 0;
     private Set<String> sampleSet = new HashSet<String>();
     private Set<Integer> internalSampleIds = new HashSet<Integer>();
-
     private Set<String> geneSet = new HashSet<String>();
     private Set<String> filteredMutations = new HashSet<String>();
     private Set<String> namespaces = new HashSet<String>();
     private Pattern SEQUENCE_SAMPLES_REGEX = Pattern.compile("^.*sequenced_samples:(.*)$");
     private final String ASCN_NAMESPACE = "ASCN";
-
     private final Integer genePanelId;
-
     private final boolean overwriteExisting;
-
-    private static final String MUTATION_EVENT_SEQUENCE = "seq_mutation_event";
 
     /**
      * construct an ImportExtendedMutationData.
@@ -112,7 +118,6 @@ public class ImportExtendedMutationData {
         this.swissprotIsAccession = false;
         this.genePanelId = (genePanel == null) ? null : GeneticProfileUtil.getGenePanelId(genePanel);
         this.filteredMutations = filteredMutations;
-
         // create default MutationFilter
         myMutationFilter = new MutationFilter( );
         this.namespaces = namespaces;
@@ -139,7 +144,7 @@ public class ImportExtendedMutationData {
         HashSet <String> sequencedCaseSet = new HashSet<String>();
         Map<MutationEvent,MutationEvent> existingEvents = new HashMap<MutationEvent,MutationEvent>();
         ProgressMonitor.setCurrentMessage("Starting to load existing mutation events...");
-        for(MutationEvent mutationEvent: DaoMutation.getAllMutationEvents()) {
+        for (MutationEvent mutationEvent: DaoMutation.getAllMutationEvents()) {
             existingEvents.put(mutationEvent, mutationEvent);
         }
         ProgressMonitor.setCurrentMessage("Loaded " + existingEvents.size() + " existing mutation events.");
@@ -147,30 +152,23 @@ public class ImportExtendedMutationData {
         Map<ExtendedMutation,ExtendedMutation> mutations = new HashMap<ExtendedMutation,ExtendedMutation>();
         List<AlleleSpecificCopyNumber> ascnRecords = new ArrayList<AlleleSpecificCopyNumber>();
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
-
-        try (FileReader reader = new FileReader(mutationFile);
-             BufferedReader buf = new BufferedReader(reader)) {
-
+        try (
+                FileReader reader = new FileReader(mutationFile);
+                BufferedReader buf = new BufferedReader(reader)) { // begin try-with-resources
         // process MAF header and return line immediately following it
         String line = processMAFHeader(buf);
-
         MafUtil mafUtil = new MafUtil(line, namespaces);
-
         boolean fileHasOMAData = false;
-
         if (mafUtil.getMaFImpactIndex() >= 0) {
             // fail gracefully if a non-essential column is missing
             // e.g. if there is no MA_link.var column, we assume that the value is NA and insert it as such
             fileHasOMAData = true;
-            ProgressMonitor.setCurrentMessage(" --> OMA Scores Column Number:  "
-                                       + mafUtil.getMaFImpactIndex());
-        }
-        else {
+            ProgressMonitor.setCurrentMessage(" --> OMA Scores Column Number:  " + mafUtil.getMaFImpactIndex());
+        } else {
             fileHasOMAData = false;
         }
 
         GeneticProfile geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
-
         CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByInternalId(geneticProfile.getCancerStudyId());
         String referenceGenome = cancerStudy.getReferenceGenome();
         if (referenceGenome == null) {
@@ -178,16 +176,12 @@ public class ImportExtendedMutationData {
         }
         String genomeBuildName = DaoReferenceGenome.getReferenceGenomeByGenomeName(referenceGenome).getBuildName();
         Set<Integer> processedSamples = new HashSet<>();
-        while((line=buf.readLine()) != null)
-        {
+        while ((line = buf.readLine()) != null) {
             ProgressMonitor.incrementCurValue();
             ConsoleUtil.showProgress();
-
-            if(TsvUtil.isDataLine(line))
-            {
+            if (TsvUtil.isDataLine(line)) {
                 String[] parts = TsvUtil.splitTsvLine(line);
                 MafRecord record = mafUtil.parseRecord(line);
-
                 if (!record.getNcbiBuild().equalsIgnoreCase(genomeBuildName)) {
                     ProgressMonitor.logWarning("Genome Build Name does not match, expecting " + genomeBuildName);
                 }
@@ -203,70 +197,56 @@ public class ImportExtendedMutationData {
                         if (sampleSet.add(barCode))
                             samplesSkipped++;
                         continue;
-                    }
-                    else {
+                    } else {
                         throw new RuntimeException("Unknown sample id '" + StableIdUtil.getSampleId(barCode) + "' found in MAF file: " + this.mutationFile.getCanonicalPath());
                     }
-                } else if (overwriteExisting && !processedSamples.contains(sample.getInternalId())) {
-                    DaoMutation.deleteAllRecordsInGeneticProfileForSample(geneticProfileId, sample.getInternalId());
-                    processedSamples.add(sample.getInternalId());
+                } else {
+                    if (overwriteExisting && !processedSamples.contains(sample.getInternalId())) {
+                        DaoMutation.deleteAllRecordsInGeneticProfileForSample(geneticProfileId, sample.getInternalId());
+                        processedSamples.add(sample.getInternalId());
+                    }
                 }
-
                 String validationStatus = record.getValidationStatus();
-
-                if (validationStatus == null ||
-                    validationStatus.equalsIgnoreCase("Wildtype"))
-                {
+                if (validationStatus == null || validationStatus.equalsIgnoreCase("Wildtype")) {
                     ProgressMonitor.logWarning("Skipping entry with Validation_Status: Wildtype");
                     entriesSkipped++;
                     continue;
                 }
-
                 String chr = DaoGeneOptimized.normalizeChr(record.getChr().toUpperCase());
-                if (chr==null) {
+                if (chr == null) {
                     ProgressMonitor.logWarning("Skipping entry with chromosome value: " + record.getChr());
                     entriesSkipped++;
                     continue;
                 }
                 record.setChr(chr);
-
-                if (record.getStartPosition() < 0)
+                if (record.getStartPosition() < 0) {
                     record.setStartPosition(0);
-
-                if (record.getEndPosition() < 0)
-                    record.setEndPosition(0);
-
-                String mutationType,
-                    proteinChange,
-                    aaChange,
-                    codonChange,
-                    refseqMrnaId,
-                    uniprotAccession;
-
-                int proteinPosStart,
-                    proteinPosEnd;
-
-                // determine whether to use canonical or best effect transcript
-
-                // try canonical first
-                if (ExtendedMutationUtil.isAcceptableMutation(record.getVariantClassification()))
-                {
-                    mutationType = record.getVariantClassification();
                 }
-                // if not acceptable either, use the default value
-                else
-                {
+                if (record.getEndPosition() < 0) {
+                    record.setEndPosition(0);
+                }
+                String mutationType;
+                String proteinChange;
+                String aaChange;
+                String codonChange;
+                String refseqMrnaId;
+                String uniprotAccession;
+                int proteinPosStart;
+                int proteinPosEnd;
+                // determine whether to use canonical or best effect transcript
+                // try canonical first
+                if (ExtendedMutationUtil.isAcceptableMutation(record.getVariantClassification())) {
+                    mutationType = record.getVariantClassification();
+                } else {
+                    // if not acceptable either, use the default value
                     mutationType = ExtendedMutationUtil.getMutationType(record);
                 }
-
                 // skip RNA mutations
-                if (mutationType != null && mutationType.equalsIgnoreCase("rna"))
-                {
+                if (mutationType != null && mutationType.equalsIgnoreCase("rna")) {
                     ProgressMonitor.logWarning("Skipping entry with mutation type: RNA");
                     entriesSkipped++;
                     continue;
                 }
-
                 proteinChange = ExtendedMutationUtil.getProteinChange(parts, record);
                 //proteinChange = record.getProteinChange();
                 aaChange = record.getAminoAcidChange();
@@ -274,20 +254,14 @@ public class ImportExtendedMutationData {
                 refseqMrnaId = record.getRefSeq();
                 //always uniprot accession
                 uniprotAccession = record.getSwissprot();
-                
-                proteinPosStart = ExtendedMutationUtil.getProteinPosStart(
-                        record.getProteinPosition(), proteinChange);
-                proteinPosEnd = ExtendedMutationUtil.getProteinPosEnd(
-                        record.getProteinPosition(), proteinChange);
-
+                proteinPosStart = ExtendedMutationUtil.getProteinPosStart(record.getProteinPosition(), proteinChange);
+                proteinPosEnd = ExtendedMutationUtil.getProteinPosEnd(record.getProteinPosition(), proteinChange);
                 //  Assume we are dealing with Entrez Gene Ids (this is the best / most stable option)
                 String geneSymbol = record.getHugoGeneSymbol();
                 String entrezIdString = record.getGivenEntrezGeneId();
-
                 CanonicalGene gene = null;
                 // try to parse entrez if it is not empty nor 0:
-                if (!(entrezIdString.isEmpty() ||
-                      entrezIdString.equals("0"))) {
+                if (!(entrezIdString.isEmpty() || entrezIdString.equals("0"))) {
                     Long entrezGeneId;
                     try {
                         entrezGeneId = Long.parseLong(entrezIdString);
@@ -296,42 +270,32 @@ public class ImportExtendedMutationData {
                     }
                     //non numeric values or negative values should not be allowed:
                     if (entrezGeneId == null || entrezGeneId < 0) {
-                        ProgressMonitor.logWarning(
-                                "Ignoring line with invalid Entrez_Id " +
-                                entrezIdString);
+                        ProgressMonitor.logWarning( "Ignoring line with invalid Entrez_Id " + entrezIdString);
                         entriesSkipped++;
                         continue;
                     } else {
                         gene = daoGene.getGene(entrezGeneId);
                         if (gene == null) {
                             //skip if not in DB:
-                            ProgressMonitor.logWarning(
-                                    "Entrez gene ID " + entrezGeneId +
-                                    " not found. Record will be skipped.");
+                            ProgressMonitor.logWarning("Entrez gene ID " + entrezGeneId + " not found. Record will be skipped.");
                             entriesSkipped++;
                             continue;
                         }
                     }
                 }
-
                 // If Entrez Gene ID Fails, try Symbol.
-                if (gene == null &&
-                        !(geneSymbol.equals("") ||
-                          geneSymbol.equals("Unknown"))) {
+                if (gene == null && !(geneSymbol.equals("") || geneSymbol.equals("Unknown"))) {
                     gene = daoGene.getNonAmbiguousGene(geneSymbol, true);
                 }
-
                 // assume symbol=Unknown and entrez=0 (or missing Entrez column) to imply an
                 // intergenic, irrespective of what the column Variant_Classification says
-                if (geneSymbol.equals("Unknown") &&
-                        (entrezIdString.equals("0") || mafUtil.getEntrezGeneIdIndex() == -1)) {
+                if (geneSymbol.equals("Unknown") && (entrezIdString.equals("0") || mafUtil.getEntrezGeneIdIndex() == -1)) {
                     // give extra warning if mutationType is something different from IGR:
-                    if (mutationType != null &&
-                            !mutationType.equalsIgnoreCase("IGR")) {
+                    if (mutationType != null && !mutationType.equalsIgnoreCase("IGR")) {
                         ProgressMonitor.logWarning(
-                            "Treating mutation with gene symbol 'Unknown' " +
-                            (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene id 0") + " as intergenic ('IGR') " +
-                            "instead of '" + mutationType + "'. Entry filtered/skipped.");
+                                "Treating mutation with gene symbol 'Unknown' " +
+                                (mafUtil.getEntrezGeneIdIndex() == -1 ? "" : "and Entrez gene id 0") + " as intergenic ('IGR') " +
+                                "instead of '" + mutationType + "'. Entry filtered/skipped.");
                     }
                     // treat as IGR:
                     myMutationFilter.decisions++;
@@ -340,7 +304,6 @@ public class ImportExtendedMutationData {
                     entriesSkipped++;
                     continue;
                 }
-
                 // skip the record if a gene was expected but not identified
                 if (gene == null) {
                     ProgressMonitor.logWarning(
@@ -352,7 +315,6 @@ public class ImportExtendedMutationData {
                     continue;
                 } else {
                     ExtendedMutation mutation = new ExtendedMutation();
-
                     mutation.setGeneticProfileId(geneticProfileId);
                     mutation.setSampleId(sample.getInternalId());
                     mutation.setGene(gene);
@@ -373,9 +335,9 @@ public class ImportExtendedMutationData {
                     // log whether tumor seq allele is empty (failed to resolve tumor seq allele because of invalid data values)
                     if (mutation.getTumorSeqAllele().isEmpty()) {
                         ProgressMonitor.logWarning("Tumor allele could not be resolved for sample '" + sample.getStableId() +
-                            "' (chr,start,end,ref,tum1,tum2) = (" + record.getChr() + "," + record.getStartPosition() + "," +
-                            record.getEndPosition() + "," + record.getReferenceAllele() + "," + record.getTumorSeqAllele1() +
-                            "," + record.getTumorSeqAllele2() + ")");
+                                "' (chr,start,end,ref,tum1,tum2) = (" + record.getChr() + "," + record.getStartPosition() + "," +
+                                record.getEndPosition() + "," + record.getReferenceAllele() + "," + record.getTumorSeqAllele1() +
+                                "," + record.getTumorSeqAllele2() + ")");
                     }
                     mutation.setDbSnpRs(record.getDbSNP_RS());
                     mutation.setDbSnpValStatus(record.getDbSnpValStatus());
@@ -423,22 +385,18 @@ public class ImportExtendedMutationData {
                     mutation.setAnnotationJson(
                         mafUtil.getNamespaceColumnParser().writeValueAsString(record.getNamespacesMap())
                     );
-
                     sequencedCaseSet.add(sample.getStableId());
-
                     //  Filter out Mutations
-                    if( myMutationFilter.acceptMutation( mutation, this.filteredMutations )) {
+                    if (myMutationFilter.acceptMutation(mutation, this.filteredMutations)) {
                         MutationEvent event = existingEvents.get(mutation.getEvent());
-                        if (event!=null) {
+                        if (event != null) {
                             mutation.setEvent(event);
                         } else {
-                            mutation.setMutationEventId(ClickHouseAutoIncrement.nextId(MUTATION_EVENT_SEQUENCE)); // TODO : relocate this to dao code layer
                             existingEvents.put(mutation.getEvent(), mutation.getEvent());
                             newEvents.add(mutation.getEvent());
                         }
-
                         ExtendedMutation exist = mutations.get(mutation);
-                        if (exist!=null) {
+                        if (exist != null) {
                             ExtendedMutation merged = mergeMutationData(exist, mutation);
                             mutations.put(merged, merged);
                         } else {
@@ -449,36 +407,31 @@ public class ImportExtendedMutationData {
                             ascn.updateAscnUniqueKeyDetails(mutation);
                             ascnRecords.add(ascn);
                         }
-
                         //keep track:
                         sampleSet.add(sample.getStableId());
                         internalSampleIds.add(sample.getInternalId());
-                        geneSet.add(mutation.getEntrezGeneId()+"");
-                    }
-                    else {
+                        geneSet.add(mutation.getEntrezGeneId() + "");
+                    } else {
                         entriesSkipped++;
                     }
                 }
             }
         }
         DaoSampleProfile.upsertSampleToProfileMapping(internalSampleIds, geneticProfileId, genePanelId);
-
         for (MutationEvent event : newEvents) {
             try {
-                DaoMutation.addMutationEvent(event);
+                DaoMutation.addMutationEvent(event); // This also sets the mutation event internal id
             } catch (DaoException ex) {
                 throw ex;
             }
         }
-
         for (ExtendedMutation mutation : mutations.values()) {
             try {
-                DaoMutation.addMutation(mutation,false);
+                DaoMutation.addMutation(mutation);
             } catch (DaoException ex) {
                 throw ex;
             }
         }
-
         for (AlleleSpecificCopyNumber ascn : ascnRecords) {
             try {
                 DaoAlleleSpecificCopyNumber.addAlleleSpecificCopyNumber(ascn);
@@ -486,8 +439,7 @@ public class ImportExtendedMutationData {
                 throw ex;
             }
         }
-
-        if( ClickHouseBulkLoader.isBulkLoad()) {
+        if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();
         }
         // run sanity check on `mutation_event` to determine whether duplicate
@@ -495,12 +447,11 @@ public class ImportExtendedMutationData {
         if (DaoMutation.hasDuplicateMutationEvents()) {
             throw new DaoException("Duplicate mutation events were detected during this import. Aborting...");
         }
-
         /*
-         * At MSKCC there are some MUTATION_UNCALLED
-         * profiles that shouldn't be included when determining the number of
-         * mutations for a sample
-         */
+        * At MSKCC there are some MUTATION_UNCALLED
+        * profiles that shouldn't be included when determining the number of
+        * mutations for a sample
+        */
         if (geneticProfile.getGeneticAlterationType().equals(GeneticAlterationType.MUTATION_EXTENDED)) {
             DaoMutation.createMutationCountClinicalData(geneticProfile);
         }
@@ -508,11 +459,9 @@ public class ImportExtendedMutationData {
         // fine to calculate for any genetic profile
         ProgressMonitor.setCurrentMessage("Calculating mutation counts by keyword...");
         DaoMutation.calculateMutationCountByKeyword(geneticProfileId);
-
-        if( ClickHouseBulkLoader.isBulkLoad()) {
+        if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();
         }
-
         if (entriesSkipped > 0) {
             ProgressMonitor.setCurrentMessage(" --> total number of data entries skipped (see table below):  " + entriesSkipped);
         }
@@ -521,66 +470,63 @@ public class ImportExtendedMutationData {
             ProgressMonitor.setCurrentMessage(" --> total number of samples skipped (normal samples): " + samplesSkipped);
         }
         ProgressMonitor.setCurrentMessage(" --> total number of genes for which one or more mutation events were stored:  " + geneSet.size());
-
         ProgressMonitor.setCurrentMessage("Filtering table:\n-----------------");
         ProgressMonitor.setCurrentMessage(myMutationFilter.getStatistics() );
         } // end try-with-resources
     }
 
     /**
-         * merge the current mutation
-         * @return
-         */
-        private ExtendedMutation mergeMutationData(ExtendedMutation mut1, ExtendedMutation mut2) {
-            ExtendedMutation ret = mut1;
-            if (!mut1.getMatchedNormSampleBarcode().equalsIgnoreCase(mut2.getMatchedNormSampleBarcode())) {
-                if (mut2.getMatchedNormSampleBarcode().matches("TCGA-..-....-10.*")) {
-                    // select blood normal if available
+     * merge the current mutation
+     * @return
+     */
+    private ExtendedMutation mergeMutationData(ExtendedMutation mut1, ExtendedMutation mut2) {
+        ExtendedMutation ret = mut1;
+        if (!mut1.getMatchedNormSampleBarcode().equalsIgnoreCase(mut2.getMatchedNormSampleBarcode())) {
+            if (mut2.getMatchedNormSampleBarcode().matches("TCGA-..-....-10.*")) {
+                // select blood normal if available
+                ret = mut2;
+            }
+        } else if (!mut1.getValidationStatus().equalsIgnoreCase(mut2.getValidationStatus())) {
+            if (mut2.getValidationStatus().equalsIgnoreCase("Valid") ||
+                    mut2.getValidationStatus().equalsIgnoreCase("VALIDATED")) {
+                // select validated mutations
+                ret = mut2;
+            }
+        } else if (!mut1.getMutationStatus().equalsIgnoreCase(mut2.getMutationStatus())) {
+            if (mut2.getMutationStatus().equalsIgnoreCase("Germline")) {
+                // select germline over somatic
+                ret = mut2;
+            } else if (mut2.getMutationStatus().equalsIgnoreCase("SOMATIC")) {
+                if (!mut1.getMutationStatus().equalsIgnoreCase("Germline")) {
+                    // select somatic over others
                     ret = mut2;
-                }
-            } else if (!mut1.getValidationStatus().equalsIgnoreCase(mut2.getValidationStatus())) {
-                if (mut2.getValidationStatus().equalsIgnoreCase("Valid") ||
-                        mut2.getValidationStatus().equalsIgnoreCase("VALIDATED")) {
-                    // select validated mutations
-                    ret = mut2;
-                }
-            } else if (!mut1.getMutationStatus().equalsIgnoreCase(mut2.getMutationStatus())) {
-                if (mut2.getMutationStatus().equalsIgnoreCase("Germline")) {
-                    // select germline over somatic
-                    ret = mut2;
-                } else if (mut2.getMutationStatus().equalsIgnoreCase("SOMATIC")) {
-                    if (!mut1.getMutationStatus().equalsIgnoreCase("Germline")) {
-                        // select somatic over others
-                        ret = mut2;
-                    }
                 }
             }
-
-            // merge centers
-            Set<String> centers = new TreeSet<String>(Arrays.asList(mut1.getSequencingCenter().split(";")));
-            if (centers.addAll(Arrays.asList(mut2.getSequencingCenter().split(";")))) {
-                if (centers.size()>1) {
-                    centers.remove("NA");
-                }
-                ret.setSequencingCenter(StringUtils.join(centers, ";"));
-            }
-
-            return ret;
         }
+        // merge centers
+        Set<String> centers = new TreeSet<String>(Arrays.asList(mut1.getSequencingCenter().split(";")));
+        if (centers.addAll(Arrays.asList(mut2.getSequencingCenter().split(";")))) {
+            if (centers.size()>1) {
+                centers.remove("NA");
+            }
+            ret.setSequencingCenter(StringUtils.join(centers, ";"));
+        }
+        return ret;
+    }
 
     private String transformOMAScore( String omaScore) {
-        if( omaScore == null || omaScore.length() ==0) {
+        if (omaScore == null || omaScore.length() == 0) {
             return omaScore;
         }
-        if( omaScore.equalsIgnoreCase("H") || omaScore.equalsIgnoreCase("high")) {
+        if (omaScore.equalsIgnoreCase("H") || omaScore.equalsIgnoreCase("high")) {
             return "H";
-        } else if( omaScore.equalsIgnoreCase("M") || omaScore.equalsIgnoreCase("medium")) {
+        } else if (omaScore.equalsIgnoreCase("M") || omaScore.equalsIgnoreCase("medium")) {
             return "M";
-        } else if( omaScore.equalsIgnoreCase("L") || omaScore.equalsIgnoreCase("low")) {
+        } else if (omaScore.equalsIgnoreCase("L") || omaScore.equalsIgnoreCase("low")) {
             return "L";
-        } else if( omaScore.equalsIgnoreCase("N") || omaScore.equalsIgnoreCase("neutral")) {
+        } else if (omaScore.equalsIgnoreCase("N") || omaScore.equalsIgnoreCase("neutral")) {
             return "N";
-        } else if( omaScore.equalsIgnoreCase("[sent]")) {
+        } else if (omaScore.equalsIgnoreCase("[sent]")) {
             return "NA";
         } else {
             return omaScore;
@@ -606,8 +552,9 @@ public class ImportExtendedMutationData {
     private Set<Integer> getSequencedInternalSampleId(String sequencedSamplesIDList, GeneticProfile geneticProfile) {
         Set<Integer> toReturn = new HashSet<>();
         for (String stableSampleID : sequencedSamplesIDList.trim().split("\\s")) {
-            Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(geneticProfile.getCancerStudyId(),
-                                                                        StableIdUtil.getSampleId(stableSampleID));
+            Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(
+                    geneticProfile.getCancerStudyId(),
+                    StableIdUtil.getSampleId(stableSampleID));
             // if data files are run through validator, this condition should be minimal
             if (sample == null) {
                 missingSample(stableSampleID);

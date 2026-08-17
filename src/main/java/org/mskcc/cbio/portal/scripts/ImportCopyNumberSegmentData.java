@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2015 Memorial Sloan-Kettering Cancer Center.
+ * Copyright (c) 2015, 2026 Memorial Sloan Kettering Cancer Center.
  *
  * This library is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS
  * FOR A PARTICULAR PURPOSE. The software and documentation provided hereunder
- * is on an "as is" basis, and Memorial Sloan-Kettering Cancer Center has no
+ * is on an "as is" basis, and Memorial Sloan Kettering Cancer Center has no
  * obligations to provide maintenance, support, updates, enhancements or
- * modifications. In no event shall Memorial Sloan-Kettering Cancer Center be
+ * modifications. In no event shall Memorial Sloan Kettering Cancer Center be
  * liable to any party for direct, indirect, special, incidental or
  * consequential damages, including lost profits, arising out of the use of this
- * software and its documentation, even if Memorial Sloan-Kettering Cancer
+ * software and its documentation, even if Memorial Sloan Kettering Cancer
  * Center has been advised of the possibility of such damage.
  */
 
@@ -64,8 +64,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
     private boolean isIncrementalUpdateMode;
     private Set<Integer> processedSampleIds;
 
-    private static final String COPY_NUMBER_SEG_SEQUENCE = "seq_copy_number_seg";
-
     private void importData(File file, int cancerStudyId) throws IOException, DaoException {
         FileReader reader = new FileReader(file);
         BufferedReader buf = new BufferedReader(reader);
@@ -75,7 +73,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             while ((line=buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
-                
                 String[] strs = line.split("\t");
                 if (strs.length<6) {
                     System.err.println("wrong format: "+line);
@@ -84,7 +81,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                 String chrom = strs[1].trim();
                 //validate in same way as GistitReader:
                 ValidationUtils.validateChromosome(chrom);
-                
                 long start = Double.valueOf(strs[2]).longValue();
                 long end = Double.valueOf(strs[3]).longValue();
                 if (start >= end) {
@@ -92,7 +88,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                     ProgressMonitor.logWarning("Start position of segment is not lower than end position. Skipping this entry.");
                     entriesSkipped++;
                     continue;
-                }            
+                }
                 int numProbes = new BigDecimal((strs[4])).intValue();
                 double segMean = Double.parseDouble(strs[5]);
 
@@ -109,7 +105,6 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                     }
                 }
                 CopyNumberSegment cns = new CopyNumberSegment(cancerStudyId, s.getInternalId(), chrom, start, end, numProbes, segMean);
-                cns.setSegId(ClickHouseAutoIncrement.nextId(COPY_NUMBER_SEG_SEQUENCE)); // TODO : relocate this to dao code layer
                 DaoCopyNumberSegment.addCopyNumberSegment(cns);
                 processedSampleIds.add(s.getInternalId());
             }
@@ -121,11 +116,10 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             buf.close();
         }
     }
-    
+
     public void run() {
         try {
             String description = "Import 'segment data' files";
-            
             OptionSet options = ConsoleUtil.parseStandardDataAndMetaOptions(args, description, true);
             if (options.has("loadMode") && !"bulkLoad".equalsIgnoreCase((String) options.valueOf("loadMode"))) {
                 throw new UnsupportedOperationException("This loader supports bulkLoad load mode only, but "
@@ -135,14 +129,10 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             String dataFile = (String) options.valueOf("data");
             File descriptorFile = new File((String) options.valueOf("meta"));
             isIncrementalUpdateMode = options.has("overwrite-existing");
-        
             Properties properties = new Properties();
             properties.load(new FileInputStream(descriptorFile));
-            
             ProgressMonitor.setCurrentMessage("Reading data from:  " + dataFile);
-            
             CancerStudy cancerStudy = getCancerStudy(properties);
-            
             if (!isIncrementalUpdateMode && segmentDataExistsForCancerStudy(cancerStudy)) {
                  throw new IllegalArgumentException("Seg data for cancer study " + cancerStudy.getCancerStudyStableId() + " has already been imported: " + dataFile);
             }
@@ -180,10 +170,10 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             referenceGenome = ReferenceGenome.HOMO_SAPIENS_DEFAULT_GENOME_NAME;
         }
         if (!referenceGenomeId.equalsIgnoreCase(referenceGenome)) {
-            ProgressMonitor.setCurrentMessage(" Genome Build Name does not match, expecting " 
+            ProgressMonitor.setCurrentMessage(" Genome Build Name does not match, expecting "
                     + cancerStudy.getReferenceGenome());
         }
-        copyNumSegFile.referenceGenomeId = getRefGenId(referenceGenomeId); 
+        copyNumSegFile.referenceGenomeId = getRefGenId(referenceGenomeId);
         copyNumSegFile.description = properties.getProperty("description").trim();
         copyNumSegFile.filename = properties.getProperty("data_filename").trim();
         CopyNumberSegmentFile storedCopyNumSegFile = DaoCopyNumberSegmentFile.getCopyNumberSegmentFile(cancerStudy.getInternalId());

@@ -74,70 +74,77 @@ public final class DaoMutation {
     private static final String DELETE_ALTERATION_DRIVER_ANNOTATION = "DELETE from alteration_driver_annotation WHERE genetic_profile_id=? and sample_id=?";
     private static final String DELETE_MUTATION = "DELETE from mutation WHERE genetic_profile_id=? and sample_id=?";
 
-    public static int addMutation(ExtendedMutation mutation, boolean newMutationEvent) throws DaoException {
+    public static void addMutation(ExtendedMutation mutation) throws DaoException {
         if (!ClickHouseBulkLoader.isBulkLoad()) {
             throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert mutations");
-        } else {
-            int result = 1;
-            if (newMutationEvent) {
-                //add event first, as mutation has a Foreign key constraint to the event:
-                result = addMutationEvent(mutation.getEvent())+1;
-            }
-
-            if ((mutation.getDriverFilter() != null
+        }
+        // caller must have already added/committed the associated mutation event, or else an exception is thrown
+        if (mutation.getEvent() == null) {
+            throw new DaoException("attempt to add a mutation without an associated mutation event");
+        }
+        // the very first mutation event record stored will be assigned internal id '1' because of
+        // this function call in ClickHouseAutoIncrement : return counter.incrementAndGet();
+        // So value '0' would indicate an uncommitted/uninitialized mutation event subobject
+        if (mutation.getMutationEventId() <= 0) {
+            String chr = mutation.getChr();
+            Long pos = mutation.getStartPosition();
+            String proteinChange = mutation.getProteinChange();
+            throw new DaoException(String.format(
+                    "Attempt to add a mutation before the associated mutation event has been added. Chr:%s S.Pos:%d Prot.Change:%s",
+                    (chr == null ? "null" : chr),
+                    (pos == null ? "null" : Long.toString(pos)),
+                    (proteinChange == null ? "null" : proteinChange)));
+        }
+        if ((mutation.getDriverFilter() != null
                 && !mutation.getDriverFilter().isEmpty()
                 && !mutation.getDriverFilter().toLowerCase().equals("na"))
                 ||
                 (mutation.getDriverTiersFilter() != null
                 && !mutation.getDriverTiersFilter().isEmpty()
                 && !mutation.getDriverTiersFilter().toLowerCase().equals("na"))) {
-                ClickHouseBulkLoader.getClickHouseBulkLoader("alteration_driver_annotation").insertRecord(
+            ClickHouseBulkLoader.getClickHouseBulkLoader("alteration_driver_annotation").insertRecord(
                     Long.toString(mutation.getMutationEventId()),
                     Integer.toString(mutation.getGeneticProfileId()),
                     Integer.toString(mutation.getSampleId()),
                     mutation.getDriverFilter(),
                     mutation.getDriverFilterAnn(),
                     mutation.getDriverTiersFilter(),
-                    mutation.getDriverTiersFilterAnn()
-                );
-            }
-
-            ClickHouseBulkLoader.getClickHouseBulkLoader("mutation").insertRecord(
-                    Long.toString(mutation.getMutationEventId()),
-                    Integer.toString(mutation.getGeneticProfileId()),
-                    Integer.toString(mutation.getSampleId()),
-                    Long.toString(mutation.getGene().getEntrezGeneId()),
-                    mutation.getSequencingCenter(),
-                    mutation.getSequencer(),
-                    mutation.getMutationStatus(),
-                    mutation.getValidationStatus(),
-                    mutation.getTumorSeqAllele1(),
-                    mutation.getTumorSeqAllele2(),
-                    mutation.getMatchedNormSampleBarcode(),
-                    mutation.getMatchNormSeqAllele1(),
-                    mutation.getMatchNormSeqAllele2(),
-                    mutation.getTumorValidationAllele1(),
-                    mutation.getTumorValidationAllele2(),
-                    mutation.getMatchNormValidationAllele1(),
-                    mutation.getMatchNormValidationAllele2(),
-                    mutation.getVerificationStatus(),
-                    mutation.getSequencingPhase(),
-                    mutation.getSequenceSource(),
-                    mutation.getValidationMethod(),
-                    mutation.getScore(),
-                    mutation.getBamFile(),
-                    (mutation.getTumorAltCount() == null) ? null : Integer.toString(mutation.getTumorAltCount()),
-                    (mutation.getTumorRefCount() == null) ? null : Integer.toString(mutation.getTumorRefCount()),
-                    (mutation.getNormalAltCount() == null) ? null : Integer.toString(mutation.getNormalAltCount()),
-                    (mutation.getNormalRefCount() == null) ? null : Integer.toString(mutation.getNormalRefCount()),
-                    //AminoAcidChange column is not used
-                    null,
-                    mutation.getAnnotationJson());
-            return result;
+                    mutation.getDriverTiersFilterAnn());
         }
+        ClickHouseBulkLoader.getClickHouseBulkLoader("mutation").insertRecord(
+                Long.toString(mutation.getMutationEventId()),
+                Integer.toString(mutation.getGeneticProfileId()),
+                Integer.toString(mutation.getSampleId()),
+                Long.toString(mutation.getGene().getEntrezGeneId()),
+                mutation.getSequencingCenter(),
+                mutation.getSequencer(),
+                mutation.getMutationStatus(),
+                mutation.getValidationStatus(),
+                mutation.getTumorSeqAllele1(),
+                mutation.getTumorSeqAllele2(),
+                mutation.getMatchedNormSampleBarcode(),
+                mutation.getMatchNormSeqAllele1(),
+                mutation.getMatchNormSeqAllele2(),
+                mutation.getTumorValidationAllele1(),
+                mutation.getTumorValidationAllele2(),
+                mutation.getMatchNormValidationAllele1(),
+                mutation.getMatchNormValidationAllele2(),
+                mutation.getVerificationStatus(),
+                mutation.getSequencingPhase(),
+                mutation.getSequenceSource(),
+                mutation.getValidationMethod(),
+                mutation.getScore(),
+                mutation.getBamFile(),
+                (mutation.getTumorAltCount() == null) ? null : Integer.toString(mutation.getTumorAltCount()),
+                (mutation.getTumorRefCount() == null) ? null : Integer.toString(mutation.getTumorRefCount()),
+                (mutation.getNormalAltCount() == null) ? null : Integer.toString(mutation.getNormalAltCount()),
+                (mutation.getNormalRefCount() == null) ? null : Integer.toString(mutation.getNormalRefCount()),
+                //AminoAcidChange column is not used
+                null,
+                mutation.getAnnotationJson());
     }
 
-    public static int addMutationEvent(ExtendedMutation.MutationEvent event) throws DaoException {
+    public static void addMutationEvent(ExtendedMutation.MutationEvent event) throws DaoException {
         // use this code if bulk loading
         // write to the temp file maintained by the ClickHouseBulkLoader
         String keyword = MutationKeywordUtils.guessOncotatorMutationKeyword(event.getProteinChange(), event.getMutationType());
@@ -163,7 +170,6 @@ public final class DaoMutation {
                 Integer.toString(event.getProteinPosEnd()),
                 boolToStr(event.isCanonicalTranscript()),
                 keyword==null ? "\\N":(event.getGene().getHugoGeneSymbolAllCaps()+" "+keyword));
-        return 1;
     }
 
     public static void createMutationCountClinicalData(GeneticProfile geneticProfile) throws DaoException {

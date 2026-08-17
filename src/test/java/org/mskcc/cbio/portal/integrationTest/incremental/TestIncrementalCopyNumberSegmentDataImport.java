@@ -54,7 +54,7 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
     /**
      * Test incremental upload of CNA SEG data
      */
-	@Test
+    @Test
     public void testIncrementalUpload() throws DaoException {
         String segSampleId = "TCGA-A1-A0SE-01";
         Sample segDataSample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), segSampleId);
@@ -76,7 +76,6 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
                 95674710,
                 100,
                 0.01);
-        copyNumberSegment.setSegId(1L);
         DaoCopyNumberSegment.addCopyNumberSegment(copyNumberSegment);
         ClickHouseBulkLoader.flushAll();
 
