@@ -43,12 +43,10 @@ public class ImportStructuralVariantData {
 
     private final boolean isIncrementalUpdateMode;
 
-    private static final String STRUCTURAL_VARIANT_SEQUENCE = "seq_structural_variant";
-
     public ImportStructuralVariantData(
-        File structuralVariantFile, 
-        int geneticProfileId, 
-        String genePanel, 
+        File structuralVariantFile,
+        int geneticProfileId,
+        String genePanel,
         Set<String> namespaces,
         boolean isIncrementalUpdateMode
     ) throws DaoException {
@@ -79,7 +77,6 @@ public class ImportStructuralVariantData {
                 recordCount++;
                 String parts[] = TsvUtil.splitTsvLine(line);
                 StructuralVariant structuralVariant = structuralVariantUtil.parseStructuralVariantRecord(parts);
-                structuralVariant.setInternalId(ClickHouseAutoIncrement.nextId(STRUCTURAL_VARIANT_SEQUENCE)); // TODO : relocate this to dao code layer
                 structuralVariant.setGeneticProfileId(geneticProfileId);
                 if (!structuralVariantUtil.hasRequiredStructuralVariantFields(structuralVariant)) {
                     ProgressMonitor.logWarning(

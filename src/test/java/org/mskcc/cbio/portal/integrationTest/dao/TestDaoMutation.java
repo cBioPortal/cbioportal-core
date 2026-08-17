@@ -111,7 +111,8 @@ public class TestDaoMutation extends IntegrationTestBase {
         mutation.setCanonicalTranscript(true);
         mutation.setAnnotationJson(makeMockAnnotationJsonString());
 
-        DaoMutation.addMutation(mutation,true);
+        DaoMutation.addMutationEvent(mutation.getEvent());
+        DaoMutation.addMutation(mutation);
 
         // if bulkLoading, execute LOAD FILE
         if( ClickHouseBulkLoader.isBulkLoad()){
