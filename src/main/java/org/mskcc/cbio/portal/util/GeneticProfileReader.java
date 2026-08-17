@@ -143,37 +143,20 @@ public class GeneticProfileReader {
         }
 
         // add new genetic profile
+        // addGeneticProfile() assigns the internal id on this instance before the INSERT and
+        // caches this same instance, so geneticProfile.getGeneticProfileId() is authoritative
+        // from here on. No read-back is needed, which also avoids the ClickHouse Cloud
+        // (SharedMergeTree) window where a SELECT following an INSERT on another connection
+        // may still return a stale snapshot.
         DaoGeneticProfile.addGeneticProfile(geneticProfile);
 
         // add genetic profile link if set
         if (geneticProfileLink != null) {
             // Set `REFERRING_GENETIC_PROFILE_ID`
-            GeneticProfile gpLink = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
-            if (gpLink == null) {
-                // Fallback: concurrent reCache() may have cleared the cache since addGeneticProfile()
-                DaoGeneticProfile.reCache();
-                gpLink = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
-            }
-            if (gpLink == null) {
-                throw new DaoException("Genetic profile could not be found for link after insertion: "
-                        + geneticProfile.getStableId());
-            }
-            geneticProfileLink.setReferringGeneticProfileId(gpLink.getGeneticProfileId());
+            geneticProfileLink.setReferringGeneticProfileId(geneticProfile.getGeneticProfileId());
             DaoGeneticProfileLink.addGeneticProfileLink(geneticProfileLink);
         }
 
-        // Get ID
-        GeneticProfile gp = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
-        if (gp == null) {
-            // Fallback: the cache may have been stale after insert; force a full reload
-            DaoGeneticProfile.reCache();
-            gp = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
-        }
-        if (gp == null) {
-            throw new DaoException("Genetic profile could not be found after insertion: "
-                    + geneticProfile.getStableId());
-        }
-        geneticProfile.setGeneticProfileId(gp.getGeneticProfileId());
         return geneticProfile;
     }
 
