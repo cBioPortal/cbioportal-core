@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2015 Memorial Sloan-Kettering Cancer Center.
+ * Copyright (c) 2015, 2026 Memorial Sloan Kettering Cancer Center.
  *
  * This library is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS
  * FOR A PARTICULAR PURPOSE. The software and documentation provided hereunder
- * is on an "as is" basis, and Memorial Sloan-Kettering Cancer Center has no
+ * is on an "as is" basis, and Memorial Sloan Kettering Cancer Center has no
  * obligations to provide maintenance, support, updates, enhancements or
- * modifications. In no event shall Memorial Sloan-Kettering Cancer Center be
+ * modifications. In no event shall Memorial Sloan Kettering Cancer Center be
  * liable to any party for direct, indirect, special, incidental or
  * consequential damages, including lost profits, arising out of the use of this
- * software and its documentation, even if Memorial Sloan-Kettering Cancer
+ * software and its documentation, even if Memorial Sloan Kettering Cancer
  * Center has been advised of the possibility of such damage.
  */
 
@@ -48,40 +48,38 @@ import org.mskcc.cbio.portal.model.ClinicalEvent;
  * @author gaoj
  */
 public final class DaoClinicalEvent {
+
+    private static final String CLINICAL_EVENT_SEQUENCE = "seq_clinical_event";
+
     private DaoClinicalEvent() {}
-    
-    public static int addClinicalEvent(ClinicalEvent clinicalEvent) {
+
+    public static void addClinicalEvent(ClinicalEvent clinicalEvent) throws DaoException {
         if (!ClickHouseBulkLoader.isBulkLoad()) {
             throw new IllegalStateException("Only bulk load mode is allowed for importing clinical events");
         }
-        
+        Long clinicalEventId = ClickHouseAutoIncrement.nextId(CLINICAL_EVENT_SEQUENCE);
         ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event").insertRecord(
-                Long.toString(clinicalEvent.getClinicalEventId()),
+                Long.toString(clinicalEventId),
                 Integer.toString(clinicalEvent.getPatientId()),
                 clinicalEvent.getStartDate().toString(),
                 clinicalEvent.getStopDate()==null?null:clinicalEvent.getStopDate().toString(),
-                clinicalEvent.getEventType()
-                );
-        return 1+addClinicalEventData(clinicalEvent);
+                clinicalEvent.getEventType());
+        addClinicalEventData(clinicalEvent, clinicalEventId);
     }
-    
-    private static int addClinicalEventData(ClinicalEvent clinicalEvent) {
-        long eventId = clinicalEvent.getClinicalEventId();
+
+    private static void addClinicalEventData(ClinicalEvent clinicalEvent, Long clinicalEventId) {
         for (Map.Entry<String,String> entry : clinicalEvent.getEventData().entrySet()) {
             ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event_data").insertRecord(
-                    Long.toString(eventId),
+                    Long.toString(clinicalEventId),
                     entry.getKey(),
-                    entry.getValue()
-                    );
+                    entry.getValue());
         }
-        return 1;
-        
     }
-    
+
     public static List<ClinicalEvent> getClinicalEvent(int patientId) throws DaoException {
         return getClinicalEvent(patientId, null);
     }
-    
+
     public static List<ClinicalEvent> getClinicalEvent(int patientId, String eventType) throws DaoException {
 
         Connection con = null;
@@ -109,7 +107,7 @@ public final class DaoClinicalEvent {
             }
 
             rs.close();
-           
+
            // get data then
            if (!clinicalEvents.isEmpty()) {
                 pstmt = con.prepareStatement("SELECT * FROM clinical_event_data WHERE clinical_event_id IN ("
@@ -129,7 +127,7 @@ public final class DaoClinicalEvent {
            JdbcUtil.closeAll(DaoClinicalEvent.class, con, pstmt, rs);
         }
     }
-    
+
     private static ClinicalEvent extractClinicalEvent(ResultSet rs) throws SQLException {
         ClinicalEvent clinicalEvent = new ClinicalEvent();
         clinicalEvent.setClinicalEventId(rs.getLong("clinical_event_id"));
@@ -139,13 +137,13 @@ public final class DaoClinicalEvent {
         clinicalEvent.setEventType(rs.getString("event_type"));
         return clinicalEvent;
     }
-    
+
     /**
-     * 
+     *
      * @param cancerStudyId
      * @param caseId
      * @return true if timeline data exist for the case
-     * @throws DaoException 
+     * @throws DaoException
      */
     public static boolean timeEventsExistForPatient(int patientId) throws DaoException {
         Connection con = null;
@@ -163,19 +161,19 @@ public final class DaoClinicalEvent {
             JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
         }
     }
-    
+
     public static void deleteByCancerStudyId(int cancerStudyId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
-            
+
             pstmt = con.prepareStatement("DELETE FROM clinical_event_data WHERE clinical_event_id IN "
                     + "(SELECT clinical_event_id FROM clinical_event WHERE patient_id in (SELECT internal_id FROM patient where cancer_study_id=?))");
             pstmt.setInt(1, cancerStudyId);
             pstmt.executeUpdate();
-            
+
             pstmt = con.prepareStatement("DELETE FROM clinical_event WHERE patient_id in (SELECT internal_id FROM patient where cancer_study_id=?)");
             pstmt.setInt(1, cancerStudyId);
             pstmt.executeUpdate();
@@ -207,7 +205,7 @@ public final class DaoClinicalEvent {
             JdbcUtil.closeAll(DaoClinicalEvent.class, con, pstmt, rs);
         }
     }
-    
+
     public static void deleteAllRecords() throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;

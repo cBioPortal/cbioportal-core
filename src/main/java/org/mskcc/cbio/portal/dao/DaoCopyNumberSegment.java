@@ -34,6 +34,7 @@ package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
 import java.util.*;
+//import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.CopyNumberSegment;
 
@@ -45,15 +46,16 @@ public final class DaoCopyNumberSegment {
 
     private static final double FRACTION_GENOME_ALTERED_CUTOFF = 0.2;
     private static final String FRACTION_GENOME_ALTERED_ATTR_ID = "FRACTION_GENOME_ALTERED";
+    private static final String COPY_NUMBER_SEG_SEQUENCE = "seq_copy_number_seg";
 
     private DaoCopyNumberSegment() {}
-    
+
     public static int addCopyNumberSegment(CopyNumberSegment seg) throws DaoException {
         if (!ClickHouseBulkLoader.isBulkLoad()) {
             throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert mutations");
         } else {
             ClickHouseBulkLoader.getClickHouseBulkLoader("copy_number_seg").insertRecord(
-                    Long.toString(seg.getSegId()),
+                    Long.toString(ClickHouseAutoIncrement.nextId(COPY_NUMBER_SEG_SEQUENCE)),
                     Integer.toString(seg.getCancerStudyId()),
                     Integer.toString(seg.getSampleId()),
                     seg.getChr(),
@@ -139,12 +141,12 @@ public final class DaoCopyNumberSegment {
             JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, null, null);
         }
     }
-    
+
     public static List<CopyNumberSegment> getSegmentForASample(
             int sampleId, int cancerStudyId) throws DaoException {
         return getSegmentForSamples(Collections.singleton(sampleId),cancerStudyId);
     }
-    
+
     public static List<CopyNumberSegment> getSegmentForSamples(
             Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
         if (sampleIds == null || sampleIds.isEmpty()) {
@@ -179,14 +181,14 @@ public final class DaoCopyNumberSegment {
             }
         });
     }
-    
+
     public static double getCopyNumberActeredFraction(int sampleId,
             int cancerStudyId, double cutoff) throws DaoException {
         Double d = getCopyNumberActeredFraction(Collections.singleton(sampleId), cancerStudyId, cutoff)
                 .get(sampleId);
         return d==null ? Double.NaN : d;
     }
-    
+
     public static Map<Integer,Double> getCopyNumberActeredFraction(Collection<Integer> sampleIds,
             int cancerStudyId, double cutoff) throws DaoException {
         Map<Integer,Long> alteredLength = getCopyNumberAlteredLength(sampleIds, cancerStudyId, cutoff);
@@ -205,7 +207,7 @@ public final class DaoCopyNumberSegment {
         }
         return fraction;
     }
-    
+
     private static Map<Integer,Long> getCopyNumberAlteredLength(Collection<Integer> sampleIds,
             int cancerStudyId, double cutoff) throws DaoException {
         return ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
@@ -232,12 +234,12 @@ public final class DaoCopyNumberSegment {
             }
         });
     }
-    
+
     /**
-     * 
+     *
      * @param cancerStudyId
      * @return true if segment data exist for the cancer study
-     * @throws DaoException 
+     * @throws DaoException
      */
     public static boolean segmentDataExistForCancerStudy(int cancerStudyId) throws DaoException {
         Connection con = null;
@@ -255,13 +257,13 @@ public final class DaoCopyNumberSegment {
             JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, pstmt, rs);
         }
     }
-    
+
     /**
-     * 
+     *
      * @param cancerStudyId
      * @param sampleId
      * @return true if segment data exist for the case
-     * @throws DaoException 
+     * @throws DaoException
      */
     public static boolean segmentDataExistForSample(int cancerStudyId, int sampleId) throws DaoException {
         Connection con = null;
