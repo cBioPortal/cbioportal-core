@@ -89,7 +89,7 @@ public class ImportEmbeddingDefinition extends ConsoleRunnable{
 
     private int findAndValidateDescriptionColumn(Map<String, Integer> headerIndexMap) {
         if (!headerIndexMap.containsKey(DESCRIPTION_COLUMN_NAME)) {
-            throw new RuntimeException("Missing required column: " + EMBEDDING_ID_COLUMN_NAME);
+            throw new RuntimeException("Missing required column: " + DESCRIPTION_COLUMN_NAME);
         }
         return headerIndexMap.get(DESCRIPTION_COLUMN_NAME);
     }

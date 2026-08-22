@@ -37,7 +37,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
     public static final String X__COLUMN_NAME = "X";
     public static final String Y_COLUMN_NAME = "Y";
     private static Properties properties;
-    Map<String, Integer> seenEmbeddingIds = new HashMap<>();
+    Map<String, Integer> seenDefinitionIds = new HashMap<>();
     public static final String TABLE = "embedding_data";
 
     /**
@@ -91,26 +91,26 @@ public class ImportEmbeddingData extends ConsoleRunnable{
                 String x = fieldValues[xIndex].trim();
                 String y = fieldValues[yIndex].trim();
                 String customAttribute = fieldValues[customIndex].trim();
-                // check if we have gotten the embedding id before  by checking
+                // check if embedding definition already exists
                 // the hashMap else query for embedding definition for the internal id
-                Integer internalId = seenEmbeddingIds.get(embeddingId);
+                Integer embeddingDefinitionId = seenDefinitionIds.get(embeddingId);
                 if(sampleId.isEmpty()){
                     patientEmbedding+=1;
                 }else{
                     sampleEmbedding+=1;
                 }
 
-                if (internalId == null) {
-                    internalId = DaoEmbeddingDefinition.getDefinitionId(embeddingId);
+                if (embeddingDefinitionId == null) {
+                    embeddingDefinitionId = DaoEmbeddingDefinition.getDefinitionId(embeddingId);
 
-                    if (internalId <= 0) {
+                    if (embeddingDefinitionId <= 0) {
                         throw new IllegalArgumentException(
                                 "Embedding definition not found: " + embeddingId
                         );
                     }
-                    seenEmbeddingIds.put(embeddingId, internalId);
+                    seenDefinitionIds.put(embeddingId, embeddingDefinitionId);
                 }
-                DaoEmbeddingData.addEmbeddingData(TABLE,Integer.toString(internalId), patientId,
+                DaoEmbeddingData.addEmbeddingData(Integer.toString(embeddingDefinitionId), patientId,
                         sampleId,x,y,customAttribute, cancerStudyId);
                 recordCount+=1;
 

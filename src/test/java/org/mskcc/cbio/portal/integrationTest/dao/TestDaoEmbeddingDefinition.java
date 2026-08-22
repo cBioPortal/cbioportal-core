@@ -53,6 +53,8 @@ public class TestDaoEmbeddingDefinition extends IntegrationTestBase {
                 "UMAP"
         );
         DaoEmbeddingDefinition.addDatum(emb);
+        // Hardcoded to 1 because only one definition is added, meaning the definition id will be one.
+        // This assumption is based on how ClickHouseAutoIncrement works.
         assertEquals(1,DaoEmbeddingDefinition.getDefinitionId(emb.getEmbeddingId()));
     }
 

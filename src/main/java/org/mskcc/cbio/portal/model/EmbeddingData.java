@@ -1,16 +1,16 @@
 package org.mskcc.cbio.portal.model;
 
 public class EmbeddingData {
-    private int embeddingId;
+    private int embeddingDefinitionId;
     private String patientId;
     private String sampleId;
     private double x;
     private double y;
     private int cancerStudyId; // storing the id for the cancer study identifierand
     private String customAttribute;
-    public EmbeddingData(int embeddingId, String sampleId, String patientId,
-                         float x, float y, String customAttribute, Integer cancerStudyId) {
-        this.embeddingId = embeddingId;
+    public EmbeddingData(int embeddingDefinitionId, String sampleId, String patientId,
+                         double x, double y, String customAttribute, Integer cancerStudyId) {
+        this.embeddingDefinitionId = embeddingDefinitionId;
         this.sampleId = sampleId;
         this.patientId = patientId;
         this.x = x;
@@ -19,12 +19,12 @@ public class EmbeddingData {
         this.cancerStudyId = cancerStudyId;
     }
 
-    public int getEmbeddingId() {
-        return embeddingId;
+    public int getEmbeddingDefinitionId() {
+        return embeddingDefinitionId;
     }
 
-    public void setEmbeddingId(int embeddingId) {
-        this.embeddingId = embeddingId;
+    public void setEmbeddingDefinitionId(int embeddingDefinitionId) {
+        this.embeddingDefinitionId = embeddingDefinitionId;
     }
 
     public String getPatientId() {

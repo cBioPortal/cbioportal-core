@@ -128,7 +128,7 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.STUDY_RESOURCES:'StudyResourceValidator',
     cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION:'ResourceDefinitionValidator',
     cbioportal_common.MetaFileTypes.EMBEDDING_DEFINITION:'EmbeddingDefinitionValidator',
-    cbioportal_common.MetaFileTypes.EMBEDDING:'EmbeddingValidator',
+    cbioportal_common.MetaFileTypes.EMBEDDING:'EmbeddingDataValidator',
 }
 
 
@@ -3702,7 +3702,7 @@ class EmbeddingDefinitionValidator(Validator):
 
     REQUIRE_COLUMN_ORDER = False
     REQUIRED_HEADERS = ['EMBEDDING_ID', 'SHORT_NAME', 'DESCRIPTION',
-                        'ENTITY_TYPE', 'REDUCTION_TECHNIQUE']
+                        'ENTITY_TYPE', 'REDUCTION_TECHNIQUE', 'NAME']
     UNIQUE_COLUMNS = ['EMBEDDING_ID']
 
 
@@ -3718,18 +3718,18 @@ class EmbeddingDefinitionValidator(Validator):
                        'cause': entity_type})
 
 
-class EmbeddingValidator(Validator):
+class EmbeddingDataValidator(Validator):
     """Validator for Embeddings data files."""
     REQUIRED_HEADERS = ['EMBEDDING_ID', 'PATIENT_ID', 'SAMPLE_ID', 'X', 'Y', 'CUSTOM_ATTRIBUTES']
     REQUIRE_COLUMN_ORDER = True
     ALLOW_BLANKS = True
 
     def __init__(self, *args, **kwargs):
-        super(EmbeddingValidator, self).__init__(*args, **kwargs)
+        super(EmbeddingDataValidator, self).__init__(*args, **kwargs)
         self.seen_pairs = set()
 
     def checkLine(self, data):
-        super(EmbeddingValidator,self).checkLine(data)
+        super(EmbeddingDataValidator, self).checkLine(data)
 
 
         embedding_id = data[self.cols.index('EMBEDDING_ID')].strip()
@@ -3749,6 +3749,7 @@ class EmbeddingValidator(Validator):
         # sample embedding
         if sample_id:
             self.checkSampleId(sample_id, self.cols.index('SAMPLE_ID') + 1)
+            self.checkPatientId(patient_id, self.cols.index('PATIENT_ID') + 1)
             pair = (embedding_id, sample_id)
         # patient embedding
         else:
