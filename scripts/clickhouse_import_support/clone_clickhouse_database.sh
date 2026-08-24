@@ -238,23 +238,30 @@ function clone_all_source_database_tables_to_destination_database() {
 
     while [ "$pos" -lt "$num_tables" ] ; do
         local table_name="${database_table_list[$pos]}"
-        if [ "$table_name" == "$AUTOINCREMENT_SEQUENCE_STATE_TABLENAME" ] || [[ "$table_name" == *_derived ]] ; then
+        if [ "$table_name" == "$AUTOINCREMENT_SEQUENCE_STATE_TABLENAME" ] ; then
             echo "skipping $table_name"
             pos=$(($pos+1))
             continue
+        fi
+        if [[ "$table_name" == *_derived ]] ; then
+            local clone_schema_only="true"
+        else
+            local clone_schema_only="false"
         fi
         echo "cloning $table_name"
         if ! create_destination_database_table_schema_only "$table_name" ; then
             echo "Error : could not create database table schema for $table_name in destination database" >&2
             return 1
         fi
-        if ! copy_source_database_table_data_to_destination "$table_name" ; then
-            echo "Error : could not copy data from table $table_name into destination database" >&2
-            return 1
-        fi
-        if ! destination_table_matches_source_table "$table_name" ; then
-            echo "Cloning operation canceled" >&2
-            return 1
+        if [ "$clone_schema_only" == "false" ] ; then
+            if ! copy_source_database_table_data_to_destination "$table_name" ; then
+                echo "Error : could not copy data from table $table_name into destination database" >&2
+                return 1
+            fi
+            if ! destination_table_matches_source_table "$table_name" ; then
+                echo "Cloning operation canceled" >&2
+                return 1
+            fi
         fi
         pos=$(($pos+1))
     done

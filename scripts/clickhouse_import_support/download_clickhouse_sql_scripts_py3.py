@@ -14,17 +14,20 @@ MAXIMUM_NUMBER_OF_RETRIES = 5
 MAXIMUM_SLEEP_WAITING_FOR_RATELIMIT_RESET = 5 * 60
 
 def create_arg_parser():
-    usage = "usage: %prog destination_directory [--github_branch_name=<branch_name>]"
+    usage = "usage: %prog destination_directory [--github_branch_name=<branch_name>] [--source_filename=<source_filename>]"
     parser = argparse.ArgumentParser(
                     prog='download_clickhouse_sql_scripts_py3.py',
-                    description='Downloads all files ending with \'.sql\' in the /src/main/resources/db_scripts/clickhouse directory of the cBioPortal github repository.')
+                    description='Downloads one or more .sql files (by default, only the cbioportal derived table population script) from the /src/main/resources/db_scripts/clickhouse directory of the cBioPortal github repository.')
     parser.add_argument('destination_directory', help = "local filesystem directory where downloads will be stored")
     parser.add_argument('--github_branch_name', default = "master")
+    parser.add_argument('--source_filename', default = "populate_derived_tables.sql", help='Default is to download "populate_derived_tables.sql" but another filename can be specified, or use "*" to download all files ending in .sql')
     return parser
 
 def exit_if_args_are_invalid(args):
     if not os.path.isdir(args.destination_directory):
         sys.exit("destination_directory argument (" + args.destination_directory + ") does not exist or is not a directory")
+    if not args.source_filename == '*' and not args.source_filename.endswith('.sql'):
+        sys.exit("source_filename argument (" + args.source_filename + ") must either be '*' or be a filename ending with .sql")
 
 def request_failed(response):
     return response.status != http.HTTPStatus.OK
@@ -76,6 +79,11 @@ def request_via_http_with_retry(connection_host_name, request_string, retry_limi
     # no response was obtained
     return None
 
+def file_should_be_downloaded(github_filename, source_filename):
+    if source_filename == '*':
+        return github_filename.endswith('.sql')
+    return github_filename == source_filename
+
 def download_files_from_github(args):
     GITHUB_HOST_NAME = "api.github.com"
     GITHUB_API_PATH = "/repos/cBioPortal/cbioportal/contents/src/main/resources/db-scripts/clickhouse"
@@ -85,8 +93,9 @@ def download_files_from_github(args):
     if not directory_content_response:
         sys.exit(1)
     directory_content = json.loads(directory_content_response.read().decode("utf-8"))
-    files_to_be_downloaded = [x for x in directory_content if os.path.basename(urlparse(x["url"]).path).casefold().endswith(".sql")]
+    files_to_be_downloaded = [x for x in directory_content if file_should_be_downloaded(os.path.basename(urlparse(x["url"]).path).casefold(), args.source_filename.casefold())]
     destination_directory_path = os.path.normpath(args.destination_directory)
+    downloaded_file_count = 0
     for github_file in files_to_be_downloaded:
         filename = os.path.basename(urlparse(github_file["url"]).path)
         print(f'attempting download of {github_file["url"]} for file {filename}')
@@ -100,6 +109,14 @@ def download_files_from_github(args):
         with open(output_file_path, "w") as output_file:
             output_file.write(file_data)
         print(f'file {filename} written')
+        downloaded_file_count = downloaded_file_count + 1
+    if downloaded_file_count == 0:
+        print(f'no files were download, using source_filename {args.source_filename}')
+        sys.exit(1)
+    desired_files_count = len(files_to_be_downloaded)
+    if desired_files_count != downloaded_file_count:
+        print(f'{desired_files_count} matching files were found in github, but only {downloaded_file_count} were successfully downloaded')
+        sys.exit(1)
     
 def main():
     parser = create_arg_parser()
