@@ -498,6 +498,44 @@ class TimelineValuesDataValidationTest(DataFileTestCase):
             self.assertEqual("ERROR", error.levelname)
             self.assertIn("Invalid START_DATE", error.getMessage())
 
+    def test_duplicate_sample_id_validation_TimelineValidator(self):
+        """timeline validator should warn when duplicate SAMPLE_IDs appear
+           in specimen-related events (SPECIMEN, SAMPLE ACQUISITION, SEQUENCING).
+        """
+        
+        self.logger.setLevel(logging.WARNING)
+        record_list = self.validate('data_timeline_duplicate_sample_id.txt',
+                                     validateData.TimelineValidator)
+        self.assertEqual(1, len(record_list))
+        warning = record_list[0]
+        self.assertEqual("WARNING", warning.levelname)
+        self.assertIn("Duplicate SAMPLE_ID", warning.getMessage())
+        self.assertIn("S001", warning.cause)
+        self.assertIn("already defined on line", warning.cause)
+        self.assertIn("SPECIMEN", warning.cause)
+
+    def test_duplicate_sample_id_across_event_types_TimelineValidator(self):
+        """timeline validator should warn when SAMPLE_ID appears across 
+           different specimen-related event types (SPECIMEN -> SAMPLE ACQUISITION)
+           and within the same event type (SEQUENCING -> SEQUENCING).
+        """
+        self.logger.setLevel(logging.WARNING)
+        record_list = self.validate('data_timeline_duplicate_sample_id_cross_events.txt',
+                                     validateData.TimelineValidator)
+        self.assertEqual(2, len(record_list))
+        
+        warning1 = record_list[0]
+        self.assertEqual("WARNING", warning1.levelname)
+        self.assertIn("Duplicate SAMPLE_ID", warning1.getMessage())
+        self.assertIn("S001", warning1.cause)
+        self.assertIn("SPECIMEN", warning1.cause)  
+        
+        warning2 = record_list[1]
+        self.assertEqual("WARNING", warning2.levelname)
+        self.assertIn("Duplicate SAMPLE_ID", warning2.getMessage())
+        self.assertIn("S002", warning2.cause)
+        self.assertIn("SEQUENCING", warning2.cause)
+
         
 # TODO: make tests in this testcase check the number of properly defined types
 class CancerTypeFileValidationTestCase(DataFileTestCase):
