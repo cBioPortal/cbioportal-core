@@ -1,0 +1,302 @@
+package org.mskcc.cbio.portal.scripts;
+
+import joptsimple.OptionException;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
+import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoEmbeddingData;
+import org.mskcc.cbio.portal.dao.DaoEmbeddingDefinition;
+import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.util.ConsoleUtil;
+import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+
+/**
+ * Script to import an embedding data
+ * @author leslie
+ */
+public class ImportEmbeddingData extends ConsoleRunnable{
+    private static final Logger log = LoggerFactory.getLogger(ImportEmbeddingData.class);
+    private CancerStudy cancerStudy;
+    private File embeddingDataFile;
+    public static final String DELIMITER = "\t";
+    public static final String SAMPLE_ID_COLUMN_NAME = "SAMPLE_ID";
+    public static final String PATIENT_ID_COLUMN_NAME = "PATIENT_ID";
+    public static final String EMBEDDING_ID_COLUMN_NAME = "EMBEDDING_ID";
+    public static final String CUSTOM_ATTRIBUTE_COLUMN_NAME = "CUSTOM_ATTRIBUTES";
+    public static final String X__COLUMN_NAME = "X";
+    public static final String Y_COLUMN_NAME = "Y";
+    private static Properties properties;
+    Map<String, Integer> seenDefinitionIds = new HashMap<>();
+    public static final String TABLE = "embedding_data";
+
+    /**
+     * Instantiates a ConsoleRunnable to run with the given command line args.
+     *
+     * @param args the command line arguments to be used
+     * @see {@link #run()}
+     */
+    public ImportEmbeddingData(String[] args) {
+        super(args);
+    }
+
+    public void setFile(CancerStudy cancerStudy, File embeddingDataFile)
+    {
+        this.cancerStudy = cancerStudy;
+        this.embeddingDataFile = embeddingDataFile;
+    }
+
+    // need to pay attention to the order at which it is passed to the method  must be order
+    //might delete test for adding embedding data  and the model
+    // TODO Need to be able to count the number of sample and patient embedding added to display that into the progress message
+    //TODO Decide upon if there is a failure during the import process shpuld partial data be added or the whole data discarded
+    public void importData()throws Exception{
+        ClickHouseBulkLoader.bulkLoadOn();
+        try(BufferedReader buff = new BufferedReader(new FileReader(embeddingDataFile))){
+            String line = buff.readLine();
+
+            // Get the headers to know which index belongs to which value
+            String[] headerNames = splitFields(line);
+            Map<String, Integer> headerIndexMap = makeHeaderIndexMap(headerNames);
+            // need to fix this to not be hardcoded and to be create a single point
+            // of entry a helper method to handle extracting this values
+            int embeddingIdIndex = findEmbeddingIndex(headerIndexMap);
+            int sampleIndex =findSampleIndex(headerIndexMap);
+            int patientIndex = findPatientIndex(headerIndexMap);
+            int xIndex = findXIndex(headerIndexMap);
+            int yIndex = findYIndex(headerIndexMap);
+            int customIndex = findCustomAttributeIndex(headerIndexMap);
+            ProgressMonitor.setCurrentMessage("Loading embedding data into database...");
+            int recordCount = 0;
+            int patientEmbedding = 0;
+            int sampleEmbedding = 0;
+
+            while((line = buff.readLine())!=null){
+                String[] fieldValues = getFieldValues(line, headerIndexMap);
+
+                String embeddingId = fieldValues[embeddingIdIndex].trim();
+                int cancerStudyId =  cancerStudy.getInternalId();
+                String sampleId = fieldValues[sampleIndex].trim();
+                String patientId = fieldValues[patientIndex].trim();
+                String x = fieldValues[xIndex].trim();
+                String y = fieldValues[yIndex].trim();
+                String customAttribute = fieldValues[customIndex].trim();
+                // check if embedding definition already exists
+                // the hashMap else query for embedding definition for the internal id
+                Integer embeddingDefinitionId = seenDefinitionIds.get(embeddingId);
+                if(sampleId.isEmpty()){
+                    patientEmbedding+=1;
+                }else{
+                    sampleEmbedding+=1;
+                }
+
+                if (embeddingDefinitionId == null) {
+                    embeddingDefinitionId = DaoEmbeddingDefinition.getDefinitionId(embeddingId);
+
+                    if (embeddingDefinitionId <= 0) {
+                        throw new IllegalArgumentException(
+                                "Embedding definition not found: " + embeddingId
+                        );
+                    }
+                    seenDefinitionIds.put(embeddingId, embeddingDefinitionId);
+                }
+                DaoEmbeddingData.addEmbeddingData(Integer.toString(embeddingDefinitionId), patientId,
+                        sampleId,x,y,customAttribute, cancerStudyId);
+                recordCount+=1;
+
+
+            }
+            ProgressMonitor.setCurrentMessage("--> records inserted into `" + TABLE + "` table: " + recordCount);
+            ProgressMonitor.setCurrentMessage("--> Patient embedding inserted into `" + TABLE + "` table: " + patientEmbedding);
+            ProgressMonitor.setCurrentMessage("--> Sample embedding inserted into `" + TABLE + "` table: " + sampleEmbedding);
+        }finally {
+            if (ClickHouseBulkLoader.isBulkLoad()) {
+                ClickHouseBulkLoader.flushAll();
+                ClickHouseBulkLoader.relaxedModeOff();
+            }
+        }
+    }
+
+    private String[] splitFields(String line) throws IOException {
+        return line.split(DELIMITER, -1);
+    }
+
+    private String[] getFieldValues(String line, Map<String, Integer> headerIndexMap) {
+        // split on delimiter:
+        String[] fieldValues = line.split(DELIMITER, -1);
+
+        // validate: if number of fields is incorrect, give exception
+        if (fieldValues.length != headerIndexMap.size()) {
+            throw new IllegalArgumentException("Number of columns in line is not as expected. Expected: "
+                    + headerIndexMap.size() + " columns, found: " + fieldValues.length + ", for line: " + line);
+        }
+
+        // now iterate over lines and trim each value:
+        for (int i = 0; i < fieldValues.length; i++) {
+            fieldValues[i] = fieldValues[i].trim();
+        }
+        return fieldValues;
+    }
+
+    private Map<String, Integer> makeHeaderIndexMap(String[] headerNames) {
+        Map<String, Integer> headerIndexMap = new HashMap<String, Integer>();
+        for (int i= 0; i < headerNames.length; i++) {
+            headerIndexMap.put(headerNames[i], i);
+        }
+        return headerIndexMap;
+    }
+
+    private int findEmbeddingIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(EMBEDDING_ID_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + EMBEDDING_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(EMBEDDING_ID_COLUMN_NAME);
+    }
+
+    private int findSampleIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(SAMPLE_ID_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + SAMPLE_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(SAMPLE_ID_COLUMN_NAME);
+    }
+
+    private int findPatientIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(PATIENT_ID_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + PATIENT_ID_COLUMN_NAME);
+        }
+        return headerIndexMap.get(PATIENT_ID_COLUMN_NAME);
+    }
+
+    private int findXIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(X__COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column for embedding point: " + X__COLUMN_NAME);
+        }
+        return headerIndexMap.get(X__COLUMN_NAME);
+    }
+
+    private int findYIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(Y_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column for embedding point: " + Y_COLUMN_NAME);
+        }
+        return headerIndexMap.get(Y_COLUMN_NAME);
+    }
+
+    private int findCustomAttributeIndex(Map<String, Integer> headerIndexMap){
+        if (!headerIndexMap.containsKey(CUSTOM_ATTRIBUTE_COLUMN_NAME)) {
+            throw new RuntimeException("Missing required column: " + CUSTOM_ATTRIBUTE_COLUMN_NAME);
+        }
+        return headerIndexMap.get(CUSTOM_ATTRIBUTE_COLUMN_NAME);
+    }
+
+
+
+
+    @Override
+    public void run() {
+        try{
+            String progName = "importEmbeddingData";
+            String description = "Import Embedding data files.";
+            // usage: --data <data_file.txt> --meta <meta_file.txt> --loadMode [directLoad|bulkLoad (default)] [--noprogress]
+
+            OptionParser parser = new OptionParser();
+            OptionSpec<String> data = parser.accepts( "data",
+                    "embedding data file" ).withRequiredArg().describedAs( "data_file.txt" ).ofType( String.class );
+            OptionSpec<String> meta = parser.accepts( "meta",
+                    "meta (description) file" ).withOptionalArg().describedAs( "meta_file.txt" ).ofType( String.class );
+            OptionSpec<String> study = parser.accepts("study",
+                    "cancer study id").withOptionalArg().describedAs("study").ofType(String.class);
+            // might not need this parsed into the arguement because it always does bulk insert
+            parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
+                    .withOptionalArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
+            parser.accepts("noprogress", "this option can be given to avoid the messages regarding memory usage and % complete");
+            OptionSpec<String> overWriteExistingFlag = parser.accepts("overwrite-existing",
+                    "Flag that enables re-uploading data for the patient/sample entries that already exist in the database").withOptionalArg().describedAs("overwrite-existing").ofType(String.class);
+            OptionSet options = null;
+
+            try {
+                options = parser.parse( args );
+            } catch (OptionException e) {
+                throw new UsageException(
+                        progName, description, parser,
+                        e.getMessage());
+            }
+
+            File embeddingData_f = null;
+            if( options.has( data ) ){
+                embeddingData_f = new File( options.valueOf( data ) );
+            } else {
+                throw new UsageException(
+                        progName, description, parser,
+                        "'data' argument required.");
+            }
+            boolean relaxed = false;
+            String cancerStudyStableId = null;
+            if( options.has ( study ) )
+            {
+                cancerStudyStableId = options.valueOf(study);
+            }
+            if( options.has ( meta ) )
+            {
+                properties = new TrimmedProperties();
+                properties.load(new FileInputStream(options.valueOf(meta)));
+                cancerStudyStableId = properties.getProperty("cancer_study_identifier");
+            }
+
+            CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(cancerStudyStableId);
+            if (cancerStudy == null) {
+                throw new IllegalArgumentException("Unknown cancer study: " + cancerStudyStableId);
+            }
+            ProgressMonitor.setCurrentMessage("Reading data from:  " + embeddingData_f.getAbsolutePath());
+            int numLines = FileUtil.getNumLines(embeddingData_f);
+            ProgressMonitor.setCurrentMessage(" --> total number of lines:  " + numLines);
+            ProgressMonitor.setMaxValue(numLines);
+
+            setFile(cancerStudy, embeddingData_f);
+            importData();
+
+        }catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public void runInConsole() {
+        try {
+            Date start = new Date();
+            ProgressMonitor.setConsoleModeAndParseShowProgress(this.args);
+            this.run();
+            ConsoleUtil.showMessages();
+            System.err.println("Done.");
+            Date end = new Date();
+            long totalTime = end.getTime() - start.getTime();
+            System.err.println ("Total time:  " + totalTime + " ms\n");
+
+        }
+        catch (UsageException e) {
+            e.printUsageLine();
+        }
+        catch (Throwable t) {
+            ConsoleUtil.showWarnings();
+            System.err.println ("\nABORTED!");
+            t.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args){
+        ConsoleRunnable runner = new ImportEmbeddingData(args);
+        runner.runInConsole();
+    }
+
+}

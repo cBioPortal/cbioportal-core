@@ -127,6 +127,8 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.PATIENT_RESOURCES:'PatientResourceValidator',
     cbioportal_common.MetaFileTypes.STUDY_RESOURCES:'StudyResourceValidator',
     cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION:'ResourceDefinitionValidator',
+    cbioportal_common.MetaFileTypes.EMBEDDING_DEFINITION:'EmbeddingDefinitionValidator',
+    cbioportal_common.MetaFileTypes.EMBEDDING:'EmbeddingDataValidator',
 }
 
 
@@ -3694,6 +3696,72 @@ class CancerTypeValidator(Validator):
                 self.defined_cancer_types.append(line_cancer_type)
         finally:
             self.logger.logger.removeHandler(tracking_handler)
+
+class EmbeddingDefinitionValidator(Validator):
+    """Validator for tab-Embeddings definition files."""
+
+    REQUIRE_COLUMN_ORDER = False
+    REQUIRED_HEADERS = ['EMBEDDING_ID', 'SHORT_NAME', 'DESCRIPTION',
+                        'ENTITY_TYPE', 'REDUCTION_TECHNIQUE', 'NAME']
+    UNIQUE_COLUMNS = ['EMBEDDING_ID']
+
+
+    def checkLine(self, data):
+        super(EmbeddingDefinitionValidator, self).checkLine(data)
+
+        #Gets the index of where entity tyoes are stored
+        entity_type = data[self.cols.index('ENTITY_TYPE')].strip().lower()
+        if entity_type not in ('patient','sample'):
+            self.logger.error(
+                'Invalid entity_type, must be PATIENT or SAMPLE',
+                extra={'line_number': self.line_number,
+                       'cause': entity_type})
+
+
+class EmbeddingDataValidator(Validator):
+    """Validator for Embeddings data files."""
+    REQUIRED_HEADERS = ['EMBEDDING_ID', 'PATIENT_ID', 'SAMPLE_ID', 'X', 'Y', 'CUSTOM_ATTRIBUTES']
+    REQUIRE_COLUMN_ORDER = True
+    ALLOW_BLANKS = True
+
+    def __init__(self, *args, **kwargs):
+        super(EmbeddingDataValidator, self).__init__(*args, **kwargs)
+        self.seen_pairs = set()
+
+    def checkLine(self, data):
+        super(EmbeddingDataValidator, self).checkLine(data)
+
+
+        embedding_id = data[self.cols.index('EMBEDDING_ID')].strip()
+        patient_id = data[self.cols.index('PATIENT_ID')].strip()
+        sample_id = data[self.cols.index('SAMPLE_ID')].strip()
+        x = data[self.cols.index('X')].strip()
+        y = data[self.cols.index('Y')].strip()
+
+        # check x and y are floats
+        if not self.checkFloat(x):
+            self.logger.error('X coordinate is not a number',
+                              extra={'line_number': self.line_number, 'cause': x})
+        if not self.checkFloat(y):
+            self.logger.error('Y coordinate is not a number',
+                              extra={'line_number': self.line_number, 'cause': y})
+
+        # sample embedding
+        if sample_id:
+            self.checkSampleId(sample_id, self.cols.index('SAMPLE_ID') + 1)
+            self.checkPatientId(patient_id, self.cols.index('PATIENT_ID') + 1)
+            pair = (embedding_id, sample_id)
+        # patient embedding
+        else:
+            self.checkPatientId(patient_id, self.cols.index('PATIENT_ID') + 1)
+            pair = (embedding_id, patient_id)
+
+        # track duplicates
+        if pair in self.seen_pairs:
+            self.logger.error('Duplicate entry',
+                              extra={'line_number': self.line_number, 'cause': str(pair)})
+        else:
+            self.seen_pairs.add(pair)
 
 class ResourceDefinitionValidator(Validator):
     # 'RESOURCE_ID', 'RESOURCE_TYPE', 'DISPLAY_NAME' are required

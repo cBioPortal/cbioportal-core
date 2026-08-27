@@ -80,6 +80,8 @@ class DataImporterTests(unittest.TestCase):
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_sequenced.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_test.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.AddCaseList', 'study_es_0', 'all', '--noprogress'),
+            call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportEmbeddingDefinition','--data', f'{study_directory}/data_embedding_definition.txt', '--noprogress'),
+            call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportEmbeddingData', '--meta', f'{study_directory}/meta_embedding.txt', '--loadMode', 'bulkload','--data', f'{study_directory}/data_embedding.txt', '--noprogress'),
             make_study_available_call,
         ])
 

@@ -57,6 +57,8 @@ DROP TABLE IF EXISTS sample_to_gene_panel_derived;
 DROP TABLE IF EXISTS structural_variant;
 DROP TABLE IF EXISTS type_of_cancer;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS embedding_definition;
+DROP TABLE IF EXISTS embedding_data;
  */
 
 CREATE TABLE allele_specific_copy_number
@@ -768,6 +770,32 @@ CREATE TABLE users
     `email` Nullable(String),
     `name` Nullable(String),
     `enabled` Nullable(Int32)
+)
+    ENGINE = MergeTree
+ORDER BY tuple();
+
+CREATE TABLE embedding_definition
+(
+    `internal_id` Int32,
+    `embedding_id` String,
+    `short_name` String,
+    `name` String,
+    `description` String,
+    `entity_type` String,
+    `reduction_technique` String
+)
+    ENGINE = MergeTree
+ORDER BY tuple(internal_id, embedding_id);
+
+CREATE TABLE embedding_data
+(
+    `embedding_definition_id` Int32,
+    `patient_id` String,
+    `sample_id` String,
+    `x` Float32,
+    `y` Float32,
+    `custom_attribute` String,
+    `study_id` Int32,
 )
     ENGINE = MergeTree
 ORDER BY tuple();

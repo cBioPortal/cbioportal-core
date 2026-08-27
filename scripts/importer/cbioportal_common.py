@@ -83,6 +83,8 @@ class MetaFileTypes(object):
     PATIENT_RESOURCES = 'meta_resource_patient'
     STUDY_RESOURCES = 'meta_resource_study'
     RESOURCES_DEFINITION = 'meta_resource_definition'
+    EMBEDDING = 'meta_embedding'
+    EMBEDDING_DEFINITION = 'meta_embedding_definition'
 
 # class to hold information about a failed java process execution
 class JavaRunException(Exception):
@@ -368,6 +370,15 @@ META_FIELD_MAP = {
         'resource_type': True,
         'data_filename': True
     },
+    MetaFileTypes.EMBEDDING_DEFINITION: {
+        'embedding_type': True, # Included to help the importer distinguish between definition and data file
+        'data_filename': True
+    },
+    MetaFileTypes.EMBEDDING: {
+        'cancer_study_identifier': True,
+        'embedding_type': True, # Included to help the importer distinguish between definition and data file
+        'data_filename': True
+    },
 }
 
 # order is important! This is the order in which they should be loaded:
@@ -422,6 +433,8 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.PATIENT_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
     MetaFileTypes.STUDY_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
     MetaFileTypes.RESOURCES_DEFINITION: "org.mskcc.cbio.portal.scripts.ImportResourceDefinition",
+    MetaFileTypes.EMBEDDING_DEFINITION: "org.mskcc.cbio.portal.scripts.ImportEmbeddingDefinition",
+    MetaFileTypes.EMBEDDING: "org.mskcc.cbio.portal.scripts.ImportEmbeddingData",
 }
 
 IMPORTER_REQUIRES_METADATA = {
@@ -433,7 +446,9 @@ IMPORTER_REQUIRES_METADATA = {
     "org.mskcc.cbio.portal.scripts.ImportTimelineData" : True,
     "org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap" : False,
     "org.mskcc.cbio.portal.scripts.ImportResourceData" : True,
-    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True
+    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True,
+    "org.mskcc.cbio.portal.scripts.ImportEmbeddingData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportEmbeddingDefinition": False
 }
 
 # ------------------------------------------------------------------------------
@@ -723,6 +738,17 @@ def get_meta_file_type(meta_dictionary, logger, filename):
             result = MetaFileTypes.STUDY_RESOURCES
         elif meta_dictionary['resource_type'] == 'DEFINITION':
             result = MetaFileTypes.RESOURCES_DEFINITION
+    elif 'embedding_type' in meta_dictionary:
+        embedding_type = meta_dictionary['embedding_type'].strip().upper()
+        if embedding_type == 'DATA':
+            result = MetaFileTypes.EMBEDDING
+        elif embedding_type == 'DEFINITION':
+            result = MetaFileTypes.EMBEDDING_DEFINITION
+        else:
+            logger.error(
+                'Invalid embedding_type. Expected DEFINITION or DATA.',
+                extra={'filename_': filename,
+                       'cause': 'embedding_type: %s' % meta_dictionary['embedding_type']})
     else:
         logger.error('Could not determine the file type. Did not find expected meta file fields. Please check your meta files for correct configuration.',
                          extra={'filename_': filename})

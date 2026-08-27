@@ -1,0 +1,3 @@
+EMBEDDING_ID	SHORT_NAME	NAME	DESCRIPTION	ENTITY_TYPE	REDUCTION_TECHNIQUE
+mosaic_sample	UMAP	UMAP Patient Embedding	UMAP embedding for patient similarity	PATIENT	umap
+patient_record_embedding	PCA	PCA Sample Embedding	PCA embedding for sample similarity	SAMPLE	pca

@@ -1,0 +1,9 @@
+EMBEDDING_ID	PATIENT_ID	SAMPLE_ID	X	Y	CUSTOM_ATTRIBUTES
+mosaic_sample	TEST-PAT1		1.2	3.4	{"data_split":"train"}
+mosaic_sample	TEST-PAT2		2.1	0.8	{"data_split":"train"}
+mosaic_sample	TEST-PAT3		4.5	1.1	{"data_split":"validation"}
+mosaic_sample	TEST-PAT4		3.3	2.2	{"data_split":"test"}
+patient_record_embedding	TEST-PAT5	TCGA-A1-A0SB-01	0.5	1.9	{"data_split":"train"}
+patient_record_embedding	TEST-PAT6	TCGA-A1-A0SD-01	2.7	3.1	{"data_split":"validation"}
+patient_record_embedding	TEST-PAT7	TCGA-A1-A0SE-01	1.8	0.4	{"data_split":"test"}
+patient_record_embedding	TEST-PAT9	TCGA-A1-A0SH-01	3.9	2.6	{"data_split":"test"}
