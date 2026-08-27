@@ -58,8 +58,9 @@ REMOVE_SAMPLES = "remove-samples"
 REMOVE_PATIENTS = "remove-patients"
 IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
+ENABLE_STUDY = "enable-study"
 
-COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS]
+COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS, ENABLE_STUDY]
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -268,6 +269,11 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity)
     elif command == IMPORT_CASE_LIST:
         import_case_list(jvm_args, meta_filename)
+    elif command == ENABLE_STUDY:
+        if study_ids is None:
+            raise RuntimeError('enable-study requires -id/--study_ids')
+        for study_id in study_ids.split(","):
+            update_study_status(jvm_args, study_id)
 
 def get_meta_filenames(data_directory):
     meta_filenames = [
@@ -278,13 +284,16 @@ def get_meta_filenames(data_directory):
         not (meta_filename.startswith('.') or meta_filename.endswith('~'))]
     return meta_filenames
 
-def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None):
+def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None, enable_study = True):
     """
     Import an entire study directory based on meta files found.
 
     1. Determine meta files in study directory.
     2. Read all meta files and determine file types.
     3. Import data files in specific order by file type.
+
+    enable_study=False skips the final AVAILABLE status flip -- the study stays UNAVAILABLE
+    until a separate `enable-study` call is made (see ENABLE_STUDY command).
     """
 
     study_id = None
@@ -467,7 +476,8 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         add_global_case_list(jvm_args, study_id)
 
     # enable study
-    update_study_status(jvm_args, study_id)
+    if enable_study:
+        update_study_status(jvm_args, study_id)
 
 def get_meta_filenames_by_type(data_directory) -> Dict[str, Tuple[str, Dict]]:
     """
@@ -589,6 +599,9 @@ def add_parser_args(parser):
                         help='Path to meta file')
     parser.add_argument('-data', '--data_filename', type=str, required=False,
                         help='Path to Data file')
+    parser.add_argument('--skip-enable-study', dest='skip_enable_study', action='store_true',
+                        help='With -s: skip marking the study AVAILABLE at the end of import. '
+                             'Call the enable-study command separately once ready.')
 
 def interface(args=None):
     parent_parser = argparse.ArgumentParser(description='cBioPortal meta Importer')
@@ -616,6 +629,10 @@ def interface(args=None):
                         help='Cancer Study ID(s) that contains sample(s). Comma separated, if multiple.')
     remove_patients.add_argument('--patient_ids', type=str, required=True,
                         help='Patient ID(s). Comma separated, if multiple.')
+
+    enable_study = subparsers.add_parser('enable-study', parents=[parent_parser], add_help=False)
+    enable_study.add_argument('-id', '--study_ids', type=str, required=True,
+                        help='Cancer Study ID(s) to mark AVAILABLE, comma separated')
 
     parser.add_argument('-c', '--command', type=str, required=False,
                         help='This argument is outdated. Please use the listed subcommands, without the -c flag. '
@@ -700,7 +717,8 @@ def main(args):
         process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity)
     elif args.study_directory is not None:
         check_dir(args.study_directory)
-        process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity)
+        process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity,
+                                 enable_study=not getattr(args, 'skip_enable_study', False))
     else:
         check_args(args.command)
         check_files(args.meta_filename, args.data_filename)
