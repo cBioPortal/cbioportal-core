@@ -64,6 +64,17 @@ public class ClickHouseBulkLoader {
     private static boolean bulkLoad = false;
     private static boolean relaxedMode = false;
 
+    /**
+     * When enabled, matrix-style genetic alteration data is written directly to the exploded
+     * {@code genetic_alteration_derived} table at import time instead of being stored packed in
+     * {@code genetic_alteration} and rebuilt later by the ARRAY JOIN derive step. Defaults from the
+     * {@code cbioportal.importer.no_explode} system property (or {@code CBIOPORTAL_IMPORTER_NO_EXPLODE}
+     * env var) so it can be toggled from metaImport.py, and can also be set programmatically.
+     */
+    private static boolean noExplode = Boolean.parseBoolean(
+        System.getProperty("cbioportal.importer.no_explode",
+            System.getenv().getOrDefault("CBIOPORTAL_IMPORTER_NO_EXPLODE", "false")));
+
     private final String tableName;
     private final List<String[]> pendingRecords = new ArrayList<>();
     private String[] fieldNames = null;
@@ -83,6 +94,19 @@ public class ClickHouseBulkLoader {
         }
         BULK_LOADERS.clear();
         return totalInserted;
+    }
+
+    /**
+     * Flush this loader's buffered rows immediately. Lets a caller bound memory by flushing
+     * periodically instead of accumulating an entire (potentially huge) batch before {@link #flushAll()}.
+     */
+    public int flush() throws DaoException {
+        return flushPendingRecords();
+    }
+
+    /** Number of rows currently buffered (not yet flushed). */
+    public int pendingSize() {
+        return pendingRecords.size();
     }
 
     private int flushPendingRecords() throws DaoException {
@@ -203,6 +227,18 @@ public class ClickHouseBulkLoader {
 
     public static void bulkLoadOff() {
         bulkLoad = false;
+    }
+
+    public static boolean isNoExplode() {
+        return noExplode;
+    }
+
+    public static void noExplodeOn() {
+        noExplode = true;
+    }
+
+    public static void noExplodeOff() {
+        noExplode = false;
     }
 
     public static void relaxedModeOn() {
