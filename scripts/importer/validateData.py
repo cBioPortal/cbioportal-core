@@ -91,6 +91,11 @@ COLOR_REGEX = re.compile("^#[a-fA-F0-9]{6}$")
 # global character limit on sample stable ids
 MAX_SAMPLE_STABLE_ID_LENGTH = 63
 
+# global character limit on clinical attribute values; matches the
+# `clinical_patient`/`clinical_sample` ATTR_VALUE varchar(255) database columns,
+# beyond which values would be silently truncated on load
+MAX_CLINICAL_ATTRIBUTE_VALUE_LENGTH = 255
+
 # global variable that defines the invalid ID characters
 INVALID_ID_CHARACTERS = r"[^A-Za-z0-9._()\[\]',+\-:;]"
 
@@ -2749,6 +2754,18 @@ class ClinicalValidator(Validator):
             if col_index < len(data):
                 value = data[col_index].strip()
             data_type = self.attr_defs[col_index]['datatype']
+
+            # values are stored in a varchar(255) column and would be silently
+            # truncated on load if they are longer than that
+            if len(value) > MAX_CLINICAL_ATTRIBUTE_VALUE_LENGTH:
+                self.logger.error(
+                    'Value exceeds the maximum length of %d characters and '
+                    'would be truncated when loaded' %
+                    MAX_CLINICAL_ATTRIBUTE_VALUE_LENGTH,
+                    extra={'line_number': self.line_number,
+                           'column_number': col_index + 1,
+                           'column_name': col_name,
+                           'cause': value[:50] + '...'})
 
             # if not blank, check if values match the datatype
             if value.strip().lower() in self.NULL_VALUES:
