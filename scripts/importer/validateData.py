@@ -3881,10 +3881,40 @@ class ResourceValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
 
+            if col_name == 'PRIORITY':
+                if value.strip() and value.strip().lower() not in self.NULL_VALUES:
+                    try:
+                        int(value.strip())
+                    except ValueError:
+                        self.logger.error(
+                            'wrong value of PRIORITY, the value should be an integer',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value})
+
+            if col_name == 'METADATA':
+                metadata_value = value.strip()
+                if metadata_value and metadata_value.lower() not in self.NULL_VALUES:
+                    try:
+                        json.loads(metadata_value)
+                    except json.JSONDecodeError:
+                        self.logger.error(
+                            'Invalid JSON in METADATA column.',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value})
+                    except Exception:
+                        self.logger.error(
+                            'Error processing METADATA column.',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value})
+
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
 
     REQUIRED_HEADERS = ['SAMPLE_ID', 'PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'GROUP_PATH', 'METADATA', 'PRIORITY']
 
     def __init__(self, *args, **kwargs):
         """Initialize a SampleResourceValidator with the given parameters."""
@@ -3948,6 +3978,7 @@ class SampleResourceValidator(ResourceValidator):
 class PatientResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'GROUP_PATH', 'METADATA', 'PRIORITY']
 
     def __init__(self, *args, **kwargs):
         """Initialize a PatientResourceValidator with the given parameters."""
@@ -4000,6 +4031,7 @@ class PatientResourceValidator(ResourceValidator):
 class StudyResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'GROUP_PATH', 'METADATA', 'PRIORITY']
 
     def __init__(self, *args, **kwargs):
         """Initialize a StudyResourceValidator with the given parameters."""
