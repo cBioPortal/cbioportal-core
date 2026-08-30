@@ -157,6 +157,58 @@ class MaxLevelTrackingHandler(logging.Handler):
         else:
             return 2
 
+
+class ValidationSummaryHandler(logging.Handler):
+
+    """Handler that collects validation messages and prints a grouped summary.
+
+    Groups messages by severity (ERROR, WARNING) and by message text,
+    providing counts for repeated messages. This makes it easier for
+    curators to triage validation output by scanning categories rather
+    than reading a chronological stream.
+    """
+
+    def __init__(self):
+        """Initialize with dictionaries to track message counts."""
+        super(ValidationSummaryHandler, self).__init__()
+        self.error_counts = {}
+        self.warning_counts = {}
+
+    def emit(self, record):
+        """Collect messages by severity and message text."""
+        msg = record.getMessage()
+        if record.levelno == logging.ERROR:
+            self.error_counts[msg] = self.error_counts.get(msg, 0) + 1
+        elif record.levelno == logging.WARNING:
+            self.warning_counts[msg] = self.warning_counts.get(msg, 0) + 1
+
+    def get_summary(self):
+        """Return a formatted summary string grouped by severity."""
+        lines = []
+        total_errors = sum(self.error_counts.values())
+        total_warnings = sum(self.warning_counts.values())
+        lines.append('-' * 60)
+        lines.append('VALIDATION SUMMARY')
+        lines.append('-' * 60)
+        if total_errors == 0 and total_warnings == 0:
+            lines.append('  No errors or warnings.')
+            lines.append('')
+            return '\n'.join(lines)
+        if total_errors > 0:
+            lines.append('ERRORS (%d):' % total_errors)
+            for msg, count in sorted(self.error_counts.items(),
+                                     key=lambda x: x[1], reverse=True):
+                lines.append('  [%d] %s' % (count, msg))
+            lines.append('')
+        if total_warnings > 0:
+            lines.append('WARNINGS (%d):' % total_warnings)
+            for msg, count in sorted(self.warning_counts.items(),
+                                     key=lambda x: x[1], reverse=True):
+                lines.append('  [%d] %s' % (count, msg))
+            lines.append('')
+        lines.append('-' * 60)
+        return '\n'.join(lines)
+
 class LineCountHandler(logging.Handler):
 
     """Handler that does nothing but track the number of lines with error and warnings."""
@@ -5635,6 +5687,8 @@ def main_validate(args):
     logger.setLevel(logging.DEBUG)
     exit_status_handler = MaxLevelTrackingHandler()
     logger.addHandler(exit_status_handler)
+    summary_handler = ValidationSummaryHandler()
+    logger.addHandler(summary_handler)
 
     # process the options
     if args.study_directory:
@@ -5738,6 +5792,15 @@ def main_validate(args):
         # flush logger and generate HTML while overriding cbio_version after retrieving it from the API
         collapsing_html_handler.flush()
         html_handler.generateHtml(cbio_version=cbio_version)
+
+    # flush collapsing handlers before printing summary so all messages
+    # are captured by the summary handler
+    collapsing_text_handler.flush()
+    if collapsing_html_handler is not None:
+        collapsing_html_handler.flush()
+
+    # print grouped validation summary to stderr
+    print(summary_handler.get_summary(), file=sys.stderr)
 
     return exit_status_handler.get_exit_status()
 
