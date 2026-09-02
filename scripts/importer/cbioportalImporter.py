@@ -301,6 +301,7 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     gsva_pvalue_filepair = None
     structural_variant_filepair = None
     cna_long_filepair = None
+    wsi_filepair = None
 
     # Determine meta filenames in study directory
     meta_filenames = get_meta_filenames(study_directory)
@@ -388,6 +389,13 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         elif meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
             cna_long_filepair = (
                 (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+        elif meta_file_type == MetaFileTypes.WSI:
+            if wsi_filepair is not None:
+                raise RuntimeError(
+                    'Multiple WSI files found: {} and {}'.format(
+                        wsi_filepair[0], meta_filename))
+            wsi_filepair = (
+                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))
         # Add all other types of data
         else:
             regular_filepairs.append(
@@ -411,6 +419,13 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     else:
         meta_filename, data_filename = sample_attr_filepair
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+
+    # WSI rows reference the study's patient/sample definitions and must be
+    # published before any later data import can mark the study available.
+    if wsi_filepair is not None:
+        meta_filename, data_filename = wsi_filepair
+        import_data(jvm_args, meta_filename, data_filename,
+                    update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Next, we need to import resource definitions for resource data
     if resource_definition_filepair is not None:

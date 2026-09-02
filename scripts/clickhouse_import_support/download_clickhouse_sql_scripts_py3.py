@@ -60,7 +60,7 @@ def request_via_http_with_retry(connection_host_name, request_string, retry_limi
                         sys.exit(1)
                     if attempt_number < retry_limit - 1:
                         print(f"because of a request rate limit, this program must now sleep for {required_sleep_duration} seconds until the next reset")
-                        time.sleep(sleep_duration_seconds)
+                        time.sleep(required_sleep_duration)
                         continue
                     else:
                         print(f'warning : request to host {connection_host_name} with url string {request_string} failed.')

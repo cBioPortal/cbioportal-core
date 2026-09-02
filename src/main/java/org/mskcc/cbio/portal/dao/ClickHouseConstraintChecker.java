@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * - Rows are checked only when all FK/unique-key columns are non-NULL.
  * - "NULL" in referer/key values means the column value was NULL.
  * <p>
- * The constraint lists are hard-coded for the ClickHouse schema (see clickhouse_cgds.sql).
+ * The constraint lists are hard-coded for the ClickHouse schema (see the canonical init/schema.sql).
  * Update {@link #schemaForeignKeys()} and {@link #schemaUniqueKeys()} when the schema changes.
  */
 public class ClickHouseConstraintChecker {
@@ -179,7 +179,7 @@ public class ClickHouseConstraintChecker {
 
     /**
      * Foreign key list for the ClickHouse schema (lower-case names).
-     * Keep this in sync with clickhouse_cgds.sql.
+     * Keep this in sync with the canonical init/schema.sql.
      */
     private static List<ForeignKey> schemaForeignKeys() {
         List<ForeignKey> fks = new ArrayList<>();
@@ -325,7 +325,7 @@ public class ClickHouseConstraintChecker {
 
     /**
      * Unique key list for the ClickHouse schema (lower-case names).
-     * Keep this in sync with clickhouse_cgds.sql.
+     * Keep this in sync with the canonical init/schema.sql.
      */
     private static List<UniqueKey> schemaUniqueKeys() {
         List<UniqueKey> uniqueKeys = new ArrayList<>();

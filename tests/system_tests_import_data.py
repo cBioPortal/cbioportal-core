@@ -20,6 +20,22 @@ class DataImporterTests(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
+    @mock.patch('importer.cbioportalImporter.cbioportal_common.parse_metadata_file')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_wsi_import_dispatch(self, run_java, parse_metadata_file):
+        """WSI cannot be imported incrementally into an existing database."""
+        parse_metadata_file.return_value = {
+            'meta_file_type': cbioportalImporter.MetaFileTypes.WSI,
+            'data_filename': 'data_wsi.txt',
+            'cancer_study_identifier': 'study_es_0',
+        }
+
+        with self.assertRaises(NotImplementedError):
+            cbioportalImporter.import_data(
+                '-Dspring.profiles.active=dbcp -cp test.jar',
+                '/tmp/meta_wsi.txt', '/tmp/data_wsi.txt', incremental=True)
+        run_java.assert_not_called()
+
     @mock.patch('importer.cbioportalImporter.locate_jar')
     @mock.patch('importer.cbioportalImporter.run_java')
     def test_full_study_load(self, run_java, locate_jar):

@@ -3236,5 +3236,35 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
         self.assertEqual('Validation complete', record_list[-1].getMessage())
 
 
+class WsiValidatorTestCase(PostClinicalDataFileTestCase):
+
+    def test_deid_rejects_common_absolute_date_formats(self):
+        for value in ('2021-03-14', '03/14/2021', '14/03/2021',
+                      'March 14, 2021', '14 March 2021'):
+            self.assertTrue(validateData._wsi_contains_absolute_date(value))
+
+    def test_valid_unmatched_slide(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_wsi_valid.txt', validateData.WsiValidator)
+        self.assertEqual([], [record for record in record_list if record.levelno >= logging.ERROR])
+
+    def test_tile_metadata_requires_browser_contract(self):
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({
+            'dimensions': {'width': 256, 'height': 256},
+            'levels': 1,
+            'level_dimensions': [],
+            'max_zoom': 0,
+            'tile_size': 256,
+        }))
+        self.assertTrue(validateData.WsiValidator._is_valid_tile_metadata({
+            'dimensions': {'width': 256, 'height': 256},
+            'levels': 1,
+            'level_dimensions': [{'width': 256, 'height': 256}],
+            'max_zoom': 0,
+            'tile_size': 256,
+        }))
+
+
 if __name__ == '__main__':
     unittest.main(buffer=True)
