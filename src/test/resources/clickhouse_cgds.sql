@@ -15,6 +15,8 @@ DROP TABLE IF EXISTS cna_event;
 DROP TABLE IF EXISTS copy_number_seg;
 DROP TABLE IF EXISTS copy_number_seg_file;
 DROP TABLE IF EXISTS data_access_tokens;
+DROP TABLE IF EXISTS facets_cncf;
+DROP TABLE IF EXISTS facets_genes;
 DROP TABLE IF EXISTS gene;
 DROP TABLE IF EXISTS gene_alias;
 DROP TABLE IF EXISTS gene_panel;
@@ -243,6 +245,41 @@ CREATE TABLE data_access_tokens
 )
     ENGINE = MergeTree
 ORDER BY tuple();
+
+CREATE TABLE facets_cncf
+(
+    `seg_id` Int64,
+    `cancer_study_id` Int64,
+    `sample_id` Int64,
+    `chr` LowCardinality(String),
+    `start` Int64,
+    `end` Int64,
+    `tcn` Nullable(Float64),
+    `lcn` Nullable(Float64),
+    `cellular_fraction` Nullable(Float64),
+    `purity` Nullable(Float64)
+)
+    ENGINE = MergeTree
+ORDER BY (cancer_study_id, sample_id, chr, start);
+
+CREATE TABLE facets_genes
+(
+    `gene_id` Int64,
+    `cancer_study_id` Int64,
+    `sample_id` Int64,
+    `hugo_gene_symbol` String,
+    `entrez_gene_id` Int64,
+    `chr` LowCardinality(String),
+    `start` Int64,
+    `end` Int64,
+    `tcn` Nullable(Float64),
+    `lcn` Nullable(Float64),
+    `cellular_fraction` Nullable(Float64),
+    `purity` Nullable(Float64),
+    INDEX idx_facets_genes_hugo_symbol hugo_gene_symbol TYPE bloom_filter GRANULARITY 4
+)
+    ENGINE = MergeTree
+ORDER BY (cancer_study_id, sample_id, hugo_gene_symbol);
 
 CREATE TABLE gene
 (

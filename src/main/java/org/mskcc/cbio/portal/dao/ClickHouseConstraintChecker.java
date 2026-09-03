@@ -296,6 +296,12 @@ public class ClickHouseConstraintChecker {
         fks.add(new ForeignKey("copy_number_seg", List.of("sample_id"), "sample", List.of("internal_id")));
         fks.add(new ForeignKey("copy_number_seg_file", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
 
+        // facets_cncf / facets_genes
+        fks.add(new ForeignKey("facets_cncf", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("facets_cncf", List.of("sample_id"), "sample", List.of("internal_id")));
+        fks.add(new ForeignKey("facets_genes", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("facets_genes", List.of("sample_id"), "sample", List.of("internal_id")));
+
         // clinical_event / clinical_event_data
         fks.add(new ForeignKey("clinical_event", List.of("patient_id"), "patient", List.of("internal_id")));
         fks.add(new ForeignKey("clinical_event_data", List.of("clinical_event_id"), "clinical_event", List.of("clinical_event_id")));
@@ -449,6 +455,10 @@ public class ClickHouseConstraintChecker {
         // copy_number_seg / copy_number_seg_file
         uniqueKeys.add(new UniqueKey("copy_number_seg", List.of("seg_id")));
         uniqueKeys.add(new UniqueKey("copy_number_seg_file", List.of("seg_file_id")));
+
+        // facets_cncf / facets_genes
+        uniqueKeys.add(new UniqueKey("facets_cncf", List.of("seg_id")));
+        uniqueKeys.add(new UniqueKey("facets_genes", List.of("gene_id")));
 
         // clinical_event
         uniqueKeys.add(new UniqueKey("clinical_event", List.of("clinical_event_id")));

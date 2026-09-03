@@ -197,6 +197,10 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
         addFk(keys, "copy_number_seg", "cancer_study_id", "cancer_study", "cancer_study_id");
         addFk(keys, "copy_number_seg", "sample_id", "sample", "internal_id");
         addFk(keys, "copy_number_seg_file", "cancer_study_id", "cancer_study", "cancer_study_id");
+        addFk(keys, "facets_cncf", "cancer_study_id", "cancer_study", "cancer_study_id");
+        addFk(keys, "facets_cncf", "sample_id", "sample", "internal_id");
+        addFk(keys, "facets_genes", "cancer_study_id", "cancer_study", "cancer_study_id");
+        addFk(keys, "facets_genes", "sample_id", "sample", "internal_id");
         addFk(keys, "clinical_event", "patient_id", "patient", "internal_id");
         addFk(keys, "clinical_event_data", "clinical_event_id", "clinical_event", "clinical_event_id");
         addFk(keys, "reference_genome_gene", "reference_genome_id", "reference_genome", "reference_genome_id");
@@ -249,6 +253,8 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
         addUk(keys, "sample_cna_event", "cna_event_id,sample_id,genetic_profile_id");
         addUk(keys, "copy_number_seg", "seg_id");
         addUk(keys, "copy_number_seg_file", "seg_file_id");
+        addUk(keys, "facets_cncf", "seg_id");
+        addUk(keys, "facets_genes", "gene_id");
         addUk(keys, "clinical_event", "clinical_event_id");
         addUk(keys, "reference_genome_gene", "entrez_gene_id,reference_genome_id");
         addUk(keys, "data_access_tokens", "token");
