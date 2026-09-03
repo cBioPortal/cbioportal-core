@@ -63,6 +63,8 @@ class MetaFileTypes(object):
     CNA_LOG2 = 'meta_log2CNA'
     CNA_CONTINUOUS = 'meta_contCNA'
     SEG = 'meta_segment'
+    FACETS_CNCF = 'meta_facets_cncf'
+    FACETS_GENE_LEVEL = 'meta_facets_gene_level'
     EXPRESSION = 'meta_expression'
     MUTATION = 'meta_mutations_extended'
     MUTATION_UNCALLED = 'meta_mutations_uncalled'
@@ -168,6 +170,22 @@ META_FIELD_MAP = {
         'gene_panel': False
     },
     MetaFileTypes.SEG: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'reference_genome_id': True,
+        'data_filename': True,
+        'description': True
+    },
+    MetaFileTypes.FACETS_CNCF: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'reference_genome_id': True,
+        'data_filename': True,
+        'description': True
+    },
+    MetaFileTypes.FACETS_GENE_LEVEL: {
         'cancer_study_identifier': True,
         'genetic_alteration_type': True,
         'datatype': True,
@@ -390,6 +408,8 @@ INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
     MetaFileTypes.GENE_PANEL_MATRIX,
     MetaFileTypes.STRUCTURAL_VARIANT,
     MetaFileTypes.SEG,
+    MetaFileTypes.FACETS_CNCF,
+    MetaFileTypes.FACETS_GENE_LEVEL,
 ]
 
 IMPORTER_CLASSNAME_BY_META_TYPE = {
@@ -402,6 +422,8 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.CNA_LOG2: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.CNA_CONTINUOUS: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.SEG: "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData",
+    MetaFileTypes.FACETS_CNCF: "org.mskcc.cbio.portal.scripts.ImportFacetsCncfData",
+    MetaFileTypes.FACETS_GENE_LEVEL: "org.mskcc.cbio.portal.scripts.ImportFacetsGeneLevelData",
     MetaFileTypes.EXPRESSION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.MUTATION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.MUTATION_UNCALLED: "org.mskcc.cbio.portal.scripts.ImportProfileData",
@@ -427,6 +449,8 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
 IMPORTER_REQUIRES_METADATA = {
     "org.mskcc.cbio.portal.scripts.ImportClinicalData" : True,
     "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportFacetsCncfData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportFacetsGeneLevelData" : True,
     "org.mskcc.cbio.portal.scripts.ImportGisticData" : False,
     "org.mskcc.cbio.portal.scripts.ImportMutSigData" : False,
     "org.mskcc.cbio.portal.scripts.ImportProfileData" : True,
@@ -666,6 +690,8 @@ def get_meta_file_type(meta_dictionary, logger, filename):
         ("COPY_NUMBER_ALTERATION", "CONTINUOUS"): MetaFileTypes.CNA_CONTINUOUS,
         ("COPY_NUMBER_ALTERATION", "LOG2-VALUE"): MetaFileTypes.CNA_LOG2,
         ("COPY_NUMBER_ALTERATION", "SEG"): MetaFileTypes.SEG,
+        ("COPY_NUMBER_ALTERATION", "FACETS_CNCF"): MetaFileTypes.FACETS_CNCF,
+        ("COPY_NUMBER_ALTERATION", "FACETS_GENE_LEVEL"): MetaFileTypes.FACETS_GENE_LEVEL,
         # expression
         ("MRNA_EXPRESSION", "CONTINUOUS"): MetaFileTypes.EXPRESSION,
         ("MRNA_EXPRESSION", "Z-SCORE"): MetaFileTypes.EXPRESSION,
