@@ -7,7 +7,7 @@ version 3, or (at your option) any later version.
 """
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import sys
 import logging.handlers
 import textwrap
@@ -3264,6 +3264,23 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             'max_zoom': 0,
             'tile_size': 256,
         }))
+
+    def test_tile_metadata_deid_allows_date_like_source_fingerprint(self):
+        validator = validateData.WsiValidator.__new__(validateData.WsiValidator)
+        validator.logger = Mock()
+        header = ['TILE_METADATA_JSON']
+        metadata = {'source_fingerprint': 'a' * 10 + '20395333' + 'b' * 46}
+        validator._validate_metadata_deid(metadata, 1, header)
+        validator.logger.error.assert_not_called()
+
+    def test_approved_source_prefix_allows_pipeline_release_date(self):
+        with patch.dict(validateData.os.environ, {
+            'WSI_ALLOWED_SOURCE_PREFIXES': 's3://mskmind-bkt/reef-slides-reprocess-staging/',
+        }):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                's3://mskmind-bkt/reef-slides-reprocess-staging/prod-staged-20260819-v2/1.svs',
+                'source',
+            ))
 
 
 if __name__ == '__main__':

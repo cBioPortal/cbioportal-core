@@ -4562,17 +4562,23 @@ class WsiValidator(Validator):
         if (not path or path.endswith('/')
                 or any(segment in ('.', '..') for segment in path.split('/'))):
             return False
-        if (_wsi_contains_absolute_date(value) or _wsi_contains_absolute_date(path)
-                or WSI_COMPACT_DATE.search(value) or WSI_COMPACT_DATE.search(path)):
-            return False
-        if WSI_LABELLED_MRN.search(value) or WSI_LABELLED_MRN.search(path):
-            return False
         prefixes = cls._uri_prefixes(
             'WSI_ALLOWED_SOURCE_PREFIXES'
             if kind == 'source'
             else 'WSI_ALLOWED_THUMBNAIL_PREFIXES'
         )
-        if prefixes and not any(value.startswith(prefix + '/') for prefix in prefixes):
+        prefix_match = bool(prefixes and any(value.startswith(prefix + '/') for prefix in prefixes))
+        # Approved object-store prefixes are deployment-controlled artifact
+        # roots. Their paths may contain pipeline release dates (for example
+        # ``prod-staged-20260819-v2``), which are not patient dates. Keep the
+        # strict date/MRN checks for URLs outside the configured roots.
+        if (not prefix_match and (_wsi_contains_absolute_date(value)
+                or _wsi_contains_absolute_date(path)
+                or WSI_COMPACT_DATE.search(value) or WSI_COMPACT_DATE.search(path))):
+            return False
+        if WSI_LABELLED_MRN.search(value) or WSI_LABELLED_MRN.search(path):
+            return False
+        if prefixes and not prefix_match:
             return False
         filename = path.rsplit('/', 1)[-1]
         stem, separator, extension = filename.rpartition('.')
@@ -4584,7 +4590,11 @@ class WsiValidator(Validator):
             'PATIENT_ID', 'REFERENCE_SAMPLE_ID', 'SAMPLE_ID', 'IMAGE_ID'
         }
         for name, value in row.items():
-            if name in approved_identifier_fields or name in WSI_NON_TEXT_FIELDS or not value:
+            # Artifact URLs are validated below with the configured source/
+            # thumbnail prefix policy. Do not run the generic free-text date
+            # detector over controlled release path components.
+            if name in approved_identifier_fields or name in WSI_NON_TEXT_FIELDS \
+                    or name in {'SOURCE_URL', 'THUMBNAIL_URL'} or not value:
                 continue
             if (WSI_LABELLED_MRN.search(value) or _wsi_contains_absolute_date(value)
                     or WSI_COMPACT_DATE.search(value)):
@@ -4628,6 +4638,13 @@ class WsiValidator(Validator):
                     header.index(name), name)
 
     def _validate_metadata_deid(self, value, line_number, header, field='TILE_METADATA_JSON'):
+        # This is a SHA-256 content identity, not clinical free text.  Its
+        # hexadecimal payload can contain an eight-digit substring that looks
+        # like YYYYMMDD, which must not be rejected as a date.
+        if field.endswith('.source_fingerprint'):
+            if not isinstance(value, str) or not re.fullmatch(r'[0-9a-fA-F]{64}', value):
+                self._deid_error('TILE_METADATA_JSON', line_number, header)
+            return
         if isinstance(value, str):
             if (WSI_LABELLED_MRN.search(value) or _wsi_contains_absolute_date(value)
                     or WSI_COMPACT_DATE.search(value)):

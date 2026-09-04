@@ -120,6 +120,7 @@ public class ImportWsiData extends ConsoleRunnable {
         "(?<!\\d)(?:19|20)\\d{6}(?!\\d)");
     private static final Pattern LABELLED_MRN = Pattern.compile(
         "(?i)\\b(?:mrn|medical[ _-]?record(?:[ _-]?number)?)\\b\\s*[:=#-]?\\s*\\d{4,}");
+    private static final Pattern SOURCE_FINGERPRINT = Pattern.compile("[0-9a-fA-F]{64}");
     private static final Set<String> SOURCE_EXTENSIONS = Set.of("svs", "tif", "tiff", "ndpi", "mrxs", "scn");
     private static final Set<String> THUMBNAIL_EXTENSIONS = Set.of("jpg", "jpeg", "png");
     private static final Set<String> ALLOWED_METADATA_KEYS = Set.of(
@@ -511,6 +512,7 @@ public class ImportWsiData extends ConsoleRunnable {
         }
         for (int index = 0; index < fields.length; index++) {
             if (index == 0 || index == 1 || index == 2 || index == 3
+                || index == 25 || index == 27
                 || NON_TEXT_WSI_COLUMNS.contains(index)) {
                 continue; // approved portal/image pseudonyms
             }
@@ -566,9 +568,18 @@ public class ImportWsiData extends ConsoleRunnable {
                 || COMPACT_DATE.matcher(value).find();
         }
         if (node.isObject()) {
-            var values = node.elements();
-            while (values.hasNext()) {
-                if (containsForbiddenMetadataText(values.next())) return true;
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                var entry = fields.next();
+                if ("source_fingerprint".equals(entry.getKey())) {
+                    JsonNode fingerprint = entry.getValue();
+                    if (!fingerprint.isTextual()
+                        || !SOURCE_FINGERPRINT.matcher(fingerprint.asText()).matches()) {
+                        return true;
+                    }
+                    continue;
+                }
+                if (containsForbiddenMetadataText(entry.getValue())) return true;
             }
         } else if (node.isArray()) {
             for (JsonNode child : node) {
@@ -626,20 +637,22 @@ public class ImportWsiData extends ConsoleRunnable {
                 return false;
             }
             String prefixes = System.getenv(prefixEnv);
+            boolean approved = false;
             if (prefixes != null && !prefixes.isBlank()) {
-                boolean approved = Arrays.stream(prefixes.split(","))
+                approved = Arrays.stream(prefixes.split(","))
                     .map(String::trim).filter(prefix -> !prefix.isBlank())
                     .anyMatch(prefix -> value.startsWith(prefix.replaceAll("/+$", "") + "/"));
                 if (!approved) return false;
             }
             String filename = path.substring(path.lastIndexOf('/') + 1);
             int dot = filename.lastIndexOf('.');
-            return dot > 0
-                && !containsAbsoluteDate(value)
+            boolean dateSafe = approved || (!containsAbsoluteDate(value)
                 && !containsAbsoluteDate(path)
-                && !COMPACT_DATE.matcher(value).find()
-                && !COMPACT_DATE.matcher(path).find()
                 && (rawPath == null || !COMPACT_DATE.matcher(rawPath).find())
+                && !COMPACT_DATE.matcher(value).find()
+                && !COMPACT_DATE.matcher(path).find());
+            return dot > 0
+                && dateSafe
                 && !LABELLED_MRN.matcher(value).find()
                 && !LABELLED_MRN.matcher(path).find()
                 && extensions.contains(filename.substring(dot + 1).toLowerCase(Locale.ROOT));
