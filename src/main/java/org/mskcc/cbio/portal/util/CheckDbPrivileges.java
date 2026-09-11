@@ -42,9 +42,18 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoDbServerSessionInfo;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
-// basic strategy : get current grants, iterate through map keys for any matches, collect values of matches, finally compare to the full list of all recommneded privileges
+/** 
+ * A class to retrieve and examine the privilege grants given to the current user. A set of recommended
+ * privileges are matched to the actual privilege grants and any unprovided recommendataion are output as a warning.
+ */
 public class CheckDbPrivileges {
 
+    /**
+     * A class to represent a Recommended Privilege. A data member contains a list of privileges which (if held)
+     * subsume the recommended privilege. For example, a user who holds 'GRANT SHOW ON *.*' also inherently
+     * holds 'GRANT SHOW TABLE ON *.*' because that is subsumed by 'GRANT SHOW ON *.*'.
+     *
+    */
     public static class RecommendedPrivilege {
         String name;
         List<String> subsumingPrivileges;
@@ -65,7 +74,14 @@ public class CheckDbPrivileges {
         }
     };
 
+    /**
+     * A (not to be modified) set of all Recommended privileges. Because some privileges are version specific,
+     * some recommnedations are only added after the system is running and the database server version is known
+     */
     private static Set<RecommendedPrivilege> recommendedPrivilegeSet = new HashSet<>();
+    /**
+     * A flag to indicate whether the version dependent privileges have been added yet.
+     */
     private static boolean versionDependentPrivilegesAdded = false;
 
     static {
@@ -248,7 +264,7 @@ public class CheckDbPrivileges {
             return actualDatabase.equals(recommended.onDatabase);
         }
     }
-    
+
     private static boolean actualTableCoversRecommendedTable(String actualTable, CheckDbPrivileges.RecommendedPrivilege recommended) {
         if (actualTable.equals("*")) {
             return true; // everything is covered by this actual rule
@@ -259,7 +275,7 @@ public class CheckDbPrivileges {
         }
         return actualTable.equals(recommended.onTable);
     }
-    
+
     private static boolean actualPrivilegeSatisfiesRecommendation(String privilegeString, CheckDbPrivileges.RecommendedPrivilege recommended, String currentDatabase) {
         int onPosition = privilegeString.lastIndexOf(" ON ");
         if (onPosition == -1) {
@@ -284,6 +300,13 @@ public class CheckDbPrivileges {
         return privilegeMatchedOrSubsumed && privilegeDatabaseCovered && privilegeTableCovered;
     }
 
+    /**
+     * Obtains the actual grants for the current user and prints warnings if any recommended privilege is not granted.
+     * Implemented by iterating actual grants (after splitting them into individual grants) and checking each one
+     * against all (not-yet) satisfied recommendations. If any recommendation(s) is satisfied by the checked acutal
+     * grant, the recommendation(s) is removed from the unsatisfied list. After all actual grants have been checked
+     * a warning will be printed if any recommendations remain as unsatisfied.
+     */
     public static void logWarningIfRecommendedPrivilegeIsAbsent() throws DaoException {
         try {
             String dbServerVersion = DaoDbServerSessionInfo.getServerVersion();
