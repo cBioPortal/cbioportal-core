@@ -40,13 +40,19 @@ import java.util.ArrayList;
 import java.util.List;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
+/**
+ * Provides database query functions which return information about the session created
+ * by the database update process.
+ */
 public class DaoDbServerSessionInfo {
 
     /**
-     * Make a simple query from an expression, return the response as a string
+     * Make a simple query based on a provided expression. The return value must be a single String
+     * @param expression : a valid SQL expression which will be evaluated to yield a single string.
+     * @return a string from the database server's expression evaluation.
      * @throws DaoException
      */
-    public static String queryDatabaseServerForString(String expression) throws DaoException {
+    private static String queryDatabaseServerForString(String expression) throws DaoException {
         Connection connection = null;
         try {
             String query = String.format("SELECT %s AS expression_result", expression);
@@ -73,6 +79,7 @@ public class DaoDbServerSessionInfo {
 
     /**
      * Get version of the database server
+     * @return the database version (by evaluating 'version()')
      * @throws DaoException
      */
     public static String getServerVersion() throws DaoException {
@@ -81,6 +88,7 @@ public class DaoDbServerSessionInfo {
 
     /**
      * Get the name of the target database in use
+     * @return the default / in-use database name (by evaluating 'current_database()')
      * @throws DaoException
      */
     public static String getDatabaseInUse() throws DaoException {
@@ -89,6 +97,7 @@ public class DaoDbServerSessionInfo {
 
     /**
      * Get the name of the database user we are connecting as
+     * @return the name of the user that the update process is using to connect to the database.
      * @throws DaoException
      */
     public static String getDatabaseCurrentUser() throws DaoException {
@@ -96,7 +105,8 @@ public class DaoDbServerSessionInfo {
     }
 
     /**
-     * Get privilege grants for the current user
+     * Get the privilege grants for the current user.
+     * @return a list of GRANT privilege strings for the current user. Strings may contain multiple privileges listed (comma separated) on a single line.
      * @throws DaoException
      */
     public static List<String> getPrivilegesForCurrentUser() throws DaoException {

@@ -62,6 +62,7 @@ class DataImporterTests(unittest.TestCase):
 
         ]
         self.assertCountEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.CheckDbPrivileges',),
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportTypesOfCancers', f'{study_directory}/data_cancer_type.txt', 'false', '--noprogress'),
             remove_study_call,
@@ -131,6 +132,7 @@ class DataImporterTests(unittest.TestCase):
             '--meta', f'{data_directory}/meta_cna_hg19_seg.txt', '--loadMode', 'bulkload', '--data', f'{data_directory}/data_cna_hg19.seg', '--noprogress')
 
         self.assertCountEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.CheckDbPrivileges',),
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
             clinical_patient_call,
             clinical_sample_call,
@@ -166,6 +168,7 @@ class DataImporterTests(unittest.TestCase):
                 '--meta', f'{data_directory}/meta_cna_discrete_long.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete_long.txt', '--noprogress')
 
         self.assertCountEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.CheckDbPrivileges',),
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
             cna_discrete_long_call,
             ])
@@ -183,6 +186,7 @@ class DataImporterTests(unittest.TestCase):
             cbioportalImporter.main(parsed_args)
 
             self.assertCountEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.CheckDbPrivileges',),
                 call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
                 call(*common_part, 'org.mskcc.cbio.portal.scripts.RemoveSamples', '--study_ids', 'STUDY1,STUDY2', '--sample_ids', 'SAMPLE1,SAMPLE2'),
             ])
@@ -200,6 +204,7 @@ class DataImporterTests(unittest.TestCase):
             cbioportalImporter.main(parsed_args)
 
             self.assertCountEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.CheckDbPrivileges',),
                 call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
                 call(*common_part, 'org.mskcc.cbio.portal.scripts.RemovePatients', '--study_ids', 'STUDY1,STUDY2', '--patient_ids', 'PATIENT1,PATIENT2'),
             ])
