@@ -39,6 +39,7 @@ IMPORT_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.ImportSampleList"
 ADD_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.AddCaseList"
 UPDATE_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds"
 VERSION_UTIL_CLASS = "org.mskcc.cbio.portal.util.VersionUtil"
+CHECK_DB_PRIVILEGES_CLASS = "org.mskcc.cbio.portal.util.CheckDbPrivileges"
 
 PORTAL_PROPERTY_DATABASE_USER = 'db.user'
 PORTAL_PROPERTY_DATABASE_PW = 'db.password'
@@ -603,7 +604,7 @@ class CollapsingLogMessageHandler(logging.handlers.MemoryHandler):
                 getattr(record, 'cause', None))
 
             grouping_dict[identifying_tuple].append(record)
-        
+
         aggregated_buffer = []
         # for each list of same-message records
         for record_list in list(grouping_dict.values()):
@@ -762,7 +763,7 @@ def validate_types_and_id(meta_dictionary, logger, filename):
         ("MRNA_EXPRESSION", "CONTINUOUS", "mirna"),
         ("MRNA_EXPRESSION", "Z-SCORE", "mirna_median_Zscores"),
         ("MRNA_EXPRESSION", "Z-SCORE", "mrna_merged_median_Zscores"),
-        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna"),       
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna"),
         ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_Zscores"),
         ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_all_sample_Zscores"),
         ("MRNA_EXPRESSION", "Z-SCORE", "mrna_median_all_sample_Zscores"),
@@ -1085,7 +1086,7 @@ class PortalProperties(object):
 def get_database_properties(properties_filename: str) -> Optional[PortalProperties]:
 
     properties = parse_properties_file(properties_filename)
-    
+
     missing_properties = []
     for required_property in REQUIRED_DATABASE_PROPERTIES:
         if required_property not in properties or len(properties[required_property]) == 0:
@@ -1119,7 +1120,7 @@ def parse_properties_file(properties_filename: str) -> Dict[str, str]:
     if not os.path.exists(properties_filename):
         print('properties file %s cannot be found' % properties_filename, file=ERROR_FILE)
         sys.exit(2)
-        
+
     properties = {}
     with open(properties_filename, 'r') as properties_file:
         for line in properties_file:

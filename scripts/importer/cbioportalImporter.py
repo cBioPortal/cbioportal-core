@@ -40,6 +40,7 @@ from .cbioportal_common import REMOVE_SAMPLES_CLASS
 from .cbioportal_common import REMOVE_PATIENTS_CLASS
 from .cbioportal_common import IMPORT_CASE_LIST_CLASS
 from .cbioportal_common import ADD_CASE_LIST_CLASS
+from .cbioportal_common import CHECK_DB_PRIVILEGES_CLASS
 from .cbioportal_common import VERSION_UTIL_CLASS
 from .cbioportal_common import run_java
 from .cbioportal_common import UPDATE_CASE_LIST_CLASS
@@ -239,6 +240,11 @@ def check_version(jvm_args):
             'before continuing.',
             file=OUTPUT_FILE)
         raise
+
+def check_database_privileges(jvm_args):
+    args = jvm_args.split(' ')
+    args.append(CHECK_DB_PRIVILEGES_CLASS)
+    run_java(*args)
 
 def process_case_lists(jvm_args, case_list_dir):
     for case_list in os.listdir(case_list_dir):
@@ -694,6 +700,9 @@ def main(args):
 
     # check if DB version and application version are in sync
     check_version(jvm_args)
+
+    # check if database user has recommended privileges and warn if not
+    check_database_privileges(jvm_args)
 
     if args.data_directory is not None:
         check_dir(args.data_directory)
