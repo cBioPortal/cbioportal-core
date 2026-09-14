@@ -61,6 +61,9 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
+from . import preprocessing
+from .preprocessing_case_lists import (missing_generated_case_lists, StagingCaseCollector,
+                                      configured_staging_filenames)
 
 
 # ------------------------------------------------------------------------------
@@ -301,6 +304,7 @@ class PortalInstance(object):
         """Represent a portal instance with the given dictionaries."""
         self.portal_info_dict = portal_info_dict
         self.cancer_type_dict = cancer_type_dict
+        self.oncotree = preprocessing.OncotreeReference()
         self.hugo_entrez_map = hugo_entrez_map
         self.alias_entrez_map = alias_entrez_map
         self.gene_set_list = gene_set_list
@@ -440,11 +444,18 @@ class Validator(object):
             self.logger.error('File could not be opened')
             return
 
+        # Reuse this mandatory scan for generator-compatible case membership.
+        collector = (StagingCaseCollector(Path(self.filename).name)
+                     if Path(self.filename).name.lower() in configured_staging_filenames() else None)
+        self.generated_case_members = None
         # Validate whether the file is correct UTF-8
         try:
             with open(self.filename, 'r', newline=None) as opened_file:
                 for line in opened_file:
-                    pass
+                    if collector is not None and collector.active:
+                        collector.feed(line)
+            if collector is not None and collector.error is None:
+                self.generated_case_members = collector.members
         except UnicodeDecodeError:
             self.logger.error("File contains invalid UTF-8 bytes. Please check values in file")
             return
@@ -520,7 +531,7 @@ class Validator(object):
             for unique_col_name in self.UNIQUE_COLUMNS:
                 col_index = _get_column_index(header_cols, unique_col_name)
                 if col_index > -1:
-                    self.unique_col_data[_get_column_index(header_cols, unique_col_name)] = []
+                    self.unique_col_data[col_index] = set()
 
             if self.checkHeader(header_cols) > 0:
                 if not self.relaxed_mode:
@@ -560,7 +571,7 @@ class Validator(object):
                                 cell_value, self.cols[unique_col_index])
                             continue
                         # add the value to the set for comparison with other rows
-                        previous_values.append(cell_value)
+                        previous_values.add(cell_value)
                     self.checkLine(fields)
 
             # (tuple of) string(s) of the newlines read (for 'rU' mode files)
@@ -1066,6 +1077,10 @@ class FeaturewiseFileValidator(Validator):
         num_errors += self._set_sample_ids_from_columns()
         return num_errors
 
+    DUPLICATE_FEATURE_LEVEL = logging.WARNING
+    DUPLICATE_FEATURE_MESSAGE = ('Duplicate line for a previously listed feature/gene, '
+                                 'this line will be ignored.')
+
     def checkLine(self, data):
         """Check the feature and sample columns in a data line."""
         super(FeaturewiseFileValidator, self).checkLine(data)
@@ -1076,9 +1091,9 @@ class FeaturewiseFileValidator(Validator):
             return
         # skip line with an error if the feature was encountered before
         if feature_id in self._feature_id_lines:
-            self.logger.warning(
-                'Duplicate line for a previously listed feature/gene, '
-                'this line will be ignored.',
+            self.logger.log(
+                self.DUPLICATE_FEATURE_LEVEL,
+                self.DUPLICATE_FEATURE_MESSAGE,
                 extra={
                     'line_number': self.line_number,
                     'cause': '%s (already defined on line %d)' % (
@@ -1220,6 +1235,10 @@ class CNAValidator(GenewiseFileValidator):
     This is an abstract class. Should be subclassed to a class that knows how to check values.
     """
 
+    DUPLICATE_FEATURE_LEVEL = logging.ERROR
+    DUPLICATE_FEATURE_MESSAGE = ('Duplicate CNA gene after gene/alias resolution. '
+                                 'Run CNA duplicate-gene preprocessing before import; '
+                                 'inspect conflicting values before merging.')
     OPTIONAL_HEADERS = ['Cytoband'] + GenewiseFileValidator.OPTIONAL_HEADERS
 
     def checkGeneIdentification(self, gene_symbol=None, entrez_id=None):
@@ -1734,6 +1753,15 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
                                   'Missing %s' % (','.join(missing_ascn_columns)))
                 num_errors += 1
 
+        # Preserve first-column behavior for duplicate headers (already errors).
+        self._mutation_checks = [
+            (cols.index(name), getattr(self, self.CHECK_FUNCTION_MAP[name]))
+            for name in cols if name in self.CHECK_FUNCTION_MAP]
+        key_columns = (
+            "Entrez_Gene_Id", "Chromosome", "Start_Position", "End_Position",
+            "Variant_Classification", "Tumor_Seq_Allele2", "HGVSp_Short", "Tumor_Sample_Barcode")
+        self._mutation_key_indexes = (tuple(cols.index(name) for name in key_columns)
+                                      if all(name in cols for name in key_columns) else None)
         return num_errors
 
     def checkLine(self, data):
@@ -1757,34 +1785,21 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
         # Validate duplicate mutations
         self.checkDuplicateMutation(data)
 
-        for col_index, col_name in enumerate(self.cols):
-            # validate the column if there's a function defined for it
-            try:
-                check_function_name = self.CHECK_FUNCTION_MAP[col_name]
-            except KeyError:
-                pass
-            else:
-                col_index = self.cols.index(col_name)
-                value = data[col_index]
-                # get the checking method for this column
-                checking_function = getattr(self, check_function_name)
-                if not checking_function(value):
-                    self.printDataInvalidStatement(value, col_index)
-                elif self.extra_exists or self.extra:
-                    raise RuntimeError(('Checking function %s set an error '
-                                        'message but reported no error') %
-                                       checking_function.__name__)
+        for col_index, checking_function in self._mutation_checks:
+            value = data[col_index]
+            if not checking_function(value):
+                self.printDataInvalidStatement(value, col_index)
+            elif self.extra_exists or self.extra:
+                raise RuntimeError(('Checking function %s set an error '
+                                    'message but reported no error') %
+                                   checking_function.__name__)
+
     def checkDuplicateMutation(self, data):
         """
         Check for duplicate mutations in the MAF file based on key columns.
         """
-        key_columns = [
-            "Entrez_Gene_Id", "Chromosome", "Start_Position", "End_Position",
-            "Variant_Classification", "Tumor_Seq_Allele2", "HGVSp_Short", "Tumor_Sample_Barcode"
-        ]
-
-        if all(col in self.cols for col in key_columns):
-            mutation_key = tuple(data[self.cols.index(col)].strip() for col in key_columns)
+        if self._mutation_key_indexes is not None:
+            mutation_key = tuple(data[index].strip() for index in self._mutation_key_indexes)
 
             if mutation_key in self.seen_mutations:
                 log_message = f"Duplicate mutation found: {mutation_key}"
@@ -2826,6 +2841,8 @@ class SampleClinicalValidator(ClinicalValidator):
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(SampleClinicalValidator, self).checkLine(data)
+        preprocessing.check_oncotree_row(
+            self.cols, data, self.portal.oncotree, self.logger, self.line_number)
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4564,8 +4581,9 @@ class GenericAssayContinuousValidator(GenericAssayWiseFileValidator):
         stripped_value = value.strip()
         # if the value is prefixed with '>' or '<' remove this prefix
         # prior to evaluation of the numeric value
-        hasTruncSymbol = re.match("^[><]", stripped_value)
-        stripped_value = re.sub(r"^[><]\s*","", stripped_value)
+        hasTruncSymbol = stripped_value.startswith(('>', '<'))
+        if hasTruncSymbol:
+            stripped_value = stripped_value[1:].lstrip()
 
         # do not check null values
         # 'NA' is an allowed value. No further validations apply.
@@ -4859,6 +4877,21 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
             validators_by_type[meta_file_type].append(validator)
         else:
             validators_by_type[meta_file_type].append(None)
+
+    # Timeline staging files are otherwise silently ignored without metadata.
+    timeline_paths = {
+        Path(validator.filename).resolve()
+        for validator in validators_by_type.get(cbioportal_common.MetaFileTypes.TIMELINE, [])
+        if validator is not None}
+    for path in sorted(Path(directory).iterdir()):
+        if (path.is_file() and
+                re.fullmatch(r'data_timeline(?:_.*)?\.(?:txt|tsv)', path.name, re.IGNORECASE) and
+                path.resolve() not in timeline_paths):
+            logger.error(
+                'Timeline data file has no referencing timeline meta file. Add a meta file '
+                'with genetic_alteration_type: CLINICAL, datatype: TIMELINE, and '
+                'data_filename: %s.', path.name,
+                extra={'filename_': str(path)})
 
     # prepend the cancer study id to any case list suffixes
     defined_case_list_fns = {}
@@ -5333,7 +5366,7 @@ def load_portal_info(path, logger, offline=False):
 
     if all(d is None for d in list(portal_dict.values())):
         raise LookupError('No portal information found at {}'.format(path))
-    return PortalInstance(portal_info_dict=portal_dict['info'],
+    portal = PortalInstance(portal_info_dict=portal_dict['info'],
                           cancer_type_dict=portal_dict['cancer-types'],
                           hugo_entrez_map=portal_dict['genes'],
                           # TODO - create a /genealiases equivalent in the new api
@@ -5342,11 +5375,15 @@ def load_portal_info(path, logger, offline=False):
                           gene_panel_list=portal_dict['gene-panels'],
                           geneset_version = portal_dict['genesets_version'],
                           offline=offline)
+    if offline:
+        portal.oncotree = preprocessing.OncotreeReference(Path(path) / 'oncotree.json')
+    return portal
 
 
 # ------------------------------------------------------------------------------
 def interface(args=None):
     parser = argparse.ArgumentParser(description='cBioPortal study validator')
+    preprocessing.add_arguments(parser)
     data_source_group = parser.add_mutually_exclusive_group()
     data_source_group.add_argument('-s', '--study_directory',
                         type=str, help='path to study directory.')
@@ -5602,6 +5639,26 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
                 continue
             validator.validate()
 
+    # Avoid reporting twice for lists already required by the core checks above.
+    checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
+    if 'meta_mutations_extended' in validators_by_meta_type:
+        checked_ids.add(study_id + '_sequenced')
+    if 'meta_CNA' in validators_by_meta_type:
+        checked_ids.add(study_id + '_cna')
+    scanned_members = {
+        str(Path(validator.filename).resolve()): validator.generated_case_members
+        for validators in validators_by_meta_type.values() for validator in validators
+        if validator is not None and getattr(validator, 'generated_case_members', None) is not None}
+    try:
+        for stable_id, filename, count in missing_generated_case_lists(
+                study_dir, study_id, checked_ids, scanned_members=scanned_members):
+            logger.error(
+                "Missing generated case list '%s' (%d samples). Run case-list "
+                "preprocessing before import (suggested filename: %s).",
+                stable_id, count, filename)
+    except (OSError, ValueError, IndexError) as exc:
+        logger.error("Cannot check case-list preprocessing: %s", exc)
+
     # additional validation between meta files, after all meta files are processed
     validate_data_relations(validators_by_meta_type, logger)
     logger.info('Validation complete')
@@ -5720,6 +5777,12 @@ def main_validate(args):
                                            offline=True)
     else:
         portal_instance = load_portal_info(server_url, logger)
+
+    portal_instance.oncotree = preprocessing.OncotreeReference(
+        getattr(args, 'oncotree_file', None) or
+        (str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None),
+        getattr(args, 'oncotree_version', 'oncotree_latest_stable'),
+        cache_filename=getattr(args, 'oncotree_cache', None))
 
     # set portal version
     cbio_version = portal_instance.portal_version

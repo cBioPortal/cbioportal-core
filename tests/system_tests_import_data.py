@@ -75,6 +75,7 @@ class DataImporterTests(unittest.TestCase):
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportGisticData', '--data', f'{study_directory}/data_gistic_genes_amp.txt', '--study', 'study_es_0', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap', '--meta', f'{study_directory}/meta_gene_panel_matrix.txt', '--data', f'{study_directory}/data_gene_panel_matrix.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_cna.txt', '--noprogress'),
+            call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_methylation_hm27.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_cnaseq.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_custom.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_sequenced.txt', '--noprogress'),
