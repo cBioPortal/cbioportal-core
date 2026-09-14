@@ -240,6 +240,76 @@ class UniqueColumnTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('data_unique_column_test.txt', UniqueColumnTestCase.DummyFeaturewiseFileValidator)
         self.assertEqual(1, len(record_list))
 
+class UniqueColumnRegressionTestCase(LogBufferTestCase):
+    """Uniqueness uses raw cells and must not suppress downstream checks."""
+
+    def test_multiple_unique_columns_preserve_diagnostics_and_check_every_row(self):
+        class TrackingValidator(validateData.Validator):
+            REQUIRED_HEADERS = ['id', 'name']
+            UNIQUE_COLUMNS = ['id', 'name', 'absent']
+            ALLOW_BLANKS = True
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.checked_rows = []
+
+            def checkLine(self, data):
+                super().checkLine(data)
+                self.checked_rows.append(data)
+
+        rows = ['a\tx', 'b\ty', 'a\tx', 'a\tz', ' a\t x', '\t', '\ty', 'c\t', 'd\t']
+        self.logger.setLevel(logging.WARNING)
+        contents = 'id\tname\n' + '\n'.join(rows) + '\n'
+        with temp_inputfolder({'data.txt': contents}) as study_dir:
+            validator = TrackingValidator(study_dir, {'data_filename': 'data.txt'},
+                                          None, self.logger, False, False)
+            validator.validate()
+        records = self.get_log_records()
+        self.assertTrue(validator.fileCouldBeParsed)
+        self.assertEqual([row.split('\t') for row in rows if row != '\t'],
+                         validator.checked_rows)
+        self.assertEqual([
+            'Cell value `a` in column `id` is not unique.',
+            'Cell value `x` in column `name` is not unique.',
+            'Cell value `a` in column `id` is not unique.',
+            'Blank line',
+            'Cell value `y` in column `name` is not unique.',
+            'Cell value `` in column `name` is not unique.',
+        ], [record.getMessage() for record in records])
+
+    def test_generic_assay_duplicate_keeps_first_line_and_value_diagnostics(self):
+        self.logger.setLevel(logging.WARNING)
+        contents = ('ENTITY_STABLE_ID\tNAME\tSAMPLE\n'
+                    'probe1\tone\t0.5\n'
+                    'probe2\ttwo\tbad\n'
+                    'probe1\tone\tbad\n'
+                    'probe1\tone\tNaN\n'
+                    'probe3\tthree\tinf\n')
+        with temp_inputfolder({'data.txt': contents}) as study_dir:
+            validator = validateData.GenericAssayContinuousValidator(
+                study_dir, {'data_filename': 'data.txt',
+                            'generic_entity_meta_properties': 'NAME'},
+                None, self.logger, False, False)
+            validator.validate()
+        records = self.get_log_records()
+        self.assertTrue(validator.fileCouldBeParsed)
+        self.assertEqual([
+            ('ERROR', 'Value cannot be interpreted as a floating point number '
+             'and is not valid value.', 3, 3, 'bad'),
+            ('ERROR', 'Cell value `probe1` in column `ENTITY_STABLE_ID` is not unique.',
+             None, None, None),
+            ('WARNING', 'Duplicate line for a previously listed feature/gene, '
+             'this line will be ignored.', 4, None, 'probe1 (already defined on line 2)'),
+            ('ERROR', 'Cell value `probe1` in column `ENTITY_STABLE_ID` is not unique.',
+             None, None, None),
+            ('WARNING', 'Duplicate line for a previously listed feature/gene, '
+             'this line will be ignored.', 5, None, 'probe1 (already defined on line 2)'),
+            ('ERROR', 'Value is infinite and, therefore, not a valid value.', 6, 3, 'inf'),
+        ], [(r.levelname, r.getMessage(), getattr(r, 'line_number', None),
+             getattr(r, 'column_number', None), getattr(r, 'cause', None))
+            for r in records])
+
+
 class ClinicalColumnDefsTestCase(PostClinicalDataFileTestCase):
 
     """Tests for validations of the column definitions in a clinical file."""
