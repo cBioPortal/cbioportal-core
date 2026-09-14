@@ -83,6 +83,10 @@ def main(args):
         if args.strict_maf_checks is not False:
             validator_args.append('-m')
 
+        if getattr(args, 'oncotree_file', None):
+            validator_args.extend(['--oncotree-file', args.oncotree_file])
+        validator_args.extend(['--oncotree-version', args.oncotree_version])
+
         # When HTML file is required, create html file name and add to arguments for validateData
         if output_folder is not None:
             try:
@@ -177,6 +181,9 @@ def interface(args=None):
                         help='Option to enable strict mode for validator when '
                              'validating mutation data')
 
+    parser.add_argument('--oncotree-file', help='Saved OncoTree tumorTypes JSON snapshot')
+    parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
+                        help='OncoTree version used when no snapshot is supplied')
     args = parser.parse_args(args)
 
     # Check if -d or -l was given as input, otherwise let the parser give an error and stop

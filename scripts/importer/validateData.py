@@ -61,6 +61,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
+from . import preprocessing
+from .preprocessing_case_lists import missing_generated_case_lists
 
 
 # ------------------------------------------------------------------------------
@@ -301,6 +303,7 @@ class PortalInstance(object):
         """Represent a portal instance with the given dictionaries."""
         self.portal_info_dict = portal_info_dict
         self.cancer_type_dict = cancer_type_dict
+        self.oncotree = preprocessing.OncotreeReference()
         self.hugo_entrez_map = hugo_entrez_map
         self.alias_entrez_map = alias_entrez_map
         self.gene_set_list = gene_set_list
@@ -1066,6 +1069,10 @@ class FeaturewiseFileValidator(Validator):
         num_errors += self._set_sample_ids_from_columns()
         return num_errors
 
+    DUPLICATE_FEATURE_LEVEL = logging.WARNING
+    DUPLICATE_FEATURE_MESSAGE = ('Duplicate line for a previously listed feature/gene, '
+                                 'this line will be ignored.')
+
     def checkLine(self, data):
         """Check the feature and sample columns in a data line."""
         super(FeaturewiseFileValidator, self).checkLine(data)
@@ -1076,9 +1083,9 @@ class FeaturewiseFileValidator(Validator):
             return
         # skip line with an error if the feature was encountered before
         if feature_id in self._feature_id_lines:
-            self.logger.warning(
-                'Duplicate line for a previously listed feature/gene, '
-                'this line will be ignored.',
+            self.logger.log(
+                self.DUPLICATE_FEATURE_LEVEL,
+                self.DUPLICATE_FEATURE_MESSAGE,
                 extra={
                     'line_number': self.line_number,
                     'cause': '%s (already defined on line %d)' % (
@@ -1220,6 +1227,10 @@ class CNAValidator(GenewiseFileValidator):
     This is an abstract class. Should be subclassed to a class that knows how to check values.
     """
 
+    DUPLICATE_FEATURE_LEVEL = logging.ERROR
+    DUPLICATE_FEATURE_MESSAGE = ('Duplicate CNA gene after gene/alias resolution. '
+                                 'Run CNA duplicate-gene preprocessing before import; '
+                                 'inspect conflicting values before merging.')
     OPTIONAL_HEADERS = ['Cytoband'] + GenewiseFileValidator.OPTIONAL_HEADERS
 
     def checkGeneIdentification(self, gene_symbol=None, entrez_id=None):
@@ -2826,6 +2837,8 @@ class SampleClinicalValidator(ClinicalValidator):
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(SampleClinicalValidator, self).checkLine(data)
+        preprocessing.check_oncotree_row(
+            self.cols, data, self.portal.oncotree, self.logger, self.line_number)
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -5333,7 +5346,7 @@ def load_portal_info(path, logger, offline=False):
 
     if all(d is None for d in list(portal_dict.values())):
         raise LookupError('No portal information found at {}'.format(path))
-    return PortalInstance(portal_info_dict=portal_dict['info'],
+    portal = PortalInstance(portal_info_dict=portal_dict['info'],
                           cancer_type_dict=portal_dict['cancer-types'],
                           hugo_entrez_map=portal_dict['genes'],
                           # TODO - create a /genealiases equivalent in the new api
@@ -5342,11 +5355,15 @@ def load_portal_info(path, logger, offline=False):
                           gene_panel_list=portal_dict['gene-panels'],
                           geneset_version = portal_dict['genesets_version'],
                           offline=offline)
+    if offline:
+        portal.oncotree = preprocessing.OncotreeReference(Path(path) / 'oncotree.json')
+    return portal
 
 
 # ------------------------------------------------------------------------------
 def interface(args=None):
     parser = argparse.ArgumentParser(description='cBioPortal study validator')
+    preprocessing.add_arguments(parser)
     data_source_group = parser.add_mutually_exclusive_group()
     data_source_group.add_argument('-s', '--study_directory',
                         type=str, help='path to study directory.')
@@ -5577,6 +5594,22 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
         file_types=list(validators_by_meta_type.keys()),
         logger=logger)
 
+    # Avoid reporting twice for lists already required by the core checks above.
+    checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
+    if 'meta_mutations_extended' in validators_by_meta_type:
+        checked_ids.add(study_id + '_sequenced')
+    if 'meta_CNA' in validators_by_meta_type:
+        checked_ids.add(study_id + '_cna')
+    try:
+        for stable_id, filename, count in missing_generated_case_lists(
+                study_dir, study_id, checked_ids):
+            logger.error(
+                "Missing generated case list '%s' (%d samples). Run case-list "
+                "preprocessing before import (suggested filename: %s).",
+                stable_id, count, filename)
+    except (OSError, ValueError, IndexError) as exc:
+        logger.error("Cannot check case-list preprocessing: %s", exc)
+
     # Validate the gene panel matrix file. This file is depending on clinical and case list data.
     if cbioportal_common.MetaFileTypes.GENE_PANEL_MATRIX in validators_by_meta_type:
         if len(validators_by_meta_type[cbioportal_common.MetaFileTypes.GENE_PANEL_MATRIX]) > 1:
@@ -5720,6 +5753,11 @@ def main_validate(args):
                                            offline=True)
     else:
         portal_instance = load_portal_info(server_url, logger)
+
+    portal_instance.oncotree = preprocessing.OncotreeReference(
+        getattr(args, 'oncotree_file', None) or
+        (str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None),
+        getattr(args, 'oncotree_version', 'oncotree_latest_stable'))
 
     # set portal version
     cbio_version = portal_instance.portal_version

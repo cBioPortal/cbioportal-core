@@ -811,7 +811,7 @@ class FeatureWiseValuesTestCase(PostClinicalDataFileTestCase):
             self.assertLessEqual(record.levelno, logging.INFO)
 
     def test_repeated_gene(self):
-        """Test if a warning is issued and the line is skipped if duplicate.
+        """Test if an error is issued and the line is skipped if duplicate.
 
         In the test data, the Entrez ID in line 6 is removed. Therefore the gene symbol and gene alias table will be
         used to look up this gene in the database. ENTB5 is an alias for Entrez 116983 (ACAP3). This gene was defined
@@ -821,11 +821,11 @@ class FeatureWiseValuesTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_duplicate_gene.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting a warning about the duplicate gene,
+        # expecting an error about the duplicate gene,
         # but no errors about values
         self.assertEqual(1, len(record_list))
         record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
         self.assertTrue(record.cause.startswith('116983'))
 

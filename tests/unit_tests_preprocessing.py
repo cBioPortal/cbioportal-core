@@ -1,0 +1,176 @@
+"""Regression tests for validation before/after required preprocessing."""
+import json
+import logging
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch, Mock
+
+from importer import preprocessing, preprocessing_case_lists as cases, validateData
+
+
+NODES = [{'code': 'LUAD', 'mainType': 'Non-Small Cell Lung Cancer',
+          'name': 'Lung Adenocarcinoma'}]
+
+
+class PreprocessingTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.logger = logging.getLogger(self.id())
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.propagate = False
+        self.handler = validateData.MaxLevelTrackingHandler()
+        self.logger.addHandler(self.handler)
+        self.addCleanup(self.logger.removeHandler, self.handler)
+        self.snapshot = self.root / 'oncotree.json'
+        self.snapshot.write_text(json.dumps(NODES))
+        self.portal = validateData.PortalInstance(None, {}, {'GENE': [1]}, {'ALIAS': [1]}, [], [], None)
+        self.portal.oncotree = preprocessing.OncotreeReference(self.snapshot)
+
+    def write(self, name, text):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        return path
+
+    def test_oncotree_stale_labels_fail_then_corrected_labels_pass(self):
+        columns = ['SAMPLE_ID', 'PATIENT_ID', 'ONCOTREE_CODE', 'CANCER_TYPE', 'CANCER_TYPE_DETAILED']
+        header = '\n'.join(['#' + '\t'.join(columns), '#' + '\t'.join(columns),
+                            '#STRING\tSTRING\tSTRING\tSTRING\tSTRING', '#1\t1\t1\t1\t1', '\t'.join(columns)])
+        path = self.write('samples.txt', header + '\nS1\tP1\tLUAD\tOld type\tOld name\n')
+        validator = validateData.SampleClinicalValidator(str(self.root), {'data_filename': path.name},
+                                                         self.portal, self.logger, True, False)
+        with self.assertLogs(self.logger, logging.ERROR) as logs:
+            validator.validate()
+        self.assertTrue(any('CANCER_TYPE is' in msg for msg in logs.output))
+        self.assertTrue(any('CANCER_TYPE_DETAILED is' in msg for msg in logs.output))
+        path.write_text(header + '\nS1\tP1\tLUAD\tNon-Small Cell Lung Cancer\tLung Adenocarcinoma\n')
+        self.handler.max_level = logging.NOTSET
+        validateData.SampleClinicalValidator(str(self.root), {'data_filename': path.name},
+                                             self.portal, self.logger, True, False).validate()
+        self.assertLess(self.handler.max_level, logging.ERROR)
+
+    def test_unknown_code_and_missing_labels(self):
+        nodes = {n['code']: n for n in NODES}
+        self.assertEqual('ONCOTREE_CODE', list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'RETIRED'}, nodes))[0][0])
+        self.assertEqual(2, len(list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'LUAD'}, nodes))))
+        self.assertEqual(2, len(list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'NA'}, nodes))))
+        self.assertEqual([], list(preprocessing.oncotree_findings(
+            {'ONCOTREE_CODE': 'NA', 'CANCER_TYPE': 'Custom', 'CANCER_TYPE_DETAILED': 'Custom'}, nodes)))
+
+    def test_snapshot_failure_fails_once_without_network(self):
+        self.snapshot.write_text('[]')
+        with patch('importer.preprocessing.requests.get') as get:
+            with self.assertLogs(self.logger, logging.ERROR) as logs:
+                for line in (5, 6):
+                    preprocessing.check_oncotree_row(['ONCOTREE_CODE'], ['LUAD'],
+                        self.portal.oncotree, self.logger, line)
+            self.assertEqual(1, len(logs.output))
+            get.assert_not_called()
+
+    def test_online_reference_cached_and_bounded(self):
+        reference = preprocessing.OncotreeReference(version='pinned-version')
+        response = Mock(content=json.dumps(NODES).encode())
+        with patch('importer.preprocessing.requests.get', return_value=response) as get:
+            self.assertEqual(reference.load(self.logger), reference.load(self.logger))
+            get.assert_called_once_with('https://oncotree.mskcc.org/api/tumorTypes',
+                                       params={'version': 'pinned-version'}, timeout=(10, 30))
+        self.assertEqual(['LUAD'], list(reference.nodes))
+
+    def test_cna_alias_collision_fails_and_merged_copy_passes(self):
+        with patch.object(validateData, 'DEFINED_SAMPLE_IDS', ['S1']):
+            path = self.write('cna.txt', 'Hugo_Symbol\tEntrez_Gene_Id\tS1\nGENE\t1\t0\nALIAS\t\t2\n')
+            validator = validateData.CNADiscreteValidator(str(self.root), {'data_filename': path.name},
+                                                         self.portal, self.logger, False, False)
+            with self.assertLogs(self.logger, logging.ERROR) as logs:
+                validator.validate()
+            self.assertIn('Duplicate CNA gene', '\n'.join(logs.output))
+            path.write_text('Hugo_Symbol\tEntrez_Gene_Id\tS1\nGENE\t1\t2\n')
+            self.handler.max_level = logging.NOTSET
+            validateData.CNADiscreteValidator(str(self.root), {'data_filename': path.name},
+                                             self.portal, self.logger, False, False).validate()
+            self.assertEqual(0, self.handler.get_exit_status())
+
+    def test_continuous_cna_duplicates_fail_without_changing_expression_policy(self):
+        with patch.object(validateData, 'DEFINED_SAMPLE_IDS', ['S1']):
+            self.write('values.txt', 'Hugo_Symbol\tEntrez_Gene_Id\tS1\nGENE\t1\t2\nGENE\t1\t-2\n')
+            for cls, status in ((validateData.CNAContinuousValuesValidator, 1),
+                                (validateData.ContinuousValuesValidator, 3)):
+                self.handler.max_level = logging.NOTSET
+                cls(str(self.root), {'data_filename': 'values.txt'}, self.portal,
+                    self.logger, False, False).validate()
+                self.assertEqual(status, self.handler.get_exit_status())
+
+    def test_missing_case_lists_and_existing_curated_lists(self):
+        self.write('data_CNA.txt', 'Hugo_Symbol\tS1\tS2\nGENE\t0\t2\n')
+        missing = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
+        self.assertEqual([('study_cna', 'cases_cna.txt', 2)], missing)
+        # Stable ID, not filename/order/event-derived membership, establishes coverage.
+        self.assertEqual([], list(cases.missing_generated_case_lists(self.root, 'study', ['study_all', 'study_cna', 'study_custom'])))
+
+    def test_sequenced_override_includes_samples_without_mutations(self):
+        self.write('data_mutations_extended.txt', 'Tumor_Sample_Barcode\nS1\n')
+        self.write('sequenced_samples.txt', 'S1\nS2\n')
+        missing = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
+        self.assertEqual([('study_sequenced', 'cases_sequenced.txt', 2)], missing)
+
+    def test_intersection_requires_all_files_and_nonempty_overlap(self):
+        self.write('data_CNA.txt', 'Hugo_Symbol\tS1\nGENE\t2\n')
+        self.write('data_mutations_extended.txt', 'Tumor_Sample_Barcode\nS2\n')
+        found = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
+        self.assertNotIn('study_cnaseq', [x[0] for x in found])
+        self.write('data_mutations_extended.txt', '#sequenced_samples: S1 S2\nTumor_Sample_Barcode\nS2\n')
+        found = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
+        self.assertIn(('study_cnaseq', 'cases_cnaseq.txt', 1), found)
+
+    def test_case_checks_leave_input_bytes_unchanged(self):
+        self.write('data_cna.txt', 'Hugo_Symbol\tTCGA-AA-1234-01A\nGENE\t2\n')
+        before = {p.name: p.read_bytes() for p in self.root.iterdir()}
+        found = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
+        self.assertEqual([('study_cna', 'cases_cna.txt', 1)], found)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.root.iterdir()})
+
+    def test_profile_presence_alone_does_not_prove_nonempty_intersection(self):
+        with self.assertLogs(self.logger, logging.WARNING) as logs:
+            validateData.validate_defined_caselists('study', ['study_all', 'study_cna', 'study_sequenced'],
+                                                   ['meta_mutations_extended', 'meta_CNA'], self.logger)
+        self.assertIn('study_cnaseq', '\n'.join(logs.output))
+
+    def test_three_way_intersection_does_not_restart_after_disjoint_pair(self):
+        self.write('data_RNA_Seq_v2_mRNA_median_Zscores.txt', 'Hugo_Symbol\tS1\nGENE\t1\n')
+        self.write('data_CNA.txt', 'Hugo_Symbol\tS2\nGENE\t2\n')
+        self.write('data_mutations_extended.txt', 'Tumor_Sample_Barcode\nS2\n')
+        found = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
+        self.assertNotIn('study_3way_complete', [x[0] for x in found])
+
+    def test_cli_oncotree_failure_then_corrected_study(self):
+        self.write('meta_study.txt', 'cancer_study_identifier: test\ntype_of_cancer: lung\n'
+                   'name: Test\ndescription: Test\nadd_global_case_list: true\n')
+        self.write('meta_clinical_sample.txt', 'cancer_study_identifier: test\n'
+                   'genetic_alteration_type: CLINICAL\ndatatype: SAMPLE_ATTRIBUTES\n'
+                   'data_filename: data_clinical_sample.txt\n')
+        header = ('#Sample\tPatient\tCode\tType\tDetailed\n'
+                  '#Sample\tPatient\tCode\tType\tDetailed\n'
+                  '#STRING\tSTRING\tSTRING\tSTRING\tSTRING\n#1\t1\t1\t1\t1\n'
+                  'SAMPLE_ID\tPATIENT_ID\tONCOTREE_CODE\tCANCER_TYPE\tCANCER_TYPE_DETAILED\n')
+        path = self.write('data_clinical_sample.txt', header + 'S1\tP1\tLUAD\tStale\tStale\n')
+        script = Path(validateData.__file__)
+        command = [sys.executable, str(script), '-s', str(self.root), '-n',
+                   '--oncotree-file', str(self.snapshot)]
+        before = path.read_bytes()
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertIn('OncoTree preprocessing required', result.stdout + result.stderr)
+        self.assertEqual(before, path.read_bytes())
+        path.write_text(header + 'S1\tP1\tLUAD\tNon-Small Cell Lung Cancer\tLung Adenocarcinoma\n')
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        self.assertIn(result.returncode, (0, 3), result.stderr)
+        self.assertNotIn('OncoTree preprocessing required', result.stdout + result.stderr)
+
+
+if __name__ == '__main__':
+    unittest.main()
