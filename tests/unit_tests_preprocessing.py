@@ -218,6 +218,55 @@ class PreprocessingTests(unittest.TestCase):
         found = list(cases.missing_generated_case_lists(self.root, 'study', ['study_all']))
         self.assertNotIn('study_3way_complete', [x[0] for x in found])
 
+    def test_timeline_requires_reference_not_matching_meta_name(self):
+        self.write('meta_study.txt', 'cancer_study_identifier: test\ntype_of_cancer: lung\n'
+                   'name: Test\ndescription: Test\nadd_global_case_list: true\n')
+        data = self.write('DATA_TIMELINE_treatment.tsv',
+                          'PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE\nP1\t0\t1\tTREATMENT\n')
+        # A similarly named file with the wrong data reference does not cover it.
+        meta = self.write('meta_timeline_treatment.txt',
+                         'cancer_study_identifier: test\ngenetic_alteration_type: CLINICAL\n'
+                         'datatype: TIMELINE\ndata_filename: other.txt\n')
+        with self.assertLogs(self.logger, logging.ERROR) as logs:
+            validateData.process_metadata_files(str(self.root), self.portal, self.logger, False, False)
+        self.assertIn('no referencing timeline meta file', '\n'.join(logs.output))
+        meta.unlink()
+        self.write('meta_arbitrary_name.txt',
+                   'cancer_study_identifier: test\ngenetic_alteration_type: CLINICAL\n'
+                   'datatype: TIMELINE\ndata_filename: ./DATA_TIMELINE_treatment.tsv\n')
+        self.handler.max_level = logging.NOTSET
+        validateData.process_metadata_files(str(self.root), self.portal, self.logger, False, False)
+        self.assertLess(self.handler.max_level, logging.ERROR)
+        self.assertTrue(data.exists())
+
+    def test_timeline_cli_failure_then_reference_added(self):
+        self.write('meta_study.txt', 'cancer_study_identifier: test\ntype_of_cancer: lung\n'
+                   'name: Test\ndescription: Test\nadd_global_case_list: true\n')
+        self.write('meta_clinical_sample.txt', 'cancer_study_identifier: test\n'
+                   'genetic_alteration_type: CLINICAL\ndatatype: SAMPLE_ATTRIBUTES\n'
+                   'data_filename: data_clinical_sample.txt\n')
+        self.write('data_clinical_sample.txt',
+                   '#Sample\tPatient\n#Sample\tPatient\n#STRING\tSTRING\n#1\t1\n'
+                   'SAMPLE_ID\tPATIENT_ID\nS1\tP1\n')
+        self.write('data_timeline.txt', 'PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE\n'
+                   'P1\t0\t1\tTREATMENT\n')
+        # Archived files, editor backups, and unrelated data are outside this rule.
+        for name in ('archived_files/data_timeline_old.txt', 'data_timeline_old.txt~',
+                     '.data_timeline_hidden.txt', 'data_expression.txt'):
+            self.write(name, 'unused\n')
+        command = [sys.executable, str(Path(validateData.__file__)), '-s', str(self.root), '-n']
+        before = {str(p): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn('no referencing timeline meta file', result.stdout + result.stderr)
+        self.assertEqual(before, {str(p): p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
+        self.write('meta_events.txt', 'cancer_study_identifier: test\n'
+                   'genetic_alteration_type: CLINICAL\ndatatype: TIMELINE\n'
+                   'data_filename: data_timeline.txt\n')
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        self.assertIn(result.returncode, (0, 3), result.stdout + result.stderr)
+        self.assertNotIn('no referencing timeline meta file', result.stdout + result.stderr)
+
     def test_cli_oncotree_failure_then_corrected_study(self):
         self.write('meta_study.txt', 'cancer_study_identifier: test\ntype_of_cancer: lung\n'
                    'name: Test\ndescription: Test\nadd_global_case_list: true\n')

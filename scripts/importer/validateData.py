@@ -4878,6 +4878,21 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         else:
             validators_by_type[meta_file_type].append(None)
 
+    # Timeline staging files are otherwise silently ignored without metadata.
+    timeline_paths = {
+        Path(validator.filename).resolve()
+        for validator in validators_by_type.get(cbioportal_common.MetaFileTypes.TIMELINE, [])
+        if validator is not None}
+    for path in sorted(Path(directory).iterdir()):
+        if (path.is_file() and
+                re.fullmatch(r'data_timeline(?:_.*)?\.(?:txt|tsv)', path.name, re.IGNORECASE) and
+                path.resolve() not in timeline_paths):
+            logger.error(
+                'Timeline data file has no referencing timeline meta file. Add a meta file '
+                'with genetic_alteration_type: CLINICAL, datatype: TIMELINE, and '
+                'data_filename: %s.', path.name,
+                extra={'filename_': str(path)})
+
     # prepend the cancer study id to any case list suffixes
     defined_case_list_fns = {}
     if study_id is not None:

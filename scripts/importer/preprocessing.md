@@ -80,3 +80,10 @@ reference in a private temporary directory shared by its child validators.
 The directory is removed after the batch. Explicit snapshots keep precedence;
 independent CLI invocations should use the same `--oncotree-file` for a pinned
 reference. Network failures still fail each affected study's validation.
+
+Timeline metadata: top-level `data_timeline.txt`, `data_timeline_*.txt`, and their
+`.tsv` equivalents (case-insensitive) must be referenced by a timeline meta file
+(`genetic_alteration_type: CLINICAL`, `datatype: TIMELINE`). Metadata filenames
+need not match the data filename; resolved `data_filename` paths establish the
+reference. Missing references are errors. Archived subdirectories, hidden files,
+editor backups, and files with unrelated names are not inferred as timeline data.
