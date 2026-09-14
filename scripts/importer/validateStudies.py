@@ -17,6 +17,12 @@ import subprocess
 def main(args):
     """Process arguments and run validation"""
 
+    # Each subprocess reads the same lazily fetched reference for this batch.
+    with tempfile.TemporaryDirectory(prefix='oncotree-validation-') as cache_dir:
+        return validate_studies(args, os.path.join(cache_dir, 'oncotree.json'))
+
+
+def validate_studies(args, oncotree_cache):
     # Set variables for directory and list of studies
     root_dir = args.root_directory
     studies = args.list_of_studies
@@ -83,6 +89,7 @@ def main(args):
         if args.strict_maf_checks is not False:
             validator_args.append('-m')
 
+        validator_args.extend(['--oncotree-cache', oncotree_cache])
         if getattr(args, 'oncotree_file', None):
             validator_args.extend(['--oncotree-file', args.oncotree_file])
         validator_args.extend(['--oncotree-version', args.oncotree_version])

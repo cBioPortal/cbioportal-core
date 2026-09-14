@@ -62,7 +62,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
 
 from . import cbioportal_common
 from . import preprocessing
-from .preprocessing_case_lists import missing_generated_case_lists
+from .preprocessing_case_lists import (missing_generated_case_lists, StagingCaseCollector,
+                                      configured_staging_filenames)
 
 
 # ------------------------------------------------------------------------------
@@ -443,11 +444,18 @@ class Validator(object):
             self.logger.error('File could not be opened')
             return
 
+        # Reuse this mandatory scan for generator-compatible case membership.
+        collector = (StagingCaseCollector(Path(self.filename).name)
+                     if Path(self.filename).name.lower() in configured_staging_filenames() else None)
+        self.generated_case_members = None
         # Validate whether the file is correct UTF-8
         try:
             with open(self.filename, 'r', newline=None) as opened_file:
                 for line in opened_file:
-                    pass
+                    if collector is not None and collector.active:
+                        collector.feed(line)
+            if collector is not None and collector.error is None:
+                self.generated_case_members = collector.members
         except UnicodeDecodeError:
             self.logger.error("File contains invalid UTF-8 bytes. Please check values in file")
             return
@@ -1745,6 +1753,15 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
                                   'Missing %s' % (','.join(missing_ascn_columns)))
                 num_errors += 1
 
+        # Preserve first-column behavior for duplicate headers (already errors).
+        self._mutation_checks = [
+            (cols.index(name), getattr(self, self.CHECK_FUNCTION_MAP[name]))
+            for name in cols if name in self.CHECK_FUNCTION_MAP]
+        key_columns = (
+            "Entrez_Gene_Id", "Chromosome", "Start_Position", "End_Position",
+            "Variant_Classification", "Tumor_Seq_Allele2", "HGVSp_Short", "Tumor_Sample_Barcode")
+        self._mutation_key_indexes = (tuple(cols.index(name) for name in key_columns)
+                                      if all(name in cols for name in key_columns) else None)
         return num_errors
 
     def checkLine(self, data):
@@ -1768,34 +1785,21 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
         # Validate duplicate mutations
         self.checkDuplicateMutation(data)
 
-        for col_index, col_name in enumerate(self.cols):
-            # validate the column if there's a function defined for it
-            try:
-                check_function_name = self.CHECK_FUNCTION_MAP[col_name]
-            except KeyError:
-                pass
-            else:
-                col_index = self.cols.index(col_name)
-                value = data[col_index]
-                # get the checking method for this column
-                checking_function = getattr(self, check_function_name)
-                if not checking_function(value):
-                    self.printDataInvalidStatement(value, col_index)
-                elif self.extra_exists or self.extra:
-                    raise RuntimeError(('Checking function %s set an error '
-                                        'message but reported no error') %
-                                       checking_function.__name__)
+        for col_index, checking_function in self._mutation_checks:
+            value = data[col_index]
+            if not checking_function(value):
+                self.printDataInvalidStatement(value, col_index)
+            elif self.extra_exists or self.extra:
+                raise RuntimeError(('Checking function %s set an error '
+                                    'message but reported no error') %
+                                   checking_function.__name__)
+
     def checkDuplicateMutation(self, data):
         """
         Check for duplicate mutations in the MAF file based on key columns.
         """
-        key_columns = [
-            "Entrez_Gene_Id", "Chromosome", "Start_Position", "End_Position",
-            "Variant_Classification", "Tumor_Seq_Allele2", "HGVSp_Short", "Tumor_Sample_Barcode"
-        ]
-
-        if all(col in self.cols for col in key_columns):
-            mutation_key = tuple(data[self.cols.index(col)].strip() for col in key_columns)
+        if self._mutation_key_indexes is not None:
+            mutation_key = tuple(data[index].strip() for index in self._mutation_key_indexes)
 
             if mutation_key in self.seen_mutations:
                 log_message = f"Duplicate mutation found: {mutation_key}"
@@ -4577,8 +4581,9 @@ class GenericAssayContinuousValidator(GenericAssayWiseFileValidator):
         stripped_value = value.strip()
         # if the value is prefixed with '>' or '<' remove this prefix
         # prior to evaluation of the numeric value
-        hasTruncSymbol = re.match("^[><]", stripped_value)
-        stripped_value = re.sub(r"^[><]\s*","", stripped_value)
+        hasTruncSymbol = stripped_value.startswith(('>', '<'))
+        if hasTruncSymbol:
+            stripped_value = stripped_value[1:].lstrip()
 
         # do not check null values
         # 'NA' is an allowed value. No further validations apply.
@@ -5594,22 +5599,6 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
         file_types=list(validators_by_meta_type.keys()),
         logger=logger)
 
-    # Avoid reporting twice for lists already required by the core checks above.
-    checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
-    if 'meta_mutations_extended' in validators_by_meta_type:
-        checked_ids.add(study_id + '_sequenced')
-    if 'meta_CNA' in validators_by_meta_type:
-        checked_ids.add(study_id + '_cna')
-    try:
-        for stable_id, filename, count in missing_generated_case_lists(
-                study_dir, study_id, checked_ids):
-            logger.error(
-                "Missing generated case list '%s' (%d samples). Run case-list "
-                "preprocessing before import (suggested filename: %s).",
-                stable_id, count, filename)
-    except (OSError, ValueError, IndexError) as exc:
-        logger.error("Cannot check case-list preprocessing: %s", exc)
-
     # Validate the gene panel matrix file. This file is depending on clinical and case list data.
     if cbioportal_common.MetaFileTypes.GENE_PANEL_MATRIX in validators_by_meta_type:
         if len(validators_by_meta_type[cbioportal_common.MetaFileTypes.GENE_PANEL_MATRIX]) > 1:
@@ -5634,6 +5623,26 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             if validator is None:
                 continue
             validator.validate()
+
+    # Avoid reporting twice for lists already required by the core checks above.
+    checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
+    if 'meta_mutations_extended' in validators_by_meta_type:
+        checked_ids.add(study_id + '_sequenced')
+    if 'meta_CNA' in validators_by_meta_type:
+        checked_ids.add(study_id + '_cna')
+    scanned_members = {
+        str(Path(validator.filename).resolve()): validator.generated_case_members
+        for validators in validators_by_meta_type.values() for validator in validators
+        if validator is not None and getattr(validator, 'generated_case_members', None) is not None}
+    try:
+        for stable_id, filename, count in missing_generated_case_lists(
+                study_dir, study_id, checked_ids, scanned_members=scanned_members):
+            logger.error(
+                "Missing generated case list '%s' (%d samples). Run case-list "
+                "preprocessing before import (suggested filename: %s).",
+                stable_id, count, filename)
+    except (OSError, ValueError, IndexError) as exc:
+        logger.error("Cannot check case-list preprocessing: %s", exc)
 
     # additional validation between meta files, after all meta files are processed
     validate_data_relations(validators_by_meta_type, logger)
@@ -5757,7 +5766,8 @@ def main_validate(args):
     portal_instance.oncotree = preprocessing.OncotreeReference(
         getattr(args, 'oncotree_file', None) or
         (str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None),
-        getattr(args, 'oncotree_version', 'oncotree_latest_stable'))
+        getattr(args, 'oncotree_version', 'oncotree_latest_stable'),
+        cache_filename=getattr(args, 'oncotree_cache', None))
 
     # set portal version
     cbio_version = portal_instance.portal_version

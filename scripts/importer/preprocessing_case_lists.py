@@ -4,6 +4,7 @@ Source: d8526de87d4e38e0badf9666cf8e75477aecd87f,
 jar-case-list-generator/generate_case_lists_jar.py (AGPL-3.0).
 Keep these parsing rules aligned with that generator; see preprocessing.md.
 """
+from functools import lru_cache
 import os
 import re
 from pathlib import Path
@@ -114,45 +115,69 @@ def case_list_from_staging_file(study_dir, staging_filename):
     path = resolve_staging_path(study_dir, staging_filename)
     if path is None:
         return []
-    case_set = []
-    seen = set()
-    inline_prefix = "#" + MUTATION_CASE_LIST_META_HEADER + ":"
+    collector = StagingCaseCollector(staging_filename)
     with open(path) as f:
-        process_header = True
-        id_column = 0
         for raw in f:
-            line = raw.rstrip("\r\n")
-            if line.startswith("#"):
-                if line.startswith(inline_prefix):
-                    return line[len(MUTATION_CASE_LIST_META_HEADER) + 2:].strip().split()
-                continue
+            collector.feed(raw)
+            if not collector.active:
+                break
+    if collector.error:
+        raise collector.error
+    return collector.members
+
+
+@lru_cache(maxsize=1)
+def configured_staging_filenames():
+    return frozenset(name.lower() for spec in read_config(Path(__file__).with_name('case_list_config.tsv'))
+                     for name in re.split(r"[|&]", spec['staging_filenames']))
+
+
+class StagingCaseCollector:
+    """Collect generator-compatible IDs while the validator scans UTF-8.
+
+    Raw lines preserve the generator's comment, blank-row and trailing-tab rules.
+    Errors are deferred so collection never interrupts normal validation.
+    """
+    def __init__(self, filename):
+        self.filename = filename
+        self.members = set()
+        self.active = True
+        self.error = None
+        self.id_column = None
+
+    def feed(self, raw):
+        if not self.active:
+            return
+        line = raw.rstrip("\r\n")
+        prefix = "#" + MUTATION_CASE_LIST_META_HEADER + ":"
+        if line.startswith('#'):
+            if line.startswith(prefix):
+                self.members = set(line[len(prefix):].strip().split())
+                self.active = False
+            return
+        # Only split through the sample column on data rows. Removing trailing
+        # tabs first preserves Java's discarded trailing empty fields.
+        if self.id_column is None:
             row = java_split(line)
-            if process_header:
-                maf_idx = row.index(MUTATION_CASE_ID_COLUMN_HEADER) if MUTATION_CASE_ID_COLUMN_HEADER in row else -1
-                sample_idx = row.index(SAMPLE_ID_COLUMN_HEADER) if SAMPLE_ID_COLUMN_HEADER in row else -1
-                if maf_idx == -1 and sample_idx == -1:
-                    # not a MAF/clinical file: header itself carries the case ids
-                    for token in row:
-                        if token.upper() in NON_CASE_IDS:
-                            continue
-                        if token not in seen:
-                            seen.add(token)
-                            case_set.append(token)
-                    break
-                id_column = maf_idx if maf_idx != -1 else sample_idx
-                process_header = False
-                continue
-            # Java List.get throws on short rows; surface the same failure
-            if id_column >= len(row):
-                raise IndexError(f"{staging_filename}: data row has no column {id_column}: {line[:80]}")
-            case_id = row[id_column]
-            if case_id not in seen:
-                seen.add(case_id)
-                case_set.append(case_id)
-    return case_set
+        else:
+            trimmed = line.rstrip('\t')
+            row = trimmed.split('\t', self.id_column + 1) if trimmed else []
+        if self.id_column is None:
+            if MUTATION_CASE_ID_COLUMN_HEADER in row:
+                self.id_column = row.index(MUTATION_CASE_ID_COLUMN_HEADER)
+            elif SAMPLE_ID_COLUMN_HEADER in row:
+                self.id_column = row.index(SAMPLE_ID_COLUMN_HEADER)
+            else:
+                self.members = {token for token in row if token.upper() not in NON_CASE_IDS}
+                self.active = False
+        elif self.id_column >= len(row):
+            self.error = IndexError(f"{self.filename}: data row has no column {self.id_column}: {line[:80]}")
+            self.active = False
+        else:
+            self.members.add(row[self.id_column])
 
 
-def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=None):
+def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=None, scanned_members=None):
     """Yield lists that gap-fill preprocessing would create; never change inputs.
 
     Existing stable IDs (including virtual _all) count regardless of filename.
@@ -160,6 +185,7 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
     """
     config_path = config_path or Path(__file__).with_name('case_list_config.tsv')
     cache = {}
+    scanned_members = scanned_members or {}
     reported = set(defined_ids)
     for spec in read_config(config_path):
         stable_id = spec['meta_stable_id'].replace(CANCER_STUDY_TAG, study_id)
@@ -174,8 +200,14 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
         members = None if intersection else set()
         for filename in filenames:
             if filename not in cache:
-                cache[filename] = set(map(get_sample_id,
-                    case_list_from_staging_file(study_dir, filename)))
+                path = resolve_staging_path(study_dir, filename)
+                # The sidecar overrides mutation rows, including an empty sidecar.
+                override = (MUTATION_STAGING_GENERAL_PREFIX in filename.lower() and
+                            os.path.exists(os.path.join(study_dir, SEQUENCED_SAMPLES_FILENAME)))
+                key = str(Path(path).resolve()) if path else None
+                raw_members = (scanned_members[key] if key in scanned_members and not override
+                               else case_list_from_staging_file(study_dir, filename))
+                cache[filename] = set(map(get_sample_id, raw_members))
             found = cache[filename]
             if intersection:
                 members = found.copy() if members is None else members & found

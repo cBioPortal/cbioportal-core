@@ -71,3 +71,12 @@ is no runtime dependency on unmerged curation PRs. Future generator changes must
 update this vendored policy and parity tests together. Unlike the upstream loop,
 a three-way intersection stays empty after any disjoint pair; it must not
 restart from the third input.
+
+Performance: generator-compatible IDs are collected during the existing UTF-8
+scan and reused after data-file validation. Files not visited by a validator
+still use the standalone parser. Sequenced-sample sidecars retain precedence.
+`validateStudies.py` lazily saves the first successfully fetched OncoTree
+reference in a private temporary directory shared by its child validators.
+The directory is removed after the batch. Explicit snapshots keep precedence;
+independent CLI invocations should use the same `--oncotree-file` for a pinned
+reference. Network failures still fail each affected study's validation.

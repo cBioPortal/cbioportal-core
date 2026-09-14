@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, Mock
 
-from importer import preprocessing, preprocessing_case_lists as cases, validateData
+from importer import preprocessing, preprocessing_case_lists as cases, validateData, validateStudies
 
 
 NODES = [{'code': 'LUAD', 'mainType': 'Non-Small Cell Lung Cancer',
@@ -80,6 +80,77 @@ class PreprocessingTests(unittest.TestCase):
             get.assert_called_once_with('https://oncotree.mskcc.org/api/tumorTypes',
                                        params={'version': 'pinned-version'}, timeout=(10, 30))
         self.assertEqual(['LUAD'], list(reference.nodes))
+
+    def test_batch_wrapper_uses_one_temporary_snapshot(self):
+        args = validateStudies.interface(['-l', 'study-a,study-b', '-n',
+                                         '-html', str(self.root / 'reports')])
+        # Avoid unrelated meta_study lookups in this subprocess orchestration test.
+        args.html_folder = None
+        paths = []
+        def run(command, **kwargs):
+            path = Path(command[command.index('--oncotree-cache') + 1])
+            paths.append(path)
+            if len(paths) == 1:
+                path.write_text(json.dumps(NODES))
+            else:
+                self.assertEqual(NODES, json.loads(path.read_text()))
+            return 0
+        with patch.object(validateStudies.subprocess, 'call', side_effect=run):
+            self.assertEqual(0, validateStudies.main(args))
+        self.assertEqual(paths[0], paths[1])
+        self.assertFalse(paths[0].exists())
+
+    def test_matrix_scan_supplies_case_members(self):
+        self.write('data_CNA.txt', 'Hugo_Symbol\tEntrez_Gene_Id\tS1\nGENE\t1\t0\n')
+        with patch.object(validateData, 'DEFINED_SAMPLE_IDS', {'S1'}):
+            validator = validateData.CNADiscreteValidator(
+                str(self.root), {'data_filename': 'data_CNA.txt'}, self.portal,
+                self.logger, False, False)
+            validator.validate()
+        self.assertEqual({'S1'}, validator.generated_case_members)
+
+    def test_batch_snapshot_shared_across_reference_instances(self):
+        cache = self.root / 'batch.json'
+        response = Mock(content=json.dumps(NODES).encode())
+        with patch('importer.preprocessing.requests.get', return_value=response) as get:
+            first = preprocessing.OncotreeReference(cache_filename=cache)
+            second = preprocessing.OncotreeReference(cache_filename=cache)
+            self.assertEqual(first.load(self.logger), second.load(self.logger))
+            get.assert_called_once()
+        # Explicit snapshots override any batch cache.
+        cache.write_text('invalid')
+        self.assertEqual(['LUAD'], list(preprocessing.OncotreeReference(
+            self.snapshot, cache_filename=cache).load(self.logger)))
+
+    def test_scanned_case_members_avoid_reopen_and_keep_overrides(self):
+        path = self.write('data_mutations_extended.txt',
+                          'Tumor_Sample_Barcode\tOther\nS1\tx\nS2\ty\n')
+        collector = cases.StagingCaseCollector(path.name)
+        for line in path.read_text().splitlines(keepends=True):
+            collector.feed(line)
+        scanned = {str(path.resolve()): collector.members}
+        with patch.object(cases, 'case_list_from_staging_file', wraps=cases.case_list_from_staging_file) as read:
+            found = list(cases.missing_generated_case_lists(
+                self.root, 'study', ['study_all'], scanned_members=scanned))
+            self.assertIn(('study_sequenced', 'cases_sequenced.txt', 2), found)
+            self.assertNotIn('data_mutations_extended.txt', [call.args[1] for call in read.call_args_list])
+        self.write('sequenced_samples.txt', '')
+        self.assertEqual([], list(cases.missing_generated_case_lists(
+            self.root, 'study', ['study_all'], scanned_members=scanned)))
+
+    def test_scan_preserves_inline_and_malformed_row_rules(self):
+        for content, expected in (
+                ('Tumor_Sample_Barcode\nS1\n#sequenced_samples: S2 S3\nS4\n', {'S2', 'S3'}),
+                ('SAMPLE_ID\tOTHER\nS1\tx\nS1\ty\n', {'S1'}),
+                ('Hugo_Symbol\tTCGA-AA-1234-01A\nGENE\t2\n', {'TCGA-AA-1234-01A'})):
+            collector = cases.StagingCaseCollector('data.txt')
+            for line in content.splitlines(keepends=True):
+                collector.feed(line)
+            self.assertEqual(expected, collector.members)
+        collector = cases.StagingCaseCollector('data.txt')
+        for line in ('Other\tSAMPLE_ID\n', 'x\t\n'):
+            collector.feed(line)
+        self.assertIsInstance(collector.error, IndexError)
 
     def test_cna_alias_collision_fails_and_merged_copy_passes(self):
         with patch.object(validateData, 'DEFINED_SAMPLE_IDS', ['S1']):

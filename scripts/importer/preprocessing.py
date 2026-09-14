@@ -1,4 +1,5 @@
 """Read-only checks for clinical data requiring OncoTree preprocessing."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -6,6 +7,7 @@ import requests
 
 
 def add_arguments(parser):
+    parser.add_argument('--oncotree-cache', help=argparse.SUPPRESS)
     parser.add_argument('--oncotree-file', help='Saved OncoTree tumorTypes JSON for reproducible/offline validation')
     parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
                         help='OncoTree version to fetch when no snapshot is supplied (default: latest stable)')
@@ -13,8 +15,9 @@ def add_arguments(parser):
 
 class OncotreeReference:
     """Fetch lazily once, including failures; never retry for each sample."""
-    def __init__(self, filename=None, version='oncotree_latest_stable'):
+    def __init__(self, filename=None, version='oncotree_latest_stable', cache_filename=None):
         self.filename = filename
+        self.cache_filename = cache_filename
         self.version = version
         self.nodes = None
         self.error = None
@@ -27,6 +30,9 @@ class OncotreeReference:
             if self.filename:
                 raw = Path(self.filename).read_bytes()
                 source = str(self.filename)
+            elif self.cache_filename and Path(self.cache_filename).exists():
+                raw = Path(self.cache_filename).read_bytes()
+                source = 'OncoTree version ' + self.version + ' (batch snapshot)'
             else:
                 response = requests.get('https://oncotree.mskcc.org/api/tumorTypes',
                                         params={'version': self.version}, timeout=(10, 30))
@@ -46,6 +52,8 @@ class OncotreeReference:
                     raise ValueError('duplicate OncoTree code: ' + item['code'])
                 nodes[item['code']] = dict(item, name=item.get('name') or '',
                                           mainType=item.get('mainType') or '')
+            if self.cache_filename and not self.filename:
+                Path(self.cache_filename).write_bytes(raw)
             self.nodes = nodes
             logger.info('OncoTree reference: %s; SHA-256 %s', source, hashlib.sha256(raw).hexdigest())
         except (OSError, ValueError, requests.RequestException) as exc:
