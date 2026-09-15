@@ -4480,16 +4480,14 @@ class WsiValidator(Validator):
     ]
     REQUIRED_VALUES = {
         'PATIENT_ID', 'IMAGE_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
-        'SPECIMEN_KEY', 'STAIN_NAME', 'STAIN_GROUP', 'IS_HNE', 'IS_IHC',
-        'SLIDE_TYPE', 'CAN_SERVE_TILES',
+        'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'SLIDE_TYPE', 'CAN_SERVE_TILES',
     }
 
     @staticmethod
     def _stain_contract_error(row):
         controlled = {'H&E', 'IHC', 'Other'}
-        for name in ('STAIN_NAME', 'STAIN_GROUP', 'SLIDE_TYPE'):
-            if row.get(name) not in controlled:
-                return '%s must be H&E, IHC, or Other' % name
+        if row.get('SLIDE_TYPE') not in controlled:
+            return 'SLIDE_TYPE must be H&E, IHC, or Other'
         is_hne = row.get('IS_HNE') == 'TRUE'
         is_ihc = row.get('IS_IHC') == 'TRUE'
         if is_hne and is_ihc:

@@ -465,13 +465,8 @@ public class ImportWsiData extends ConsoleRunnable {
 
             boolean isHne = requiredBoolean(value(fields, 18), "IS_HNE", line);
             boolean isIhc = requiredBoolean(value(fields, 19), "IS_IHC", line);
-            String stainName = value(fields, 16);
-            String stainGroup = value(fields, 17);
-            if (!Set.of("H&E", "IHC", "Other").contains(stainName)
-                || !Set.of("H&E", "IHC", "Other").contains(stainGroup)) {
-                throw new IllegalArgumentException(
-                    "Line " + line + ": stain name/group must be H&E, IHC, or Other");
-            }
+            String stainName = nullable(value(fields, 16));
+            String stainGroup = nullable(value(fields, 17));
             String slideType = validatedSlideType(value(fields, 23), isHne, isIhc, line);
             boolean canServe = requiredBoolean(value(fields, 24), "CAN_SERVE_TILES", line);
             Long fileSize = optionalLong(value(fields, 21), "FILE_SIZE_BYTES", line);

@@ -52,6 +52,10 @@ Required values are `PATIENT_ID`, `IMAGE_ID`,
 `PART_KEY`, `BLOCK_KEY`, `MATCH_LEVEL`, `SPECIMEN_KEY`, `IS_HNE`, `IS_IHC`,
 and `CAN_SERVE_TILES`. `MATCH_LEVEL` is `BLOCK`, `PART`, or `UNMATCHED`;
 matched rows require `SAMPLE_ID`, while unmatched rows leave it blank.
+`SLIDE_TYPE` is also required and is the controlled classification value:
+`H&E`, `IHC`, or `Other`. `STAIN_NAME` and `STAIN_GROUP` are optional
+descriptive source labels and are not classification fields; values such as
+`H&E, Initial` and `H&E (Initial)` are valid.
 
 `IMAGE_ID` is unique within a study. Repeated part and block keys must carry
 the same descriptive values. Stable patient, sample, and reference-sample IDs

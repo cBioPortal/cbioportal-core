@@ -3264,6 +3264,22 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             **valid, 'IS_HNE': 'TRUE',
         }))
 
+    def test_stain_contract_allows_descriptive_source_labels(self):
+        self.assertIsNone(validateData.WsiValidator._stain_contract_error({
+            'STAIN_NAME': 'H&E, Initial',
+            'STAIN_GROUP': 'H&E (Initial)',
+            'SLIDE_TYPE': 'H&E',
+            'IS_HNE': 'TRUE',
+            'IS_IHC': 'FALSE',
+        }))
+        self.assertIsNone(validateData.WsiValidator._stain_contract_error({
+            'STAIN_NAME': '',
+            'STAIN_GROUP': '',
+            'SLIDE_TYPE': 'Other',
+            'IS_HNE': 'FALSE',
+            'IS_IHC': 'FALSE',
+        }))
+
     def test_tile_metadata_requires_browser_contract(self):
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({
