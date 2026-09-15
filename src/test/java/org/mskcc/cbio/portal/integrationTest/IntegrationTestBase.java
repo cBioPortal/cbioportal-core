@@ -45,12 +45,18 @@ public abstract class IntegrationTestBase {
     private static final String SKIP_ENV = "CBIOPORTAL_TEST_DB_SKIP";
     private static final String TARGET_DIR = "target/test-db";
     private static final String VERSION_FILE = "cbioportal.version";
-    private static final String CGDS_SQL_FILE = "clickhouse_cgds.sql";
+    private static final String SCHEMA_SQL_FILE = "schema.sql";
     private static final String SEED_SQL_FILE = "seed_mini.sql";
-    private static final String CGDS_URL_TEMPLATE =
-        "https://raw.githubusercontent.com/cBioPortal/cbioportal/%s/src/test/resources/clickhouse_cgds.sql";
+    private static final String SCHEMA_PATH_PROPERTY = "cbioportal.schema.path";
+    private static final String SCHEMA_URL_TEMPLATE =
+        "https://raw.githubusercontent.com/cBioPortal/cbioportal/%s/"
+            + "src/main/resources/db-scripts/clickhouse/init/schema.sql";
     private static final Pattern CBIOPORTAL_VERSION_PATTERN =
         Pattern.compile("<cbioportal\\.version>\\s*([^<]+)\\s*</cbioportal\\.version>");
+    private static final Pattern DB_VERSION_PATTERN =
+        Pattern.compile("<db\\.version>\\s*([^<]+)\\s*</db\\.version>");
+    private static final String EXPECTED_WSI_TABLES =
+        "'wsi_patient', 'wsi_part', 'wsi_block', 'wsi_slide', 'wsi_slide_placement'";
 
     private static ClickHouseContainer container;
 
@@ -114,7 +120,7 @@ public abstract class IntegrationTestBase {
     }
 
     private static ClickHouseContainer startAndInitializeContainer() {
-        Path cgdsPath = ensureCgdsSql();
+        Path schemaPath = ensureSchemaSql();
         Path seedPath = ensureSeedSql();
         ClickHouseContainer clickhouse = new ClickHouseContainer(DockerImageName.parse(CLICKHOUSE_IMAGE))
             .withUsername(DB_USER)
@@ -122,7 +128,8 @@ public abstract class IntegrationTestBase {
             .withEnv("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
             .withStartupTimeout(Duration.ofMinutes(5));
         clickhouse.start();
-        applySchema(clickhouse, cgdsPath);
+        applySchema(clickhouse, schemaPath);
+        verifySchema(clickhouse);
         applySeed(clickhouse, seedPath);
         setSystemProperties(clickhouse);
         waitForSchema(clickhouse);
@@ -201,12 +208,33 @@ public abstract class IntegrationTestBase {
     }
 
     private static void applySchema(ClickHouseContainer clickhouse, Path schemaPath) {
-        String containerSchemaPath = "/tmp/" + CGDS_SQL_FILE;
+        String containerSchemaPath = "/tmp/" + SCHEMA_SQL_FILE;
         clickhouse.copyFileToContainer(MountableFile.forHostPath(schemaPath), containerSchemaPath);
 
         executeClickHouseQuery(clickhouse, "CREATE DATABASE IF NOT EXISTS " + DB_NAME);
 
         applySqlFile(clickhouse, containerSchemaPath);
+    }
+
+    private static void verifySchema(ClickHouseContainer clickhouse) {
+        String expectedVersion = readDbVersion();
+        String actualVersion = executeClickHouseScalar(
+            clickhouse,
+            "SELECT db_schema_version FROM " + DB_NAME + ".info LIMIT 1");
+        if (!expectedVersion.equals(actualVersion)) {
+            throw new IllegalStateException(
+                "Canonical ClickHouse schema version mismatch: expected "
+                    + expectedVersion + ", found " + actualVersion);
+        }
+
+        String wsiTableCount = executeClickHouseScalar(
+            clickhouse,
+            "SELECT count() FROM system.tables WHERE database = '" + DB_NAME
+                + "' AND name IN (" + EXPECTED_WSI_TABLES + ")");
+        if (!"5".equals(wsiTableCount)) {
+            throw new IllegalStateException(
+                "Canonical ClickHouse schema is missing WSI tables: found " + wsiTableCount);
+        }
     }
 
     private static void applySeed(ClickHouseContainer clickhouse, Path seedPath) {
@@ -233,6 +261,15 @@ public abstract class IntegrationTestBase {
         executeClickHouseCommand(clickhouse, command);
     }
 
+    private static String executeClickHouseScalar(ClickHouseContainer clickhouse, String query) {
+        List<String> command = baseClickHouseCommand();
+        command.add("--query");
+        command.add(query);
+        command.add("--format");
+        command.add("TabSeparatedRaw");
+        return executeClickHouseCommand(clickhouse, command).getStdout().trim();
+    }
+
     private static List<String> baseClickHouseCommand() {
         List<String> command = new ArrayList<>();
         command.add("clickhouse-client");
@@ -243,7 +280,8 @@ public abstract class IntegrationTestBase {
         return command;
     }
 
-    private static void executeClickHouseCommand(ClickHouseContainer clickhouse, List<String> command) {
+    private static Container.ExecResult executeClickHouseCommand(
+        ClickHouseContainer clickhouse, List<String> command) {
         try {
             Container.ExecResult result = clickhouse.execInContainer(command.toArray(new String[0]));
             if (result.getExitCode() != 0) {
@@ -253,6 +291,7 @@ public abstract class IntegrationTestBase {
                 }
                 throw new IllegalStateException("ClickHouse command failed: " + error);
             }
+            return result;
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to execute ClickHouse command", ex);
         } catch (InterruptedException ex) {
@@ -261,26 +300,33 @@ public abstract class IntegrationTestBase {
         }
     }
 
-    private static Path ensureCgdsSql() {
-        //FIXME Uncomment when cbioportal contains the complete clickhouse_cgds.sql for the current version
-        /*
+    private static Path ensureSchemaSql() {
+        String configuredPath = System.getProperty(SCHEMA_PATH_PROPERTY);
+        if (configuredPath != null && !configuredPath.isBlank()) {
+            Path path = Paths.get(configuredPath).toAbsolutePath();
+            if (!Files.exists(path)) {
+                throw new IllegalStateException(
+                    "Configured canonical ClickHouse schema was not found at " + path);
+            }
+            return path;
+        }
+
         String cbioportalVersion = readCbioportalVersion();
         Path targetDir = Paths.get(System.getProperty("user.dir"), TARGET_DIR);
-        Path cgdsPath = targetDir.resolve(CGDS_SQL_FILE);
+        Path schemaPath = targetDir.resolve(SCHEMA_SQL_FILE);
         Path versionPath = targetDir.resolve(VERSION_FILE);
         try {
             Files.createDirectories(targetDir);
-            if (!Files.exists(cgdsPath) || !Files.exists(versionPath)
+            if (!Files.exists(schemaPath) || !Files.exists(versionPath)
                 || !cbioportalVersion.equals(readFile(versionPath).trim())) {
-                downloadCgdsSql(cbioportalVersion, cgdsPath);
+                downloadSchemaSql(cbioportalVersion, schemaPath);
                 Files.writeString(versionPath, cbioportalVersion, StandardCharsets.UTF_8);
             }
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to prepare clickhouse_cgds.sql for integration tests", ex);
+            throw new IllegalStateException(
+                "Failed to prepare the canonical ClickHouse schema for integration tests", ex);
         }
-        */
-        Path cgdsPath = Paths.get(System.getProperty("user.dir"), "src", "test", "resources", CGDS_SQL_FILE);
-        return cgdsPath;
+        return schemaPath;
     }
 
     private static Path ensureSeedSql() {
@@ -292,26 +338,39 @@ public abstract class IntegrationTestBase {
     }
 
     private static String readCbioportalVersion() {
+        String version = readPomProperty(CBIOPORTAL_VERSION_PATTERN, "cbioportal.version");
+        if (!version.matches("[0-9a-fA-F]{40}")) {
+            throw new IllegalStateException(
+                "cbioportal.version must be a full 40-character commit SHA: " + version);
+        }
+        return version;
+    }
+
+    private static String readDbVersion() {
+        return readPomProperty(DB_VERSION_PATTERN, "db.version");
+    }
+
+    private static String readPomProperty(Pattern pattern, String propertyName) {
         Path pomPath = Paths.get(System.getProperty("user.dir"), "pom.xml");
         try {
             String pomContents = readFile(pomPath);
-            Matcher matcher = CBIOPORTAL_VERSION_PATTERN.matcher(pomContents);
+            Matcher matcher = pattern.matcher(pomContents);
             if (matcher.find()) {
                 return matcher.group(1).trim();
             }
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to read pom.xml for cbioportal.version", ex);
+            throw new IllegalStateException("Failed to read pom.xml for " + propertyName, ex);
         }
-        throw new IllegalStateException("cbioportal.version not found in pom.xml");
+        throw new IllegalStateException(propertyName + " not found in pom.xml");
     }
 
     private static String readFile(Path path) throws IOException {
         return Files.readString(path, StandardCharsets.UTF_8);
     }
 
-    private static void downloadCgdsSql(String version, Path destination) throws IOException {
-        String url = String.format(CGDS_URL_TEMPLATE, version);
-        System.out.println("Downloading clickhouse_cgds.sql for " + version + "...");
+    private static void downloadSchemaSql(String version, Path destination) throws IOException {
+        String url = String.format(SCHEMA_URL_TEMPLATE, version);
+        System.out.println("Downloading the canonical ClickHouse schema for " + version + "...");
         try (InputStream input = new URL(url).openStream()) {
             Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING);
         }
