@@ -17,6 +17,16 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
             if not portal_home:
                 raise RuntimeError("PORTAL_HOME not set, could not locate derived table script")
             derived_table_sql_filepath = os.path.join(portal_home, 'populate_derived_tables.sql')
+            if not os.path.isfile(derived_table_sql_filepath):
+                # The primary cBioPortal repository keeps ClickHouse scripts
+                # under db-scripts/clickhouse in both source and build
+                # resource trees.  Accept that layout as well as the legacy
+                # flat PORTAL_HOME layout used by older deployments.
+                nested = os.path.join(
+                    portal_home, 'db-scripts', 'clickhouse', 'populate_derived_tables.sql'
+                )
+                if os.path.isfile(nested):
+                    derived_table_sql_filepath = nested
             if not os.path.exists(derived_table_sql_filepath):
                 raise RuntimeError(f"Could not find derived table script at {derived_table_sql_filepath}")
 

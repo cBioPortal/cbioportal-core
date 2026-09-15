@@ -82,7 +82,21 @@ public class BackupUtil {
         Connection con = null;
         try {
             con = JdbcUtil.getDbConnection(BackupUtil.class);
-            con.prepareStatement("EXCHANGE TABLES " + backupTable + " AND " + tableName + ";").executeUpdate();
+            try {
+                con.prepareStatement("EXCHANGE TABLES " + backupTable + " AND " + tableName + ";").executeUpdate();
+            } catch (SQLException exchangeException) {
+                if (!isExchangeUnsupported(exchangeException)) {
+                    throw exchangeException;
+                }
+
+                // Some ClickHouse deployments run on filesystems without renameat2,
+                // which is required by EXCHANGE TABLES.  RENAME TABLE is supported
+                // there, so replace the failed table with the immutable backup.  The
+                // operation is only used while recovering a failed import, before
+                // control is returned to the caller.
+                con.prepareStatement("DROP TABLE " + tableName + ";").executeUpdate();
+                con.prepareStatement("RENAME TABLE " + backupTable + " TO " + tableName + ";").executeUpdate();
+            }
 
             ProgressMonitor.setCurrentMessage(tableName + " successfully restored.");
         } catch (SQLException e) {
@@ -91,6 +105,18 @@ public class BackupUtil {
         } finally {
             JdbcUtil.closeAll(BackupUtil.class, con, null, null);
         }
+    }
+
+    private static boolean isExchangeUnsupported(SQLException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null && (message.contains("renameat2") || message.contains("UNSUPPORTED_METHOD"))) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private static void deleteBackup(String tableName) {

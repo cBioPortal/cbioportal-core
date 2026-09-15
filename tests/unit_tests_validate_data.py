@@ -7,7 +7,7 @@ version 3, or (at your option) any later version.
 """
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import sys
 import logging.handlers
 import textwrap
@@ -3234,6 +3234,85 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
                                        self.logger, False, False)
         record_list = self.get_log_records()
         self.assertEqual('Validation complete', record_list[-1].getMessage())
+
+
+class WsiValidatorTestCase(PostClinicalDataFileTestCase):
+
+    def test_deid_rejects_common_absolute_date_formats(self):
+        for value in ('2021-03-14', '03/14/2021', '14/03/2021',
+                      'March 14, 2021', '14 March 2021'):
+            self.assertTrue(validateData._wsi_contains_absolute_date(value))
+
+    def test_valid_unmatched_slide(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_wsi_valid.txt', validateData.WsiValidator)
+        self.assertEqual([], [record for record in record_list if record.levelno >= logging.ERROR])
+
+    def test_stain_contract_rejects_null_and_conflicting_values(self):
+        valid = {
+            'STAIN_NAME': 'IHC', 'STAIN_GROUP': 'IHC', 'SLIDE_TYPE': 'IHC',
+            'IS_HNE': 'FALSE', 'IS_IHC': 'TRUE',
+        }
+        self.assertIsNone(validateData.WsiValidator._stain_contract_error(valid))
+        self.assertIn('SLIDE_TYPE', validateData.WsiValidator._stain_contract_error({
+            **valid, 'SLIDE_TYPE': '',
+        }))
+        self.assertIn('inconsistent', validateData.WsiValidator._stain_contract_error({
+            **valid, 'SLIDE_TYPE': 'H&E',
+        }))
+        self.assertIn('both H&E and IHC', validateData.WsiValidator._stain_contract_error({
+            **valid, 'IS_HNE': 'TRUE',
+        }))
+
+    def test_stain_contract_allows_descriptive_source_labels(self):
+        self.assertIsNone(validateData.WsiValidator._stain_contract_error({
+            'STAIN_NAME': 'H&E, Initial',
+            'STAIN_GROUP': 'H&E (Initial)',
+            'SLIDE_TYPE': 'H&E',
+            'IS_HNE': 'TRUE',
+            'IS_IHC': 'FALSE',
+        }))
+        self.assertIsNone(validateData.WsiValidator._stain_contract_error({
+            'STAIN_NAME': '',
+            'STAIN_GROUP': '',
+            'SLIDE_TYPE': 'Other',
+            'IS_HNE': 'FALSE',
+            'IS_IHC': 'FALSE',
+        }))
+
+    def test_tile_metadata_requires_browser_contract(self):
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({
+            'dimensions': {'width': 256, 'height': 256},
+            'levels': 1,
+            'level_dimensions': [],
+            'max_zoom': 0,
+            'tile_size': 256,
+        }))
+        self.assertTrue(validateData.WsiValidator._is_valid_tile_metadata({
+            'dimensions': {'width': 256, 'height': 256},
+            'levels': 1,
+            'level_dimensions': [{'width': 256, 'height': 256}],
+            'max_zoom': 0,
+            'tile_size': 256,
+        }))
+
+    def test_tile_metadata_deid_allows_date_like_source_fingerprint(self):
+        validator = validateData.WsiValidator.__new__(validateData.WsiValidator)
+        validator.logger = Mock()
+        header = ['TILE_METADATA_JSON']
+        metadata = {'source_fingerprint': 'a' * 10 + '20395333' + 'b' * 46}
+        validator._validate_metadata_deid(metadata, 1, header)
+        validator.logger.error.assert_not_called()
+
+    def test_approved_source_prefix_allows_pipeline_release_date(self):
+        with patch.dict(validateData.os.environ, {
+            'WSI_ALLOWED_SOURCE_PREFIXES': 's3://mskmind-bkt/reef-slides-reprocess-staging/',
+        }):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                's3://mskmind-bkt/reef-slides-reprocess-staging/prod-staged-20260819-v2/1.svs',
+                'source',
+            ))
 
 
 if __name__ == '__main__':
