@@ -64,17 +64,24 @@ public final class DaoResourceData {
             // Column order matches DESCRIBE TABLE resource_data:
             // RESOURCE_DATA_ID, RESOURCE_ID, CANCER_STUDY_ID, ENTITY_TYPE,
             // PATIENT_ID, SAMPLE_ID, URL, DISPLAY_NAME, TYPE, METADATA, PRIORITY
+            //
+            // Nulls are passed through rather than substituted with "": the loader encodes a
+            // null as \N, which ClickHouse stores as a real NULL, and these columns are
+            // Nullable(String). The distinction matters. A patient-level row carries no sample,
+            // and queries select those rows with "SAMPLE_ID IS NULL"; an empty string satisfies
+            // neither that nor "SAMPLE_ID IN (...)", so such rows would be silently dropped from
+            // every cohort-scoped query and miscounted by the distinct-sample count.
             ClickHouseBulkLoader.getClickHouseBulkLoader(RESOURCE_DATA_TABLE).insertRecord(
                 Long.toString(resourceDataIdSeq.incrementAndGet()),
                 resourceId,
                 Integer.toString(cancerStudyId),
                 entityType,
-                patientId  != null ? patientId  : "",
-                sampleId   != null ? sampleId   : "",
+                patientId,
+                sampleId,
                 url,
-                displayName != null ? displayName : "",
-                type       != null ? type       : "",
-                metadata   != null ? metadata   : "",
+                displayName,
+                type,
+                metadata,
                 Integer.toString(priority)
             );
             return 1;
