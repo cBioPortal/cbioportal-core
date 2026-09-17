@@ -44,6 +44,7 @@ from .cbioportal_common import VERSION_UTIL_CLASS
 from .cbioportal_common import run_java
 from .cbioportal_common import UPDATE_CASE_LIST_CLASS
 from .cbioportal_common import INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
+from .cbioportal_common import JavaRunException
 
 # ------------------------------------------------------------------------------
 # globals
