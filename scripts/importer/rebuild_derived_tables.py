@@ -1,7 +1,10 @@
 
+import hashlib
+import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 
 
 def rebuild_derived_tables(derived_table_sql_filepath=None):
@@ -51,6 +54,22 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
         ch_props['optimize_backoff_secs'] = os.environ.get('CLICKHOUSE_OPTIMIZE_BACKOFF_SECS', '0')
 
         execute_clickhouse_sql(derived_table_sql_filepath, ch_props)
+        counts = verify_source_backed_derived_tables(ch_props)
+        receipt_path = os.environ.get('DERIVED_TABLE_RECEIPT')
+        if receipt_path:
+            with open(derived_table_sql_filepath, 'rb') as sql_file:
+                sql_sha256 = hashlib.sha256(sql_file.read()).hexdigest()
+            receipt = {
+                'database': ch_props['database'],
+                'sql_sha256': sql_sha256,
+                'completed_at': datetime.now(timezone.utc).isoformat(),
+                'source_derived_counts': counts,
+            }
+            temporary_path = f'{receipt_path}.tmp'
+            with open(temporary_path, 'w', encoding='utf-8') as receipt_file:
+                json.dump(receipt, receipt_file, indent=2, sort_keys=True)
+                receipt_file.write('\n')
+            os.replace(temporary_path, receipt_path)
         return True
     except Exception as e:
         print(RED + f"Derived table construction failed: {e}" + END, file=sys.stderr)
@@ -82,3 +101,53 @@ def execute_clickhouse_sql(sql_filepath, ch_props):
         raise RuntimeError(
             f"clickhouse client failed (exit {result.returncode}):\n{result.stderr}"
         )
+
+
+def execute_clickhouse_query(query, ch_props):
+    """Run a bounded verification query and return TSV rows."""
+    cmd = [
+        'clickhouse', 'client',
+        '--host', ch_props['host'],
+        '--port', ch_props['port'],
+        '--user', ch_props['user'],
+        '--password', ch_props['password'],
+        '--database', ch_props['database'],
+        '--format', 'TSVRaw',
+        '--query', query,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"clickhouse verification query failed (exit {result.returncode}):\n{result.stderr}"
+        )
+    return result.stdout
+
+
+def verify_source_backed_derived_tables(ch_props):
+    """Reject a rebuild that leaves a source-backed derived table empty."""
+    pairs = (
+        ('sample', 'sample_derived'),
+        ('clinical_event', 'clinical_event_derived'),
+        ('clinical_event_data', 'clinical_event_data_derived'),
+        ('genetic_alteration', 'genetic_alteration_derived'),
+        ('mutation', 'mutation_derived'),
+    )
+    query = ' UNION ALL '.join(
+        f"SELECT '{source}', toString(count()), '{derived}', "
+        f"toString((SELECT count() FROM {derived})) FROM {source}"
+        for source, derived in pairs
+    )
+    rows = {}
+    for line in execute_clickhouse_query(query, ch_props).splitlines():
+        source, source_count, derived, derived_count = line.split('\t')
+        rows[source] = {
+            'source': int(source_count),
+            'derived_table': derived,
+            'derived': int(derived_count),
+        }
+        if int(source_count) > 0 and int(derived_count) == 0:
+            raise RuntimeError(
+                f"derived table {derived} is empty while source table {source} has "
+                f"{source_count} rows"
+            )
+    return rows
