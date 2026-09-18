@@ -31,7 +31,7 @@ cancer_study_identifier: <study stable id>
 genetic_alteration_type: PATHOLOGY_SLIDES
 datatype: WSI
 data_filename: data_wsi.txt
-format_version: 2
+format_version: 3
 ```
 
 The importer rejects unsupported format versions. A study may contain one WSI
@@ -39,15 +39,17 @@ pair. The data file follows the normal cBioPortal five-row preamble: four
 comment rows, followed by this exact header:
 
 ```text
-PATIENT_ID  REFERENCE_SAMPLE_ID  SAMPLE_ID  IMAGE_ID  PART_KEY  PART_NUMBER  PART_DESIGNATOR  PART_TYPE  PART_DESCRIPTION  SUBSPECIALTY  PATH_DX_TITLE  BLOCK_KEY  BLOCK_NUMBER  BLOCK_LABEL  MATCH_LEVEL  SPECIMEN_KEY  STAIN_NAME  STAIN_GROUP  IS_HNE  IS_IHC  MAGNIFICATION  FILE_SIZE_BYTES  BARCODE  SLIDE_TYPE  CAN_SERVE_TILES  SOURCE_URL  TILE_METADATA_JSON  THUMBNAIL_URL  THUMBNAIL_WIDTH  THUMBNAIL_HEIGHT  THUMBNAIL_CONTENT_TYPE
+PATIENT_ID  REFERENCE_SAMPLE_ID  SAMPLE_ID  IMAGE_ID  PART_KEY  PART_NUMBER  PART_DESIGNATOR  PART_TYPE  PART_DESCRIPTION  SUBSPECIALTY  PATH_DX_TITLE  BLOCK_KEY  BLOCK_NUMBER  BLOCK_LABEL  MATCH_LEVEL  SPECIMEN_KEY  STAIN_NAME  STAIN_GROUP  IS_HNE  IS_IHC  MAGNIFICATION  FILE_SIZE_BYTES  BARCODE  SLIDE_TYPE  CAN_SERVE_TILES  SOURCE_URL  TILE_METADATA_JSON  THUMBNAIL_URL  THUMBNAIL_WIDTH  THUMBNAIL_HEIGHT  THUMBNAIL_CONTENT_TYPE  TIMELINE_START_DAYS  TIMELINE_DATE_STATUS  TIMELINE_DATE_KIND  TIMELINE_DATE_SOURCE  TIMELINE_DATE_REASON  TIMELINE_COORDINATE_SYSTEM  TIMEPOINT_SOURCE
 ```
 
-Values are tab-delimited. Timing is represented by the standard
-`PATHOLOGY SLIDES` clinical timeline event, not by the WSI hierarchy file.
-Every canonical slide with an available timeline date is represented in that
-event stream. Slides whose resolved stain flags are neither H&E nor IHC use
-the `Other` subtype and an all-slides linkout. Rows without a usable timeline
-date remain in the WSI hierarchy but cannot be placed on the timeline.
+Values are tab-delimited. Format v3 carries the de-identified relative timing
+contract on every row. `TIMELINE_START_DAYS` is relative to the patient's first
+tumor-sequencing sample; day zero is valid. `TIMELINE_DATE_KIND` is `RECORDED`,
+`ESTIMATED`, or `UNDATED`, and `TIMELINE_DATE_SOURCE` and
+`TIMELINE_DATE_REASON` preserve provenance. The coordinate system must be
+`patient_first_tumor_sequencing_day_zero`. Missing procedure dates remain in the
+WSI hierarchy and are represented by the adjacent undated UI section; they are
+not converted into dated clinical events.
 Required values are `PATIENT_ID`, `IMAGE_ID`,
 `PART_KEY`, `BLOCK_KEY`, `MATCH_LEVEL`, `SPECIMEN_KEY`, `IS_HNE`, `IS_IHC`,
 and `CAN_SERVE_TILES`. `MATCH_LEVEL` is `BLOCK`, `PART`, or `UNMATCHED`;
@@ -104,6 +106,7 @@ the flat file into these tables:
 - `wsi_block`
 - `wsi_slide`
 - `wsi_slide_placement`
+- `wsi_slide_timing`
 The five tables are provisioned by the cBioPortal backend schema. Core does not
 create or migrate production tables. Study deletion removes the snapshot rows.
 The importer is insert-only and must run against a fresh inactive database;

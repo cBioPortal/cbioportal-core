@@ -49,7 +49,7 @@ import java.util.regex.Pattern;
  */
 public class ImportWsiData extends ConsoleRunnable {
 
-    private static final int COLUMN_COUNT = 31;
+    private static final int COLUMN_COUNT = 38;
     private static final String[] COLUMNS = {
         "PATIENT_ID", "REFERENCE_SAMPLE_ID", "SAMPLE_ID", "IMAGE_ID",
         "PART_KEY", "PART_NUMBER", "PART_DESIGNATOR", "PART_TYPE",
@@ -58,7 +58,9 @@ public class ImportWsiData extends ConsoleRunnable {
         "STAIN_NAME", "STAIN_GROUP", "IS_HNE", "IS_IHC", "MAGNIFICATION",
         "FILE_SIZE_BYTES", "BARCODE", "SLIDE_TYPE", "CAN_SERVE_TILES", "SOURCE_URL",
         "TILE_METADATA_JSON", "THUMBNAIL_URL", "THUMBNAIL_WIDTH",
-        "THUMBNAIL_HEIGHT", "THUMBNAIL_CONTENT_TYPE"
+        "THUMBNAIL_HEIGHT", "THUMBNAIL_CONTENT_TYPE", "TIMELINE_START_DAYS",
+        "TIMELINE_DATE_STATUS", "TIMELINE_DATE_KIND", "TIMELINE_DATE_SOURCE",
+        "TIMELINE_DATE_REASON", "TIMELINE_COORDINATE_SYSTEM", "TIMEPOINT_SOURCE"
     };
 
     private static final String[] PATIENT_FIELDS = {
@@ -83,6 +85,11 @@ public class ImportWsiData extends ConsoleRunnable {
     private static final String[] PLACEMENT_FIELDS = {
         "cancer_study_id", "patient_id", "image_id", "part_key",
         "block_key", "sample_id", "match_level", "specimen_key"
+    };
+    private static final String[] TIMING_FIELDS = {
+        "cancer_study_id", "patient_id", "image_id", "timeline_start_days",
+        "timeline_date_status", "timeline_date_kind", "timeline_date_source",
+        "timeline_date_reason", "timeline_coordinate_system", "timepoint_source"
     };
     private static final String[] CLINICAL_SAMPLE_FIELDS = {
         "internal_id", "attr_id", "attr_value"
@@ -128,7 +135,7 @@ public class ImportWsiData extends ConsoleRunnable {
         "tile_size", "mpp", "objective_power", "vendor", "identity_version", "safe_min_level",
         "tile_metadata_schema_version", "decode_policy_version", "max_decode_pixels",
         "thumbnail_max_decode_pixels", "source_fingerprint");
-    private static final Set<Integer> NON_TEXT_WSI_COLUMNS = Set.of(18, 19, 21, 24, 26, 28, 29);
+    private static final Set<Integer> NON_TEXT_WSI_COLUMNS = Set.of(18, 19, 21, 24, 26, 28, 29, 31);
     private static final Map<String, String> THUMBNAIL_CONTENT_TYPES = Map.of(
         "jpg", "image/jpeg", "jpeg", "image/jpeg", "png", "image/png");
 
@@ -142,6 +149,7 @@ public class ImportWsiData extends ConsoleRunnable {
         private final Map<String, String[]> blocks = new LinkedHashMap<>();
         private final Map<String, String[]> slides = new LinkedHashMap<>();
         private final Map<String, String[]> placements = new LinkedHashMap<>();
+        private final Map<String, String[]> timings = new LinkedHashMap<>();
     }
 
     private static String value(String[] fields, int index) {
@@ -275,8 +283,8 @@ public class ImportWsiData extends ConsoleRunnable {
             || !"WSI".equals(properties.getProperty("datatype"))) {
             throw new IllegalArgumentException("WSI metadata must use PATHOLOGY_SLIDES / WSI");
         }
-        if (!"2".equals(properties.getProperty("format_version"))) {
-            throw new IllegalArgumentException("Unsupported WSI format_version; expected 2");
+        if (!"3".equals(properties.getProperty("format_version"))) {
+            throw new IllegalArgumentException("Unsupported WSI format_version; expected 3");
         }
         for (String field : List.of("cancer_study_identifier", "data_filename")) {
             require(properties.getProperty(field), field, 0);
@@ -485,6 +493,25 @@ public class ImportWsiData extends ConsoleRunnable {
                 thumbnailHeight = null;
                 thumbnailContentType = null;
             }
+            Long timelineStartDays = optionalLong(value(fields, 31), "TIMELINE_START_DAYS", line);
+            String timelineStatus = value(fields, 32);
+            String timelineKind = value(fields, 33);
+            String timelineSource = value(fields, 34);
+            String timelineReason = nullable(value(fields, 35));
+            String timelineCoordinateSystem = value(fields, 36);
+            String timepointSource = nullable(value(fields, 37));
+            validateTiming(
+                timelineStartDays,
+                timelineStatus,
+                timelineKind,
+                timelineSource,
+                timelineReason,
+                timelineCoordinateSystem,
+                line
+            );
+            if (timepointSource == null) {
+                timepointSource = deriveTimepointSource(timelineKind, timelineReason, timelineSource, timelineStatus);
+            }
             String[] slide = new String[] {
                 Long.toString(refs.studyId()), Long.toString(patientId), imageId,
                 nullable(value(fields, 16)), nullable(value(fields, 17)), isHne ? "1" : "0",
@@ -501,8 +528,63 @@ public class ImportWsiData extends ConsoleRunnable {
                 value(fields, 15)
             };
             output.placements.put(imageId, placement);
+            output.timings.put(imageId, new String[] {
+                Long.toString(refs.studyId()), Long.toString(patientId), imageId,
+                nullableLong(timelineStartDays), timelineStatus, timelineKind,
+                timelineSource, timelineReason, timelineCoordinateSystem, timepointSource
+            });
         }
         return output;
+    }
+
+    private static void validateTiming(
+        Long timelineStartDays,
+        String timelineStatus,
+        String timelineKind,
+        String timelineSource,
+        String timelineReason,
+        String timelineCoordinateSystem,
+        int line
+    ) {
+        if (!Set.of("AVAILABLE", "MISSING_PROCEDURE_DATE", "MISSING_REFERENCE_SEQUENCING_DATE")
+            .contains(timelineStatus)) {
+            throw new IllegalArgumentException("Line " + line + ": invalid TIMELINE_DATE_STATUS");
+        }
+        if (!Set.of("RECORDED", "ESTIMATED", "UNDATED").contains(timelineKind)) {
+            throw new IllegalArgumentException("Line " + line + ": invalid TIMELINE_DATE_KIND");
+        }
+        require(timelineSource, "TIMELINE_DATE_SOURCE", line);
+        if (!"patient_first_tumor_sequencing_day_zero".equals(timelineCoordinateSystem)) {
+            throw new IllegalArgumentException("Line " + line + ": unsupported TIMELINE_COORDINATE_SYSTEM");
+        }
+        if ("AVAILABLE".equals(timelineStatus)) {
+            if (timelineStartDays == null || "UNDATED".equals(timelineKind) || timelineReason != null) {
+                throw new IllegalArgumentException("Line " + line + ": AVAILABLE timing is inconsistent");
+            }
+            return;
+        }
+        if (timelineStartDays != null) {
+            throw new IllegalArgumentException("Line " + line + ": non-AVAILABLE timing cannot have TIMELINE_START_DAYS");
+        }
+        if ("MISSING_PROCEDURE_DATE".equals(timelineStatus) && !"UNDATED".equals(timelineKind)) {
+            throw new IllegalArgumentException("Line " + line + ": missing procedure date must be UNDATED");
+        }
+        if ("MISSING_REFERENCE_SEQUENCING_DATE".equals(timelineStatus)
+            && "UNDATED".equals(timelineKind)) {
+            throw new IllegalArgumentException("Line " + line + ": missing reference date cannot be UNDATED");
+        }
+    }
+
+    private static String deriveTimepointSource(
+        String timelineKind, String timelineReason, String timelineSource, String timelineStatus
+    ) {
+        if ("ESTIMATED".equals(timelineKind)) {
+            return "Verified estimated procedure date relative to first tumor sequencing";
+        }
+        if ("RECORDED".equals(timelineKind)) {
+            return "Recorded procedure date relative to first tumor sequencing";
+        }
+        return timelineReason != null ? timelineReason : timelineSource != null ? timelineSource : timelineStatus;
     }
 
     private static void validateDeidRow(String[] fields, int line) {
@@ -843,6 +925,8 @@ public class ImportWsiData extends ConsoleRunnable {
         rows.slides.values().forEach(record -> ClickHouseBulkLoader.getClickHouseBulkLoader("wsi_slide").insertRecord(record));
         ClickHouseBulkLoader.getClickHouseBulkLoader("wsi_slide_placement").setFieldNames(PLACEMENT_FIELDS);
         rows.placements.values().forEach(record -> ClickHouseBulkLoader.getClickHouseBulkLoader("wsi_slide_placement").insertRecord(record));
+        ClickHouseBulkLoader.getClickHouseBulkLoader("wsi_slide_timing").setFieldNames(TIMING_FIELDS);
+        rows.timings.values().forEach(record -> ClickHouseBulkLoader.getClickHouseBulkLoader("wsi_slide_timing").insertRecord(record));
         insertSampleSlideCounts(rows, studyId);
         ClickHouseBulkLoader.flushAll();
     }

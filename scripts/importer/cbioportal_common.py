@@ -996,9 +996,9 @@ def parse_metadata_file(filename,
                 'WSI metadata must use genetic_alteration_type PATHOLOGY_SLIDES and datatype WSI',
                 extra={'filename_': filename})
             meta_dictionary['meta_file_type'] = None
-        elif meta_dictionary.get('format_version') != '2':
+        elif meta_dictionary.get('format_version') != '3':
             logger.error(
-                "Unsupported WSI format_version; expected '2'",
+                "Unsupported WSI format_version; expected '3'",
                 extra={'filename_': filename,
                        'cause': meta_dictionary.get('format_version')})
             meta_dictionary['meta_file_type'] = None

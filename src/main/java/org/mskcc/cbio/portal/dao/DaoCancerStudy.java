@@ -552,6 +552,7 @@ public final class DaoCancerStudy {
             deleteByStudyId("DELETE FROM wsi_block WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM wsi_slide WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM wsi_slide_placement WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId("DELETE FROM wsi_slide_timing WHERE cancer_study_id=?", internalCancerStudyId);
 
             deleteByStudyId("DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);

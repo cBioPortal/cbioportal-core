@@ -89,7 +89,8 @@ WSI_METADATA_KEYS = {
 }
 WSI_NON_TEXT_FIELDS = {
     'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES', 'FILE_SIZE_BYTES',
-    'THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT', 'TILE_METADATA_JSON',
+    'THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT', 'TIMELINE_START_DAYS',
+    'TILE_METADATA_JSON',
 }
 WSI_THUMBNAIL_CONTENT_TYPES = {
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
@@ -4476,11 +4477,15 @@ class WsiValidator(Validator):
         'STAIN_NAME', 'STAIN_GROUP', 'IS_HNE', 'IS_IHC', 'MAGNIFICATION',
         'FILE_SIZE_BYTES', 'BARCODE', 'SLIDE_TYPE', 'CAN_SERVE_TILES', 'SOURCE_URL',
         'TILE_METADATA_JSON', 'THUMBNAIL_URL', 'THUMBNAIL_WIDTH',
-        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE',
+        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'TIMELINE_START_DAYS',
+        'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
+        'TIMELINE_DATE_REASON', 'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE',
     ]
     REQUIRED_VALUES = {
         'PATIENT_ID', 'IMAGE_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
         'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES',
+        'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
+        'TIMELINE_COORDINATE_SYSTEM',
     }
 
     @staticmethod
@@ -4726,6 +4731,45 @@ class WsiValidator(Validator):
                     except ValueError:
                         self._error('WSI numeric value is invalid', line_number,
                                     self.EXPECTED_HEADERS.index(name), row[name])
+
+            timeline_start = row['TIMELINE_START_DAYS']
+            if timeline_start:
+                try:
+                    int(timeline_start)
+                except ValueError:
+                    self._error('WSI timeline offset is invalid', line_number,
+                                self.EXPECTED_HEADERS.index('TIMELINE_START_DAYS'), timeline_start)
+            timeline_status = row['TIMELINE_DATE_STATUS']
+            timeline_kind = row['TIMELINE_DATE_KIND']
+            timeline_reason = row['TIMELINE_DATE_REASON']
+            if timeline_status not in (
+                    'AVAILABLE', 'MISSING_PROCEDURE_DATE',
+                    'MISSING_REFERENCE_SEQUENCING_DATE'):
+                self._error('WSI timeline status is invalid', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_STATUS'), timeline_status)
+            if timeline_kind not in ('RECORDED', 'ESTIMATED', 'UNDATED'):
+                self._error('WSI timeline date kind is invalid', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_KIND'), timeline_kind)
+            if not row['TIMELINE_DATE_SOURCE']:
+                self._error('WSI timeline date source is required', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_SOURCE'))
+            if row['TIMELINE_COORDINATE_SYSTEM'] != 'patient_first_tumor_sequencing_day_zero':
+                self._error('WSI timeline coordinate system is unsupported', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_COORDINATE_SYSTEM'),
+                            row['TIMELINE_COORDINATE_SYSTEM'])
+            if timeline_status == 'AVAILABLE' and (
+                    not timeline_start or timeline_kind == 'UNDATED' or timeline_reason):
+                self._error('WSI AVAILABLE timing is inconsistent', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_STATUS'))
+            if timeline_status != 'AVAILABLE' and timeline_start:
+                self._error('WSI non-AVAILABLE timing cannot have an offset', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_START_DAYS'))
+            if timeline_status == 'MISSING_PROCEDURE_DATE' and timeline_kind != 'UNDATED':
+                self._error('WSI missing procedure dates must be UNDATED', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_KIND'))
+            if timeline_status == 'MISSING_REFERENCE_SEQUENCING_DATE' and timeline_kind == 'UNDATED':
+                self._error('WSI missing reference dates cannot be UNDATED', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_KIND'))
 
             image_id = row['IMAGE_ID']
             if image_id in seen_images:
