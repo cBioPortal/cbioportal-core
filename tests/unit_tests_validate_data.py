@@ -3281,6 +3281,9 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'tile_metadata_schema_version': 99}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'safe_min_level': 1}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'decode_policy_version': 'old'}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'tile_metadata_schema_version': None}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'max_decode_pixels': '16777216'}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'max_decode_pixels': 16777216.0}))
 
     def test_tile_metadata_deid_allows_date_like_source_fingerprint(self):
         validator = validateData.WsiValidator.__new__(validateData.WsiValidator)

@@ -269,8 +269,12 @@ public class ImportWsiData extends ConsoleRunnable {
                 .allMatch(value -> value.isNumber() && value.asDouble() > 0
                     && Double.isFinite(value.asDouble()))
             && decodePolicy != null && DECODE_POLICY_VERSION.equals(decodePolicy.asText())
-            && node.path("max_decode_pixels").asInt(-1) == MAX_DECODE_PIXELS
-            && node.path("thumbnail_max_decode_pixels").asInt(-1) == MAX_DECODE_PIXELS;
+            && node.has("max_decode_pixels")
+            && node.get("max_decode_pixels").isIntegralNumber()
+            && node.get("max_decode_pixels").asLong() == MAX_DECODE_PIXELS
+            && node.has("thumbnail_max_decode_pixels")
+            && node.get("thumbnail_max_decode_pixels").isIntegralNumber()
+            && node.get("thumbnail_max_decode_pixels").asLong() == MAX_DECODE_PIXELS;
     }
 
     private static void requireJsonObject(String value, int line) {

@@ -4527,10 +4527,10 @@ class WsiValidator(Validator):
         ):
             return False
 
-        schema = metadata.get('tile_metadata_schema_version')
-        if schema is None:
+        if 'tile_metadata_schema_version' not in metadata:
             return True
-        if schema != WSI_TILE_METADATA_SCHEMA_VERSION:
+        schema = metadata['tile_metadata_schema_version']
+        if type(schema) is not int or schema != WSI_TILE_METADATA_SCHEMA_VERSION:
             return False
         safe_min_level = metadata.get('safe_min_level')
         downsamples = metadata.get('level_downsamples')
@@ -4541,8 +4541,10 @@ class WsiValidator(Validator):
             and len(downsamples) == levels
             and all(type(value) in (int, float) and value > 0 for value in downsamples)
             and metadata.get('decode_policy_version') == WSI_DECODE_POLICY_VERSION
-            and metadata.get('max_decode_pixels') == WSI_MAX_DECODE_PIXELS
-            and metadata.get('thumbnail_max_decode_pixels') == WSI_MAX_DECODE_PIXELS
+            and type(metadata.get('max_decode_pixels')) is int
+            and metadata['max_decode_pixels'] == WSI_MAX_DECODE_PIXELS
+            and type(metadata.get('thumbnail_max_decode_pixels')) is int
+            and metadata['thumbnail_max_decode_pixels'] == WSI_MAX_DECODE_PIXELS
         )
 
     def _error(self, message, line_number, column=None, cause=None):
