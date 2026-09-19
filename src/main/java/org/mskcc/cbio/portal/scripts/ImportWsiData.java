@@ -135,6 +135,10 @@ public class ImportWsiData extends ConsoleRunnable {
         "tile_size", "mpp", "objective_power", "vendor", "identity_version", "safe_min_level",
         "tile_metadata_schema_version", "decode_policy_version", "max_decode_pixels",
         "thumbnail_max_decode_pixels", "source_fingerprint");
+    private static final int TILE_METADATA_SCHEMA_VERSION = 2;
+    private static final String DECODE_POLICY_VERSION =
+        "geometry-v2;tile-max=16777216;thumbnail-max=16777216";
+    private static final int MAX_DECODE_PIXELS = 16_777_216;
     private static final Set<Integer> NON_TEXT_WSI_COLUMNS = Set.of(18, 19, 21, 24, 26, 28, 29, 31);
     private static final Map<String, String> THUMBNAIL_CONTENT_TYPES = Map.of(
         "jpg", "image/jpeg", "jpeg", "image/jpeg", "png", "image/png");
@@ -245,8 +249,28 @@ public class ImportWsiData extends ConsoleRunnable {
         }
         JsonNode maxZoom = node.get("max_zoom");
         JsonNode tileSize = node.get("tile_size");
-        return maxZoom != null && maxZoom.isIntegralNumber() && maxZoom.asLong() >= 0
-            && positiveInteger(tileSize);
+        if (maxZoom == null || !maxZoom.isIntegralNumber() || maxZoom.asLong() < 0
+            || !positiveInteger(tileSize)) {
+            return false;
+        }
+        JsonNode schema = node.get("tile_metadata_schema_version");
+        if (schema == null) {
+            return true;
+        }
+        JsonNode safeMinLevel = node.get("safe_min_level");
+        JsonNode downsamples = node.get("level_downsamples");
+        JsonNode decodePolicy = node.get("decode_policy_version");
+        return schema.isIntegralNumber() && schema.asInt() == TILE_METADATA_SCHEMA_VERSION
+            && safeMinLevel != null && safeMinLevel.isIntegralNumber()
+            && safeMinLevel.asInt() >= 0 && safeMinLevel.asInt() <= maxZoom.asInt()
+            && downsamples != null && downsamples.isArray()
+            && downsamples.size() == levels.asInt()
+            && java.util.stream.StreamSupport.stream(downsamples.spliterator(), false)
+                .allMatch(value -> value.isNumber() && value.asDouble() > 0
+                    && Double.isFinite(value.asDouble()))
+            && decodePolicy != null && DECODE_POLICY_VERSION.equals(decodePolicy.asText())
+            && node.path("max_decode_pixels").asInt(-1) == MAX_DECODE_PIXELS
+            && node.path("thumbnail_max_decode_pixels").asInt(-1) == MAX_DECODE_PIXELS;
     }
 
     private static void requireJsonObject(String value, int line) {

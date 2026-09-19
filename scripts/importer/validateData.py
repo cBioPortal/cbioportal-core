@@ -87,6 +87,9 @@ WSI_METADATA_KEYS = {
     'tile_metadata_schema_version', 'decode_policy_version', 'max_decode_pixels',
     'thumbnail_max_decode_pixels', 'source_fingerprint',
 }
+WSI_TILE_METADATA_SCHEMA_VERSION = 2
+WSI_DECODE_POLICY_VERSION = 'geometry-v2;tile-max=16777216;thumbnail-max=16777216'
+WSI_MAX_DECODE_PIXELS = 16777216
 WSI_NON_TEXT_FIELDS = {
     'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES', 'FILE_SIZE_BYTES',
     'THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT', 'TIMELINE_START_DAYS',
@@ -4518,9 +4521,28 @@ class WsiValidator(Validator):
 
         max_zoom = metadata.get('max_zoom')
         tile_size = metadata.get('tile_size')
-        return (
+        if not (
             type(max_zoom) is int and max_zoom >= 0
             and type(tile_size) is int and tile_size > 0
+        ):
+            return False
+
+        schema = metadata.get('tile_metadata_schema_version')
+        if schema is None:
+            return True
+        if schema != WSI_TILE_METADATA_SCHEMA_VERSION:
+            return False
+        safe_min_level = metadata.get('safe_min_level')
+        downsamples = metadata.get('level_downsamples')
+        return (
+            type(safe_min_level) is int
+            and 0 <= safe_min_level <= max_zoom
+            and isinstance(downsamples, list)
+            and len(downsamples) == levels
+            and all(type(value) in (int, float) and value > 0 for value in downsamples)
+            and metadata.get('decode_policy_version') == WSI_DECODE_POLICY_VERSION
+            and metadata.get('max_decode_pixels') == WSI_MAX_DECODE_PIXELS
+            and metadata.get('thumbnail_max_decode_pixels') == WSI_MAX_DECODE_PIXELS
         )
 
     def _error(self, message, line_number, column=None, cause=None):

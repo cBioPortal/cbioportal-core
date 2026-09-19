@@ -3264,6 +3264,23 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             'max_zoom': 0,
             'tile_size': 256,
         }))
+        current = {
+            'dimensions': {'width': 100, 'height': 100},
+            'levels': 1,
+            'level_dimensions': [{'width': 100, 'height': 100}],
+            'max_zoom': 0,
+            'tile_size': 256,
+            'safe_min_level': 0,
+            'level_downsamples': [1.0],
+            'tile_metadata_schema_version': 2,
+            'decode_policy_version': 'geometry-v2;tile-max=16777216;thumbnail-max=16777216',
+            'max_decode_pixels': 16777216,
+            'thumbnail_max_decode_pixels': 16777216,
+        }
+        self.assertTrue(validateData.WsiValidator._is_valid_tile_metadata(current))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'tile_metadata_schema_version': 99}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'safe_min_level': 1}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'decode_policy_version': 'old'}))
 
     def test_tile_metadata_deid_allows_date_like_source_fingerprint(self):
         validator = validateData.WsiValidator.__new__(validateData.WsiValidator)
