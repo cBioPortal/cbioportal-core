@@ -929,7 +929,7 @@ class Validator(object):
                 self.logger.warning(
                     'Gene alias maps to multiple Entrez gene ids (%s), '
                     'please specify which one you mean or choose a non-ambiguous symbol.',
-                    '/'.join(self.portal.alias_entrez_map[gene_symbol]),
+                    '/'.join(str(entrez) for entrez in self.portal.alias_entrez_map[gene_symbol]),
                     extra={'line_number': self.line_number,
                            'cause': gene_symbol})
             # no canonical symbol and no alias
@@ -1245,7 +1245,23 @@ class CNAValidator(GenewiseFileValidator):
         if gene_symbol is not None:
             if '|' in gene_symbol:
                 gene_symbol, __ = gene_symbol.split('|', maxsplit=1)
-        return super().checkGeneIdentification(gene_symbol, entrez_id)
+        if entrez_id is not None:
+            normalized = entrez_id.lstrip('0') or '0'
+            if (not re.fullmatch(r'[0-9]+', entrez_id) or len(normalized) > 10
+                    or not 0 < int(normalized) <= 2147483647):
+                self.logger.error('Invalid CNA Entrez gene id; this row would not be loaded. '
+                                  'Curate the identifier before import.',
+                                  extra={'line_number': self.line_number, 'cause': entrez_id})
+                return None
+            # Integer spellings such as 001 and 1 identify the same gene.
+            entrez_id = normalized
+        resolved = super().checkGeneIdentification(gene_symbol, entrez_id)
+        if resolved is None:
+            self.logger.error('CNA gene could not be resolved; this row would not be loaded. '
+                              'Curate the identifier before import.',
+                              extra={'line_number': self.line_number,
+                                     'cause': entrez_id or gene_symbol})
+        return resolved
 
 
 class CNADiscreteValidator(CNAValidator):
@@ -1709,6 +1725,7 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
         super(MutationsExtendedValidator, self).__init__(*args, **kwargs)
         self.extraCols = []
         self.seen_mutations = set()  # Store seen mutations for duplicate detection
+        self.mutation_samples = set()
 
     def checkHeader(self, cols):
         """Validate header, requiring at least one gene id column."""
@@ -1815,6 +1832,7 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
 
         # Keep track of all sample IDs in the mutation data file
         mutation_file_sample_ids.add(sample_id)
+        self.mutation_samples.add(sample_id)
 
         # parse hugo and entrez to validate them together
         hugo_symbol = None
@@ -4878,20 +4896,33 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         else:
             validators_by_type[meta_file_type].append(None)
 
-    # Timeline staging files are otherwise silently ignored without metadata.
-    timeline_paths = {
+    # Recognized top-level staging files must not silently disappear from import.
+    # A metadata filename is not proof of coverage: require the right validator
+    # type and its resolved data_filename. Distinct mutation profiles remain valid.
+    types = cbioportal_common.MetaFileTypes
+    required_references = (
+        (r'data_timeline(?:_.*)?\.(?:txt|tsv)', (types.TIMELINE,),
+         'Timeline data file has no referencing timeline meta file. Add a meta file '
+         'with genetic_alteration_type: CLINICAL, datatype: TIMELINE'),
+        (r'data_clinical(?:_.*)?\.(?:txt|tsv)', (types.SAMPLE_ATTRIBUTES, types.PATIENT_ATTRIBUTES),
+         'Clinical data file has no referencing clinical meta file. Merge supplemental '
+         'clinical data into the main sample/patient file when applicable, or add '
+         'the appropriate clinical metadata'),
+        (r'data_mutations(?:_.*)?\.(?:txt|tsv|maf)', (types.MUTATION, types.MUTATION_UNCALLED),
+         'Mutation data file has no referencing mutation meta file. Fuse same-profile '
+         'MAFs when applicable, or declare a distinct mutation profile'),
+    )
+    coverage = [(re.compile(pattern, re.IGNORECASE), {
         Path(validator.filename).resolve()
-        for validator in validators_by_type.get(cbioportal_common.MetaFileTypes.TIMELINE, [])
-        if validator is not None}
+        for meta_type in meta_types for validator in validators_by_type.get(meta_type, [])
+        if validator is not None}, message)
+        for pattern, meta_types, message in required_references]
     for path in sorted(Path(directory).iterdir()):
-        if (path.is_file() and
-                re.fullmatch(r'data_timeline(?:_.*)?\.(?:txt|tsv)', path.name, re.IGNORECASE) and
-                path.resolve() not in timeline_paths):
-            logger.error(
-                'Timeline data file has no referencing timeline meta file. Add a meta file '
-                'with genetic_alteration_type: CLINICAL, datatype: TIMELINE, and '
-                'data_filename: %s.', path.name,
-                extra={'filename_': str(path)})
+        if path.is_file():
+            for pattern, referenced_paths, message in coverage:
+                if pattern.fullmatch(path.name) and path.resolve() not in referenced_paths:
+                    logger.error('%s, with data_filename: %s.', message, path.name,
+                                 extra={'filename_': str(path)})
 
     # prepend the cancer study id to any case list suffixes
     defined_case_list_fns = {}
@@ -5440,6 +5471,11 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global PATIENTS_WITH_SAMPLES
     global RESOURCE_DEFINITION_DICTIONARY
     global RESOURCE_PATIENTS_WITH_SAMPLES
+    global mutation_sample_ids, mutation_file_sample_ids
+
+    # These are collected anew for each study; never reuse a previous study's IDs.
+    mutation_sample_ids = None
+    mutation_file_sample_ids = set()
 
     if portal_instance.cancer_type_dict is None:
         logger.warning('Skipping validations relating to cancer types '
@@ -5639,6 +5675,14 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
                 continue
             validator.validate()
 
+    # Case lists were read before mutation rows, so compare membership now.
+    if mutation_sample_ids is not None:
+        called_samples = set().union(*(validator.mutation_samples for validator in
+            validators_by_meta_type.get(cbioportal_common.MetaFileTypes.MUTATION, [])))
+        missing_mutation_samples = called_samples - mutation_sample_ids
+        if missing_mutation_samples:
+            logger.error("Sample IDs from mutation data are missing from the '_sequenced' case list.",
+                         extra={'cause': ', '.join(sorted(missing_mutation_samples))})
     # Avoid reporting twice for lists already required by the core checks above.
     checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
     if 'meta_mutations_extended' in validators_by_meta_type:

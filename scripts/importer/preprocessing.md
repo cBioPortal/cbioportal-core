@@ -1,20 +1,39 @@
 # Required preprocessing checks
 
-`validateData.py`, `validateStudies.py`, and `metaImport.py` reject studies that
-need OncoTree label updates, CNA duplicate-gene resolution, or missing generated
-case lists. Validation never rewrites study files. No marker proving that a
-script ran is required: already-correct data passes.
+`validateData.py`, `validateStudies.py`, and `metaImport.py` check the conditions
+that remain when applicable preprocessing is skipped. Validation never rewrites
+study files. No marker proving that a script ran is required: already-correct
+data passes. Script execution and input hashes belong in workflow provenance.
+
+| Preprocessing step | Validation gate |
+| --- | --- |
+| CNA merging | Duplicate resolved genes and invalid/unresolvable CNA identifiers are errors. |
+| Supplemental clinical merging | Unreferenced top-level clinical files and multiple sample/patient attribute files are errors; existing clinical header, attribute and ID checks still apply. |
+| Same-profile MAF fusion | Unreferenced top-level mutation files and repeated profile stable IDs are errors. Called and uncalled profiles with separate metadata remain separate. |
+| MAF deduplication | Duplicate mutations on the existing eight-column key are errors. |
+| Metadata gap-fill | Clinical, mutation and timeline staging files need a referencing metadata file of the correct type. Declared missing files also fail the ordinary file checks. |
+| Case-list gap-fill | Missing required/nonempty generated lists are errors. Called mutation samples missing from the sequenced list are checked after reading mutation data. |
+| OncoTree audit | Retired/unknown codes and populated conflicting labels are errors for curation; blank optional labels are not filled or rejected. |
+
+Existing supported MAF formats are retained: the eight-column duplicate check
+applies when all eight columns are present. This does not add a blanket requirement
+for all optional MAF columns. Explicit importer filtering remains in effect.
 
 ## OncoTree
 
 When sample clinical data contains `ONCOTREE_CODE`, nonempty codes must exist in
-the selected reference, and `CANCER_TYPE` / `CANCER_TYPE_DETAILED` must match its
-`mainType` / `name`. Unknown codes, missing label columns and stale labels are
-errors. Missing/NA codes remain allowed; existing labels for unclassified samples
-are preserved. This is the strict audit policy from curation-tools PR #77;
-its default Datahub mode preserves existing labels, so correcting drift requires
-reviewing its audit and using `oncotree_apply.py --force`. Remap retired codes
-before applying; do not erase unknown codes to make validation pass.
+the selected reference. Populated `CANCER_TYPE` / `CANCER_TYPE_DETAILED` values
+must match its `mainType` / `name`. Unknown codes and stale populated labels are
+errors. Missing/NA codes and absent/blank/NA optional labels remain allowed;
+existing labels for unclassified samples are preserved. Findings follow
+cmo-pipelines PR #1394's read-only audit at `83f6e0e`, also retaining the core
+validator's bracketed unavailable-value conventions. Codes and labels are trimmed
+before comparison. Do not automatically rewrite labels or erase unknown codes
+to make validation pass: report them for manual curation.
+
+Running an audit cannot make a stale annotation current: the data is unchanged.
+A regression therefore checks that audit and validator agree on the finding,
+that neither edits input bytes, and that a reviewed correction clears the error.
 
 For reproducible or disconnected runs, save the OncoTree `tumorTypes` JSON array
 used during preprocessing, then pass the same snapshot:
@@ -44,6 +63,11 @@ CNA matrices. Resolution reuses core's existing gene/alias resolver; this is not
 a second alias implementation copied from curation-tools PR #75. Unrelated
 expression/methylation duplicate warning behavior is unchanged. Both compatible
 and conflicting duplicates fail: inspect conflicts before running the merger.
+Invalid nonempty Entrez identifiers, unknown identifiers and unresolved genes
+are errors, not merely warnings that rows will be dropped. Equivalent integer
+spellings (for example `001` and `1`) collide. Blank Entrez values can still
+resolve through a valid gene symbol. Full resolution checks require portal
+references; `-n` does not prove unknown-gene or alias-collision coverage.
 
 The curation merger documents differences from Java for ambiguous symbols,
 miRNA aliases and fallback rules. These checks do not claim to resolve those
@@ -53,6 +77,13 @@ upstream gaps or validate exact byte-for-byte transformation output.
 
 `case_list_config.tsv` and the read-only parsing helpers are derived from
 curation-tools PR #76 at `d8526de87d4e38e0badf9666cf8e75477aecd87f` (AGPL-3.0).
+The parser includes cmo-pipelines PR #1394 parity for `Sample_ID` and `Sample_Id`
+headers, blank data/sidecar lines, deterministic file lookup, and trailing fields.
+The bundled config adds canonical `data_mutations.txt` alternatives to the legacy
+mutation filenames. Synchronize the generator's deployed config to this same
+candidate config before preparing new inputs; do not assume an older EC2 config
+already contains those entries.
+
 The bundled config determines which additional lists are required for its
 recognized staging filenames. Parsing preserves case-insensitive filename
 lookup, sequenced-sample overrides, TCGA normalization and union/intersection
@@ -65,6 +96,9 @@ validate references and metadata. Existing curated memberships, custom lists,
 descriptions and ordering are not replaced or compared against mutation events:
 a sample with no mutation events can still have been sequenced. That matches the
 generator's gap-fill policy rather than inventing an overwrite policy.
+Called mutation samples that are present in input but absent from `_sequenced`
+are errors. This comparison runs after mutation-file validation, excludes the
+separate uncalled profile, and resets per-study state between validations.
 
 The read-only helper exposes `missing_generated_case_lists()` for reuse. There
 is no runtime dependency on unmerged curation PRs. Future generator changes must
@@ -87,3 +121,35 @@ Timeline metadata: top-level `data_timeline.txt`, `data_timeline_*.txt`, and the
 need not match the data filename; resolved `data_filename` paths establish the
 reference. Missing references are errors. Archived subdirectories, hidden files,
 editor backups, and files with unrelated names are not inferred as timeline data.
+
+The same reference-based coverage rule applies to top-level `data_clinical.txt`,
+`data_clinical_*.txt` (`.tsv` also), and `data_mutations.txt`,
+`data_mutations_*.txt` (`.tsv`/`.maf` also), case-insensitively. Correct metadata
+may have any filename. A supplemental clinical file cannot bypass the single
+sample/patient profile rule merely by adding a second metadata file. Do not fuse
+explicitly distinct mutation profiles to satisfy this check. Arbitrarily named
+unreferenced files and archived subdirectories cannot be reliably inferred as
+import inputs and are outside this filename-based check.
+
+## Regression and pinned-tool verification
+
+`bash test_scripts.sh` includes omission/correction fixtures, already-clean
+controls, alternate metadata names, distinct called/uncalled profiles, exact
+duplicate identity, source-byte preservation, case-list completeness and state
+isolation, and unchanged non-CNA warning policy.
+
+To additionally exercise the actual pinned scripts used for public preprocessing:
+
+```sh
+PREPROCESS_TOOLS_DIR=/path/to/pinned-tools bash test_scripts.sh
+```
+
+That directory must contain cmo-pipelines PR1394 scripts (`83f6e0e`), CNA PR75
+(`9843d670`), clinical/metadata PR78 (`92fdb9e1`), and MAF-fusion PR79 (`51e36fac`).
+The integration fixture fails with each applicable preprocessing omission, runs
+the six transforming tools using the candidate case-list config, then passes.
+It separately compares the seventh, read-only OncoTree audit to validator output.
+Without that environment variable this external-tool test is explicitly skipped.
+It does not download tools or use the network. A valid fixture without a virtual
+`_all` list exercises physical-list generation; the validator still rejects a
+duplicate physical `_all` when `add_global_case_list: true` already defines one.

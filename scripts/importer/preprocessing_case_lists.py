@@ -3,6 +3,7 @@
 Source: d8526de87d4e38e0badf9666cf8e75477aecd87f,
 jar-case-list-generator/generate_case_lists_jar.py (AGPL-3.0).
 Keep these parsing rules aligned with that generator; see preprocessing.md.
+Parser parity updated for cmo-pipelines PR #1394, revision 83f6e0e.
 """
 from functools import lru_cache
 import os
@@ -16,6 +17,8 @@ NON_CASE_IDS = {"MIRNA", "LOCUS", "ID", "GENE SYMBOL", "ENTREZ_GENE_ID",
 MUTATION_CASE_ID_COLUMN_HEADER = "Tumor_Sample_Barcode"
 
 SAMPLE_ID_COLUMN_HEADER = "SAMPLE_ID"
+SAMPLE_ID_COLUMN_HEADERS = (MUTATION_CASE_ID_COLUMN_HEADER, SAMPLE_ID_COLUMN_HEADER,
+                            "Sample_ID", "Sample_Id")
 
 MUTATION_CASE_LIST_META_HEADER = "sequenced_samples"
 
@@ -85,7 +88,7 @@ def case_list_from_sequenced_samples_file(path):
     with open(path) as f:
         for line in f:
             line = line.rstrip("\r\n")
-            if line not in seen:
+            if line and line not in seen:
                 seen[line] = True
                 out.append(line)
     return out
@@ -95,12 +98,12 @@ def resolve_staging_path(study_dir, staging_filename):
     study directory (observed live behavior: a config entry of data_CNA.txt
     matches a study's data_cna.txt). Exact match wins."""
     path = os.path.join(study_dir, staging_filename)
-    if os.path.exists(path):
+    if os.path.isfile(path):
         return path
     lower = staging_filename.lower()
     try:
-        for name in os.listdir(study_dir):
-            if name.lower() == lower:
+        for name in sorted(os.listdir(study_dir)):
+            if name.lower() == lower and os.path.isfile(os.path.join(study_dir, name)):
                 return os.path.join(study_dir, name)
     except OSError:
         pass
@@ -155,18 +158,18 @@ class StagingCaseCollector:
                 self.members = set(line[len(prefix):].strip().split())
                 self.active = False
             return
-        # Only split through the sample column on data rows. Removing trailing
-        # tabs first preserves Java's discarded trailing empty fields.
+        # Split only through the sample column on rows, preserving PR1394's
+        # trailing empty values. Blank rows after the header are ignored.
         if self.id_column is None:
-            row = java_split(line)
+            row = line.split('\t')
         else:
-            trimmed = line.rstrip('\t')
-            row = trimmed.split('\t', self.id_column + 1) if trimmed else []
+            if not line.strip():
+                return
+            row = line.split('\t', self.id_column + 1)
         if self.id_column is None:
-            if MUTATION_CASE_ID_COLUMN_HEADER in row:
-                self.id_column = row.index(MUTATION_CASE_ID_COLUMN_HEADER)
-            elif SAMPLE_ID_COLUMN_HEADER in row:
-                self.id_column = row.index(SAMPLE_ID_COLUMN_HEADER)
+            sample_headers = [column for column in SAMPLE_ID_COLUMN_HEADERS if column in row]
+            if sample_headers:
+                self.id_column = row.index(sample_headers[0])
             else:
                 self.members = {token for token in row if token.upper() not in NON_CASE_IDS}
                 self.active = False

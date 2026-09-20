@@ -57,8 +57,8 @@ class PreprocessingTests(unittest.TestCase):
     def test_unknown_code_and_missing_labels(self):
         nodes = {n['code']: n for n in NODES}
         self.assertEqual('ONCOTREE_CODE', list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'RETIRED'}, nodes))[0][0])
-        self.assertEqual(2, len(list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'LUAD'}, nodes))))
-        self.assertEqual(2, len(list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'NA'}, nodes))))
+        self.assertEqual([], list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'LUAD'}, nodes)))
+        self.assertEqual([], list(preprocessing.oncotree_findings({'ONCOTREE_CODE': 'NA'}, nodes)))
         self.assertEqual([], list(preprocessing.oncotree_findings(
             {'ONCOTREE_CODE': 'NA', 'CANCER_TYPE': 'Custom', 'CANCER_TYPE_DETAILED': 'Custom'}, nodes)))
 
@@ -148,7 +148,7 @@ class PreprocessingTests(unittest.TestCase):
                 collector.feed(line)
             self.assertEqual(expected, collector.members)
         collector = cases.StagingCaseCollector('data.txt')
-        for line in ('Other\tSAMPLE_ID\n', 'x\t\n'):
+        for line in ('Other\tSAMPLE_ID\n', 'x\n'):
             collector.feed(line)
         self.assertIsInstance(collector.error, IndexError)
 

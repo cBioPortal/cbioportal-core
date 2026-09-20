@@ -754,13 +754,12 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_both_invalid_entrez.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting two warning messages:
-        self.assertEqual(2, len(record_list))
-        for record in record_list:
-            self.assertEqual(logging.WARNING, record.levelno)
+        # Keep the reference warnings, but make omitted CNA rows fatal.
+        self.assertEqual(4, len(record_list))
+        self.assertEqual([logging.WARNING, logging.ERROR] * 2, [r.levelno for r in record_list])
         # expecting these to be the cause:
         self.assertEqual('999999999', record_list[0].cause)
-        self.assertEqual('888888888', record_list[1].cause)
+        self.assertEqual('888888888', record_list[2].cause)
 
     def test_both_name_and_entrez_but_invalid_couple(self):
         """Test when a file has both the Hugo name and Entrez ID columns, both valid, but association is invalid."""
@@ -780,14 +779,13 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_hugo_only_invalid.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting two warning messages:
-        self.assertEqual(3, len(record_list))
-        for record in record_list:
-            self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(5, len(record_list))
+        self.assertEqual([logging.WARNING, logging.WARNING, logging.ERROR, logging.WARNING, logging.ERROR],
+                         [r.levelno for r in record_list])
         # expecting these to be the cause:
         self.assertIn('The recommended column Entrez_Gene_Id', record_list[0].message)
         self.assertEqual('XXATAD3A', record_list[1].cause)
-        self.assertEqual('XXATAD3B', record_list[2].cause)
+        self.assertEqual('XXATAD3B', record_list[3].cause)
 
     def test_name_only_but_ambiguous(self):
         """Test when a file has a Hugo name column but none for Entrez IDs, and hugo maps to multiple Entrez ids.
@@ -797,9 +795,9 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('data_cna_genecol_presence_hugo_only_ambiguous.txt',
                                     validateData.CNADiscreteValidator)
         # expecting one error message
-        self.assertEqual(2, len(record_list))
+        self.assertEqual(3, len(record_list))
         record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(logging.ERROR, record.levelno)
         # expecting this gene to be the cause
         self.assertEqual('TRAPPC2P1', record.cause)
 
@@ -808,13 +806,11 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_entrez_only_invalid.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting two warning messages:
-        self.assertEqual(2, len(record_list))
-        for record in record_list:
-            self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(4, len(record_list))
+        self.assertEqual([logging.WARNING, logging.ERROR] * 2, [r.levelno for r in record_list])
         # expecting these to be the cause:
         self.assertEqual('1073741824', record_list[0].cause)
-        self.assertEqual('2147483647', record_list[1].cause)
+        self.assertEqual('2147483647', record_list[2].cause)
 
     def test_unambiguous_hugo_also_used_as_alias(self):
         """Test referencing a gene by a Hugo symbol occurring as an alias too.
@@ -826,9 +822,9 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('data_cna_genecol_presence_hugo_only_possible_alias.txt',
                                     validateData.CNADiscreteValidator)
         # expecting one error message
-        self.assertEqual(2, len(record_list))
+        self.assertEqual(3, len(record_list))
         record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(logging.ERROR, record.levelno)
         # expecting this gene to be the cause
         self.assertEqual('ACT', record.cause)
 

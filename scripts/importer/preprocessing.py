@@ -62,21 +62,24 @@ class OncotreeReference:
 
 
 def oncotree_findings(row, nodes):
-    """Yield (column, actual, expected); follow strict audit/--force label policy."""
-    code = row.get('ONCOTREE_CODE', '')
-    if code.strip().lower() in ('', 'na', '[not available]', '[not applicable]'):
-        for column in ('CANCER_TYPE', 'CANCER_TYPE_DETAILED'):
-            if column not in row:
-                yield column, '<missing column>', 'NA'
+    """Yield read-only drift findings, matching cmo-pipelines PR1394 audit.
+
+    Absence of optional labels is not evidence that the read-only audit was
+    skipped. Populated contradictory labels and retired codes require curation.
+    """
+    unavailable = ('', 'NA', 'N/A', 'NOT AVAILABLE', '[NOT AVAILABLE]', '[NOT APPLICABLE]')
+    code = row.get('ONCOTREE_CODE', '').strip()
+    if code.upper() in unavailable:
         return
     if code not in nodes:
         yield 'ONCOTREE_CODE', code, 'a code in the selected OncoTree reference; remap retired codes'
         return
     node = nodes[code]
     for column, expected in (('CANCER_TYPE', node['mainType'] or 'NA'),
-                             ('CANCER_TYPE_DETAILED', node['name'])):
-        if row.get(column) != expected:
-            yield column, row.get(column, '<missing column>'), expected
+                             ('CANCER_TYPE_DETAILED', node['name'] or 'NA')):
+        actual = row.get(column, '').strip()
+        if actual.upper() not in unavailable and actual != expected:
+            yield column, actual, expected
 
 
 def check_oncotree_row(columns, values, reference, logger, line_number):
