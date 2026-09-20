@@ -90,7 +90,7 @@ public class JdbcUtil {
         // but may slow the speed?
         Connection con;
         try {
-            con = getDataSource().getConnection();
+            con = JdbcDiagnostics.acquire(getDataSource(), requester);
         } catch (Exception e) {
             logMessage(e.getMessage());
             throw new SQLException(e);
