@@ -4539,7 +4539,12 @@ class WsiValidator(Validator):
             and 0 <= safe_min_level <= max_zoom
             and isinstance(downsamples, list)
             and len(downsamples) == levels
-            and all(type(value) in (int, float) and value > 0 for value in downsamples)
+            and all(
+                type(value) in (int, float)
+                and math.isfinite(value)
+                and value > 0
+                for value in downsamples
+            )
             and metadata.get('decode_policy_version') == WSI_DECODE_POLICY_VERSION
             and type(metadata.get('max_decode_pixels')) is int
             and metadata['max_decode_pixels'] == WSI_MAX_DECODE_PIXELS

@@ -3305,6 +3305,16 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             'thumbnail_max_decode_pixels': 16777216,
         }
         self.assertTrue(validateData.WsiValidator._is_valid_tile_metadata(current))
+        self.assertFalse(
+            validateData.WsiValidator._is_valid_tile_metadata(
+                {**current, 'level_downsamples': [float('inf')]}
+            )
+        )
+        self.assertFalse(
+            validateData.WsiValidator._is_valid_tile_metadata(
+                {**current, 'level_downsamples': [float('nan')]}
+            )
+        )
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'tile_metadata_schema_version': 99}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'safe_min_level': 1}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'decode_policy_version': 'old'}))

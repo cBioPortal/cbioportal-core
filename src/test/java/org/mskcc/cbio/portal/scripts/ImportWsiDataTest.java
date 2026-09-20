@@ -42,6 +42,28 @@ public class ImportWsiDataTest {
         }
     }
 
+    @Test
+    public void rejectsNonFiniteDownsampleBeforeImport() throws Exception {
+        Method validator = ImportWsiData.class.getDeclaredMethod(
+            "requireValidTileMetadata", String.class, int.class);
+        validator.setAccessible(true);
+        String metadata = "{\"dimensions\":{\"width\":256,\"height\":256},"
+            + "\"levels\":1,\"level_dimensions\":[{\"width\":256,\"height\":256}],"
+            + "\"max_zoom\":0,\"tile_size\":256,"
+            + "\"tile_metadata_schema_version\":2,\"safe_min_level\":0,"
+            + "\"level_downsamples\":[1e309],"
+            + "\"decode_policy_version\":\"geometry-v2;tile-max=16777216;thumbnail-max=16777216\","
+            + "\"max_decode_pixels\":16777216,\"thumbnail_max_decode_pixels\":16777216}";
+
+        try {
+            validator.invoke(null, metadata, 8);
+            fail("non-finite tile metadata must be rejected");
+        } catch (InvocationTargetException exception) {
+            assertTrue(exception.getCause() instanceof IllegalArgumentException);
+            assertTrue(exception.getCause().getMessage().contains("valid tile contract"));
+        }
+    }
+
     private static String[] placement(String patientId, String matchLevel) {
         String[] placement = new String[9];
         placement[1] = patientId;
