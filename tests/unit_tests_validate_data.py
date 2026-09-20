@@ -240,6 +240,76 @@ class UniqueColumnTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('data_unique_column_test.txt', UniqueColumnTestCase.DummyFeaturewiseFileValidator)
         self.assertEqual(1, len(record_list))
 
+class UniqueColumnRegressionTestCase(LogBufferTestCase):
+    """Uniqueness uses raw cells and must not suppress downstream checks."""
+
+    def test_multiple_unique_columns_preserve_diagnostics_and_check_every_row(self):
+        class TrackingValidator(validateData.Validator):
+            REQUIRED_HEADERS = ['id', 'name']
+            UNIQUE_COLUMNS = ['id', 'name', 'absent']
+            ALLOW_BLANKS = True
+
+            def __init__(self, *args):
+                super().__init__(*args)
+                self.checked_rows = []
+
+            def checkLine(self, data):
+                super().checkLine(data)
+                self.checked_rows.append(data)
+
+        rows = ['a\tx', 'b\ty', 'a\tx', 'a\tz', ' a\t x', '\t', '\ty', 'c\t', 'd\t']
+        self.logger.setLevel(logging.WARNING)
+        contents = 'id\tname\n' + '\n'.join(rows) + '\n'
+        with temp_inputfolder({'data.txt': contents}) as study_dir:
+            validator = TrackingValidator(study_dir, {'data_filename': 'data.txt'},
+                                          None, self.logger, False, False)
+            validator.validate()
+        records = self.get_log_records()
+        self.assertTrue(validator.fileCouldBeParsed)
+        self.assertEqual([row.split('\t') for row in rows if row != '\t'],
+                         validator.checked_rows)
+        self.assertEqual([
+            'Cell value `a` in column `id` is not unique.',
+            'Cell value `x` in column `name` is not unique.',
+            'Cell value `a` in column `id` is not unique.',
+            'Blank line',
+            'Cell value `y` in column `name` is not unique.',
+            'Cell value `` in column `name` is not unique.',
+        ], [record.getMessage() for record in records])
+
+    def test_generic_assay_duplicate_keeps_first_line_and_value_diagnostics(self):
+        self.logger.setLevel(logging.WARNING)
+        contents = ('ENTITY_STABLE_ID\tNAME\tSAMPLE\n'
+                    'probe1\tone\t0.5\n'
+                    'probe2\ttwo\tbad\n'
+                    'probe1\tone\tbad\n'
+                    'probe1\tone\tNaN\n'
+                    'probe3\tthree\tinf\n')
+        with temp_inputfolder({'data.txt': contents}) as study_dir:
+            validator = validateData.GenericAssayContinuousValidator(
+                study_dir, {'data_filename': 'data.txt',
+                            'generic_entity_meta_properties': 'NAME'},
+                None, self.logger, False, False)
+            validator.validate()
+        records = self.get_log_records()
+        self.assertTrue(validator.fileCouldBeParsed)
+        self.assertEqual([
+            ('ERROR', 'Value cannot be interpreted as a floating point number '
+             'and is not valid value.', 3, 3, 'bad'),
+            ('ERROR', 'Cell value `probe1` in column `ENTITY_STABLE_ID` is not unique.',
+             None, None, None),
+            ('WARNING', 'Duplicate line for a previously listed feature/gene, '
+             'this line will be ignored.', 4, None, 'probe1 (already defined on line 2)'),
+            ('ERROR', 'Cell value `probe1` in column `ENTITY_STABLE_ID` is not unique.',
+             None, None, None),
+            ('WARNING', 'Duplicate line for a previously listed feature/gene, '
+             'this line will be ignored.', 5, None, 'probe1 (already defined on line 2)'),
+            ('ERROR', 'Value is infinite and, therefore, not a valid value.', 6, 3, 'inf'),
+        ], [(r.levelname, r.getMessage(), getattr(r, 'line_number', None),
+             getattr(r, 'column_number', None), getattr(r, 'cause', None))
+            for r in records])
+
+
 class ClinicalColumnDefsTestCase(PostClinicalDataFileTestCase):
 
     """Tests for validations of the column definitions in a clinical file."""
@@ -684,13 +754,12 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_both_invalid_entrez.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting two warning messages:
-        self.assertEqual(2, len(record_list))
-        for record in record_list:
-            self.assertEqual(logging.WARNING, record.levelno)
+        # Unknown reference IDs warn about omitted rows without rejecting the study.
+        self.assertEqual(4, len(record_list))
+        self.assertEqual([logging.WARNING] * 4, [r.levelno for r in record_list])
         # expecting these to be the cause:
         self.assertEqual('999999999', record_list[0].cause)
-        self.assertEqual('888888888', record_list[1].cause)
+        self.assertEqual('888888888', record_list[2].cause)
 
     def test_both_name_and_entrez_but_invalid_couple(self):
         """Test when a file has both the Hugo name and Entrez ID columns, both valid, but association is invalid."""
@@ -710,14 +779,13 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_hugo_only_invalid.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting two warning messages:
-        self.assertEqual(3, len(record_list))
-        for record in record_list:
-            self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(5, len(record_list))
+        self.assertEqual([logging.WARNING] * 5,
+                         [r.levelno for r in record_list])
         # expecting these to be the cause:
         self.assertIn('The recommended column Entrez_Gene_Id', record_list[0].message)
         self.assertEqual('XXATAD3A', record_list[1].cause)
-        self.assertEqual('XXATAD3B', record_list[2].cause)
+        self.assertEqual('XXATAD3B', record_list[3].cause)
 
     def test_name_only_but_ambiguous(self):
         """Test when a file has a Hugo name column but none for Entrez IDs, and hugo maps to multiple Entrez ids.
@@ -726,8 +794,8 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_hugo_only_ambiguous.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting one error message
-        self.assertEqual(2, len(record_list))
+        # Ambiguous aliases remain warnings, including the omitted-row diagnostic.
+        self.assertEqual(3, len(record_list))
         record = record_list.pop()
         self.assertEqual(logging.WARNING, record.levelno)
         # expecting this gene to be the cause
@@ -738,13 +806,11 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_entrez_only_invalid.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting two warning messages:
-        self.assertEqual(2, len(record_list))
-        for record in record_list:
-            self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(4, len(record_list))
+        self.assertEqual([logging.WARNING] * 4, [r.levelno for r in record_list])
         # expecting these to be the cause:
         self.assertEqual('1073741824', record_list[0].cause)
-        self.assertEqual('2147483647', record_list[1].cause)
+        self.assertEqual('2147483647', record_list[2].cause)
 
     def test_unambiguous_hugo_also_used_as_alias(self):
         """Test referencing a gene by a Hugo symbol occurring as an alias too.
@@ -755,8 +821,8 @@ class GeneIdColumnsTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_genecol_presence_hugo_only_possible_alias.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting one error message
-        self.assertEqual(2, len(record_list))
+        # Alias ambiguity and the omitted-row diagnostic remain warnings.
+        self.assertEqual(3, len(record_list))
         record = record_list.pop()
         self.assertEqual(logging.WARNING, record.levelno)
         # expecting this gene to be the cause
@@ -811,7 +877,7 @@ class FeatureWiseValuesTestCase(PostClinicalDataFileTestCase):
             self.assertLessEqual(record.levelno, logging.INFO)
 
     def test_repeated_gene(self):
-        """Test if a warning is issued and the line is skipped if duplicate.
+        """Test if an error is issued and the line is skipped if duplicate.
 
         In the test data, the Entrez ID in line 6 is removed. Therefore the gene symbol and gene alias table will be
         used to look up this gene in the database. ENTB5 is an alias for Entrez 116983 (ACAP3). This gene was defined
@@ -821,11 +887,11 @@ class FeatureWiseValuesTestCase(PostClinicalDataFileTestCase):
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_cna_duplicate_gene.txt',
                                     validateData.CNADiscreteValidator)
-        # expecting a warning about the duplicate gene,
+        # expecting an error about the duplicate gene,
         # but no errors about values
         self.assertEqual(1, len(record_list))
         record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(logging.ERROR, record.levelno)
         self.assertEqual(6, record.line_number)
         self.assertTrue(record.cause.startswith('116983'))
 
