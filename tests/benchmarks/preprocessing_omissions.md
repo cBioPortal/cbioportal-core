@@ -40,6 +40,12 @@ varies, and this is not a whole-collection or candidate-image benchmark.
 
 ## Real-study spot checks
 
+Historical results below used candidate `a964d5b`, before the subsequent user
+policy change restoring unresolved CNA identifiers to warnings. Those findings
+are no longer blocking by themselves; duplicate resolved CNA genes, malformed
+Entrez IDs and OncoTree errors remain blocking. See `preprocessing.md` for the
+current policy. Do not use these historical pass/fail results as a new manifest.
+
 Checks used the batch's frozen public-blue gene/alias tables and OncoTree
 `oncotree_2025_10_03`. Cancer-type, gene-set and gene-panel references were not
 supplied, so those checks were explicitly skipped. These are targeted source

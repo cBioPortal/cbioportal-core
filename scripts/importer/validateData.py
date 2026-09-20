@@ -1257,10 +1257,10 @@ class CNAValidator(GenewiseFileValidator):
             entrez_id = normalized
         resolved = super().checkGeneIdentification(gene_symbol, entrez_id)
         if resolved is None:
-            self.logger.error('CNA gene could not be resolved; this row would not be loaded. '
-                              'Curate the identifier before import.',
-                              extra={'line_number': self.line_number,
-                                     'cause': entrez_id or gene_symbol})
+            self.logger.warning('CNA gene could not be resolved; this row would not be loaded. '
+                                'Review the identifier; import can continue with this row omitted.',
+                                extra={'line_number': self.line_number,
+                                       'cause': entrez_id or gene_symbol})
         return resolved
 
 

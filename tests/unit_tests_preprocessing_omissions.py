@@ -191,7 +191,7 @@ class OmissionTests(unittest.TestCase):
     def test_cna_invalid_identifiers_are_errors_and_integer_spellings_collide(self):
         logger = logging.getLogger(self.id())
         portal = validateData.PortalInstance(None, None, {'GENE': [1]}, {'ALIAS': [1]}, None, None, None)
-        for value in ('NA', '999', '0', '-1', '1_0', '2147483648', '9' * 5000):
+        for value in ('NA', '0', '-1', '1_0', '2147483648', '9' * 5000):
             validator = validateData.CNADiscreteValidator(str(self.study), {'data_filename': 'unused'},
                                                          portal, logger, False, False)
             with self.subTest(value=value[:12]), self.assertLogs(logger, logging.ERROR):
@@ -202,7 +202,18 @@ class OmissionTests(unittest.TestCase):
                                              portal, logger, False, False).validate()
         self.assertIn('Duplicate CNA gene', '\n'.join(logs.output))
 
-    def test_ambiguous_numeric_alias_ids_report_error_without_crashing(self):
+    def test_unresolved_cna_identifiers_are_warnings_not_errors(self):
+        logger = logging.getLogger(self.id())
+        portal = validateData.PortalInstance(None, None, {'GENE': [1]}, {'ALIAS': [1]}, None, None, None)
+        for cls in (validateData.CNADiscreteValidator, validateData.CNAContinuousValuesValidator):
+            for symbol, entrez in [('GENE', '999'), ('UNKNOWN', None)]:
+                validator = cls(str(self.study), {'data_filename': 'unused'}, portal, logger, False, False)
+                with self.subTest(validator=cls.__name__, symbol=symbol, entrez=entrez), self.assertLogs(logger, logging.WARNING) as logs:
+                    self.assertIsNone(validator.checkGeneIdentification(symbol, entrez))
+                self.assertTrue(all(record.levelno == logging.WARNING for record in logs.records))
+                self.assertIn('CNA gene could not be resolved; this row would not be loaded', '\n'.join(logs.output))
+
+    def test_ambiguous_numeric_alias_ids_report_warning_without_crashing(self):
         logger = logging.getLogger(self.id())
         portal = validateData.PortalInstance(None, None, {'ONE': [1], 'TWO': [2]},
                                              {'AMBIGUOUS': [1, 2]}, None, None, None)
@@ -211,7 +222,7 @@ class OmissionTests(unittest.TestCase):
         with self.assertLogs(logger, logging.WARNING) as logs:
             self.assertIsNone(validator.checkGeneIdentification('AMBIGUOUS', None))
         self.assertIn('(1/2)', '\n'.join(logs.output))
-        self.assertTrue(any(record.levelno == logging.ERROR for record in logs.records))
+        self.assertTrue(all(record.levelno == logging.WARNING for record in logs.records))
 
     @unittest.skipUnless(os.environ.get('PREPROCESS_TOOLS_DIR'), 'Pinned preprocessing tools not supplied')
     def test_actual_pinned_tools_clear_all_applicable_omission_checks(self):

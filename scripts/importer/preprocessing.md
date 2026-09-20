@@ -7,7 +7,7 @@ data passes. Script execution and input hashes belong in workflow provenance.
 
 | Preprocessing step | Validation gate |
 | --- | --- |
-| CNA merging | Duplicate resolved genes and invalid/unresolvable CNA identifiers are errors. |
+| CNA merging | Duplicate resolved genes and malformed Entrez identifiers are errors. Unresolved genes are warnings. |
 | Supplemental clinical merging | Unreferenced top-level clinical files and multiple sample/patient attribute files are errors; existing clinical header, attribute and ID checks still apply. |
 | Same-profile MAF fusion | Unreferenced top-level mutation files and repeated profile stable IDs are errors. Called and uncalled profiles with separate metadata remain separate. |
 | MAF deduplication | Duplicate mutations on the existing eight-column key are errors. |
@@ -63,8 +63,13 @@ CNA matrices. Resolution reuses core's existing gene/alias resolver; this is not
 a second alias implementation copied from curation-tools PR #75. Unrelated
 expression/methylation duplicate warning behavior is unchanged. Both compatible
 and conflicting duplicates fail: inspect conflicts before running the merger.
-Invalid nonempty Entrez identifiers, unknown identifiers and unresolved genes
-are errors, not merely warnings that rows will be dropped. Equivalent integer
+Malformed nonempty Entrez identifiers (non-integer, non-positive or outside the
+supported 32-bit range) remain errors. Unknown identifiers and unresolved genes
+are warnings: per the public rollout policy, import may continue with those rows
+omitted. An unresolved identifier alone does not fail a study, and validation
+does not rewrite or remove the input row. Existing errors for missing identifiers
+or ambiguous official symbols remain unchanged. Duplicate resolved genes remain
+errors, including alias collisions. Equivalent integer
 spellings (for example `001` and `1`) collide. Blank Entrez values can still
 resolve through a valid gene symbol. Full resolution checks require portal
 references; `-n` does not prove unknown-gene or alias-collision coverage.
