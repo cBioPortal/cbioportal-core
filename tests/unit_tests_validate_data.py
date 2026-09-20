@@ -3248,6 +3248,33 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         record_list = self.validate('data_wsi_valid.txt', validateData.WsiValidator)
         self.assertEqual([], [record for record in record_list if record.levelno >= logging.ERROR])
 
+    def test_malformed_tile_metadata_is_rejected(self):
+        valid_data = Path('test_data/data_wsi_valid.txt').read_text()
+        malformed_data = valid_data.replace(
+            '"dimensions":{"width":256,"height":256}',
+            '"dimensions":{"width":"bad","height":256}',
+        )
+        with temp_inputfolder({'data_wsi_invalid.txt': malformed_data}) as study_dir:
+            validator = validateData.WsiValidator(
+                study_dir,
+                {'data_filename': 'data_wsi_invalid.txt'},
+                PORTAL_INSTANCE,
+                self.logger,
+                False,
+                False,
+            )
+            validator.validate()
+
+        errors = [
+            record
+            for record in self.get_log_records()
+            if record.levelno >= logging.ERROR
+        ]
+        self.assertTrue(
+            any('valid tile metadata' in record.getMessage() for record in errors),
+            errors,
+        )
+
     def test_tile_metadata_requires_browser_contract(self):
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({
