@@ -5696,6 +5696,10 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     try:
         for stable_id, filename, count in missing_generated_case_lists(
                 study_dir, study_id, checked_ids, scanned_members=scanned_members):
+            if (Path(study_dir) / 'case_lists' / filename).exists():
+                logger.error("Case-list filename '%s' is occupied by an unrelated list. "
+                             "Resolve the stable-ID/category conflict without overwriting curated data.",
+                             filename)
             logger.error(
                 "Missing generated case list '%s' (%d samples). Run case-list "
                 "preprocessing before import (suggested filename: %s).",

@@ -95,7 +95,11 @@ lookup, sequenced-sample overrides, TCGA normalization and union/intersection
 rules. Reference samples are cached for the duration of a study check.
 
 A nonempty generated list missing from the study is an error. Existing stable
-IDs count even under different filenames; virtual `_all` from
+IDs count even under different filenames. A study-local, nonempty curated list
+with the expected category (except generic `other`) also satisfies the generated
+role, even with a different stable ID. This does not bypass metadata or sample-ID
+validation. An unrelated list occupying a required output filename is a conflict,
+not permission to overwrite it. Virtual `_all` from
 `add_global_case_list: true` also counts. Core's existing case-list checks still
 validate references and metadata. Existing curated memberships, custom lists,
 descriptions and ordering are not replaced or compared against mutation events:

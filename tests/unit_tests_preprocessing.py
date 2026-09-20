@@ -37,6 +37,20 @@ class PreprocessingTests(unittest.TestCase):
         path.write_text(text)
         return path
 
+    def test_curated_case_category_satisfies_generated_role(self):
+        self.write('data_cna.txt', 'Hugo_Symbol\tS1\nGENE\t1\n')
+        path = self.write('case_lists/curated.txt', 'cancer_study_identifier: study\n'
+                          'stable_id: study_custom\ncase_list_category: all_cases_with_cna_data\n'
+                          'case_list_ids: S1\n')
+        defined = ['study_all', 'study_custom']
+        self.assertEqual([], list(cases.missing_generated_case_lists(self.root, 'study', defined)))
+        for text in (path.read_text().replace('all_cases_with_cna_data', 'other'),
+                     path.read_text().replace('cancer_study_identifier: study', 'cancer_study_identifier: foreign'),
+                     path.read_text().replace('case_list_ids: S1', 'case_list_ids:')):
+            with self.subTest(metadata=text):
+                path.write_text(text)
+                self.assertTrue(list(cases.missing_generated_case_lists(self.root, 'study', defined)))
+
     def test_oncotree_stale_labels_fail_then_corrected_labels_pass(self):
         columns = ['SAMPLE_ID', 'PATIENT_ID', 'ONCOTREE_CODE', 'CANCER_TYPE', 'CANCER_TYPE_DETAILED']
         header = '\n'.join(['#' + '\t'.join(columns), '#' + '\t'.join(columns),

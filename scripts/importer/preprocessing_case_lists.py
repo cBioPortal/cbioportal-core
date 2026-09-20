@@ -184,15 +184,37 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
     """Yield lists that gap-fill preprocessing would create; never change inputs.
 
     Existing stable IDs (including virtual _all) count regardless of filename.
+    A study-local curated list with the same non-generic category also counts;
+    ordinary metadata/sample validation remains responsible for its validity.
     Curated membership is not reconstructed from event-only mutation files.
     """
     config_path = config_path or Path(__file__).with_name('case_list_config.tsv')
     cache = {}
     scanned_members = scanned_members or {}
     reported = set(defined_ids)
+    categories = set()
+    case_dir = Path(study_dir) / CASE_LIST_DIRECTORY_NAME
+    if case_dir.is_dir():
+        for path in case_dir.iterdir():
+            if not path.is_file() or path.name.startswith('.') or path.name.endswith('~'):
+                continue
+            values = {}
+            with path.open() as stream:
+                for line in stream:
+                    if not line.lstrip().startswith('#') and ':' in line:
+                        key, value = line.split(':', 1)
+                        values[key.strip()] = value.strip()
+            if (values.get('stable_id') in reported
+                    and values.get('stable_id', '').startswith(study_id + '_')
+                    and values.get('cancer_study_identifier') == study_id
+                    and values.get('case_list_ids', '').strip()):
+                categories.add(values.get('case_list_category'))
     for spec in read_config(config_path):
         stable_id = spec['meta_stable_id'].replace(CANCER_STUDY_TAG, study_id)
         if stable_id in reported:
+            continue
+        category = spec['meta_case_list_category']
+        if category and category != 'other' and category in categories:
             continue
         patterns = spec['staging_filenames']
         union = '|' in patterns

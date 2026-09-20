@@ -73,6 +73,32 @@ class OmissionTests(unittest.TestCase):
     def test_clean_study_no_marker_needed(self):
         self.assert_passes()
 
+    @unittest.skipUnless(os.environ.get('PREPROCESS_CASE_GENERATOR'), 'Set PREPROCESS_CASE_GENERATOR for paired category regression')
+    def test_generator_preserves_curated_cnaseq_and_validator_checks_members(self):
+        self.maf()
+        self.metadata('meta_mutations.txt', 'data_mutations.txt', 'MUTATION_EXTENDED', 'MAF', 'mutations')
+        self.case_list()
+        self.write('data_cna.txt', 'Hugo_Symbol\tEntrez_Gene_Id\tS1\tS2\nGENE\t1\t0\t1\n')
+        self.metadata('meta_cna.txt', 'data_cna.txt', 'COPY_NUMBER_ALTERATION', 'DISCRETE', 'gistic')
+        self.write('case_lists/cases_cna.txt', 'cancer_study_identifier: test\n'
+                   'stable_id: test_cna\ncase_list_name: CNA\ncase_list_description: CNA\n'
+                   'case_list_category: all_cases_with_cna_data\ncase_list_ids: S1\tS2\n')
+        path = self.write('case_lists/cases_cnaseq.txt', 'cancer_study_identifier: test\n'
+                          'stable_id: test_cna_seq\ncase_list_name: CNA and mutation\n'
+                          'case_list_description: Curated\n'
+                          'case_list_category: all_cases_with_mutation_and_cna_data\ncase_list_ids: S1\tS2\n')
+        before = path.read_bytes()
+        subprocess.run([sys.executable, os.environ['PREPROCESS_CASE_GENERATOR'],
+                        '--study-dir', str(self.study), '--case-list-dir', str(path.parent),
+                        '--case-list-config-file', str(Path(cases.__file__).with_name('case_list_config.tsv'))],
+                       check=True, capture_output=True, text=True)
+        self.assertEqual(before, path.read_bytes())
+        self.assert_passes()
+        path.write_text(path.read_text().replace('case_list_ids: S1\tS2', 'case_list_ids: MISSING'))
+        code, output = self.cli()
+        self.assertEqual(1, code, output)
+        self.assertIn('Sample ID not defined in clinical file', output)
+
     def test_unmerged_unreferenced_clinical_fails_then_merged_passes(self):
         supp = self.clinical('data_clinical_supp.txt', ['SAMPLE_ID', 'EXTRA'], [['S1', 'yes']])
         code, output = self.cli()
