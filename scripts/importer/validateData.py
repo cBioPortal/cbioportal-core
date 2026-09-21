@@ -3709,6 +3709,84 @@ class ResourceDefinitionValidator(Validator):
         super(ResourceDefinitionValidator, self).__init__(*args, **kwargs)
         self.resource_definition_dictionary = {}
 
+    # Keys the portal reads from the contract. Anything else is ignored downstream, so a
+    # misspelling would otherwise be silently discarded: the portal treats a structurally
+    # unusable contract as "no contract" and says nothing.
+    CONTRACT_FIELD_KEYS = {'key', 'type', 'label', 'description', 'filterable',
+                           'visibleByDefault'}
+    CONTRACT_FIELD_TYPES = {'string', 'number'}
+
+    def checkCustomMetadataContract(self, contract, col_index):
+        """Check the shape of a parsed CUSTOM_METADATA contract.
+
+        The contract describes the metadata keys a resource's rows carry. The portal parses
+        it leniently and falls back to "no contract" on anything it cannot use, so problems
+        here are invisible at run time - validation is the only place a curator finds out.
+
+        Severity follows the blast radius. A contract the portal cannot read at all is an
+        error; a single field declaring something the portal does not recognise is a warning,
+        since the rest of the contract still applies and no data is affected - only how one
+        column presents.
+        """
+        extra = {'line_number': self.line_number, 'column_number': col_index + 1}
+
+        if not isinstance(contract, dict):
+            self.logger.error(
+                'CUSTOM_METADATA must be a JSON object.',
+                extra=dict(extra, cause=str(contract)[:80]))
+            return
+
+        if 'fields' not in contract:
+            self.logger.error(
+                "CUSTOM_METADATA has no 'fields' key, so the portal will ignore it.",
+                extra=dict(extra, cause=', '.join(sorted(contract.keys())) or '(empty object)'))
+            return
+
+        fields = contract['fields']
+        if not isinstance(fields, list):
+            self.logger.error(
+                "CUSTOM_METADATA 'fields' must be a list.",
+                extra=dict(extra, cause=type(fields).__name__))
+            return
+
+        for position, field in enumerate(fields, start=1):
+            if not isinstance(field, dict):
+                self.logger.error(
+                    'CUSTOM_METADATA field entry must be a JSON object.',
+                    extra=dict(extra, cause='entry %d: %s' % (position, str(field)[:60])))
+                continue
+
+            if not field.get('key'):
+                self.logger.error(
+                    "CUSTOM_METADATA field entry has no 'key', so it cannot be matched to "
+                    'any metadata column.',
+                    extra=dict(extra, cause='entry %d' % position))
+
+            field_type = field.get('type')
+            if field_type is not None and field_type not in self.CONTRACT_FIELD_TYPES:
+                self.logger.warning(
+                    "CUSTOM_METADATA field 'type' is not one of %s, so the portal will "
+                    'detect the type from the data instead.'
+                    % ', '.join(sorted(self.CONTRACT_FIELD_TYPES)),
+                    extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
+                                                          field_type)))
+
+            for flag in ('filterable', 'visibleByDefault'):
+                if flag in field and not isinstance(field[flag], bool):
+                    self.logger.warning(
+                        "CUSTOM_METADATA field '%s' is not true or false, so the portal will "
+                        'ignore it and use its default.' % flag,
+                        extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
+                                                              field[flag])))
+
+            unknown = sorted(set(field.keys()) - self.CONTRACT_FIELD_KEYS)
+            if unknown:
+                self.logger.warning(
+                    'CUSTOM_METADATA field has keys the portal does not read; they will have '
+                    'no effect.',
+                    extra=dict(extra, cause='%s: %s' % (field.get('key', 'entry %d' % position),
+                                                        ', '.join(unknown))))
+
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(ResourceDefinitionValidator, self).checkLine(data)
@@ -3784,7 +3862,8 @@ class ResourceDefinitionValidator(Validator):
                 custom_metadata_value = value.strip()
                 if custom_metadata_value and custom_metadata_value.lower() not in self.NULL_VALUES:
                     try:
-                        json.loads(custom_metadata_value)
+                        self.checkCustomMetadataContract(
+                            json.loads(custom_metadata_value), col_index)
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             'Invalid JSON in CUSTOM_METADATA column.',
@@ -3881,10 +3960,27 @@ class ResourceValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
 
+            if col_name == 'METADATA' and value and value.strip().lower() not in self.NULL_VALUES:
+                try:
+                    parsed = json.loads(value)
+                    if not isinstance(parsed, dict):
+                        self.logger.error(
+                            'METADATA must be a JSON object (key-value map), not an array or scalar',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value[:80]})
+                except ValueError:
+                    self.logger.error(
+                        'METADATA value is not valid JSON',
+                        extra={'line_number': self.line_number,
+                               'column_number': col_index + 1,
+                               'cause': value[:80]})
+
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
 
     REQUIRED_HEADERS = ['SAMPLE_ID', 'PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a SampleResourceValidator with the given parameters."""
@@ -3948,6 +4044,7 @@ class SampleResourceValidator(ResourceValidator):
 class PatientResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a PatientResourceValidator with the given parameters."""
@@ -4000,6 +4097,7 @@ class PatientResourceValidator(ResourceValidator):
 class StudyResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a StudyResourceValidator with the given parameters."""
