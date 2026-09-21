@@ -45,7 +45,6 @@ public final class DaoResourceData {
      * @param url            URL of the resource
      * @param displayName    optional display name override (may be null)
      * @param type           optional type hint, e.g. IMAGE/LINK/PDF (may be null)
-     * @param priority       display priority
      * @param metadata       optional JSON metadata string (may be null)
      */
     public static int addResourceDatum(
@@ -57,13 +56,12 @@ public final class DaoResourceData {
             String url,
             String displayName,
             String type,
-            int priority,
             String metadata) throws DaoException {
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             // Column order matches DESCRIBE TABLE resource_data:
             // RESOURCE_DATA_ID, RESOURCE_ID, CANCER_STUDY_ID, ENTITY_TYPE,
-            // PATIENT_ID, SAMPLE_ID, URL, DISPLAY_NAME, TYPE, METADATA, PRIORITY
+            // PATIENT_ID, SAMPLE_ID, URL, DISPLAY_NAME, TYPE, METADATA
             //
             // Nulls are passed through rather than substituted with "": the loader encodes a
             // null as \N, which ClickHouse stores as a real NULL, and these columns are
@@ -81,8 +79,7 @@ public final class DaoResourceData {
                 url,
                 displayName,
                 type,
-                metadata,
-                Integer.toString(priority)
+                metadata
             );
             return 1;
         }
@@ -96,8 +93,8 @@ public final class DaoResourceData {
                 "INSERT INTO `" + RESOURCE_DATA_TABLE + "` "
                 + "(`RESOURCE_ID`,`CANCER_STUDY_ID`,`ENTITY_TYPE`,"
                 + "`PATIENT_ID`,`SAMPLE_ID`,`URL`,"
-                + "`DISPLAY_NAME`,`TYPE`,`METADATA`,`PRIORITY`) "
-                + "VALUES (?,?,?,?,?,?,?,?,?,?)"
+                + "`DISPLAY_NAME`,`TYPE`,`METADATA`) "
+                + "VALUES (?,?,?,?,?,?,?,?,?)"
             );
             pstmt.setString(1, resourceId);
             pstmt.setInt(2, cancerStudyId);
@@ -108,7 +105,6 @@ public final class DaoResourceData {
             pstmt.setString(7, displayName);
             pstmt.setString(8, type);
             pstmt.setString(9, metadata);
-            pstmt.setInt(10, priority);
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

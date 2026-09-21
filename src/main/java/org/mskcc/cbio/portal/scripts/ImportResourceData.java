@@ -387,14 +387,13 @@ public class ImportResourceData extends ConsoleRunnable {
         String type = getOptionalField(fields, headerIndexMap, TYPE_COLUMN_NAME);
         if (type == null) type = (def != null) ? resourceType.toString() : null;
         String metadata = getOptionalField(fields, headerIndexMap, METADATA_COLUMN_NAME);
-        int priority = (def != null && def.getPriority() != null) ? def.getPriority() : 0;
 
         if (resourceType.equals(ResourceType.PATIENT)) {
             numPatientSpecificResourcesAdded++;
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "PATIENT",
                 stableId, null,
-                resourceURL, displayName, type, priority, metadata);
+                resourceURL, displayName, type, metadata);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
             // derive stable patient ID from the sample's internal patient linkage
@@ -408,13 +407,13 @@ public class ImportResourceData extends ConsoleRunnable {
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "SAMPLE",
                 stablePatientId, stableId,
-                resourceURL, displayName, type, priority, metadata);
+                resourceURL, displayName, type, metadata);
         } else {
             numStudySpecificResourcesAdded++;
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "STUDY",
                 null, null,
-                resourceURL, displayName, type, priority, metadata);
+                resourceURL, displayName, type, metadata);
         }
     }
 
