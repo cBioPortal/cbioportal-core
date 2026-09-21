@@ -42,7 +42,7 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoDbServerSessionInfo;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
-/** 
+/**
  * A class to retrieve and examine the privilege grants given to the current user. A set of recommended
  * privileges are matched to the actual privilege grants and any unprovided recommendataion are output as a warning.
  */
@@ -59,30 +59,51 @@ public class CheckDbPrivileges {
         List<String> subsumingPrivileges;
         String onDatabase;
         String onTable;
+        Integer equivalenceGroup;
 
         public static String CURRENT_DATABASE_SPECIAL_VALUE = "currentDatabase()";
+        public static Integer EQUIVALENCE_GROUP_NONE = -1;
+        public static Integer EQUIVALENCE_GROUP_REMOTE = 1;
+
+        public RecommendedPrivilege(
+                String name,
+                List<String> subsumingPrivileges,
+                String onDatabase,
+                String onTable,
+                Integer equivalenceGroup) {
+            this.name = name;
+            this.subsumingPrivileges = new ArrayList<>(subsumingPrivileges);
+            this.onDatabase = onDatabase;
+            this.onTable = onTable;
+            this.equivalenceGroup = equivalenceGroup;
+        }
 
         public RecommendedPrivilege(
                 String name,
                 List<String> subsumingPrivileges,
                 String onDatabase,
                 String onTable) {
-            this.name = name;
-            this.subsumingPrivileges = new ArrayList<>(subsumingPrivileges);
-            this.onDatabase = onDatabase;
-            this.onTable = onTable;
+            this(name, subsumingPrivileges, onDatabase, onTable, RecommendedPrivilege.EQUIVALENCE_GROUP_NONE);
+        }
+
+        public boolean hasAnEquivalenceGroup() {
+            if (equivalenceGroup == null) {
+                return false;
+            }
+            if (equivalenceGroup == RecommendedPrivilege.EQUIVALENCE_GROUP_NONE) {
+                return false;
+            }
+            return true;
         }
     };
 
     /**
-     * A (not to be modified) set of all Recommended privileges. Because some privileges are version specific,
-     * some recommnedations are only added after the system is running and the database server version is known
+     * A (not to be modified) set of all Recommended privileges. Because some privileges are version and
+     * server_setting specific, these recommnedations are represented as a linked equivalence group across
+     * version variations. Satisfaction of any one of the recommended privileges in the group satisfies
+     * the entire group.
      */
     private static Set<RecommendedPrivilege> recommendedPrivilegeSet = new HashSet<>();
-    /**
-     * A flag to indicate whether the version dependent privileges have been added yet.
-     */
-    private static boolean versionDependentPrivilegesAdded = false;
 
     static {
         // construct list of recommended privileges for import (those independent of clickhouse version)
@@ -162,53 +183,21 @@ public class CheckDbPrivileges {
                 "SELECT",
                 new ArrayList<String>(List.of("ALL")),
                 "system", "one"));
-    }
-
-    private static boolean versionEqualsOrPreceeds(String actualVersion, String compareVersion) throws DaoException {
-        // check only major and minor
-        String[] actual = actualVersion.split("\\.");
-        String[] compare = compareVersion.split("\\.");
-        try {
-            int actualMajor = Integer.parseInt(actual[0]);
-            int compareMajor = Integer.parseInt(compare[0]);
-            if (actualMajor < compareMajor) {
-                return true;
-            }
-
-            if (actualMajor > compareMajor) {
-                return false;
-            }
-            int actualMinor = Integer.parseInt(actual[1]);
-            int compareMinor = Integer.parseInt(compare[1]);
-            if (actualMinor <= compareMinor) {
-                return true;
-            }
-
-            if (actualMinor > compareMinor) {
-                return false;
-            }
-            throw new DaoException("a non-evaluatable number (like NaN) was somehow reported by the database server : " + actualVersion);
-        } catch (ArrayIndexOutOfBoundsException | NumberFormatException e) {
-            throw new DaoException("likely an invalid version was returned from database server : " + actualVersion + " " + e.getClass().getName());
-        }
-    }
-
-    private static void addVersionDependentRecommendationsIfNeeded(String serverVersion) throws DaoException {
-        if (versionDependentPrivilegesAdded) {
-            return;
-        }
-        if (versionEqualsOrPreceeds(serverVersion, "11.6")) {
-            recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // REMOTE ON *.*
-                    "REMOTE",
-                    new ArrayList<String>(List.of("ALL", "SOURCES")),
-                    "*", "*"));
-        } else {
-            recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE
-                    "READ",
-                    new ArrayList<String>(List.of("ALL", "SOURCES", "REMOTE")),
-                    "REMOTE", "*"));  // special : a user with privilege REMOTE ON *.* inherently has READ ON REMOTE (no table reference), so wildcard matching should include "nothing" as well as "anything"
-       }
-        versionDependentPrivilegesAdded = true;
+        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // REMOTE ON *.*
+                "REMOTE",
+                new ArrayList<String>(List.of("SOURCES")),
+                "*", "*",
+                RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
+        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE
+                "READ",
+                new ArrayList<String>(),
+                "REMOTE", "",
+                RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
+        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE (subsubsumed by READ ON SOURCES)
+                "READ",
+                new ArrayList<String>(),
+                "SOURCES", "",
+                RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
     }
 
     // Function discards unparsable privileges without raising an exception
@@ -269,10 +258,6 @@ public class CheckDbPrivileges {
         if (actualTable.equals("*")) {
             return true; // everything is covered by this actual rule
         }
-        if (actualTable.equals("")) {
-            // this happens for the special actual rules in the form "READ ON REMOTE" or "WRITE ON SOURCES" where no table is specified (not even a wildcard)
-            return recommended.onTable.equals("*"); // recommendations for these special cases will have "*" as the table specified in order to cover subsuming grants like "REMOTE ON *.*"
-        }
         return actualTable.equals(recommended.onTable);
     }
 
@@ -300,6 +285,20 @@ public class CheckDbPrivileges {
         return privilegeMatchedOrSubsumed && privilegeDatabaseCovered && privilegeTableCovered;
     }
 
+    public static void removeAllEquivalentRecommendations(
+            Set<RecommendedPrivilege> unsatisfiedRecommendations,
+            Integer equivalenceGroup) {
+        List<RecommendedPrivilege> equivalentMembers = new ArrayList<>();
+        for (CheckDbPrivileges.RecommendedPrivilege member : unsatisfiedRecommendations) {
+            if (member.equivalenceGroup == equivalenceGroup) {
+                equivalentMembers.add(member);
+            }
+        }
+        for (RecommendedPrivilege member : equivalentMembers) {
+            unsatisfiedRecommendations.remove(member);
+        }
+    }
+
     /**
      * Obtains the actual grants for the current user and prints warnings if any recommended privilege is not granted.
      * Implemented by iterating actual grants (after splitting them into individual grants) and checking each one
@@ -309,8 +308,6 @@ public class CheckDbPrivileges {
      */
     public static void logWarningIfRecommendedPrivilegeIsAbsent() throws DaoException {
         try {
-            String dbServerVersion = DaoDbServerSessionInfo.getServerVersion();
-            addVersionDependentRecommendationsIfNeeded(dbServerVersion);
             String currentDatabase = DaoDbServerSessionInfo.getDatabaseInUse();
             String currentUser = DaoDbServerSessionInfo.getDatabaseCurrentUser();
             List<String> privilegesForCurrentUser = DaoDbServerSessionInfo.getPrivilegesForCurrentUser();
@@ -324,30 +321,47 @@ public class CheckDbPrivileges {
                     }
                 }
                 for (CheckDbPrivileges.RecommendedPrivilege satisfied : satisfiedRecommendations) {
-                    unsatisfiedRecommendations.remove(satisfied);
+                    if (satisfied.hasAnEquivalenceGroup()) {
+                        removeAllEquivalentRecommendations(unsatisfiedRecommendations, satisfied.equivalenceGroup);
+                    } else {
+                        unsatisfiedRecommendations.remove(satisfied);
+                    }
                 }
             }
             if (unsatisfiedRecommendations.size() > 0) {
                 ProgressMonitor.setCurrentMessage("warning : recommended database privileges have not been granted; database interactions may fail.");
                 ProgressMonitor.setCurrentMessage("          Executing the following SQL statements when connected to the database with a user that");
                 ProgressMonitor.setCurrentMessage("          has the 'WITH GRANT' option enabled for all needed privileges may resolve this issue:");
+                boolean remotePrivilegeInvolvement = false;
                 for (CheckDbPrivileges.RecommendedPrivilege recommended : unsatisfiedRecommendations) {
-                    String onClause = null;
+                    if (recommended.equivalenceGroup == RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE) {
+                        remotePrivilegeInvolvement = true;
+                        continue; // Give a single message at the end instead
+                    }
                     String onClauseDatabase = recommended.onDatabase;
                     if (onClauseDatabase.equals(RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE)) {
                         onClauseDatabase = currentDatabase;
                     }
-                    if (recommended.onTable == null || recommended.onTable.strip().isEmpty()) {
-                        onClause = onClauseDatabase;
-                    } else {
-                        onClause = String.format("%s.%s", onClauseDatabase, recommended.onTable);
-                    }
-                    // special case
-                    if (onClause.equals("REMOTE.*") || onClause.equals("SOURCES.*")) {
-                        onClause = onClause.substring(0, onClause.length() - 2);
-                    }
+                    String onClause = String.format("%s.%s", onClauseDatabase, recommended.onTable);
                     String grantCommand = String.format("    GRANT %s ON %s TO %s", recommended.name, onClause, currentUser);
                     ProgressMonitor.setCurrentMessage(grantCommand);
+                }
+                String dbServerVersion = DaoDbServerSessionInfo.getServerVersion();
+                if (remotePrivilegeInvolvement) {
+                     ProgressMonitor.setCurrentMessage("    Special case:");
+                     ProgressMonitor.setCurrentMessage("        Depending on your installation of Clickhouse (which version,");
+                     ProgressMonitor.setCurrentMessage("        and what system settings you have chosen), you are recommended");
+                     ProgressMonitor.setCurrentMessage("        to either use 'GRANT READ ON REMOTE TO " + currentUser + "'");
+                     ProgressMonitor.setCurrentMessage("        (especially with clickhouse.cloud deployments);  or to use");
+                     ProgressMonitor.setCurrentMessage("        'GRANT REMOTE ON *.* TO " + currentUser + "' for earlier versions");
+                     ProgressMonitor.setCurrentMessage("        of Clickhouse, or those which have not enabled server setting");
+                     ProgressMonitor.setCurrentMessage("        'access_control_improvements.enable_read_write_grants'.");
+                     ProgressMonitor.setCurrentMessage("        If either GRANT is successfully applied, database updates");
+                     ProgressMonitor.setCurrentMessage("        should proceed without privilege problems.");
+                     ProgressMonitor.setCurrentMessage("        Your Clickhouse sever version is " + dbServerVersion);
+                     ProgressMonitor.setCurrentMessage("        Clickhouse server version 25.7/25.8 introduced and expanded the ");
+                     ProgressMonitor.setCurrentMessage("        'GRANT READ ON REMOTE' syntax (initially disabled in");
+                     ProgressMonitor.setCurrentMessage("        non-clickhouse.cloud deployments).");
                 }
                 ProgressMonitor.setCurrentMessage("          Note : if you are running cBioPortal in a configuration which uses multiple databases,");
                 ProgressMonitor.setCurrentMessage("                 all involved databases should be updated in a similar way.");
