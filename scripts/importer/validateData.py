@@ -3722,6 +3722,11 @@ class ResourceDefinitionValidator(Validator):
         The contract describes the metadata keys a resource's rows carry. The portal parses
         it leniently and falls back to "no contract" on anything it cannot use, so problems
         here are invisible at run time - validation is the only place a curator finds out.
+
+        Severity follows the blast radius. A contract the portal cannot read at all is an
+        error; a single field declaring something the portal does not recognise is a warning,
+        since the rest of the contract still applies and no data is affected - only how one
+        column presents.
         """
         extra = {'line_number': self.line_number, 'column_number': col_index + 1}
 
@@ -3759,16 +3764,18 @@ class ResourceDefinitionValidator(Validator):
 
             field_type = field.get('type')
             if field_type is not None and field_type not in self.CONTRACT_FIELD_TYPES:
-                self.logger.error(
-                    "CUSTOM_METADATA field 'type' must be one of: %s."
+                self.logger.warning(
+                    "CUSTOM_METADATA field 'type' is not one of %s, so the portal will "
+                    'detect the type from the data instead.'
                     % ', '.join(sorted(self.CONTRACT_FIELD_TYPES)),
                     extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
                                                           field_type)))
 
             for flag in ('filterable', 'visibleByDefault'):
                 if flag in field and not isinstance(field[flag], bool):
-                    self.logger.error(
-                        "CUSTOM_METADATA field '%s' must be true or false." % flag,
+                    self.logger.warning(
+                        "CUSTOM_METADATA field '%s' is not true or false, so the portal will "
+                        'ignore it and use its default.' % flag,
                         extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
                                                               field[flag])))
 
