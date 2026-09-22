@@ -1,5 +1,6 @@
 package org.mskcc.cbio.portal.dao;
 
+import java.time.Duration;
 import java.util.*;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.mskcc.cbio.portal.util.DatabaseProperties;
@@ -76,7 +77,11 @@ public class JdbcDataSource extends BasicDataSource {
         this.setTestWhileIdle(true);
         // Avoid connections living so long they go stale on the server side
         this.setMaxConnLifetimeMillis(1800000); // 30 minutes
-        this.setValidationQuery("SELECT 1");
+        // Let DBCP call Connection.isValid(timeout) instead of executing a validation
+        // query. ClickHouse JDBC bounds both connection and socket I/O in isValid,
+        // including a TLS handshake that can otherwise inherit the long import
+        // query socket timeout.
+        this.setValidationQueryTimeout(Duration.ofSeconds(10));
     }
 
     private void logUsedDeprecatedProperties(DatabaseProperties dbProperties) {
