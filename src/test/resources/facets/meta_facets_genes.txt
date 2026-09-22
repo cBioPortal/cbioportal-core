@@ -1,5 +1,5 @@
 cancer_study_identifier: study_tcga_pub
-genetic_alteration_type: COPY_NUMBER_ALTERATION
+genetic_alteration_type: ALLELE_SPECIFIC_COPY_NUMBER
 datatype: FACETS_GENE_LEVEL
 reference_genome_id: hg19
 description: FACETS gene-level copy number calls derived from CNCF segments.

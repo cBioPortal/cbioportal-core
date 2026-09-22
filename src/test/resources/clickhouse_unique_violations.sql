@@ -255,13 +255,13 @@ INSERT INTO copy_number_seg_file (seg_file_id, cancer_study_id) VALUES
 (700220, 700010),
 (700220, 700011);
 
--- facets_cncf
-INSERT INTO facets_cncf (seg_id, cancer_study_id, sample_id) VALUES
+-- ascn_cncf
+INSERT INTO ascn_cncf (seg_id, cancer_study_id, sample_id) VALUES
 (700221, 700010, 700040),
 (700221, 700011, 700041);
 
--- facets_genes
-INSERT INTO facets_genes (gene_id, cancer_study_id, sample_id) VALUES
+-- ascn_genes
+INSERT INTO ascn_genes (gene_id, cancer_study_id, sample_id) VALUES
 (700222, 700010, 700040),
 (700222, 700011, 700041);
 

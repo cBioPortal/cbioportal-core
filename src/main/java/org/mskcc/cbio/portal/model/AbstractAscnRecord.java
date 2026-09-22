@@ -33,11 +33,14 @@
 package org.mskcc.cbio.portal.model;
 
 /**
- * Common fields shared by FACETS allele-specific copy number records, whether
- * at the raw segment level ({@link FacetsCncfSegment}) or the derived
- * gene level ({@link FacetsGeneLevelRecord}).
+ * Common fields shared by allele-specific copy number (ASCN) records, whether
+ * at the raw segment level ({@link AscnCncfSegment}) or the derived
+ * gene level ({@link AscnGeneLevelRecord}). FACETS is presently the only tool
+ * producing data in this shape; the {@code datatype} values for these records
+ * (e.g. {@code FACETS_CNCF}) name it explicitly, but the model/DAO/importer
+ * classes are named after the general ASCN concept.
  */
-public abstract class AbstractFacetsRecord {
+public abstract class AbstractAscnRecord {
 
     private long id;
     private int cancerStudyId;
@@ -50,9 +53,9 @@ public abstract class AbstractFacetsRecord {
     private Double cellularFraction;
     private Double purity;
 
-    protected AbstractFacetsRecord() {}
+    protected AbstractAscnRecord() {}
 
-    protected AbstractFacetsRecord(int cancerStudyId, int sampleId, String chr, long start, long end,
+    protected AbstractAscnRecord(int cancerStudyId, int sampleId, String chr, long start, long end,
             Double tcn, Double lcn, Double cellularFraction, Double purity) {
         this.cancerStudyId = cancerStudyId;
         this.sampleId = sampleId;
