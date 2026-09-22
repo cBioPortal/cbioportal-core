@@ -106,7 +106,7 @@ public class DaoDbServerSessionInfo {
 
     /**
      * Get the privilege grants for the current user.
-     * @return a list of GRANT privilege strings for the current user. Strings may contain multiple privileges listed (comma separated) on a single line.
+     * @return a list of GRANT privilege strings for the current user. Strings may contain multiple privileges listed (comma separated) on a single line. Some privileges may be role names.
      * @throws DaoException
      */
     public static List<String> getPrivilegesForCurrentUser() throws DaoException {
@@ -125,6 +125,38 @@ public class DaoDbServerSessionInfo {
             }
         } catch (SQLException e) {
             String errorMessage = "unable to evaluate expression 'SHOW GRANTS' on database service";
+            ProgressMonitor.setCurrentMessage(errorMessage);
+            throw new DaoException(errorMessage, e);
+        } finally {
+            JdbcUtil.closeAll(DaoDbServerSessionInfo.class, connection, null, null);
+        }
+    }
+
+    /**
+     * Get the privilege grants for a role.
+     * @return a list of GRANT privilege strings for the passed role. Strings may contain multiple privileges listed (comma separated) on a single line. Some privileges may be role names.
+     * @throws DaoException
+     */
+    public static List<String> getPrivilegesForRole(String role) throws DaoException {
+        if (role == null || role.strip().length() == 0) {
+            throw new DaoException("illegal empty role value");
+        }
+        Connection connection = null;
+        try {
+            String query = "SHOW GRANTS FOR ?";
+            connection = JdbcUtil.getDbConnection(DaoDbServerSessionInfo.class);
+            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+                preparedStatement.setString(1, role);
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    List<String> privileges = new ArrayList<>();
+                    while (resultSet.next()) {
+                        privileges.add(resultSet.getString("Grants"));
+                    }
+                    return privileges;
+                }
+            }
+        } catch (SQLException e) {
+            String errorMessage = "unable to evaluate expression 'SHOW GRANTS FOR " + role + "' on database service";
             ProgressMonitor.setCurrentMessage(errorMessage);
             throw new DaoException(errorMessage, e);
         } finally {
