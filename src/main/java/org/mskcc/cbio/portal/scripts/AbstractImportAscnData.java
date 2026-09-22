@@ -54,8 +54,8 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 
 /**
- * Shared logic for importing FACETS allele-specific copy number data
- * ({@code facets_cncf} and {@code facets_genes}). Both data types carry the
+ * Shared logic for importing ASCN allele-specific copy number data
+ * ({@code ascn_cncf} and {@code ascn_genes}). Both data types carry the
  * same core columns (sample, genomic coordinates, tcn/lcn/cellular fraction,
  * purity); this class centralizes CLI parsing, coordinate/sample validation,
  * numeric parsing, and the bulk-load / incremental-update lifecycle, mirroring
@@ -65,7 +65,7 @@ import org.mskcc.cbio.portal.util.StableIdUtil;
  * HUGO gene symbol for gene-level data) and persist the row through the
  * appropriate DAO.
  */
-public abstract class AbstractImportFacetsData extends ConsoleRunnable {
+public abstract class AbstractImportAscnData extends ConsoleRunnable {
 
     protected static final String SAMPLE_ID_COLUMN = "SAMPLE_ID";
     protected static final String CHROMOSOME_COLUMN = "CHROMOSOME";
@@ -80,11 +80,11 @@ public abstract class AbstractImportFacetsData extends ConsoleRunnable {
     protected final Set<Integer> processedSampleIds = new HashSet<>();
     private int entriesSkipped;
 
-    public AbstractImportFacetsData(String[] args) {
+    public AbstractImportAscnData(String[] args) {
         super(args);
     }
 
-    /** A human-readable label used in log/error messages (e.g. "FACETS CNCF"). */
+    /** A human-readable label used in log/error messages (e.g. "ASCN CNCF"). */
     protected abstract String dataTypeLabel();
 
     /** @return true if data for this data type already exists for the given study. */
@@ -104,7 +104,7 @@ public abstract class AbstractImportFacetsData extends ConsoleRunnable {
      * resolving any additional columns (via colIndex/parts) and issuing the
      * DAO insert call.
      */
-    protected abstract boolean storeRow(CommonFacetsFields common, String[] parts, Map<String, Integer> colIndex,
+    protected abstract boolean storeRow(CommonAscnFields common, String[] parts, Map<String, Integer> colIndex,
             CancerStudy study, Sample sample) throws DaoException;
 
     @Override
@@ -237,7 +237,7 @@ public abstract class AbstractImportFacetsData extends ConsoleRunnable {
         Double cellularFraction = parseNullableDouble(getValue(parts, colIndex, CELLULAR_FRACTION_COLUMN));
         Double purity = parseNullableDouble(getValue(parts, colIndex, PURITY_COLUMN));
 
-        CommonFacetsFields common = new CommonFacetsFields(chrom, start, end, tcn, lcn, cellularFraction, purity);
+        CommonAscnFields common = new CommonAscnFields(chrom, start, end, tcn, lcn, cellularFraction, purity);
         boolean stored = storeRow(common, parts, colIndex, cancerStudy, sample);
         if (stored) {
             processedSampleIds.add(sample.getInternalId());
@@ -260,8 +260,8 @@ public abstract class AbstractImportFacetsData extends ConsoleRunnable {
         return Double.parseDouble(value.trim());
     }
 
-    /** Common, already-validated fields for a single FACETS data row. */
-    protected static final class CommonFacetsFields {
+    /** Common, already-validated fields for a single ASCN data row. */
+    protected static final class CommonAscnFields {
         final String chr;
         final long start;
         final long end;
@@ -270,7 +270,7 @@ public abstract class AbstractImportFacetsData extends ConsoleRunnable {
         final Double cellularFraction;
         final Double purity;
 
-        CommonFacetsFields(String chr, long start, long end, Double tcn, Double lcn, Double cellularFraction, Double purity) {
+        CommonAscnFields(String chr, long start, long end, Double tcn, Double lcn, Double cellularFraction, Double purity) {
             this.chr = chr;
             this.start = start;
             this.end = end;

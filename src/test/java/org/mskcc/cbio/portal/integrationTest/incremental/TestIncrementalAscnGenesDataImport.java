@@ -8,13 +8,13 @@ import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoFacetsGenes;
+import org.mskcc.cbio.portal.dao.DaoAscnGenes;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.FacetsGeneLevelRecord;
+import org.mskcc.cbio.portal.model.AscnGeneLevelRecord;
 import org.mskcc.cbio.portal.model.Sample;
-import org.mskcc.cbio.portal.scripts.ImportFacetsGeneLevelData;
+import org.mskcc.cbio.portal.scripts.ImportAscnGeneLevelData;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -22,11 +22,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Tests incremental (--overwrite-existing) import of FACETS gene-level data.
+ * Tests incremental (--overwrite-existing) import of ASCN gene-level data.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-public class TestIncrementalFacetsGenesDataImport extends IntegrationTestBase {
+public class TestIncrementalAscnGenesDataImport extends IntegrationTestBase {
 
     public static final String STUDY_ID = "study_tcga_pub";
     private static final String SAMPLE_ID = "TCGA-A1-A0SE-01";
@@ -43,7 +43,7 @@ public class TestIncrementalFacetsGenesDataImport extends IntegrationTestBase {
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), SAMPLE_ID);
 
         ClickHouseBulkLoader.bulkLoadOn();
-        FacetsGeneLevelRecord existingRecord = new FacetsGeneLevelRecord(
+        AscnGeneLevelRecord existingRecord = new AscnGeneLevelRecord(
                 cancerStudy.getInternalId(),
                 sample.getInternalId(),
                 "AKT1",
@@ -55,15 +55,15 @@ public class TestIncrementalFacetsGenesDataImport extends IntegrationTestBase {
                 2.0,
                 0.5,
                 0.2);
-        existingRecord.setId(DaoFacetsGenes.getNextId());
-        DaoFacetsGenes.addFacetsGeneLevelRecord(existingRecord);
+        existingRecord.setId(DaoAscnGenes.getNextId());
+        DaoAscnGenes.addAscnGeneLevelRecord(existingRecord);
         ClickHouseBulkLoader.flushAll();
 
-        File dataFolder = new File("src/test/resources/incremental/facets_genes/");
-        File metaFile = new File(dataFolder, "meta_facets_genes.txt");
-        File dataFile = new File(dataFolder, "data_facets_genes.txt");
+        File dataFolder = new File("src/test/resources/incremental/ascn_genes/");
+        File metaFile = new File(dataFolder, "meta_ascn_genes.txt");
+        File dataFile = new File(dataFolder, "data_ascn_genes.txt");
 
-        ImportFacetsGeneLevelData importer = new ImportFacetsGeneLevelData(new String[] {
+        ImportAscnGeneLevelData importer = new ImportAscnGeneLevelData(new String[] {
                 "--loadMode", "bulkLoad",
                 "--meta", metaFile.getAbsolutePath(),
                 "--data", dataFile.getAbsolutePath(),
@@ -71,7 +71,7 @@ public class TestIncrementalFacetsGenesDataImport extends IntegrationTestBase {
         });
         importer.run();
 
-        List<FacetsGeneLevelRecord> records = DaoFacetsGenes.getGeneLevelDataForSample(sample.getInternalId(), cancerStudy.getInternalId());
+        List<AscnGeneLevelRecord> records = DaoAscnGenes.getGeneLevelDataForSample(sample.getInternalId(), cancerStudy.getInternalId());
         // the pre-existing AKT1 record should have been replaced by the 2 new records (TP53, BRCA1) from the incremental file
         assertEquals(2, records.size());
         assertTrue(records.stream().noneMatch(r -> "AKT1".equals(r.getHugoGeneSymbol())));

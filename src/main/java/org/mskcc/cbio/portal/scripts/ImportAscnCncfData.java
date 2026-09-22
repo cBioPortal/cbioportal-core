@@ -35,44 +35,44 @@ package org.mskcc.cbio.portal.scripts;
 import java.util.Map;
 import java.util.Set;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoFacetsCncf;
+import org.mskcc.cbio.portal.dao.DaoAscnCncf;
 import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.FacetsCncfSegment;
+import org.mskcc.cbio.portal.model.AscnCncfSegment;
 import org.mskcc.cbio.portal.model.Sample;
 
 /**
- * Imports FACETS CNCF (allele-specific copy number segment) data into the
- * {@code facets_cncf} table.
+ * Imports ASCN CNCF (allele-specific copy number segment) data into the
+ * {@code ascn_cncf} table.
  *
  * Expected tab-delimited data file columns (any order):
  * SAMPLE_ID, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
  * CELLULAR_FRACTION, PURITY
  */
-public class ImportFacetsCncfData extends AbstractImportFacetsData {
+public class ImportAscnCncfData extends AbstractImportAscnData {
 
-    public ImportFacetsCncfData(String[] args) {
+    public ImportAscnCncfData(String[] args) {
         super(args);
     }
 
     @Override
     protected String dataTypeLabel() {
-        return "FACETS CNCF";
+        return "ASCN CNCF";
     }
 
     @Override
     protected boolean dataExistsForCancerStudy(int cancerStudyId) throws DaoException {
-        return DaoFacetsCncf.facetsCncfDataExistForCancerStudy(cancerStudyId);
+        return DaoAscnCncf.ascnCncfDataExistForCancerStudy(cancerStudyId);
     }
 
     @Override
     protected void deleteDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        DaoFacetsCncf.deleteFacetsCncfDataForSamples(cancerStudyId, sampleIds);
+        DaoAscnCncf.deleteAscnCncfDataForSamples(cancerStudyId, sampleIds);
     }
 
     @Override
-    protected boolean storeRow(CommonFacetsFields common, String[] parts, Map<String, Integer> colIndex,
+    protected boolean storeRow(CommonAscnFields common, String[] parts, Map<String, Integer> colIndex,
             CancerStudy study, Sample sample) throws DaoException {
-        FacetsCncfSegment seg = new FacetsCncfSegment(
+        AscnCncfSegment seg = new AscnCncfSegment(
                 study.getInternalId(),
                 sample.getInternalId(),
                 common.chr,
@@ -82,8 +82,8 @@ public class ImportFacetsCncfData extends AbstractImportFacetsData {
                 common.lcn,
                 common.cellularFraction,
                 common.purity);
-        seg.setId(DaoFacetsCncf.getNextId());
-        DaoFacetsCncf.addFacetsCncfSegment(seg);
+        seg.setId(DaoAscnCncf.getNextId());
+        DaoAscnCncf.addAscnCncfSegment(seg);
         return true;
     }
 
@@ -93,7 +93,7 @@ public class ImportFacetsCncfData extends AbstractImportFacetsData {
      * @param args the arguments given on the command line
      */
     public static void main(String[] args) {
-        ConsoleRunnable runner = new ImportFacetsCncfData(args);
+        ConsoleRunnable runner = new ImportAscnCncfData(args);
         runner.runInConsole();
     }
 }

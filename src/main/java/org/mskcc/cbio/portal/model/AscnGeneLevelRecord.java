@@ -33,16 +33,39 @@
 package org.mskcc.cbio.portal.model;
 
 /**
- * A single FACETS CNCF (allele-specific copy number) segment call for a sample.
+ * A gene-level ASCN record, derived from (but not directly mapped 1:1 to)
+ * CNCF segment calls. Represents the ASCN allele-specific copy number
+ * summarized at a single gene's genomic locus for a sample.
  */
-public class FacetsCncfSegment extends AbstractFacetsRecord {
+public class AscnGeneLevelRecord extends AbstractAscnRecord {
 
-    public FacetsCncfSegment() {
+    private String hugoGeneSymbol;
+    private long entrezGeneId;
+
+    public AscnGeneLevelRecord() {
         super();
     }
 
-    public FacetsCncfSegment(int cancerStudyId, int sampleId, String chr, long start, long end,
-            Double tcn, Double lcn, Double cellularFraction, Double purity) {
+    public AscnGeneLevelRecord(int cancerStudyId, int sampleId, String hugoGeneSymbol, long entrezGeneId,
+            String chr, long start, long end, Double tcn, Double lcn, Double cellularFraction, Double purity) {
         super(cancerStudyId, sampleId, chr, start, end, tcn, lcn, cellularFraction, purity);
+        this.hugoGeneSymbol = hugoGeneSymbol;
+        this.entrezGeneId = entrezGeneId;
+    }
+
+    public String getHugoGeneSymbol() {
+        return hugoGeneSymbol;
+    }
+
+    public void setHugoGeneSymbol(String hugoGeneSymbol) {
+        this.hugoGeneSymbol = hugoGeneSymbol;
+    }
+
+    public long getEntrezGeneId() {
+        return entrezGeneId;
+    }
+
+    public void setEntrezGeneId(long entrezGeneId) {
+        this.entrezGeneId = entrezGeneId;
     }
 }
