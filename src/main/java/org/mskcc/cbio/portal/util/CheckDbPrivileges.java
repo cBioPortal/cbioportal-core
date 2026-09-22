@@ -33,7 +33,9 @@
 package org.mskcc.cbio.portal.util;
 
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
@@ -200,6 +202,72 @@ public class CheckDbPrivileges {
                 RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
     }
 
+    private static List<String> apparentGrantedRoles(List<String> privilegesList) {
+        Deque<String> unexpandedRawPrivileges = new LinkedList<String>(privilegesList);
+        Set<String> expandedRoles = new HashSet<String>();
+        if (privilegesList == null || privilegesList.size() == 0) {
+            return new ArrayList<String>();
+        }
+        Pattern nonRolePrivilegePattern = Pattern.compile("^(.*)\\s\\s*[Oo][Nn]\\s\\s*(\\S\\S*)\\s\\s*[Tt][Oo]\\s.*$");
+        Pattern rolePrivilegePattern = Pattern.compile("^\\*[Gg][Rr][Aa][Nn][Tt]\\s\\s*(.*)\\s\\s*[Tt][Oo]\\s.*$");
+        while (!unexpandedRawPrivileges.isEmpty()) {
+            String privilegeItem = unexpandedRawPrivileges.pop();
+            Matcher nonRolePrivilegeMatcher = nonRolePrivilegePattern.matcher(privilegeItem);
+            Matcher rolePrivilegeMatcher = rolePrivilegePattern.matcher(privilegeItem);
+            if (nonRolePrivilegeMatcher.matches() || !rolePrivilegeMatcher.matches()) {
+                continue; // ignore all non-Role grants
+            }
+            String[] splitRoles = rolePrivilegeMatcher.group(1).split(",");
+            for (int i = 0; i < splitRoles.length; i = i + 1) {
+                String splitRole = splitRoles[i].strip();
+                if (expandedRoles.contains(splitRole)) {
+                    continue; // ignore already expanded roles (possible due to cyclical reference)
+                }
+                try {
+                    // expand
+                    List<String> privilegesForRole = DaoDbServerSessionInfo.getPrivilegesForRole(splitRole);
+                    unexpandedRawPrivileges.addAll(privilegesForRole);
+                } catch (DaoException e) {
+                    // failures to retrieve role grants do not cause halt - we continue to try to verify recommended privileges
+                }
+                expandedRoles.add(splitRole);
+            }
+        }
+        return new ArrayList<String>(expandedRoles);
+    }
+
+    private static List<String> expandGrantedRolePrivileges(List<String> privilegesForCurrentUser) {
+        List<String> expandedPrivileges = new ArrayList<String>();
+        // filter out role grants
+        Pattern nonRolePrivilegePattern = Pattern.compile("^(.*)\\s\\s*[Oo][Nn]\\s\\s*(\\S\\S*)\\s\\s*[Tt][Oo]\\s.*$");
+        Pattern rolePrivilegePattern = Pattern.compile("^\\*[Gg][Rr][Aa][Nn][Tt]\\s\\s*(.*)\\s\\s*[Tt][Oo]\\s.*$");
+        for (String privilege : privilegesForCurrentUser) {
+            Matcher nonRolePrivilegeMatcher = nonRolePrivilegePattern.matcher(privilege);
+            Matcher rolePrivilegeMatcher = rolePrivilegePattern.matcher(privilege);
+            if (nonRolePrivilegeMatcher.matches() || !rolePrivilegeMatcher.matches()) {
+                continue; // ignore all non-Role grants
+            }
+            expandedPrivileges.add(privilege);
+        }
+        // add in non-role grants for apparent roles
+        List<String> apparentRoles = apparentGrantedRoles(privilegesForCurrentUser);
+        for (String apparentRole : apparentRoles) {
+            try {
+                List<String> privilegesForRole = DaoDbServerSessionInfo.getPrivilegesForRole(apparentRole);
+                for (String privilege : privilegesForRole) {
+                    Matcher nonRolePrivilegeMatcher = nonRolePrivilegePattern.matcher(privilege);
+                    Matcher rolePrivilegeMatcher = rolePrivilegePattern.matcher(privilege);
+                    if (nonRolePrivilegeMatcher.matches() || !rolePrivilegeMatcher.matches()) {
+                        expandedPrivileges.add(privilege);
+                    }
+                }
+            } catch (DaoException e) {
+                // failures to retrieve role grants do not cause halt - we continue to try to verify recommended privileges
+            }
+        }
+        return expandedPrivileges;
+    }
+
     // Function discards unparsable privileges without raising an exception
     private static List<String> splitCombinedPrivilegeGrantStrings(List<String> combinedPrivilegesForCurrentUser) {
         List<String> splitPrivileges = new ArrayList<String>();
@@ -311,7 +379,8 @@ public class CheckDbPrivileges {
             String currentDatabase = DaoDbServerSessionInfo.getDatabaseInUse();
             String currentUser = DaoDbServerSessionInfo.getDatabaseCurrentUser();
             List<String> privilegesForCurrentUser = DaoDbServerSessionInfo.getPrivilegesForCurrentUser();
-            List<String> singlePrivilegesForCurrentUser = splitCombinedPrivilegeGrantStrings(privilegesForCurrentUser);
+            List<String> roleExpandedPrivilegesForCurrentUser = expandGrantedRolePrivileges(privilegesForCurrentUser);
+            List<String> singlePrivilegesForCurrentUser = splitCombinedPrivilegeGrantStrings(roleExpandedPrivilegesForCurrentUser);
             Set<CheckDbPrivileges.RecommendedPrivilege> unsatisfiedRecommendations = new HashSet(recommendedPrivilegeSet);
             for (String p : singlePrivilegesForCurrentUser) {
                 Set <CheckDbPrivileges.RecommendedPrivilege> satisfiedRecommendations = new HashSet<>();
