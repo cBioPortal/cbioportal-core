@@ -6,24 +6,24 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoFacetsCncf;
+import org.mskcc.cbio.portal.dao.DaoAscnCncf;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.FacetsCncfSegment;
+import org.mskcc.cbio.portal.model.AscnCncfSegment;
 import org.mskcc.cbio.portal.model.Sample;
-import org.mskcc.cbio.portal.scripts.ImportFacetsCncfData;
+import org.mskcc.cbio.portal.scripts.ImportAscnCncfData;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import static org.junit.Assert.assertEquals;
 
 /**
- * Tests the import of FACETS CNCF (allele-specific copy number segment) data.
+ * Tests the import of ASCN CNCF (allele-specific copy number segment) data.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-public class TestImportFacetsCncfData extends IntegrationTestBase {
+public class TestImportAscnCncfData extends IntegrationTestBase {
 
     private static final String STUDY_ID = "study_tcga_pub";
     private static final String SAMPLE_ID = "TCGA-A1-A0SE-01";
@@ -36,20 +36,20 @@ public class TestImportFacetsCncfData extends IntegrationTestBase {
     }
 
     @Test
-    public void testImportFacetsCncfData() throws Exception {
+    public void testImportAscnCncfData() throws Exception {
         String[] args = {
-                "--data", "src/test/resources/facets/data_facets_cncf.txt",
-                "--meta", "src/test/resources/facets/meta_facets_cncf.txt",
+                "--data", "src/test/resources/ascn/data_ascn_cncf.txt",
+                "--meta", "src/test/resources/ascn/meta_ascn_cncf.txt",
                 "--loadMode", "bulkLoad"
         };
-        ImportFacetsCncfData runner = new ImportFacetsCncfData(args);
+        ImportAscnCncfData runner = new ImportAscnCncfData(args);
         runner.run();
 
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), SAMPLE_ID);
-        List<FacetsCncfSegment> segments = DaoFacetsCncf.getSegmentsForSample(sample.getInternalId(), cancerStudy.getInternalId());
+        List<AscnCncfSegment> segments = DaoAscnCncf.getSegmentsForSample(sample.getInternalId(), cancerStudy.getInternalId());
         assertEquals(3, segments.size());
 
-        FacetsCncfSegment first = segments.stream()
+        AscnCncfSegment first = segments.stream()
                 .filter(s -> s.getStart() == 3218610)
                 .findFirst()
                 .orElseThrow();

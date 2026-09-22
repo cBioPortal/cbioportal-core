@@ -41,26 +41,26 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.mskcc.cbio.portal.model.FacetsGeneLevelRecord;
+import org.mskcc.cbio.portal.model.AscnGeneLevelRecord;
 
 /**
- * DAO for FACETS gene-level data, derived from (but not directly mapped to)
- * FACETS CNCF segment calls (see {@link DaoFacetsCncf}).
+ * DAO for ASCN gene-level data, derived from (but not directly mapped to)
+ * ASCN CNCF segment calls (see {@link DaoAscnCncf}).
  *
  * Rows are exclusively appended through {@link ClickHouseBulkLoader}. The
- * `facets_genes` table is ordered by (cancer_study_id, sample_id,
+ * `ascn_genes` table is ordered by (cancer_study_id, sample_id,
  * hugo_gene_symbol) for efficient per-sample gene table reads, with a bloom
  * filter index on hugo_gene_symbol to keep cross-sample/cohort gene lookups
  * (e.g. "show gene X across all samples") cheap as well.
  */
-public final class DaoFacetsGenes {
+public final class DaoAscnGenes {
 
-    private static final String TABLE = "facets_genes";
+    private static final String TABLE = "ascn_genes";
 
-    private DaoFacetsGenes() {}
+    private DaoAscnGenes() {}
 
-    public static void addFacetsGeneLevelRecord(FacetsGeneLevelRecord rec) throws DaoException {
-        FacetsDaoUtil.requireBulkLoad("insert FACETS gene-level data");
+    public static void addAscnGeneLevelRecord(AscnGeneLevelRecord rec) throws DaoException {
+        AscnDaoUtil.requireBulkLoad("insert ASCN gene-level data");
         ClickHouseBulkLoader.getClickHouseBulkLoader(TABLE).insertRecord(
                 Long.toString(rec.getId()),
                 Integer.toString(rec.getCancerStudyId()),
@@ -77,42 +77,42 @@ public final class DaoFacetsGenes {
         );
     }
 
-    public static void addFacetsGeneLevelRecords(List<FacetsGeneLevelRecord> recs) throws DaoException {
-        for (FacetsGeneLevelRecord rec : recs) {
-            addFacetsGeneLevelRecord(rec);
+    public static void addAscnGeneLevelRecords(List<AscnGeneLevelRecord> recs) throws DaoException {
+        for (AscnGeneLevelRecord rec : recs) {
+            addAscnGeneLevelRecord(rec);
         }
     }
 
     /**
-     * Reserves and returns the next unique id for a new `facets_genes` row.
-     * Callers should invoke this once per row before {@link #addFacetsGeneLevelRecord}.
+     * Reserves and returns the next unique id for a new `ascn_genes` row.
+     * Callers should invoke this once per row before {@link #addAscnGeneLevelRecord}.
      */
     public static long getNextId() throws DaoException {
-        return ClickHouseAutoIncrement.nextId("seq_facets_genes");
+        return ClickHouseAutoIncrement.nextId("seq_ascn_genes");
     }
 
-    public static List<FacetsGeneLevelRecord> getGeneLevelDataForSample(int sampleId, int cancerStudyId) throws DaoException {
+    public static List<AscnGeneLevelRecord> getGeneLevelDataForSample(int sampleId, int cancerStudyId) throws DaoException {
         return getGeneLevelDataForSamples(Collections.singleton(sampleId), cancerStudyId);
     }
 
-    public static List<FacetsGeneLevelRecord> getGeneLevelDataForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
-        return FacetsDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoFacetsGenes::mapRow);
+    public static List<AscnGeneLevelRecord> getGeneLevelDataForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
+        return AscnDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoAscnGenes::mapRow);
     }
 
     /**
-     * Fetches gene-level FACETS records for a single gene across a set of samples
+     * Fetches gene-level ASCN records for a single gene across a set of samples
      * (e.g. for an oncoprint-style, cohort-wide view). Relies on the bloom filter
      * index on `hugo_gene_symbol` for efficient filtering.
      */
-    public static List<FacetsGeneLevelRecord> getGeneLevelDataForGene(String hugoGeneSymbol, Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
+    public static List<AscnGeneLevelRecord> getGeneLevelDataForGene(String hugoGeneSymbol, Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
         if (sampleIds == null || sampleIds.isEmpty()) {
             return Collections.emptyList();
         }
         return ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
-            List<FacetsGeneLevelRecord> results = new ArrayList<>();
+            List<AscnGeneLevelRecord> results = new ArrayList<>();
             Connection con = null;
             try {
-                con = JdbcUtil.getDbConnection(DaoFacetsGenes.class);
+                con = JdbcUtil.getDbConnection(DaoAscnGenes.class);
                 try (PreparedStatement pstmt = con.prepareStatement(
                         "SELECT * FROM `" + TABLE + "`" +
                         " WHERE `hugo_gene_symbol`=?" +
@@ -128,21 +128,21 @@ public final class DaoFacetsGenes {
                 }
                 return results;
             } finally {
-                JdbcUtil.closeAll(DaoFacetsGenes.class, con, null, null);
+                JdbcUtil.closeAll(DaoAscnGenes.class, con, null, null);
             }
         });
     }
 
-    public static boolean facetsGenesDataExistForCancerStudy(int cancerStudyId) throws DaoException {
-        return FacetsDaoUtil.dataExistsForCancerStudy(TABLE, cancerStudyId);
+    public static boolean ascnGenesDataExistForCancerStudy(int cancerStudyId) throws DaoException {
+        return AscnDaoUtil.dataExistsForCancerStudy(TABLE, cancerStudyId);
     }
 
-    public static void deleteFacetsGenesDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        FacetsDaoUtil.deleteDataForSamples(TABLE, cancerStudyId, sampleIds);
+    public static void deleteAscnGenesDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
+        AscnDaoUtil.deleteDataForSamples(TABLE, cancerStudyId, sampleIds);
     }
 
-    private static FacetsGeneLevelRecord mapRow(ResultSet rs) throws SQLException {
-        FacetsGeneLevelRecord rec = new FacetsGeneLevelRecord(
+    private static AscnGeneLevelRecord mapRow(ResultSet rs) throws SQLException {
+        AscnGeneLevelRecord rec = new AscnGeneLevelRecord(
                 rs.getInt("cancer_study_id"),
                 rs.getInt("sample_id"),
                 rs.getString("hugo_gene_symbol"),
