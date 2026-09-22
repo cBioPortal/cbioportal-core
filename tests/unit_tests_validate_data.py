@@ -3325,8 +3325,16 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         }):
             self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
                 'https://slides.example/scan.custom', 'source'))
-            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
-                'gs://thumbnails.example/thumbnail.webp', 'thumbnail'))
+        self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+            'gs://thumbnails.example/thumbnail.webp', 'thumbnail'))
+        for uri in (
+            'https://slides.example/100%25.jpg',
+            'https://slides.example/%25ZZ.jpg',
+            'https://slides.example/%2525.jpg',
+            'https://slides.example/a+b.jpg',
+            'https://slides.example/caf%C3%A9.jpg',
+        ):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(uri, 'source'), uri)
         self.assertTrue(validateData.WsiValidator._is_image_content_type('image/webp'))
         self.assertTrue(validateData.WsiValidator._is_image_content_type('image/avif'))
         self.assertTrue(validateData.WsiValidator._is_image_content_type('image/svg+xml'))
@@ -3344,11 +3352,25 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             'https://example/../slide.svs', 'source'))
         self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
             'https://example/slides/%252e%252e/slide.svs', 'source'))
+        for uri in (
+            'https://example/100%.jpg',
+            'https://example/short%2.jpg',
+            'https://example/bad%ZZ.jpg',
+            'https://example/slides/%2e%2e/slide.svs',
+            'https://example/slides/%2E%2e/slide.svs',
+            'https://example/slides/%2e%2e%2fsecret.svs',
+            'https://example/slides/%252e%252e%252fsecret.svs',
+        ):
+            self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(uri, 'source'), uri)
         with patch.dict(validateData.os.environ, {
             'WSI_ALLOWED_SOURCE_PREFIXES': 'https://approved.example/slides/',
         }):
             self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
                 'https://approved.example/slides/scan.custom',
+                'source',
+            ))
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                'https://approved.example/slides/100%25.jpg',
                 'source',
             ))
             self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(

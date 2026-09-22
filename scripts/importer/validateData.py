@@ -4544,6 +4544,11 @@ class WsiValidator(Validator):
 
     @classmethod
     def _is_safe_artifact_url(cls, value, kind):
+        # Match URI parsers such as Java's: every percent sign in the original
+        # URI must begin a complete percent-encoded byte, even though
+        # urllib.parse.unquote itself leaves malformed escapes untouched.
+        if re.search(r'%(?![0-9a-fA-F]{2})', value):
+            return False
         try:
             parsed = urlparse(value)
         except ValueError:

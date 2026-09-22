@@ -613,7 +613,13 @@ public class ImportWsiData extends ConsoleRunnable {
         }
         for (int pass = 0; pass < 2; pass++) {
             // URLDecoder treats '+' as a space, so protect literal path plus signs.
-            path = URLDecoder.decode(path.replace("+", "%2B"), StandardCharsets.UTF_8);
+            path = path.replace("+", "%2B");
+            if (pass == 1) {
+                // The first decode may expose a literal percent (for example,
+                // from %25). Preserve it unless it starts another valid escape.
+                path = path.replaceAll("%(?![0-9A-Fa-f]{2})", "%25");
+            }
+            path = URLDecoder.decode(path, StandardCharsets.UTF_8);
         }
         return path;
     }

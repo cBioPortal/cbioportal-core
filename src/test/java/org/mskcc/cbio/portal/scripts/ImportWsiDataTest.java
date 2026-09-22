@@ -73,6 +73,16 @@ public class ImportWsiDataTest {
             "https://slides.example/scan.custom", unsetPrefixVariable));
         assertTrue(ImportWsiData.safeArtifactUrl(
             "gs://thumbnails.example/thumbnail.webp", unsetPrefixVariable));
+        assertTrue(ImportWsiData.safeArtifactUrl(
+            "https://slides.example/100%25.jpg", unsetPrefixVariable));
+        assertTrue(ImportWsiData.safeArtifactUrl(
+            "https://slides.example/%25ZZ.jpg", unsetPrefixVariable));
+        assertTrue(ImportWsiData.safeArtifactUrl(
+            "https://slides.example/%2525.jpg", unsetPrefixVariable));
+        assertTrue(ImportWsiData.safeArtifactUrl(
+            "https://slides.example/a+b.jpg", unsetPrefixVariable));
+        assertTrue(ImportWsiData.safeArtifactUrl(
+            "https://slides.example/caf%C3%A9.jpg", unsetPrefixVariable));
         assertFalse(ImportWsiData.safeArtifactUrl(
             "https://user:password@example/slide.svs", unsetPrefixVariable));
         assertFalse(ImportWsiData.safeArtifactUrl(
@@ -81,6 +91,20 @@ public class ImportWsiDataTest {
             "https://example/../slide.svs", unsetPrefixVariable));
         assertFalse(ImportWsiData.safeArtifactUrl(
             "https://example/slides/%252e%252e/slide.svs", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/100%.jpg", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/short%2.jpg", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/bad%ZZ.jpg", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/slides/%2e%2e/slide.svs", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/slides/%2E%2e/slide.svs", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/slides/%2e%2e%2fsecret.svs", unsetPrefixVariable));
+        assertFalse(ImportWsiData.safeArtifactUrl(
+            "https://example/slides/%252e%252e%252fsecret.svs", unsetPrefixVariable));
     }
 
     @Test
