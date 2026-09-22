@@ -3238,11 +3238,6 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
 
 class WsiValidatorTestCase(PostClinicalDataFileTestCase):
 
-    def test_deid_rejects_common_absolute_date_formats(self):
-        for value in ('2021-03-14', '03/14/2021', '14/03/2021',
-                      'March 14, 2021', '14 March 2021'):
-            self.assertTrue(validateData._wsi_contains_absolute_date(value))
-
     def test_valid_unmatched_slide(self):
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_wsi_valid.txt', validateData.WsiValidator)
@@ -3290,6 +3285,7 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             'level_dimensions': [{'width': 256, 'height': 256}],
             'max_zoom': 0,
             'tile_size': 256,
+            'producer_specific': {'profile': 'custom'},
         }))
         current = {
             'dimensions': {'width': 100, 'height': 100},
@@ -3322,22 +3318,70 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'max_decode_pixels': '16777216'}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'max_decode_pixels': 16777216.0}))
 
-    def test_tile_metadata_deid_allows_date_like_source_fingerprint(self):
-        validator = validateData.WsiValidator.__new__(validateData.WsiValidator)
-        validator.logger = Mock()
-        header = ['TILE_METADATA_JSON']
-        metadata = {'source_fingerprint': 'a' * 10 + '20395333' + 'b' * 46}
-        validator._validate_metadata_deid(metadata, 1, header)
-        validator.logger.error.assert_not_called()
-
-    def test_approved_source_prefix_allows_pipeline_release_date(self):
+    def test_generic_artifact_uris_and_image_types_are_accepted(self):
         with patch.dict(validateData.os.environ, {
-            'WSI_ALLOWED_SOURCE_PREFIXES': 's3://mskmind-bkt/reef-slides-reprocess-staging/',
+            'WSI_ALLOWED_SOURCE_PREFIXES': '',
+            'WSI_ALLOWED_THUMBNAIL_PREFIXES': '',
         }):
             self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
-                's3://mskmind-bkt/reef-slides-reprocess-staging/prod-staged-20260819-v2/1.svs',
+                'https://slides.example/scan.custom', 'source'))
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                'gs://thumbnails.example/thumbnail.webp', 'thumbnail'))
+        self.assertTrue(validateData.WsiValidator._is_image_content_type('image/webp'))
+        self.assertTrue(validateData.WsiValidator._is_image_content_type('image/avif'))
+        self.assertTrue(validateData.WsiValidator._is_image_content_type('image/svg+xml'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('text/plain'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('image/foo=bar'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('image/jpeg; charset=utf-8'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('image/jpëg'))
+
+    def test_artifact_uri_safety_remains_enforced(self):
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://user:password@example/slide.svs', 'source'))
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://example/slide.svs?token=secret', 'source'))
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://example/../slide.svs', 'source'))
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://example/slides/%252e%252e/slide.svs', 'source'))
+        with patch.dict(validateData.os.environ, {
+            'WSI_ALLOWED_SOURCE_PREFIXES': 'https://approved.example/slides/',
+        }):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                'https://approved.example/slides/scan.custom',
                 'source',
             ))
+            self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+                'https://other.example/slides/scan.custom',
+                'source',
+            ))
+
+    def test_generic_wsi_values_are_not_deid_scanned(self):
+        content = Path('test_data/data_wsi_valid.txt').read_text()
+        content = content.replace('PART-1', 'PART-2021-03-14')
+        content = content.replace('BLOCK-1', 'BLOCK-MRN:123456')
+        content = content.replace('file:///fixture.svs', 'https://slides.example/scan.custom')
+        content = content.replace('file:///fixture.jpg', 'gs://thumbnails.example/thumbnail.webp')
+        content = content.replace('"tile_size":256}',
+                                  '"tile_size":256,"vendor":"March 14, 2021 MRN: 123456"}')
+        content = content.replace('image/jpeg', 'image/webp')
+        with TemporaryDirectory() as study_dir:
+            Path(study_dir, 'data_wsi.txt').write_text(content)
+            with patch.dict(validateData.os.environ, {
+                'WSI_ALLOWED_SOURCE_PREFIXES': '',
+                'WSI_ALLOWED_THUMBNAIL_PREFIXES': '',
+            }):
+                validator = validateData.WsiValidator(
+                    study_dir,
+                    {'data_filename': 'data_wsi.txt'},
+                    PORTAL_INSTANCE,
+                    self.logger,
+                    False,
+                    False,
+                )
+                validator.validate()
+        self.assertEqual([], [record for record in self.get_log_records()
+                              if record.levelno >= logging.ERROR])
 
 
 if __name__ == '__main__':

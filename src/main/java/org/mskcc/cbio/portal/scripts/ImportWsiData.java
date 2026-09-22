@@ -22,6 +22,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -38,7 +39,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * Imports the canonical PATHOLOGY_SLIDES/WSI study files into ClickHouse.
@@ -109,40 +109,10 @@ public class ImportWsiData extends ConsoleRunnable {
         "WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT";
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Pattern ABSOLUTE_DATE = Pattern.compile(
-        "(?<!\\d)(?:19|20)\\d{2}[-_/](?:0?[1-9]|1[0-2])[-_/](?:0?[1-9]|[12]\\d|3[01])(?!\\d)");
-    private static final Pattern MONTH_FIRST_DATE = Pattern.compile(
-        "(?<!\\d)(?:0?[1-9]|1[0-2])[-_/](?:0?[1-9]|[12]\\d|3[01])[-_/](?:19|20)\\d{2}(?!\\d)");
-    private static final Pattern DAY_FIRST_DATE = Pattern.compile(
-        "(?<!\\d)(?:0?[1-9]|[12]\\d|3[01])[-_/](?:0?[1-9]|1[0-2])[-_/](?:19|20)\\d{2}(?!\\d)");
-    private static final Pattern NAMED_MONTH_DATE = Pattern.compile(
-        "(?i)(?<![a-z0-9])(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|"
-            + "may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|"
-            + "nov(?:ember)?|dec(?:ember)?)\\s+(?:0?[1-9]|[12]\\d|3[01])(?:st|nd|rd|th)?"
-            + "(?:,)?\\s+(?:19|20)\\d{2}|(?:0?[1-9]|[12]\\d|3[01])[-/\\s]+"
-            + "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
-            + "jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|"
-            + "dec(?:ember)?)[-/\\s]+(?:19|20)\\d{2})(?![a-z0-9])");
-    private static final Pattern COMPACT_DATE = Pattern.compile(
-        "(?<!\\d)(?:19|20)\\d{6}(?!\\d)");
-    private static final Pattern LABELLED_MRN = Pattern.compile(
-        "(?i)\\b(?:mrn|medical[ _-]?record(?:[ _-]?number)?)\\b\\s*[:=#-]?\\s*\\d{4,}");
-    private static final Pattern SOURCE_FINGERPRINT = Pattern.compile("[0-9a-fA-F]{64}");
-    private static final Set<String> SOURCE_EXTENSIONS = Set.of("svs", "tif", "tiff", "ndpi", "mrxs", "scn");
-    private static final Set<String> THUMBNAIL_EXTENSIONS = Set.of("jpg", "jpeg", "png");
-    private static final Set<String> ALLOWED_METADATA_KEYS = Set.of(
-        "dimensions", "levels", "level_dimensions", "level_downsamples", "max_zoom",
-        "tile_size", "mpp", "objective_power", "vendor", "identity_version", "safe_min_level",
-        "tile_metadata_schema_version", "decode_policy_version", "max_decode_pixels",
-        "thumbnail_max_decode_pixels", "source_fingerprint");
     private static final int TILE_METADATA_SCHEMA_VERSION = 2;
     private static final String DECODE_POLICY_VERSION =
         "geometry-v2;tile-max=16777216;thumbnail-max=16777216";
     private static final int MAX_DECODE_PIXELS = 16_777_216;
-    private static final Set<Integer> NON_TEXT_WSI_COLUMNS = Set.of(18, 19, 21, 24, 26, 28, 29, 31);
-    private static final Map<String, String> THUMBNAIL_CONTENT_TYPES = Map.of(
-        "jpg", "image/jpeg", "jpeg", "image/jpeg", "png", "image/png");
-
     private record SampleRef(long internalId, long patientId) {}
     private record StudyRefs(long studyId, Map<String, Long> patients,
                              Map<String, SampleRef> samples) {}
@@ -217,15 +187,9 @@ public class ImportWsiData extends ConsoleRunnable {
         return node != null && node.isIntegralNumber() && node.asLong() > 0;
     }
 
-    private static boolean validTileMetadata(JsonNode node) {
+    static boolean validTileMetadata(JsonNode node) {
         if (node == null || !node.isObject()) {
             return false;
-        }
-        var fieldNames = node.fieldNames();
-        while (fieldNames.hasNext()) {
-            if (!ALLOWED_METADATA_KEYS.contains(fieldNames.next())) {
-                return false;
-            }
         }
         JsonNode dimensions = node.get("dimensions");
         if (dimensions == null
@@ -412,7 +376,6 @@ public class ImportWsiData extends ConsoleRunnable {
         for (int rowIndex = 0; rowIndex < input.size(); rowIndex++) {
             int line = rowIndex + 6;
             String[] fields = input.get(rowIndex);
-            validateDeidRow(fields, line);
             String patientStableId = value(fields, 0);
             String patientKey = patientStableId;
             long patientId = refs.patients.getOrDefault(patientStableId, -1L);
@@ -501,6 +464,18 @@ public class ImportWsiData extends ConsoleRunnable {
             }
             requireAbsoluteUrl(sourceUrl, "SOURCE_URL", line);
             requireAbsoluteUrl(thumbnailUrl, "THUMBNAIL_URL", line);
+            if (sourceUrl != null && !safeArtifactUrl(sourceUrl, "WSI_ALLOWED_SOURCE_PREFIXES")) {
+                throw new IllegalArgumentException(
+                    "Line " + line + ": SOURCE_URL is unsafe or outside the configured allowlist");
+            }
+            if (thumbnailUrl != null && !safeArtifactUrl(thumbnailUrl, "WSI_ALLOWED_THUMBNAIL_PREFIXES")) {
+                throw new IllegalArgumentException(
+                    "Line " + line + ": THUMBNAIL_URL is unsafe or outside the configured allowlist");
+            }
+            if (thumbnailContentType != null && !isImageContentType(thumbnailContentType)) {
+                throw new IllegalArgumentException(
+                    "Line " + line + ": THUMBNAIL_CONTENT_TYPE must be an image media type");
+            }
             requireJsonObject(tileMetadata, line);
             if (canServe) {
                 require(sourceUrl, "SOURCE_URL", line);
@@ -615,122 +590,40 @@ public class ImportWsiData extends ConsoleRunnable {
         return timelineReason != null ? timelineReason : timelineSource != null ? timelineSource : timelineStatus;
     }
 
-    private static void validateDeidRow(String[] fields, int line) {
-        String imageId = value(fields, 3);
-        if (imageId.isBlank()) {
-            return;
-        }
-        for (int index = 0; index < fields.length; index++) {
-            if (index == 0 || index == 1 || index == 2 || index == 3
-                || index == 25 || index == 27
-                || NON_TEXT_WSI_COLUMNS.contains(index)) {
-                continue; // approved portal/image pseudonyms
-            }
-            String fieldValue = fields[index] == null ? "" : fields[index].trim();
-            if (LABELLED_MRN.matcher(fieldValue).find()
-                || containsAbsoluteDate(fieldValue)
-                || COMPACT_DATE.matcher(fieldValue).find()) {
-                throw new IllegalArgumentException(
-                    "Line " + line + ": WSI value violates the de-identification contract");
-            }
-        }
-        String metadata = nullable(value(fields, 26));
-        if (metadata != null && containsForbiddenMetadataText(metadata)) {
-            throw new IllegalArgumentException(
-                "Line " + line + ": TILE_METADATA_JSON violates the de-identification contract");
-        }
-        String source = nullable(value(fields, 25));
-        String thumbnail = nullable(value(fields, 27));
-        if (source != null && !safeArtifactUrl(source, SOURCE_EXTENSIONS, "WSI_ALLOWED_SOURCE_PREFIXES")) {
-            throw new IllegalArgumentException(
-                "Line " + line + ": SOURCE_URL violates the de-identification contract");
-        }
-        if (thumbnail != null && !safeArtifactUrl(thumbnail, THUMBNAIL_EXTENSIONS, "WSI_ALLOWED_THUMBNAIL_PREFIXES")) {
-            throw new IllegalArgumentException(
-                "Line " + line + ": THUMBNAIL_URL violates the de-identification contract");
-        }
-        for (int index : new int[] {0, 1, 2, 22}) {
-            String identifier = fields[index] == null ? "" : fields[index].trim();
-            if (!identifier.isBlank()) {
-                String lower = identifier.toLowerCase(Locale.ROOT);
-                if ((source != null && containsDecoded(source, lower))
-                    || (thumbnail != null && containsDecoded(thumbnail, lower))) {
-                    throw new IllegalArgumentException(
-                        "Line " + line + ": WSI URI contains a related identifier");
-                }
-            }
-        }
-        if (thumbnail != null) {
-            String contentType = nullable(value(fields, 30));
-            if (contentType != null && !thumbnailContentTypeMatches(thumbnail, contentType)) {
-                throw new IllegalArgumentException(
-                    "Line " + line + ": THUMBNAIL_CONTENT_TYPE does not match THUMBNAIL_URL");
-            }
-        }
-    }
-
-    private static boolean containsForbiddenMetadataText(JsonNode node) {
-        if (node == null) return false;
-        if (node.isTextual()) {
-            String value = node.asText();
-            return LABELLED_MRN.matcher(value).find()
-                || containsAbsoluteDate(value)
-                || COMPACT_DATE.matcher(value).find();
-        }
-        if (node.isObject()) {
-            var fields = node.fields();
-            while (fields.hasNext()) {
-                var entry = fields.next();
-                if ("source_fingerprint".equals(entry.getKey())) {
-                    JsonNode fingerprint = entry.getValue();
-                    if (!fingerprint.isTextual()
-                        || !SOURCE_FINGERPRINT.matcher(fingerprint.asText()).matches()) {
-                        return true;
-                    }
-                    continue;
-                }
-                if (containsForbiddenMetadataText(entry.getValue())) return true;
-            }
-        } else if (node.isArray()) {
-            for (JsonNode child : node) {
-                if (containsForbiddenMetadataText(child)) return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean containsForbiddenMetadataText(String value) {
-        try {
-            return containsForbiddenMetadataText(JSON.readTree(value));
-        } catch (IOException | IllegalArgumentException exception) {
-            return true;
-        }
-    }
-
-    private static boolean thumbnailContentTypeMatches(String value, String contentType) {
-        try {
-            URI uri = new URI(value);
-            String path = uri.getPath();
-            if (path == null) return false;
-            int dot = path.lastIndexOf('.');
-            if (dot <= path.lastIndexOf('/')) return false;
-            String extension = path.substring(dot + 1).toLowerCase(Locale.ROOT);
-            return contentType.trim().toLowerCase(Locale.ROOT)
-                .equals(THUMBNAIL_CONTENT_TYPES.get(extension));
-        } catch (URISyntaxException exception) {
+    static boolean isImageContentType(String contentType) {
+        String normalized = contentType.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.startsWith("image/")) {
             return false;
         }
+        String subtype = normalized.substring("image/".length());
+        return !subtype.isBlank() && subtype.chars().allMatch(ImportWsiData::isMediaTypeTokenCharacter);
     }
 
-    private static boolean safeArtifactUrl(String value, Set<String> extensions, String prefixEnv) {
+    private static boolean isMediaTypeTokenCharacter(int character) {
+        return (character >= 'a' && character <= 'z')
+            || (character >= 'A' && character <= 'Z')
+            || (character >= '0' && character <= '9')
+            || "!#$%&'*+-.^_`|~".indexOf(character) >= 0;
+    }
+
+    private static String decodedArtifactPath(URI uri) {
+        String path = uri.getRawPath();
+        if (path == null) {
+            return null;
+        }
+        for (int pass = 0; pass < 2; pass++) {
+            // URLDecoder treats '+' as a space, so protect literal path plus signs.
+            path = URLDecoder.decode(path.replace("+", "%2B"), StandardCharsets.UTF_8);
+        }
+        return path;
+    }
+
+    static boolean safeArtifactUrl(String value, String prefixEnv) {
         try {
             URI uri = new URI(value);
             String scheme = uri.getScheme();
-            if (scheme == null || !("s3".equalsIgnoreCase(scheme) || "file".equalsIgnoreCase(scheme))
+            if (scheme == null || (uri.getHost() == null && uri.getPath() == null)
                 || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null) {
-                return false;
-            }
-            if ("s3".equalsIgnoreCase(scheme) && (uri.getHost() == null || uri.getHost().isBlank())) {
                 return false;
             }
             if ("file".equalsIgnoreCase(scheme)
@@ -739,9 +632,8 @@ public class ImportWsiData extends ConsoleRunnable {
                 && !"localhost".equalsIgnoreCase(uri.getHost())) {
                 return false;
             }
-            String path = uri.getPath();
-            String rawPath = uri.getRawPath();
-            if (path == null || path.endsWith("/")
+            String path = decodedArtifactPath(uri);
+            if (path == null || path.isBlank() || path.endsWith("/")
                 || Arrays.stream(path.split("/", -1))
                     .anyMatch(segment -> ".".equals(segment) || "..".equals(segment))) {
                 return false;
@@ -754,41 +646,10 @@ public class ImportWsiData extends ConsoleRunnable {
                     .anyMatch(prefix -> value.startsWith(prefix.replaceAll("/+$", "") + "/"));
                 if (!approved) return false;
             }
-            String filename = path.substring(path.lastIndexOf('/') + 1);
-            int dot = filename.lastIndexOf('.');
-            boolean dateSafe = approved || (!containsAbsoluteDate(value)
-                && !containsAbsoluteDate(path)
-                && (rawPath == null || !COMPACT_DATE.matcher(rawPath).find())
-                && !COMPACT_DATE.matcher(value).find()
-                && !COMPACT_DATE.matcher(path).find());
-            return dot > 0
-                && dateSafe
-                && !LABELLED_MRN.matcher(value).find()
-                && !LABELLED_MRN.matcher(path).find()
-                && extensions.contains(filename.substring(dot + 1).toLowerCase(Locale.ROOT));
-        } catch (URISyntaxException exception) {
+            return true;
+        } catch (URISyntaxException | IllegalArgumentException exception) {
             return false;
         }
-    }
-
-    private static boolean containsDecoded(String value, String identifier) {
-        if (value.toLowerCase(Locale.ROOT).contains(identifier)) {
-            return true;
-        }
-        try {
-            URI uri = new URI(value);
-            return uri.getPath() != null
-                && uri.getPath().toLowerCase(Locale.ROOT).contains(identifier);
-        } catch (URISyntaxException exception) {
-            return true;
-        }
-    }
-
-    private static boolean containsAbsoluteDate(String value) {
-        return ABSOLUTE_DATE.matcher(value).find()
-            || MONTH_FIRST_DATE.matcher(value).find()
-            || DAY_FIRST_DATE.matcher(value).find()
-            || NAMED_MONTH_DATE.matcher(value).find();
     }
 
     private static String nullableLong(Long value) {

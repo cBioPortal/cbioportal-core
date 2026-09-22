@@ -1,28 +1,32 @@
 # WSI study import
 
 cBioPortal core is the sole database writer for whole-slide-image (WSI)
-studies. The Databricks/export pipeline produces a normal study directory with
-`meta_wsi.txt` and `data_wsi.txt`; the tile server only serves the source and
-thumbnail artifacts returned by cBioPortal.
+studies. An upstream artifact-generation/export pipeline produces a normal
+study directory with `meta_wsi.txt` and `data_wsi.txt`; the tile server only
+serves the source and thumbnail artifacts returned by cBioPortal. The upstream
+pipeline is deployment-specific and may use Databricks, scripts, or another
+service; Databricks is not required by cBioPortal core.
 
 ## Upstream artifact publication
 
-Before the study files are exported, a separate scheduled thumbnail process
-must read eligible slide inventory/source rows, generate master thumbnails,
-write them to the S3/Dell ECS-compatible object store, and populate
-`cdsi_prod.pathology_data_mining.slide_thumbnail_registry`. Each successful
-registry row carries `artifact_uri`, `tile_metadata_json`, `width`, `height`,
-and `content_type`. The Databricks canonical-association query joins the latest
-successful registry row, computes `can_serve_tiles`, and exports the artifact
-fields below into `data_wsi.txt`.
+Before the study files are imported, an upstream artifact-generation/export
+pipeline must read or receive the eligible slide inventory and source rows,
+generate the required master thumbnails and tile metadata, store the artifacts
+where the deployment's tile-serving layer can access them, and materialize the
+artifact fields below into `data_wsi.txt`. The pipeline must set
+`CAN_SERVE_TILES` consistently with the availability of the required source,
+tile-metadata, and thumbnail fields. An implementation may maintain a
+registry, perform canonical-association queries, or use a completion watermark,
+but those details are producer-specific and are not part of the cBioPortal core
+contract.
 
-The scheduled thumbnail process is outside cBioPortal core and outside the
-frontend. The frontend is a read-only consumer. The tile-server
-`app/thumbnail_worker.py` on-demand CLI may write an object-store JPEG for
-development or controlled remediation, but it does not update the registry and
-must not be used as the production publication mechanism. A canonical refresh
-must wait for the thumbnail batch completion watermark, and successful legacy
-rows missing `tile_metadata_json` must be regenerated before export.
+The artifact-generation process is outside cBioPortal core and outside the
+frontend. The frontend is a read-only consumer. A tile-serving deployment may
+provide optional development or controlled-remediation tooling, but those
+tools are not required by core and must not be used as the production
+publication mechanism. The export must wait until artifact generation and
+metadata publication are complete, and any producer-side metadata needed for
+serving must be finalized before the study is imported.
 
 ## Metadata
 
@@ -58,21 +62,29 @@ matched rows require `SAMPLE_ID`, while unmatched rows leave it blank.
 `IMAGE_ID` is unique within a study. Repeated part and block keys must carry
 the same descriptive values. Stable patient, sample, and reference-sample IDs
 must resolve to the study, and a sample/reference sample must belong to the
-row's patient. `TILE_METADATA_JSON` must be a JSON object when present. URLs
-must be absolute. When `CAN_SERVE_TILES=TRUE`, source URL, tile metadata,
-thumbnail URL, positive dimensions, and thumbnail content type are mandatory.
-The importer requires the declared media type to match the thumbnail URI
-extension (`.jpg`/`.jpeg` → `image/jpeg`, `.png` → `image/png`); mismatches are
-rejected before a row can be loaded.
+row's patient. `TILE_METADATA_JSON` must be a JSON object when present. For
+servable rows, it must contain positive `dimensions.width` and
+`dimensions.height`, a positive `levels` count with one positive
+`level_dimensions` entry per level, a nonnegative `max_zoom`, and a positive
+`tile_size`; additional producer-defined fields are preserved. URLs
+must be absolute and must not contain credentials, query strings, fragments, or
+path traversal. When `CAN_SERVE_TILES=TRUE`, source URL, tile metadata,
+thumbnail URL, positive dimensions, and an `image/*` thumbnail content type are
+mandatory. Core does not require a particular URI scheme, source filename
+extension, or thumbnail URI extension; those choices belong to the serving
+layer. Deployments may restrict source and thumbnail roots with the
+`WSI_ALLOWED_SOURCE_PREFIXES` and `WSI_ALLOWED_THUMBNAIL_PREFIXES` environment
+variables.
 Non-servable rows have those artifact columns stored as null. The importer
-rejects MRNs, absolute dates, labelled identifiers, unsafe URI components, and
-URI prefixes outside the configured `WSI_ALLOWED_SOURCE_PREFIXES` and
-`WSI_ALLOWED_THUMBNAIL_PREFIXES` environment variables. Production must set
-both allowlists; development may explicitly include `file:///app/testdata/`.
+does not perform de-identification scanning; upstream publication pipelines are
+responsible for removing protected health information and deployment-specific
+identifiers before export. Production deployments should set both URI prefix
+allowlists; development may explicitly include `file:///app/testdata/`.
 
 The importer assumes these values were already materialized by the upstream
-Databricks/export pipeline. It does not discover source slides, generate
-thumbnails, read `slide_thumbnail_registry`, or write the object store.
+artifact-generation/export pipeline. It does not discover source slides,
+generate thumbnails, read a producer-specific registry, or write the object
+store.
 
 ## Import commands
 
