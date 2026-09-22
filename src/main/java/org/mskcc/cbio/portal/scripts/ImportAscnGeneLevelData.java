@@ -35,23 +35,23 @@ package org.mskcc.cbio.portal.scripts;
 import java.util.Map;
 import java.util.Set;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoFacetsGenes;
+import org.mskcc.cbio.portal.dao.DaoAscnGenes;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
-import org.mskcc.cbio.portal.model.FacetsGeneLevelRecord;
+import org.mskcc.cbio.portal.model.AscnGeneLevelRecord;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
- * Imports FACETS gene-level data (derived from, but not directly mapped to,
- * FACETS CNCF segment calls) into the {@code facets_genes} table.
+ * Imports ASCN gene-level data (derived from, but not directly mapped to,
+ * ASCN CNCF segment calls) into the {@code ascn_genes} table.
  *
  * Expected tab-delimited data file columns (any order):
  * SAMPLE_ID, HUGO_SYMBOL, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
  * CELLULAR_FRACTION, PURITY
  */
-public class ImportFacetsGeneLevelData extends AbstractImportFacetsData {
+public class ImportAscnGeneLevelData extends AbstractImportAscnData {
 
     private static final String HUGO_SYMBOL_COLUMN = "HUGO_SYMBOL";
 
@@ -60,23 +60,23 @@ public class ImportFacetsGeneLevelData extends AbstractImportFacetsData {
     // not per-row database round trips.
     private final DaoGeneOptimized daoGeneOptimized = DaoGeneOptimized.getInstance();
 
-    public ImportFacetsGeneLevelData(String[] args) {
+    public ImportAscnGeneLevelData(String[] args) {
         super(args);
     }
 
     @Override
     protected String dataTypeLabel() {
-        return "FACETS gene-level";
+        return "ASCN gene-level";
     }
 
     @Override
     protected boolean dataExistsForCancerStudy(int cancerStudyId) throws DaoException {
-        return DaoFacetsGenes.facetsGenesDataExistForCancerStudy(cancerStudyId);
+        return DaoAscnGenes.ascnGenesDataExistForCancerStudy(cancerStudyId);
     }
 
     @Override
     protected void deleteDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        DaoFacetsGenes.deleteFacetsGenesDataForSamples(cancerStudyId, sampleIds);
+        DaoAscnGenes.deleteAscnGenesDataForSamples(cancerStudyId, sampleIds);
     }
 
     @Override
@@ -85,7 +85,7 @@ public class ImportFacetsGeneLevelData extends AbstractImportFacetsData {
     }
 
     @Override
-    protected boolean storeRow(CommonFacetsFields common, String[] parts, Map<String, Integer> colIndex,
+    protected boolean storeRow(CommonAscnFields common, String[] parts, Map<String, Integer> colIndex,
             CancerStudy study, Sample sample) throws DaoException {
         String hugoGeneSymbol = getValue(parts, colIndex, HUGO_SYMBOL_COLUMN).trim();
         CanonicalGene gene = daoGeneOptimized.getGene(hugoGeneSymbol);
@@ -94,7 +94,7 @@ public class ImportFacetsGeneLevelData extends AbstractImportFacetsData {
             return false;
         }
 
-        FacetsGeneLevelRecord rec = new FacetsGeneLevelRecord(
+        AscnGeneLevelRecord rec = new AscnGeneLevelRecord(
                 study.getInternalId(),
                 sample.getInternalId(),
                 gene.getHugoGeneSymbolAllCaps(),
@@ -106,8 +106,8 @@ public class ImportFacetsGeneLevelData extends AbstractImportFacetsData {
                 common.lcn,
                 common.cellularFraction,
                 common.purity);
-        rec.setId(DaoFacetsGenes.getNextId());
-        DaoFacetsGenes.addFacetsGeneLevelRecord(rec);
+        rec.setId(DaoAscnGenes.getNextId());
+        DaoAscnGenes.addAscnGeneLevelRecord(rec);
         return true;
     }
 
@@ -117,7 +117,7 @@ public class ImportFacetsGeneLevelData extends AbstractImportFacetsData {
      * @param args the arguments given on the command line
      */
     public static void main(String[] args) {
-        ConsoleRunnable runner = new ImportFacetsGeneLevelData(args);
+        ConsoleRunnable runner = new ImportAscnGeneLevelData(args);
         runner.runInConsole();
     }
 }

@@ -40,15 +40,15 @@ import java.util.Collection;
 import java.util.Set;
 
 /**
- * Shared helper for the FACETS DAOs ({@link DaoFacetsCncf}, {@link DaoFacetsGenes}).
+ * Shared helper for the ASCN DAOs ({@link DaoAscnCncf}, {@link DaoAscnGenes}).
  * Both tables are plain, append-only ClickHouse MergeTree tables loaded exclusively
  * through {@link ClickHouseBulkLoader}, so the boilerplate for existence checks,
  * multi-sample queries and sample-scoped deletes is identical apart from the table
  * name and row-mapping logic.
  */
-final class FacetsDaoUtil {
+final class AscnDaoUtil {
 
-    private FacetsDaoUtil() {}
+    private AscnDaoUtil() {}
 
     static void requireBulkLoad(String operation) throws DaoException {
         if (!ClickHouseBulkLoader.isBulkLoad()) {
@@ -61,7 +61,7 @@ final class FacetsDaoUtil {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
-            con = JdbcUtil.getDbConnection(FacetsDaoUtil.class);
+            con = JdbcUtil.getDbConnection(AscnDaoUtil.class);
             pstmt = con.prepareStatement("SELECT EXISTS (SELECT 1 FROM `" + table + "` WHERE `cancer_study_id`=?)");
             pstmt.setInt(1, cancerStudyId);
             rs = pstmt.executeQuery();
@@ -69,7 +69,7 @@ final class FacetsDaoUtil {
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
-            JdbcUtil.closeAll(FacetsDaoUtil.class, con, pstmt, rs);
+            JdbcUtil.closeAll(AscnDaoUtil.class, con, pstmt, rs);
         }
     }
 
@@ -80,14 +80,14 @@ final class FacetsDaoUtil {
         ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
             Connection con = null;
             try {
-                con = JdbcUtil.getDbConnection(FacetsDaoUtil.class);
+                con = JdbcUtil.getDbConnection(AscnDaoUtil.class);
                 try (PreparedStatement pstmt = con.prepareStatement(
                         "DELETE FROM `" + table + "` WHERE `cancer_study_id`=? AND `sample_id` IN (SELECT id FROM " + stagingTable + ")")) {
                     pstmt.setInt(1, cancerStudyId);
                     pstmt.executeUpdate();
                 }
             } finally {
-                JdbcUtil.closeAll(FacetsDaoUtil.class, con, null, null);
+                JdbcUtil.closeAll(AscnDaoUtil.class, con, null, null);
             }
             return null;
         });
@@ -107,7 +107,7 @@ final class FacetsDaoUtil {
             java.util.List<T> results = new java.util.ArrayList<>();
             Connection con = null;
             try {
-                con = JdbcUtil.getDbConnection(FacetsDaoUtil.class);
+                con = JdbcUtil.getDbConnection(AscnDaoUtil.class);
                 try (PreparedStatement pstmt = con.prepareStatement(
                         "SELECT * FROM `" + table + "`" +
                         " WHERE `sample_id` IN (SELECT id FROM " + stagingTable + ")" +
@@ -119,7 +119,7 @@ final class FacetsDaoUtil {
                 }
                 return results;
             } finally {
-                JdbcUtil.closeAll(FacetsDaoUtil.class, con, null, null);
+                JdbcUtil.closeAll(AscnDaoUtil.class, con, null, null);
             }
         });
     }

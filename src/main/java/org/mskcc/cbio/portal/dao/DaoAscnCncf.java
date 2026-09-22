@@ -38,24 +38,24 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.mskcc.cbio.portal.model.FacetsCncfSegment;
+import org.mskcc.cbio.portal.model.AscnCncfSegment;
 
 /**
- * DAO for FACETS CNCF (allele-specific copy number segment) data.
+ * DAO for ASCN CNCF (allele-specific copy number segment) data.
  *
  * Mirrors {@link DaoCopyNumberSegment}: rows are exclusively appended through
- * {@link ClickHouseBulkLoader}, and the `facets_cncf` table is ordered by
+ * {@link ClickHouseBulkLoader}, and the `ascn_cncf` table is ordered by
  * (cancer_study_id, sample_id, chr, start) to make genome-ordered, per-sample
  * segment reads (e.g. segment plots) efficient.
  */
-public final class DaoFacetsCncf {
+public final class DaoAscnCncf {
 
-    private static final String TABLE = "facets_cncf";
+    private static final String TABLE = "ascn_cncf";
 
-    private DaoFacetsCncf() {}
+    private DaoAscnCncf() {}
 
-    public static void addFacetsCncfSegment(FacetsCncfSegment seg) throws DaoException {
-        FacetsDaoUtil.requireBulkLoad("insert FACETS CNCF data");
+    public static void addAscnCncfSegment(AscnCncfSegment seg) throws DaoException {
+        AscnDaoUtil.requireBulkLoad("insert ASCN CNCF data");
         ClickHouseBulkLoader.getClickHouseBulkLoader(TABLE).insertRecord(
                 Long.toString(seg.getId()),
                 Integer.toString(seg.getCancerStudyId()),
@@ -70,38 +70,38 @@ public final class DaoFacetsCncf {
         );
     }
 
-    public static void addFacetsCncfSegments(List<FacetsCncfSegment> segs) throws DaoException {
-        for (FacetsCncfSegment seg : segs) {
-            addFacetsCncfSegment(seg);
+    public static void addAscnCncfSegments(List<AscnCncfSegment> segs) throws DaoException {
+        for (AscnCncfSegment seg : segs) {
+            addAscnCncfSegment(seg);
         }
     }
 
     /**
-     * Reserves and returns the next unique id for a new `facets_cncf` row.
-     * Callers should invoke this once per row before {@link #addFacetsCncfSegment}.
+     * Reserves and returns the next unique id for a new `ascn_cncf` row.
+     * Callers should invoke this once per row before {@link #addAscnCncfSegment}.
      */
     public static long getNextId() throws DaoException {
-        return ClickHouseAutoIncrement.nextId("seq_facets_cncf");
+        return ClickHouseAutoIncrement.nextId("seq_ascn_cncf");
     }
 
-    public static List<FacetsCncfSegment> getSegmentsForSample(int sampleId, int cancerStudyId) throws DaoException {
+    public static List<AscnCncfSegment> getSegmentsForSample(int sampleId, int cancerStudyId) throws DaoException {
         return getSegmentsForSamples(Collections.singleton(sampleId), cancerStudyId);
     }
 
-    public static List<FacetsCncfSegment> getSegmentsForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
-        return FacetsDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoFacetsCncf::mapRow);
+    public static List<AscnCncfSegment> getSegmentsForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
+        return AscnDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoAscnCncf::mapRow);
     }
 
-    public static boolean facetsCncfDataExistForCancerStudy(int cancerStudyId) throws DaoException {
-        return FacetsDaoUtil.dataExistsForCancerStudy(TABLE, cancerStudyId);
+    public static boolean ascnCncfDataExistForCancerStudy(int cancerStudyId) throws DaoException {
+        return AscnDaoUtil.dataExistsForCancerStudy(TABLE, cancerStudyId);
     }
 
-    public static void deleteFacetsCncfDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        FacetsDaoUtil.deleteDataForSamples(TABLE, cancerStudyId, sampleIds);
+    public static void deleteAscnCncfDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
+        AscnDaoUtil.deleteDataForSamples(TABLE, cancerStudyId, sampleIds);
     }
 
-    private static FacetsCncfSegment mapRow(ResultSet rs) throws SQLException {
-        FacetsCncfSegment seg = new FacetsCncfSegment(
+    private static AscnCncfSegment mapRow(ResultSet rs) throws SQLException {
+        AscnCncfSegment seg = new AscnCncfSegment(
                 rs.getInt("cancer_study_id"),
                 rs.getInt("sample_id"),
                 rs.getString("chr"),
