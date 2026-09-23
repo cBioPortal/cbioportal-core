@@ -46,7 +46,11 @@ from pathlib import Path
 from base64 import urlsafe_b64encode
 import math
 from abc import ABCMeta, abstractmethod
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
+
+WSI_TILE_METADATA_SCHEMA_VERSION = 2
+WSI_DECODE_POLICY_VERSION = 'geometry-v2;tile-max=16777216;thumbnail-max=16777216'
+WSI_MAX_DECODE_PIXELS = 16777216
 
 # Configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module.
@@ -70,6 +74,7 @@ from . import cbioportal_common
 DEFINED_SAMPLE_IDS = None
 DEFINED_SAMPLE_ATTRIBUTES = None
 PATIENTS_WITH_SAMPLES = None
+SAMPLE_TO_PATIENT = None
 mutation_sample_ids = None
 mutation_file_sample_ids = set()
 sample_ids_panel_dict = {}
@@ -127,6 +132,7 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.PATIENT_RESOURCES:'PatientResourceValidator',
     cbioportal_common.MetaFileTypes.STUDY_RESOURCES:'StudyResourceValidator',
     cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION:'ResourceDefinitionValidator',
+    cbioportal_common.MetaFileTypes.WSI: 'WsiValidator',
 }
 
 
@@ -2822,6 +2828,7 @@ class SampleClinicalValidator(ClinicalValidator):
         self.sample_id_lines = {}
         self.sampleIds = self.sample_id_lines.keys()
         self.patient_ids = set()
+        self.sample_to_patient = {}
 
     def checkLine(self, data):
         """Check the values in a line of data."""
@@ -2872,6 +2879,12 @@ class SampleClinicalValidator(ClinicalValidator):
                     self.sample_id_lines[value] = self.line_number
             elif col_name == 'PATIENT_ID':
                 self.patient_ids.add(value)
+                if 'SAMPLE_ID' in self.cols:
+                    sample_index = self.cols.index('SAMPLE_ID')
+                    if sample_index < len(data):
+                        sample_value = data[sample_index].strip()
+                        if sample_value:
+                            self.sample_to_patient[sample_value] = value
             # TODO: check the values in the other documented columns
 
 
@@ -4408,6 +4421,368 @@ class MultipleDataFileValidator(FeaturewiseFileValidator, metaclass=ABCMeta):
     def checkId(self):
         return self.checkIdInSamples()
 
+
+class WsiValidator(Validator):
+    """Validate the canonical whole-slide-image study file."""
+
+    EXPECTED_HEADERS = [
+        'PATIENT_ID', 'REFERENCE_SAMPLE_ID', 'SAMPLE_ID', 'IMAGE_ID',
+        'PART_KEY', 'PART_NUMBER', 'PART_DESIGNATOR', 'PART_TYPE',
+        'PART_DESCRIPTION', 'SUBSPECIALTY', 'PATH_DX_TITLE', 'BLOCK_KEY',
+        'BLOCK_NUMBER', 'BLOCK_LABEL', 'MATCH_LEVEL', 'SPECIMEN_KEY',
+        'STAIN_NAME', 'STAIN_GROUP', 'IS_HNE', 'IS_IHC', 'MAGNIFICATION',
+        'FILE_SIZE_BYTES', 'BARCODE', 'SLIDE_TYPE', 'CAN_SERVE_TILES', 'SOURCE_URL',
+        'TILE_METADATA_JSON', 'THUMBNAIL_URL', 'THUMBNAIL_WIDTH',
+        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'TIMELINE_START_DAYS',
+        'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
+        'TIMELINE_DATE_REASON', 'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE',
+    ]
+    REQUIRED_VALUES = {
+        'PATIENT_ID', 'IMAGE_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
+        'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES',
+        'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
+        'TIMELINE_COORDINATE_SYSTEM',
+    }
+
+    @staticmethod
+    def _is_valid_tile_metadata(metadata):
+        """Return whether metadata contains the browser tile contract."""
+        if not isinstance(metadata, dict):
+            return False
+        dimensions = metadata.get('dimensions')
+        if not isinstance(dimensions, dict):
+            return False
+        if not all(type(dimensions.get(name)) is int and dimensions[name] > 0
+                   for name in ('width', 'height')):
+            return False
+
+        levels = metadata.get('levels')
+        level_dimensions = metadata.get('level_dimensions')
+        if type(levels) is not int or levels <= 0:
+            return False
+        if not isinstance(level_dimensions, list) or len(level_dimensions) != levels:
+            return False
+        for level in level_dimensions:
+            if not isinstance(level, dict):
+                return False
+            if not all(type(level.get(name)) is int and level[name] > 0
+                       for name in ('width', 'height')):
+                return False
+
+        max_zoom = metadata.get('max_zoom')
+        tile_size = metadata.get('tile_size')
+        if not (
+            type(max_zoom) is int and max_zoom >= 0
+            and type(tile_size) is int and tile_size > 0
+        ):
+            return False
+
+        if 'tile_metadata_schema_version' not in metadata:
+            return True
+        schema = metadata['tile_metadata_schema_version']
+        if type(schema) is not int or schema != WSI_TILE_METADATA_SCHEMA_VERSION:
+            return False
+        safe_min_level = metadata.get('safe_min_level')
+        downsamples = metadata.get('level_downsamples')
+        return (
+            type(safe_min_level) is int
+            and 0 <= safe_min_level <= max_zoom
+            and isinstance(downsamples, list)
+            and len(downsamples) == levels
+            and all(
+                type(value) in (int, float)
+                and math.isfinite(value)
+                and value > 0
+                for value in downsamples
+            )
+            and metadata.get('decode_policy_version') == WSI_DECODE_POLICY_VERSION
+            and type(metadata.get('max_decode_pixels')) is int
+            and metadata['max_decode_pixels'] == WSI_MAX_DECODE_PIXELS
+            and type(metadata.get('thumbnail_max_decode_pixels')) is int
+            and metadata['thumbnail_max_decode_pixels'] == WSI_MAX_DECODE_PIXELS
+        )
+
+    def _error(self, message, line_number, column=None, cause=None):
+        extra = {'line_number': line_number}
+        if column is not None:
+            extra['column_number'] = column + 1
+        if cause is not None:
+            extra['cause'] = cause
+        self.logger.error(message, extra=extra)
+
+    @staticmethod
+    def _is_absolute_url(value):
+        try:
+            parsed = urlparse(value)
+        except ValueError:
+            return False
+        return bool(parsed.scheme and (parsed.netloc or parsed.path))
+
+    @staticmethod
+    def _is_media_type_token(value):
+        return bool(value) and all(
+            ('a' <= character <= 'z' or 'A' <= character <= 'Z'
+             or '0' <= character <= '9'
+             or character in "!#$%&'*+-.^_`|~")
+            for character in value
+        )
+
+    @staticmethod
+    def _is_image_content_type(value):
+        media_type = value.strip().lower()
+        if not media_type.startswith('image/'):
+            return False
+        return WsiValidator._is_media_type_token(media_type[len('image/'):])
+
+    @staticmethod
+    def _uri_prefixes(name):
+        return tuple(
+            value.strip().rstrip('/')
+            for value in os.environ.get(name, '').split(',')
+            if value.strip()
+        )
+
+    @classmethod
+    def _is_safe_artifact_url(cls, value, kind):
+        # Match URI parsers such as Java's: every percent sign in the original
+        # URI must begin a complete percent-encoded byte, even though
+        # urllib.parse.unquote itself leaves malformed escapes untouched.
+        if re.search(r'%(?![0-9a-fA-F]{2})', value):
+            return False
+        try:
+            parsed = urlparse(value)
+        except ValueError:
+            return False
+        if (
+            not parsed.scheme
+            or not (parsed.netloc or parsed.path)
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            return False
+        if parsed.scheme.lower() == 'file' and (
+                parsed.netloc not in ('', 'localhost') or not parsed.path.startswith('/')):
+            return False
+        path = unquote(unquote(parsed.path))
+        if (not path or path.endswith('/')
+                or any(segment in ('.', '..') for segment in path.split('/'))):
+            return False
+        prefixes = cls._uri_prefixes(
+            'WSI_ALLOWED_SOURCE_PREFIXES'
+            if kind == 'source'
+            else 'WSI_ALLOWED_THUMBNAIL_PREFIXES'
+        )
+        prefix_match = bool(prefixes and any(value.startswith(prefix + '/') for prefix in prefixes))
+        if prefixes and not prefix_match:
+            return False
+        return True
+
+    def _validate_file(self):
+        try:
+            with open(self.filename, 'r', newline='') as stream:
+                lines = stream.readlines()
+        except OSError:
+            self.logger.error('File could not be opened')
+            return
+        except UnicodeDecodeError:
+            self.logger.error('File contains invalid UTF-8 bytes. Please check values in file')
+            return
+
+        if len(lines) < 5:
+            self.logger.error('WSI file must contain four comment rows and a column header')
+            return
+        if any(not line.startswith('#') for line in lines[:4]):
+            self.logger.error('WSI file must begin with exactly four comment rows')
+            return
+        if lines[4].startswith('#'):
+            self.logger.error('WSI column header is missing')
+            return
+
+        header = lines[4].rstrip('\r\n').split('\t')
+        if header != self.EXPECTED_HEADERS:
+            self._error('Invalid WSI column header or column order', 5,
+                        cause=', '.join(header))
+            return
+        self.cols = header
+        self.numCols = len(header)
+
+        seen_images = set()
+        part_values = {}
+        block_values = {}
+        rows = 0
+        for line_number, line in enumerate(lines[5:], start=6):
+            values = line.rstrip('\r\n').split('\t')
+            if not any(value.strip() for value in values):
+                self._error('Blank WSI data row', line_number)
+                continue
+            if values and values[0].startswith('#'):
+                self._error("WSI data row must not start with '#'", line_number)
+                continue
+            if len(values) != len(self.EXPECTED_HEADERS):
+                self._error('Expected %d WSI columns, found %d', line_number,
+                            cause=(len(self.EXPECTED_HEADERS), len(values)))
+                continue
+            rows += 1
+            row = dict(zip(self.EXPECTED_HEADERS, (value.strip() for value in values)))
+
+            for name in self.REQUIRED_VALUES:
+                if not row[name]:
+                    self._error('Required WSI value is blank', line_number,
+                                self.EXPECTED_HEADERS.index(name), name)
+            for name in ('IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES'):
+                if row[name] not in ('TRUE', 'FALSE'):
+                    self._error('WSI boolean must be TRUE or FALSE', line_number,
+                                self.EXPECTED_HEADERS.index(name), row[name])
+            for name in ('FILE_SIZE_BYTES', 'THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT'):
+                if row[name]:
+                    try:
+                        value = int(row[name])
+                        if name == 'FILE_SIZE_BYTES' and value < 0:
+                            raise ValueError
+                        if name in ('THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT') and not (0 <= value <= 4294967295):
+                            raise ValueError
+                    except ValueError:
+                        self._error('WSI numeric value is invalid', line_number,
+                                    self.EXPECTED_HEADERS.index(name), row[name])
+
+            timeline_start = row['TIMELINE_START_DAYS']
+            if timeline_start:
+                try:
+                    int(timeline_start)
+                except ValueError:
+                    self._error('WSI timeline offset is invalid', line_number,
+                                self.EXPECTED_HEADERS.index('TIMELINE_START_DAYS'), timeline_start)
+            timeline_status = row['TIMELINE_DATE_STATUS']
+            timeline_kind = row['TIMELINE_DATE_KIND']
+            timeline_reason = row['TIMELINE_DATE_REASON']
+            if timeline_status not in (
+                    'AVAILABLE', 'MISSING_PROCEDURE_DATE',
+                    'MISSING_REFERENCE_SEQUENCING_DATE'):
+                self._error('WSI timeline status is invalid', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_STATUS'), timeline_status)
+            if timeline_kind not in ('RECORDED', 'ESTIMATED', 'UNDATED'):
+                self._error('WSI timeline date kind is invalid', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_KIND'), timeline_kind)
+            if not row['TIMELINE_DATE_SOURCE']:
+                self._error('WSI timeline date source is required', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_SOURCE'))
+            if row['TIMELINE_COORDINATE_SYSTEM'] != 'patient_first_tumor_sequencing_day_zero':
+                self._error('WSI timeline coordinate system is unsupported', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_COORDINATE_SYSTEM'),
+                            row['TIMELINE_COORDINATE_SYSTEM'])
+            if timeline_status == 'AVAILABLE' and (
+                    not timeline_start or timeline_kind == 'UNDATED' or timeline_reason):
+                self._error('WSI AVAILABLE timing is inconsistent', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_STATUS'))
+            if timeline_status != 'AVAILABLE' and timeline_start:
+                self._error('WSI non-AVAILABLE timing cannot have an offset', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_START_DAYS'))
+            if timeline_status == 'MISSING_PROCEDURE_DATE' and timeline_kind != 'UNDATED':
+                self._error('WSI missing procedure dates must be UNDATED', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_KIND'))
+            if timeline_status == 'MISSING_REFERENCE_SEQUENCING_DATE' and timeline_kind == 'UNDATED':
+                self._error('WSI missing reference dates cannot be UNDATED', line_number,
+                            self.EXPECTED_HEADERS.index('TIMELINE_DATE_KIND'))
+
+            image_id = row['IMAGE_ID']
+            if image_id in seen_images:
+                self._error('IMAGE_ID must be unique within a study', line_number,
+                            self.EXPECTED_HEADERS.index('IMAGE_ID'), image_id)
+            seen_images.add(image_id)
+
+            if '?' in row['PART_KEY'] or '?' in row['BLOCK_KEY']:
+                self._error('WSI part and block keys must not contain ?', line_number,
+                            self.EXPECTED_HEADERS.index('PART_KEY'))
+            part_key = (row['PATIENT_ID'], row['PART_KEY'])
+            part_value = tuple(row[name] for name in (
+                'PART_NUMBER', 'PART_DESIGNATOR', 'PART_TYPE',
+                'PART_DESCRIPTION', 'SUBSPECIALTY', 'PATH_DX_TITLE'))
+            if part_key in part_values and part_values[part_key] != part_value:
+                self._error('WSI part metadata conflicts for the same patient and part', line_number,
+                            self.EXPECTED_HEADERS.index('PART_KEY'), row['PART_KEY'])
+            part_values[part_key] = part_value
+            block_key = (row['PATIENT_ID'], row['PART_KEY'], row['BLOCK_KEY'])
+            block_value = (row['BLOCK_NUMBER'], row['BLOCK_LABEL'])
+            if block_key in block_values and block_values[block_key] != block_value:
+                self._error('WSI block metadata conflicts for the same patient and block', line_number,
+                            self.EXPECTED_HEADERS.index('BLOCK_KEY'), row['BLOCK_KEY'])
+            block_values[block_key] = block_value
+
+            match_level = row['MATCH_LEVEL']
+            if match_level not in ('BLOCK', 'PART', 'UNMATCHED'):
+                self._error('WSI MATCH_LEVEL must be BLOCK, PART, or UNMATCHED', line_number,
+                            self.EXPECTED_HEADERS.index('MATCH_LEVEL'), match_level)
+            if match_level == 'UNMATCHED' and row['SAMPLE_ID']:
+                self._error('UNMATCHED WSI rows must have a blank SAMPLE_ID', line_number,
+                            self.EXPECTED_HEADERS.index('SAMPLE_ID'))
+            if match_level in ('BLOCK', 'PART') and not row['SAMPLE_ID']:
+                self._error('Matched WSI rows require SAMPLE_ID', line_number,
+                            self.EXPECTED_HEADERS.index('SAMPLE_ID'))
+
+            if DEFINED_SAMPLE_IDS is not None and row['SAMPLE_ID'] and row['SAMPLE_ID'] not in DEFINED_SAMPLE_IDS:
+                self._error('Sample ID not defined in clinical file', line_number,
+                            self.EXPECTED_HEADERS.index('SAMPLE_ID'), row['SAMPLE_ID'])
+            if PATIENTS_WITH_SAMPLES is not None and row['PATIENT_ID'] not in PATIENTS_WITH_SAMPLES:
+                self._error('Patient ID not defined in clinical file', line_number,
+                            self.EXPECTED_HEADERS.index('PATIENT_ID'), row['PATIENT_ID'])
+            if SAMPLE_TO_PATIENT is not None:
+                for name in ('SAMPLE_ID', 'REFERENCE_SAMPLE_ID'):
+                    value = row[name]
+                    if value and value.upper() != 'UNMATCHED' and SAMPLE_TO_PATIENT.get(value) != row['PATIENT_ID']:
+                        self._error('%s belongs to a different patient' % name, line_number,
+                                    self.EXPECTED_HEADERS.index(name), value)
+
+            for name in ('SOURCE_URL', 'THUMBNAIL_URL'):
+                if row[name] and not self._is_absolute_url(row[name]):
+                    self._error('WSI URL must be absolute', line_number,
+                                self.EXPECTED_HEADERS.index(name), row[name])
+                elif row[name] and not self._is_safe_artifact_url(
+                        row[name], 'source' if name == 'SOURCE_URL' else 'thumbnail'):
+                    self._error('WSI URL is unsafe or outside the configured allowlist',
+                                line_number, self.EXPECTED_HEADERS.index(name), row[name])
+            if row['THUMBNAIL_CONTENT_TYPE'] and not self._is_image_content_type(
+                    row['THUMBNAIL_CONTENT_TYPE']):
+                self._error('WSI thumbnail content type must be an image media type',
+                            line_number,
+                            self.EXPECTED_HEADERS.index('THUMBNAIL_CONTENT_TYPE'),
+                            row['THUMBNAIL_CONTENT_TYPE'])
+            metadata_valid = False
+            if row['TILE_METADATA_JSON']:
+                try:
+                    metadata = json.loads(row['TILE_METADATA_JSON'])
+                    if not isinstance(metadata, dict):
+                        raise ValueError
+                    metadata_valid = self._is_valid_tile_metadata(metadata)
+                except (ValueError, json.JSONDecodeError):
+                    self._error('TILE_METADATA_JSON must be a JSON object', line_number,
+                                self.EXPECTED_HEADERS.index('TILE_METADATA_JSON'))
+
+            if row['CAN_SERVE_TILES'] == 'TRUE':
+                for name in ('SOURCE_URL', 'TILE_METADATA_JSON', 'THUMBNAIL_URL',
+                             'THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT',
+                             'THUMBNAIL_CONTENT_TYPE'):
+                    if not row[name]:
+                        self._error('Servable WSI rows require complete pixel artifacts', line_number,
+                                    self.EXPECTED_HEADERS.index(name), name)
+                if not metadata_valid:
+                    self._error('Servable WSI rows require valid tile metadata', line_number,
+                                self.EXPECTED_HEADERS.index('TILE_METADATA_JSON'))
+                for name in ('THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT'):
+                    if row[name]:
+                        try:
+                            if not (1 <= int(row[name]) <= 8192):
+                                raise ValueError
+                        except ValueError:
+                            self._error('Servable WSI thumbnail dimensions must be between 1 and 8192', line_number,
+                                        self.EXPECTED_HEADERS.index(name), row[name])
+
+        if rows == 0:
+            self.logger.error('WSI data file contains no slide rows')
+        self.fileCouldBeParsed = True
+        self.logger.info('Validation of WSI file complete')
+
 class GsvaWiseFileValidator(MultipleDataFileValidator, metaclass=ABCMeta):
     """Groups multiple gene set data files from a study to ensure consistency.
 
@@ -5401,6 +5776,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global DEFINED_SAMPLE_IDS
     global DEFINED_SAMPLE_ATTRIBUTES
     global PATIENTS_WITH_SAMPLES
+    global SAMPLE_TO_PATIENT
     global RESOURCE_DEFINITION_DICTIONARY
     global RESOURCE_PATIENTS_WITH_SAMPLES
 
@@ -5492,6 +5868,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     DEFINED_SAMPLE_IDS = defined_sample_ids
     DEFINED_SAMPLE_ATTRIBUTES = sample_validator.defined_attributes
     PATIENTS_WITH_SAMPLES = sample_validator.patient_ids
+    SAMPLE_TO_PATIENT = sample_validator.sample_to_patient
 
     if len(validators_by_meta_type.get(
                cbioportal_common.MetaFileTypes.PATIENT_ATTRIBUTES,

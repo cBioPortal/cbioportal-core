@@ -7,7 +7,7 @@ version 3, or (at your option) any later version.
 """
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import sys
 import logging.handlers
 import textwrap
@@ -3234,6 +3234,176 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
                                        self.logger, False, False)
         record_list = self.get_log_records()
         self.assertEqual('Validation complete', record_list[-1].getMessage())
+
+
+class WsiValidatorTestCase(PostClinicalDataFileTestCase):
+
+    def test_valid_unmatched_slide(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_wsi_valid.txt', validateData.WsiValidator)
+        self.assertEqual([], [record for record in record_list if record.levelno >= logging.ERROR])
+
+    def test_malformed_tile_metadata_is_rejected(self):
+        valid_data = Path('test_data/data_wsi_valid.txt').read_text()
+        malformed_data = valid_data.replace(
+            '"dimensions":{"width":256,"height":256}',
+            '"dimensions":{"width":"bad","height":256}',
+        )
+        with temp_inputfolder({'data_wsi_invalid.txt': malformed_data}) as study_dir:
+            validator = validateData.WsiValidator(
+                study_dir,
+                {'data_filename': 'data_wsi_invalid.txt'},
+                PORTAL_INSTANCE,
+                self.logger,
+                False,
+                False,
+            )
+            validator.validate()
+
+        errors = [
+            record
+            for record in self.get_log_records()
+            if record.levelno >= logging.ERROR
+        ]
+        self.assertTrue(
+            any('valid tile metadata' in record.getMessage() for record in errors),
+            errors,
+        )
+
+    def test_tile_metadata_requires_browser_contract(self):
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({
+            'dimensions': {'width': 256, 'height': 256},
+            'levels': 1,
+            'level_dimensions': [],
+            'max_zoom': 0,
+            'tile_size': 256,
+        }))
+        self.assertTrue(validateData.WsiValidator._is_valid_tile_metadata({
+            'dimensions': {'width': 256, 'height': 256},
+            'levels': 1,
+            'level_dimensions': [{'width': 256, 'height': 256}],
+            'max_zoom': 0,
+            'tile_size': 256,
+            'producer_specific': {'profile': 'custom'},
+        }))
+        current = {
+            'dimensions': {'width': 100, 'height': 100},
+            'levels': 1,
+            'level_dimensions': [{'width': 100, 'height': 100}],
+            'max_zoom': 0,
+            'tile_size': 256,
+            'safe_min_level': 0,
+            'level_downsamples': [1.0],
+            'tile_metadata_schema_version': 2,
+            'decode_policy_version': 'geometry-v2;tile-max=16777216;thumbnail-max=16777216',
+            'max_decode_pixels': 16777216,
+            'thumbnail_max_decode_pixels': 16777216,
+        }
+        self.assertTrue(validateData.WsiValidator._is_valid_tile_metadata(current))
+        self.assertFalse(
+            validateData.WsiValidator._is_valid_tile_metadata(
+                {**current, 'level_downsamples': [float('inf')]}
+            )
+        )
+        self.assertFalse(
+            validateData.WsiValidator._is_valid_tile_metadata(
+                {**current, 'level_downsamples': [float('nan')]}
+            )
+        )
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'tile_metadata_schema_version': 99}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'safe_min_level': 1}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'decode_policy_version': 'old'}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'tile_metadata_schema_version': None}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'max_decode_pixels': '16777216'}))
+        self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({**current, 'max_decode_pixels': 16777216.0}))
+
+    def test_generic_artifact_uris_and_image_types_are_accepted(self):
+        with patch.dict(validateData.os.environ, {
+            'WSI_ALLOWED_SOURCE_PREFIXES': '',
+            'WSI_ALLOWED_THUMBNAIL_PREFIXES': '',
+        }):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                'https://slides.example/scan.custom', 'source'))
+        self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+            'gs://thumbnails.example/thumbnail.webp', 'thumbnail'))
+        for uri in (
+            'https://slides.example/100%25.jpg',
+            'https://slides.example/%25ZZ.jpg',
+            'https://slides.example/%2525.jpg',
+            'https://slides.example/a+b.jpg',
+            'https://slides.example/caf%C3%A9.jpg',
+        ):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(uri, 'source'), uri)
+        self.assertTrue(validateData.WsiValidator._is_image_content_type('image/webp'))
+        self.assertTrue(validateData.WsiValidator._is_image_content_type('image/avif'))
+        self.assertTrue(validateData.WsiValidator._is_image_content_type('image/svg+xml'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('text/plain'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('image/foo=bar'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('image/jpeg; charset=utf-8'))
+        self.assertFalse(validateData.WsiValidator._is_image_content_type('image/jpëg'))
+
+    def test_artifact_uri_safety_remains_enforced(self):
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://user:password@example/slide.svs', 'source'))
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://example/slide.svs?token=secret', 'source'))
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://example/../slide.svs', 'source'))
+        self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+            'https://example/slides/%252e%252e/slide.svs', 'source'))
+        for uri in (
+            'https://example/100%.jpg',
+            'https://example/short%2.jpg',
+            'https://example/bad%ZZ.jpg',
+            'https://example/slides/%2e%2e/slide.svs',
+            'https://example/slides/%2E%2e/slide.svs',
+            'https://example/slides/%2e%2e%2fsecret.svs',
+            'https://example/slides/%252e%252e%252fsecret.svs',
+        ):
+            self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(uri, 'source'), uri)
+        with patch.dict(validateData.os.environ, {
+            'WSI_ALLOWED_SOURCE_PREFIXES': 'https://approved.example/slides/',
+        }):
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                'https://approved.example/slides/scan.custom',
+                'source',
+            ))
+            self.assertTrue(validateData.WsiValidator._is_safe_artifact_url(
+                'https://approved.example/slides/100%25.jpg',
+                'source',
+            ))
+            self.assertFalse(validateData.WsiValidator._is_safe_artifact_url(
+                'https://other.example/slides/scan.custom',
+                'source',
+            ))
+
+    def test_generic_wsi_values_are_not_deid_scanned(self):
+        content = Path('test_data/data_wsi_valid.txt').read_text()
+        content = content.replace('PART-1', 'PART-2021-03-14')
+        content = content.replace('BLOCK-1', 'BLOCK-MRN:123456')
+        content = content.replace('file:///fixture.svs', 'https://slides.example/scan.custom')
+        content = content.replace('file:///fixture.jpg', 'gs://thumbnails.example/thumbnail.webp')
+        content = content.replace('"tile_size":256}',
+                                  '"tile_size":256,"vendor":"March 14, 2021 MRN: 123456"}')
+        content = content.replace('image/jpeg', 'image/webp')
+        with TemporaryDirectory() as study_dir:
+            Path(study_dir, 'data_wsi.txt').write_text(content)
+            with patch.dict(validateData.os.environ, {
+                'WSI_ALLOWED_SOURCE_PREFIXES': '',
+                'WSI_ALLOWED_THUMBNAIL_PREFIXES': '',
+            }):
+                validator = validateData.WsiValidator(
+                    study_dir,
+                    {'data_filename': 'data_wsi.txt'},
+                    PORTAL_INSTANCE,
+                    self.logger,
+                    False,
+                    False,
+                )
+                validator.validate()
+        self.assertEqual([], [record for record in self.get_log_records()
+                              if record.levelno >= logging.ERROR])
 
 
 if __name__ == '__main__':

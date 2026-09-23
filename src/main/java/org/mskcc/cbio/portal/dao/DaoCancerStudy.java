@@ -42,6 +42,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -547,6 +548,17 @@ public final class DaoCancerStudy {
 
             ClickHouseBulkDeleter.flushAll();
 
+            // ClickHouse 24.7+ rejects lightweight deletes against tables with
+            // projections unless the query explicitly opts into projection
+            // maintenance. Keep WSI lifecycle deletes portable across server
+            // profiles rather than relying on a deployment-wide user setting.
+            deleteByStudyId("DELETE FROM wsi_patient WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId("DELETE FROM wsi_part WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId("DELETE FROM wsi_block WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId("DELETE FROM wsi_slide WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId("DELETE FROM wsi_slide_placement WHERE cancer_study_id=?", internalCancerStudyId);
+            deleteByStudyId("DELETE FROM wsi_slide_timing WHERE cancer_study_id=?", internalCancerStudyId);
+
             deleteByStudyId("DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM resource_study WHERE internal_id=?", internalCancerStudyId);
@@ -620,6 +632,18 @@ public final class DaoCancerStudy {
         Connection con = null;
         try {
             con = JdbcUtil.getDbConnection(DaoCancerStudy.class);
+            if (sql.startsWith("DELETE FROM wsi_")) {
+                // The ClickHouse HTTP JDBC driver does not preserve SET
+                // statements between requests. Use a literal, integer-only
+                // WSI query so the projection setting travels with DELETE.
+                String wsiSql = sql.replaceFirst("^DELETE FROM ([^ ]+) ", "ALTER TABLE $1 DELETE ")
+                    .replace("?", Integer.toString(cancerStudyId))
+                    + " SETTINGS lightweight_mutation_projection_mode='drop'";
+                try (Statement stmt = con.createStatement()) {
+                    stmt.executeUpdate(wsiSql);
+                }
+                return;
+            }
             try (PreparedStatement pstmt = con.prepareStatement(sql)) {
                 pstmt.setInt(1, cancerStudyId);
                 pstmt.executeUpdate();
