@@ -31,7 +31,7 @@ class DataImporterTests(unittest.TestCase):
         study_directory = 'test_data/study_es_0'
         args = ['--study_directory', study_directory]
         parsed_args = cbioportalImporter.interface(args)
-        cbioportalImporter.main(parsed_args)
+        study_id = cbioportalImporter.main(parsed_args)
 
         remove_study_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.RemoveCancerStudy',
             'study_es_0', '--noprogress')
@@ -39,8 +39,6 @@ class DataImporterTests(unittest.TestCase):
             f'{study_directory}/meta_study.txt', '--noprogress')
         clinical_sample_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportClinicalData',
             '--meta', f'{study_directory}/meta_clinical_samples.txt', '--loadMode', 'bulkload', '--data', f'{study_directory}/data_clinical_samples.txt', '--noprogress')
-        make_study_available_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCancerStudy',
-            'study_es_0', 'AVAILABLE', '--noprogress')
         mol_profile_calls = [
                     call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--meta', f'{study_directory}/meta_cna_log2.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{study_directory}/data_cna_log2.txt', '--noprogress'),
                     call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--meta', f'{study_directory}/meta_expression_median.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{study_directory}/data_expression_median.txt', '--noprogress'),
@@ -80,14 +78,15 @@ class DataImporterTests(unittest.TestCase):
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_sequenced.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportSampleList', f'{study_directory}/case_lists/cases_test.txt', '--noprogress'),
             call(*common_part, 'org.mskcc.cbio.portal.scripts.AddCaseList', 'study_es_0', 'all', '--noprogress'),
-            make_study_available_call,
         ])
 
         self.assertTrue(run_java.call_args_list.index(remove_study_call) < run_java.call_args_list.index(create_study_call))
         self.assertTrue(run_java.call_args_list.index(create_study_call) < run_java.call_args_list.index(clinical_sample_call))
         self.assertTrue(all(run_java.call_args_list.index(clinical_sample_call) <  run_java.call_args_list.index(mol_profile_call)
             for mol_profile_call in mol_profile_calls))
-        self.assertEqual(run_java.call_args_list[-1], make_study_available_call)
+        # The study is left UNAVAILABLE until the derived tables are rebuilt
+        self.assertNotIn('AVAILABLE', [c.args[-2] for c in run_java.call_args_list])
+        self.assertEqual(study_id, 'study_es_0')
 
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
@@ -101,7 +100,7 @@ class DataImporterTests(unittest.TestCase):
         data_directory = 'test_data/study_es_0_inc'
         args = ['--data_directory', data_directory]
         parsed_args = cbioportalImporter.interface(args)
-        cbioportalImporter.main(parsed_args)
+        study_id = cbioportalImporter.main(parsed_args)
 
         clinical_patient_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportClinicalData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_clinical_patients.txt', '--loadMode', 'bulkload', '--data', f'{data_directory}/data_clinical_patients.txt', '--noprogress')
@@ -130,8 +129,12 @@ class DataImporterTests(unittest.TestCase):
         seg_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData', '--overwrite-existing',
             '--meta', f'{data_directory}/meta_cna_hg19_seg.txt', '--loadMode', 'bulkload', '--data', f'{data_directory}/data_cna_hg19.seg', '--noprogress')
 
+        make_study_unavailable_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCancerStudy',
+            'study_es_0', 'UNAVAILABLE', '--noprogress')
+
         self.assertCountEqual(run_java.call_args_list, [
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
+            make_study_unavailable_call,
             clinical_patient_call,
             clinical_sample_call,
             mutation_call,
@@ -149,6 +152,8 @@ class DataImporterTests(unittest.TestCase):
 
         self.assertTrue(run_java.call_args_list.index(clinical_sample_call) < run_java.call_args_list.index(mutation_call))
         self.assertTrue(run_java.call_args_list.index(clinical_sample_call) < run_java.call_args_list.index(case_list_call))
+        self.assertEqual(run_java.call_args_list[1], make_study_unavailable_call)
+        self.assertEqual(study_id, 'study_es_0')
 
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
@@ -165,10 +170,29 @@ class DataImporterTests(unittest.TestCase):
         cna_discrete_long_call = call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportProfileData', '--overwrite-existing',
                 '--meta', f'{data_directory}/meta_cna_discrete_long.txt', '--loadMode', 'bulkload', '--update-info', 'False', '--data', f'{data_directory}/data_cna_discrete_long.txt', '--noprogress')
 
-        self.assertCountEqual(run_java.call_args_list, [
+        self.assertEqual(run_java.call_args_list, [
             call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
+            call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCancerStudy', 'study_es_0', 'UNAVAILABLE', '--noprogress'),
             cna_discrete_long_call,
             ])
+
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_enable_study(self, run_java, locate_jar):
+        '''
+        Tests java commands enabling studies produces
+        '''
+        locate_jar.return_value = "test.jar"
+
+        args = ['enable-study', '--study_ids', 'STUDY1,STUDY2']
+        parsed_args = cbioportalImporter.interface(args)
+        cbioportalImporter.main(parsed_args)
+
+        self.assertEqual(run_java.call_args_list, [
+            call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
+            call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCancerStudy', 'STUDY1', 'AVAILABLE', '--noprogress'),
+            call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCancerStudy', 'STUDY2', 'AVAILABLE', '--noprogress'),
+        ])
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
     @mock.patch('importer.cbioportalImporter.run_java')
