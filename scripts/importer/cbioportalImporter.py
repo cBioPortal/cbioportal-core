@@ -44,7 +44,6 @@ from .cbioportal_common import VERSION_UTIL_CLASS
 from .cbioportal_common import run_java
 from .cbioportal_common import UPDATE_CASE_LIST_CLASS
 from .cbioportal_common import INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
-from .cbioportal_common import JavaRunException
 
 # ------------------------------------------------------------------------------
 # globals
@@ -119,7 +118,7 @@ def remove_samples(jvm_args, study_ids, sample_ids):
         run_java(*args)
     except JavaRunException as jre:
         LOGGER.error('an error occurred during the java process which removes samples from the database.')
-        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
         LOGGER.error('  the message sent along with this error was %s' % (jre.message))
         LOGGER.error('  %s' % ('-' * 70))
         LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
@@ -528,7 +527,7 @@ def import_incremental_data(jvm_args, data_directory, update_generic_assay_entit
             except JavaRunException as jre:
                 if meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
                     LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
-                    LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
+                    LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
                     LOGGER.error('  the message sent along with this error was %s' % (jre.message))
                     LOGGER.error('  %s' % ('-' * 70))
                     LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
