@@ -129,6 +129,15 @@ def _print_need_to_update_derived_tables_warning():
         file=sys.stderr,
     )
 
+def _print_need_to_enable_study_message(study_id):
+    print(
+        Color.BOLD +
+        'The study stays UNAVAILABLE until the derived tables are rebuilt. Then run:\n'
+        '    cbioportalImporter.py enable-study -id ' + study_id + '\n' +
+        Color.END,
+        file=sys.stderr,
+    )
+
 if __name__ == '__main__':
     derive_tables_only = len(sys.argv) > 1 and sys.argv[1] == 'derive-tables'
     if derive_tables_only:
@@ -228,7 +237,7 @@ if __name__ == '__main__':
             if args.override_warning and not args.skip_db_import:
                 print(Color.BOLD + "Overriding Warnings. Importing study now" + Color.END, file=sys.stderr)
                 print("#" * 71 + "\n", file=sys.stderr)
-                cbioportalImporter.main(args)
+                study_id = cbioportalImporter.main(args)
                 exitcode = 0
                 # Rebuild derived tables after database-mutating operation
                 if not getattr(args, 'no_derive_tables', False):
@@ -243,15 +252,19 @@ if __name__ == '__main__':
                               "The database may be in an inconsistent state." +
                               Color.END, file=sys.stderr)
                         exitcode = 1
+                        _print_need_to_enable_study_message(study_id)
+                    else:
+                        cbioportalImporter.enable_study(args, study_id)
                 else:
                     _print_need_to_update_derived_tables_warning()
+                    _print_need_to_enable_study_message(study_id)
             else:
                 print(Color.BOLD + "Warnings. Please fix your files or import with override warning option" + Color.END, file=sys.stderr)
                 print("#" * 71, file=sys.stderr)
         elif exitcode == 0 and not args.skip_db_import:
             print(Color.BOLD + "Everything looks good. Importing study now" + Color.END, file=sys.stderr)
             print("#" * 71 + "\n", file=sys.stderr)
-            cbioportalImporter.main(args)
+            study_id = cbioportalImporter.main(args)
             # Rebuild derived tables after database-mutating operation
             if not getattr(args, 'no_derive_tables', False):
                 print("\n")
@@ -265,8 +278,12 @@ if __name__ == '__main__':
                           "The database may be in an inconsistent state." +
                           Color.END, file=sys.stderr)
                     exitcode = 1
+                    _print_need_to_enable_study_message(study_id)
+                else:
+                    cbioportalImporter.enable_study(args, study_id)
             else:
                 _print_need_to_update_derived_tables_warning()
+                _print_need_to_enable_study_message(study_id)
     except KeyboardInterrupt:
         print(Color.BOLD + "\nProcess interrupted. You will have to run this again to make sure study is completely loaded." + Color.END, file=sys.stderr)
         print("#" * 71, file=sys.stderr)

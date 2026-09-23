@@ -80,11 +80,11 @@ def import_study(jvm_args, meta_filename):
     args.append("--noprogress") # don't report memory usage and % progress
     run_java(*args)
 
-def update_study_status(jvm_args, study_id):
+def update_study_status(jvm_args, study_id, status="AVAILABLE"):
     args = jvm_args.split(' ')
     args.append(UPDATE_STUDY_STATUS_CLASS)
     args.append(study_id)
-    args.append("AVAILABLE")
+    args.append(status)
     args.append("--noprogress") # don't report memory usage and % progress
     run_java(*args)
 
@@ -270,8 +270,6 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
     elif command == IMPORT_CASE_LIST:
         import_case_list(jvm_args, meta_filename)
     elif command == ENABLE_STUDY:
-        if study_ids is None:
-            raise RuntimeError('enable-study requires -id/--study_ids')
         for study_id in study_ids.split(","):
             update_study_status(jvm_args, study_id)
 
@@ -284,16 +282,13 @@ def get_meta_filenames(data_directory):
         not (meta_filename.startswith('.') or meta_filename.endswith('~'))]
     return meta_filenames
 
-def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None, enable_study = True):
+def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None):
     """
     Import an entire study directory based on meta files found.
 
     1. Determine meta files in study directory.
     2. Read all meta files and determine file types.
     3. Import data files in specific order by file type.
-
-    enable_study=False skips the final AVAILABLE status flip -- the study stays UNAVAILABLE
-    until a separate `enable-study` call is made (see ENABLE_STUDY command).
     """
 
     study_id = None
@@ -475,9 +470,8 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     if study_meta_dictionary[study_meta_filename].get('add_global_case_list', 'false').lower() == 'true':
         add_global_case_list(jvm_args, study_id)
 
-    # enable study
-    if enable_study:
-        update_study_status(jvm_args, study_id)
+    # the study stays UNAVAILABLE until the derived tables are rebuilt
+    return study_id
 
 def get_meta_filenames_by_type(data_directory) -> Dict[str, Tuple[str, Dict]]:
     """
@@ -556,8 +550,16 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
     if not_supported_meta_types:
         raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
+    # the study is not removed first, so hide it here until the derived tables are rebuilt
+    study_id = next(iter(meta_file_type_to_meta_files.values()))[0][1]['cancer_study_identifier']
+    update_study_status(jvm_args, study_id, "UNAVAILABLE")
     import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files)
     update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files)
+    return study_id
+
+def enable_study(args, study_id):
+    # main() has already put the jar path into args.java_opts
+    update_study_status("-Dspring.profiles.active=dbcp " + args.java_opts, study_id)
 
 def usage():
     # TODO : replace this by usage string from interface()
@@ -599,9 +601,6 @@ def add_parser_args(parser):
                         help='Path to meta file')
     parser.add_argument('-data', '--data_filename', type=str, required=False,
                         help='Path to Data file')
-    parser.add_argument('--skip-enable-study', dest='skip_enable_study', action='store_true',
-                        help='With -s: skip marking the study AVAILABLE at the end of import. '
-                             'Call the enable-study command separately once ready.')
 
 def interface(args=None):
     parent_parser = argparse.ArgumentParser(description='cBioPortal meta Importer')
@@ -714,11 +713,10 @@ def main(args):
 
     if args.data_directory is not None:
         check_dir(args.data_directory)
-        process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity)
+        return process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity)
     elif args.study_directory is not None:
         check_dir(args.study_directory)
-        process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity,
-                                 enable_study=not getattr(args, 'skip_enable_study', False))
+        return process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity)
     else:
         check_args(args.command)
         check_files(args.meta_filename, args.data_filename)
