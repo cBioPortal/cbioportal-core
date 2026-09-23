@@ -34,6 +34,8 @@ package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.CopyNumberSegment;
 
@@ -43,8 +45,11 @@ import org.mskcc.cbio.portal.model.CopyNumberSegment;
  */
 public final class DaoCopyNumberSegment {
 
+    private static final Logger LOG = LoggerFactory.getLogger(DaoCopyNumberSegment.class);
     private static final double FRACTION_GENOME_ALTERED_CUTOFF = 0.2;
     private static final String FRACTION_GENOME_ALTERED_ATTR_ID = "FRACTION_GENOME_ALTERED";
+    private static final int FGA_VISIBILITY_MAX_ATTEMPTS = 10;
+    private static final long FGA_VISIBILITY_RETRY_MILLIS = 500;
 
     private DaoCopyNumberSegment() {}
     
@@ -102,7 +107,7 @@ public final class DaoCopyNumberSegment {
                     "GROUP BY cancer_study.`cancer_study_id`, c1.`sample_id` " +
                     "HAVING SUM(c1.`end` - c1.`start`) > 0";
 
-            Map<Integer, String> fractionGenomeAltereds = ClickHouseBulkUploader.upload(sampleIds, stagingTable -> {
+            Map<Integer, String> fractionGenomeAltereds = ClickHouseBulkUploader.upload(sampleIds, stagingTable -> retryIncompleteFga(sampleIds, () -> {
                 String inClause = stagingTable == null ? "" : "AND c1.`sample_id` IN (SELECT id FROM " + stagingTable + ") ";
                 Map<Integer, String> result = new HashMap<>();
                 try (PreparedStatement stmt = queryCon.prepareStatement(selectSql + inClause + groupSql)) {
@@ -115,7 +120,7 @@ public final class DaoCopyNumberSegment {
                     }
                 }
                 return result;
-            });
+            }, FGA_VISIBILITY_MAX_ATTEMPTS, FGA_VISIBILITY_RETRY_MILLIS));
 
             ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(FRACTION_GENOME_ALTERED_ATTR_ID, cancerStudyId);
             if (clinicalAttribute == null) {
@@ -138,6 +143,42 @@ public final class DaoCopyNumberSegment {
         } finally {
             JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, null, null);
         }
+    }
+
+    @FunctionalInterface
+    interface FgaQuery {
+        Map<Integer, String> execute() throws SQLException;
+    }
+
+    /**
+     * A staging-ID insert can succeed on one ClickHouse Cloud replica before a
+     * subsequent SELECT on another replica sees its rows. Never accept a partial
+     * FGA calculation as a successful import.
+     */
+    static Map<Integer, String> retryIncompleteFga(Set<Integer> expectedSampleIds, FgaQuery query,
+            int maxAttempts, long retryMillis) throws SQLException, DaoException {
+        if (maxAttempts < 1 || retryMillis < 0) {
+            throw new IllegalArgumentException("Invalid FGA visibility retry configuration");
+        }
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            Map<Integer, String> values = query.execute();
+            // The null case retains the public API's all-samples behavior.
+            if (expectedSampleIds == null || values.keySet().equals(expectedSampleIds)) {
+                return values;
+            }
+            LOG.warn("FGA query returned {} of {} expected samples (attempt {}/{})",
+                    values.size(), expectedSampleIds.size(), attempt, maxAttempts);
+            if (attempt < maxAttempts) {
+                try {
+                    Thread.sleep(retryMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new DaoException("Interrupted while waiting for FGA data visibility");
+                }
+            }
+        }
+        throw new DaoException("FGA calculation did not return all " + expectedSampleIds.size()
+                + " expected samples after " + maxAttempts + " attempts");
     }
     
     public static long getLargestId() throws DaoException {
