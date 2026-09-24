@@ -36,6 +36,7 @@
 		<spring_starter_test.version>3.5.0</spring_starter_test.version>
 		<junit.version>4.13.2</junit.version>
 		<jakarta_ws_rs.version>3.1.0</jakarta_ws_rs.version>
+		<mockito.version>5.23.0</mockito.version>
 		<easymock.version>4.3</easymock.version>
 		<junitparams.version>1.1.0</junitparams.version>
 		<byte_buddy.version>1.18.3</byte_buddy.version>
@@ -163,6 +164,18 @@
 			<groupId>jakarta.ws.rs</groupId>
 			<artifactId>jakarta.ws.rs-api</artifactId>
 			<version>${jakarta_ws_rs.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.easymock</groupId>
+			<artifactId>easymock</artifactId>
+			<version>${easymock.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2015 Memorial Sloan-Kettering Cancer Center.
+ * Copyright (c) 2015, 2026 Memorial Sloan Kettering Cancer Center.
  *
  * This library is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS
  * FOR A PARTICULAR PURPOSE. The software and documentation provided hereunder
- * is on an "as is" basis, and Memorial Sloan-Kettering Cancer Center has no
+ * is on an "as is" basis, and Memorial Sloan Kettering Cancer Center has no
  * obligations to provide maintenance, support, updates, enhancements or
- * modifications. In no event shall Memorial Sloan-Kettering Cancer Center be
+ * modifications. In no event shall Memorial Sloan Kettering Cancer Center be
  * liable to any party for direct, indirect, special, incidental or
  * consequential damages, including lost profits, arising out of the use of this
- * software and its documentation, even if Memorial Sloan-Kettering Cancer
+ * software and its documentation, even if Memorial Sloan Kettering Cancer
  * Center has been advised of the possibility of such damage.
  */
 
@@ -59,9 +59,9 @@ public class ProgressMonitor {
      * Private ctor for enforcing singleton
      */
     private ProgressMonitor() {
-        
+
     }
-    
+
     /**
      * Sets Console Flag.
      * When set to true Progress Monitor Messages are displayed to System.out.
@@ -71,45 +71,45 @@ public class ProgressMonitor {
     public static void setConsoleMode(boolean consoleFlag) {
         progressMonitor.consoleMode = consoleFlag;
     }
-    
+
     /**
-     * Sets consoleMode to true and tries to infer showProgress mode from args. If an argument 
+     * Sets consoleMode to true and tries to infer showProgress mode from args. If an argument
      * with name "--noprogress" is found, then showProgress is set to false
-     * 
+     *
      * @param args
      */
     public static void setConsoleModeAndParseShowProgress(String[] args) {
-    	//default
-		setConsoleMode(true);
-    	if (Arrays.asList(args).contains("--noprogress")) {
-    		setShowProgress(false);
-    	} else {
-    		//default:
-    		setShowProgress(true);
-    	}
-    		
+        //default
+        setConsoleMode(true);
+        if (Arrays.asList(args).contains("--noprogress")) {
+            setShowProgress(false);
+        } else {
+            //default:
+            setShowProgress(true);
+        }
+
     }
 
     /**
-     * Whether the progress (in % complete and memory used) should be 
-     * printed to the console. 
-     * 
+     * Whether the progress (in % complete and memory used) should be
+     * printed to the console.
+     *
      * @param showProgress : set to false to avoid extra messages about % complete and memory usage.
      */
     public static void setShowProgress(boolean showProgress) {
-    	progressMonitor.showProgress = showProgress;
+        progressMonitor.showProgress = showProgress;
     }
-    
+
     /**
-     * Whether the progress (in % complete and memory used) should be 
-     * printed to the console. 
-     * 
+     * Whether the progress (in % complete and memory used) should be
+     * printed to the console.
+     *
      * @return returns true if progressMonitor.showProgress==true
      */
     public static boolean isShowProgress() {
-    	return progressMonitor.showProgress;
+        return progressMonitor.showProgress;
     }
-    
+
     /**
      * Gets Console Mode Flag.
      *
@@ -195,6 +195,13 @@ public class ProgressMonitor {
     }
 
     /**
+     * Resets the log.
+     */
+    public static void resetLog() {
+        progressMonitor.log.setLength(0);
+    }
+
+    /**
      * Logs a Message.
      *
      * @param currentMessage Current Task Message.
@@ -219,9 +226,9 @@ public class ProgressMonitor {
     public static void logDebug(String debugMessage) {
         logger.debug(debugMessage);
         if (isShowProgress())
-        	progressMonitor.debugMessages.add(debugMessage);
+            progressMonitor.debugMessages.add(debugMessage);
     }
-    
+
     public static ArrayList<String> getWarnings() {
         ArrayList<String> ret = new ArrayList<>();
         for(Iterator<String> sit = progressMonitor.warnings.iterator(); sit.hasNext(); ) {
@@ -230,23 +237,23 @@ public class ProgressMonitor {
         }
         return ret;
     }
-    
+
     /**
      * Reset the warnings list.
      */
     public static void resetWarnings() {
-    	progressMonitor.warnings.clear();
-    	progressMonitor.warningCounts.clear();
+        progressMonitor.warnings.clear();
+        progressMonitor.warningCounts.clear();
     }
-    
+
     public static ArrayList<String> getMessages() {
-    	ArrayList<String> ret = getWarnings();
-    	ret.addAll(progressMonitor.debugMessages);
-    	return ret;
+        ArrayList<String> ret = getWarnings();
+        ret.addAll(progressMonitor.debugMessages);
+        return ret;
     }
-    
+
     public static List<String> getDebugMessages() {
-    	return progressMonitor.debugMessages;
+        return progressMonitor.debugMessages;
 
     }
 }
