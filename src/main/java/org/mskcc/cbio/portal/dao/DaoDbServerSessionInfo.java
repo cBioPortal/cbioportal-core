@@ -49,7 +49,7 @@ public class DaoDbServerSessionInfo {
     /* Singleton pattern : all functionality accessed through a singleton object rather than
      * static class methods. This enables convenient mocking for unit testing.
      */
-    private static final DaoDbServerSessionInfo daoDbServerSessionInfo = new DaoDbServerSessionInfo();
+    private static DaoDbServerSessionInfo daoDbServerSessionInfo;
 
     /**
      * Gets Global Singleton Instance.
@@ -57,6 +57,10 @@ public class DaoDbServerSessionInfo {
      * @return DaoDbServerSessionInfo Singleton object.
      */
     public static DaoDbServerSessionInfo getInstance() {
+        if (daoDbServerSessionInfo == null) {
+            // create singleton
+            daoDbServerSessionInfo = new DaoDbServerSessionInfo();
+        }
         return daoDbServerSessionInfo;
     }
 
