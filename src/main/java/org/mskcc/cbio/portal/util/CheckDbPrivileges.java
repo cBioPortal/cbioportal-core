@@ -99,117 +99,131 @@ public class CheckDbPrivileges {
         }
     };
 
+    private DaoDbServerSessionInfo daoDbServerSessionInfo; // dependency (initialized on constrution to allow mocking)
+
     /**
      * A (not to be modified) set of all Recommended privileges. Because some privileges are version and
      * server_setting specific, these recommnedations are represented as a linked equivalence group across
      * version variations. Satisfaction of any one of the recommended privileges in the group satisfies
      * the entire group.
      */
-    private static Set<RecommendedPrivilege> recommendedPrivilegeSet = new HashSet<>();
+    private Set<RecommendedPrivilege> recommendedPrivilegeSet = new HashSet<>();
 
-    static {
-        // construct list of recommended privileges for import (those independent of clickhouse version)
-        CheckDbPrivileges.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW TABLES ON current_database.*
+    /**
+     * Constructor, which initializes dependency and initializes recommendation list
+     */
+    public CheckDbPrivileges(DaoDbServerSessionInfo daoDbServerSessionInfo) {
+        this.daoDbServerSessionInfo = daoDbServerSessionInfo;
+        this.initializeRecommendedPrivileges();
+    }
+
+    /**
+     * Constructor - prohibit uninitialized construction
+     */
+    private CheckDbPrivileges() {} // do not allow uninitialized construction
+
+    private void initializeRecommendedPrivileges() {
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW TABLES ON current_database.*
                 "SHOW TABLES",
                 new ArrayList<String>(List.of("ALL", "SHOW")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON current_database.*
                 "SHOW COLUMNS",
                 new ArrayList<String>(List.of("ALL", "SHOW")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON current_database.*
                 "SELECT",
                 new ArrayList<String>(List.of("ALL")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // INSERT ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // INSERT ON current_database.*
                 "INSERT",
                 new ArrayList<String>(List.of("ALL")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // ALTER ON current_database.* (for ALTER TABLE, ALTER DELETE, ALTER UPDATE)
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // ALTER ON current_database.* (for ALTER TABLE, ALTER DELETE, ALTER UPDATE)
                 "ALTER",
                 new ArrayList<String>(List.of("ALL")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // CREATE TABLE ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // CREATE TABLE ON current_database.*
                 "CREATE TABLE",
                 new ArrayList<String>(List.of("ALL", "CREATE")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // CREATE VIEW ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // CREATE VIEW ON current_database.*
                 "CREATE VIEW",
                 new ArrayList<String>(List.of("ALL", "CREATE")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // DROP TABLE ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // DROP TABLE ON current_database.*
                 "DROP TABLE",
                 new ArrayList<String>(List.of("ALL", "DROP")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // DROP VIEW ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // DROP VIEW ON current_database.*
                 "DROP VIEW",
                 new ArrayList<String>(List.of("ALL", "DROP")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // TRUNCATE ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // TRUNCATE ON current_database.*
                 "TRUNCATE",
                 new ArrayList<String>(List.of("ALL")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // OPTIMIZE ON current_database.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // OPTIMIZE ON current_database.*
                 "OPTIMIZE",
                 new ArrayList<String>(List.of("ALL")),
                 RecommendedPrivilege.CURRENT_DATABASE_SPECIAL_VALUE, "*"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.tables
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.tables
                 "SHOW COLUMNS",
                 new ArrayList<String>(List.of("ALL", "SHOW")),
                 "system", "tables"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.parts
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.parts
                 "SHOW COLUMNS",
                 new ArrayList<String>(List.of("ALL", "SHOW")),
                 "system", "parts"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.mutations
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.mutations
                 "SHOW COLUMNS",
                 new ArrayList<String>(List.of("ALL", "SHOW")),
                 "system", "mutations"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.one
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW COLUMNS ON system.one
                 "SHOW COLUMNS",
                 new ArrayList<String>(List.of("ALL", "SHOW")),
                 "system", "one"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.tables
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.tables
                 "SELECT",
                 new ArrayList<String>(List.of("ALL")),
                 "system", "tables"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.parts
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.parts
                 "SELECT",
                 new ArrayList<String>(List.of("ALL")),
                 "system", "parts"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.mutations
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.mutations
                 "SELECT",
                 new ArrayList<String>(List.of("ALL")),
                 "system", "mutations"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.one
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SELECT ON system.one
                 "SELECT",
                 new ArrayList<String>(List.of("ALL")),
                 "system", "one"));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // REMOTE ON *.*
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // REMOTE ON *.*
                 "REMOTE",
                 new ArrayList<String>(List.of("SOURCES")),
                 "*", "*",
                 RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE
                 "READ",
                 new ArrayList<String>(),
                 "REMOTE", "",
                 RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
-        recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE (subsubsumed by READ ON SOURCES)
+        this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // READ ON REMOTE (subsubsumed by READ ON SOURCES)
                 "READ",
                 new ArrayList<String>(),
                 "SOURCES", "",
                 RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
     }
 
-    private static List<String> apparentGrantedRoles(List<String> privilegesList) {
+    private List<String> apparentGrantedRoles(List<String> privilegesList) {
         Deque<String> unexpandedRawPrivileges = new LinkedList<String>(privilegesList);
         Set<String> expandedRoles = new HashSet<String>();
         if (privilegesList == null || privilegesList.size() == 0) {
             return new ArrayList<String>();
         }
         Pattern nonRolePrivilegePattern = Pattern.compile("^(.*)\\s\\s*[Oo][Nn]\\s\\s*(\\S\\S*)\\s\\s*[Tt][Oo]\\s.*$");
-        Pattern rolePrivilegePattern = Pattern.compile("^\\*[Gg][Rr][Aa][Nn][Tt]\\s\\s*(.*)\\s\\s*[Tt][Oo]\\s.*$");
+        Pattern rolePrivilegePattern = Pattern.compile("^\\s*[Gg][Rr][Aa][Nn][Tt]\\s\\s*(.*)\\s\\s*[Tt][Oo]\\s.*$");
         while (!unexpandedRawPrivileges.isEmpty()) {
             String privilegeItem = unexpandedRawPrivileges.pop();
             Matcher nonRolePrivilegeMatcher = nonRolePrivilegePattern.matcher(privilegeItem);
@@ -225,7 +239,7 @@ public class CheckDbPrivileges {
                 }
                 try {
                     // expand
-                    List<String> privilegesForRole = DaoDbServerSessionInfo.getPrivilegesForRole(splitRole);
+                    List<String> privilegesForRole = daoDbServerSessionInfo.getPrivilegesForRole(splitRole);
                     unexpandedRawPrivileges.addAll(privilegesForRole);
                 } catch (DaoException e) {
                     // failures to retrieve role grants do not cause halt - we continue to try to verify recommended privileges
@@ -236,16 +250,16 @@ public class CheckDbPrivileges {
         return new ArrayList<String>(expandedRoles);
     }
 
-    private static List<String> expandGrantedRolePrivileges(List<String> privilegesForCurrentUser) {
+    private List<String> expandGrantedRolePrivileges(List<String> privilegesForCurrentUser) {
         List<String> expandedPrivileges = new ArrayList<String>();
         // filter out role grants
         Pattern nonRolePrivilegePattern = Pattern.compile("^(.*)\\s\\s*[Oo][Nn]\\s\\s*(\\S\\S*)\\s\\s*[Tt][Oo]\\s.*$");
-        Pattern rolePrivilegePattern = Pattern.compile("^\\*[Gg][Rr][Aa][Nn][Tt]\\s\\s*(.*)\\s\\s*[Tt][Oo]\\s.*$");
+        Pattern rolePrivilegePattern = Pattern.compile("^\\s*[Gg][Rr][Aa][Nn][Tt]\\s\\s*(.*)\\s\\s*[Tt][Oo]\\s.*$");
         for (String privilege : privilegesForCurrentUser) {
             Matcher nonRolePrivilegeMatcher = nonRolePrivilegePattern.matcher(privilege);
             Matcher rolePrivilegeMatcher = rolePrivilegePattern.matcher(privilege);
-            if (nonRolePrivilegeMatcher.matches() || !rolePrivilegeMatcher.matches()) {
-                continue; // ignore all non-Role grants
+            if (rolePrivilegeMatcher.matches() && !nonRolePrivilegeMatcher.matches() ) {
+                continue; // ignore all role grants
             }
             expandedPrivileges.add(privilege);
         }
@@ -253,7 +267,7 @@ public class CheckDbPrivileges {
         List<String> apparentRoles = apparentGrantedRoles(privilegesForCurrentUser);
         for (String apparentRole : apparentRoles) {
             try {
-                List<String> privilegesForRole = DaoDbServerSessionInfo.getPrivilegesForRole(apparentRole);
+                List<String> privilegesForRole = daoDbServerSessionInfo.getPrivilegesForRole(apparentRole);
                 for (String privilege : privilegesForRole) {
                     Matcher nonRolePrivilegeMatcher = nonRolePrivilegePattern.matcher(privilege);
                     Matcher rolePrivilegeMatcher = rolePrivilegePattern.matcher(privilege);
@@ -269,7 +283,7 @@ public class CheckDbPrivileges {
     }
 
     // Function discards unparsable privileges without raising an exception
-    private static List<String> splitCombinedPrivilegeGrantStrings(List<String> combinedPrivilegesForCurrentUser) {
+    private List<String> splitCombinedPrivilegeGrantStrings(List<String> combinedPrivilegesForCurrentUser) {
         List<String> splitPrivileges = new ArrayList<String>();
         if (combinedPrivilegesForCurrentUser == null || combinedPrivilegesForCurrentUser.size() == 0) {
             return splitPrivileges;
@@ -295,11 +309,11 @@ public class CheckDbPrivileges {
         return splitPrivileges;
     }
 
-    private static String collapseWhitespace(String s) {
+    private String collapseWhitespace(String s) {
         return s.replaceAll("\\s\\s*", " ");
     }
 
-    private static boolean actualGrantMatchesOrSubsumesRecommendation(String actualGrant, CheckDbPrivileges.RecommendedPrivilege recommended) {
+    private boolean actualGrantMatchesOrSubsumesRecommendation(String actualGrant, CheckDbPrivileges.RecommendedPrivilege recommended) {
         if (actualGrant.equals(recommended.name)) {
             return true;
         }
@@ -311,7 +325,7 @@ public class CheckDbPrivileges {
         return false;
     }
 
-    private static boolean actualDatabaseCoversRecommendedDatabase(String actualDatabase, CheckDbPrivileges.RecommendedPrivilege recommended, String currentDatabase) {
+    private boolean actualDatabaseCoversRecommendedDatabase(String actualDatabase, CheckDbPrivileges.RecommendedPrivilege recommended, String currentDatabase) {
         if (actualDatabase.equals("*")) {
             return true; // everything is covered by this actual rule
         }
@@ -322,14 +336,14 @@ public class CheckDbPrivileges {
         }
     }
 
-    private static boolean actualTableCoversRecommendedTable(String actualTable, CheckDbPrivileges.RecommendedPrivilege recommended) {
+    private boolean actualTableCoversRecommendedTable(String actualTable, CheckDbPrivileges.RecommendedPrivilege recommended) {
         if (actualTable.equals("*")) {
             return true; // everything is covered by this actual rule
         }
         return actualTable.equals(recommended.onTable);
     }
 
-    private static boolean actualPrivilegeSatisfiesRecommendation(String privilegeString, CheckDbPrivileges.RecommendedPrivilege recommended, String currentDatabase) {
+    private boolean actualPrivilegeSatisfiesRecommendation(String privilegeString, CheckDbPrivileges.RecommendedPrivilege recommended, String currentDatabase) {
         int onPosition = privilegeString.lastIndexOf(" ON ");
         if (onPosition == -1) {
             return false;
@@ -353,7 +367,7 @@ public class CheckDbPrivileges {
         return privilegeMatchedOrSubsumed && privilegeDatabaseCovered && privilegeTableCovered;
     }
 
-    public static void removeAllEquivalentRecommendations(
+    private void removeAllEquivalentRecommendations(
             Set<RecommendedPrivilege> unsatisfiedRecommendations,
             Integer equivalenceGroup) {
         List<RecommendedPrivilege> equivalentMembers = new ArrayList<>();
@@ -374,11 +388,11 @@ public class CheckDbPrivileges {
      * grant, the recommendation(s) is removed from the unsatisfied list. After all actual grants have been checked
      * a warning will be printed if any recommendations remain as unsatisfied.
      */
-    public static void logWarningIfRecommendedPrivilegeIsAbsent() throws DaoException {
+    public void logWarningIfRecommendedPrivilegeIsAbsent() throws DaoException {
         try {
-            String currentDatabase = DaoDbServerSessionInfo.getDatabaseInUse();
-            String currentUser = DaoDbServerSessionInfo.getDatabaseCurrentUser();
-            List<String> privilegesForCurrentUser = DaoDbServerSessionInfo.getPrivilegesForCurrentUser();
+            String currentDatabase = daoDbServerSessionInfo.getDatabaseInUse();
+            String currentUser = daoDbServerSessionInfo.getDatabaseCurrentUser();
+            List<String> privilegesForCurrentUser = daoDbServerSessionInfo.getPrivilegesForCurrentUser();
             List<String> roleExpandedPrivilegesForCurrentUser = expandGrantedRolePrivileges(privilegesForCurrentUser);
             List<String> singlePrivilegesForCurrentUser = splitCombinedPrivilegeGrantStrings(roleExpandedPrivilegesForCurrentUser);
             Set<CheckDbPrivileges.RecommendedPrivilege> unsatisfiedRecommendations = new HashSet(recommendedPrivilegeSet);
@@ -415,40 +429,31 @@ public class CheckDbPrivileges {
                     String grantCommand = String.format("    GRANT %s ON %s TO %s", recommended.name, onClause, currentUser);
                     ProgressMonitor.setCurrentMessage(grantCommand);
                 }
-                String dbServerVersion = DaoDbServerSessionInfo.getServerVersion();
                 if (remotePrivilegeInvolvement) {
-                     ProgressMonitor.setCurrentMessage("    Special case:");
-                     ProgressMonitor.setCurrentMessage("        Depending on your installation of Clickhouse (which version,");
-                     ProgressMonitor.setCurrentMessage("        and what system settings you have chosen), you are recommended");
-                     ProgressMonitor.setCurrentMessage("        to either use 'GRANT READ ON REMOTE TO " + currentUser + "'");
-                     ProgressMonitor.setCurrentMessage("        (especially with clickhouse.cloud deployments);  or to use");
-                     ProgressMonitor.setCurrentMessage("        'GRANT REMOTE ON *.* TO " + currentUser + "' for earlier versions");
-                     ProgressMonitor.setCurrentMessage("        of Clickhouse, or those which have not enabled server setting");
-                     ProgressMonitor.setCurrentMessage("        'access_control_improvements.enable_read_write_grants'.");
-                     ProgressMonitor.setCurrentMessage("        If either GRANT is successfully applied, database updates");
-                     ProgressMonitor.setCurrentMessage("        should proceed without privilege problems.");
-                     ProgressMonitor.setCurrentMessage("        Your Clickhouse sever version is " + dbServerVersion);
-                     ProgressMonitor.setCurrentMessage("        Clickhouse server version 25.7/25.8 introduced and expanded the ");
-                     ProgressMonitor.setCurrentMessage("        'GRANT READ ON REMOTE' syntax (initially disabled in");
-                     ProgressMonitor.setCurrentMessage("        non-clickhouse.cloud deployments).");
+                    String dbServerVersion = daoDbServerSessionInfo.getServerVersion();
+                    ProgressMonitor.setCurrentMessage("    Special case:");
+                    ProgressMonitor.setCurrentMessage("        Depending on your installation of Clickhouse (which version,");
+                    ProgressMonitor.setCurrentMessage("        and which system settings you are using), you are recommended");
+                    ProgressMonitor.setCurrentMessage("        to either use 'GRANT READ ON REMOTE TO " + currentUser + "'");
+                    ProgressMonitor.setCurrentMessage("        (especially with clickhouse.cloud deployments); or to use");
+                    ProgressMonitor.setCurrentMessage("        'GRANT REMOTE ON *.* TO " + currentUser + "' for earlier versions");
+                    ProgressMonitor.setCurrentMessage("        of Clickhouse, or those which have not enabled server setting");
+                    ProgressMonitor.setCurrentMessage("        'access_control_improvements.enable_read_write_grants'.");
+                    ProgressMonitor.setCurrentMessage("        If either GRANT is successfully applied, database updates");
+                    ProgressMonitor.setCurrentMessage("        should proceed without privilege problems.");
+                    ProgressMonitor.setCurrentMessage("        Your Clickhouse sever version is " + dbServerVersion);
+                    ProgressMonitor.setCurrentMessage("        Clickhouse server version 25.7/25.8 introduced and expanded the ");
+                    ProgressMonitor.setCurrentMessage("        'GRANT READ ON REMOTE' syntax (initially disabled in");
+                    ProgressMonitor.setCurrentMessage("        non-clickhouse.cloud deployments).");
                 }
-                ProgressMonitor.setCurrentMessage("          Note : if you are running cBioPortal in a configuration which uses multiple databases,");
-                ProgressMonitor.setCurrentMessage("                 all involved databases should be updated in a similar way.");
+                ProgressMonitor.setCurrentMessage("    Note : if you are running cBioPortal in a configuration which uses multiple databases,");
+                ProgressMonitor.setCurrentMessage("           all involved databases should be updated in a similar way.");
             }
         } catch (DaoException e) {
-            String msg = "Error : exception occurred during CheckDbPrivileges.logWarningIfRecommendedPrivilegeIsAbsent()";
+            String msg = "Error : exception occurred during CheckDbPrivileges.logWarningIfRecommendedPrivilegeIsAbsent() : " + e.getMessage();
             ProgressMonitor.setCurrentMessage(msg);
             throw new DaoException(msg, e);
         }
     }
 
-    public static void main(String[] args) {
-        try {
-            ProgressMonitor.setConsoleMode(true);
-            logWarningIfRecommendedPrivilegeIsAbsent();
-            System.exit(0);
-        } catch (DaoException e) {
-            e.printStackTrace();
-        }
-    }
 }

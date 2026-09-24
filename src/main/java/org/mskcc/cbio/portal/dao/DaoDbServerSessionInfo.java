@@ -46,13 +46,33 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
  */
 public class DaoDbServerSessionInfo {
 
+    /* Singleton pattern : all functionality accessed through a singleton object rather than
+     * static class methods. This enables convenient mocking for unit testing.
+     */
+    private static final DaoDbServerSessionInfo daoDbServerSessionInfo = new DaoDbServerSessionInfo();
+
+    /**
+     * Gets Global Singleton Instance.
+     *
+     * @return DaoDbServerSessionInfo Singleton object.
+     */
+    public static DaoDbServerSessionInfo getInstance() {
+        return daoDbServerSessionInfo;
+    }
+
+    /**
+     * Private constructor to enforce singleton pattern.
+     */
+    private DaoDbServerSessionInfo() {
+    } 
+
     /**
      * Make a simple query based on a provided expression. The return value must be a single String
      * @param expression : a valid SQL expression which will be evaluated to yield a single string.
      * @return a string from the database server's expression evaluation.
      * @throws DaoException
      */
-    private static String queryDatabaseServerForString(String expression) throws DaoException {
+    private String queryDatabaseServerForString(String expression) throws DaoException {
         Connection connection = null;
         try {
             String query = String.format("SELECT %s AS expression_result", expression);
@@ -82,7 +102,7 @@ public class DaoDbServerSessionInfo {
      * @return the database version (by evaluating 'version()')
      * @throws DaoException
      */
-    public static String getServerVersion() throws DaoException {
+    public String getServerVersion() throws DaoException {
         return queryDatabaseServerForString("version()");
     }
 
@@ -91,7 +111,7 @@ public class DaoDbServerSessionInfo {
      * @return the default / in-use database name (by evaluating 'current_database()')
      * @throws DaoException
      */
-    public static String getDatabaseInUse() throws DaoException {
+    public String getDatabaseInUse() throws DaoException {
         return queryDatabaseServerForString("current_database()");
     }
 
@@ -100,7 +120,7 @@ public class DaoDbServerSessionInfo {
      * @return the name of the user that the update process is using to connect to the database.
      * @throws DaoException
      */
-    public static String getDatabaseCurrentUser() throws DaoException {
+    public String getDatabaseCurrentUser() throws DaoException {
         return queryDatabaseServerForString("current_user()");
     }
 
@@ -109,7 +129,7 @@ public class DaoDbServerSessionInfo {
      * @return a list of GRANT privilege strings for the current user. Strings may contain multiple privileges listed (comma separated) on a single line. Some privileges may be role names.
      * @throws DaoException
      */
-    public static List<String> getPrivilegesForCurrentUser() throws DaoException {
+    public List<String> getPrivilegesForCurrentUser() throws DaoException {
         Connection connection = null;
         try {
             String query = "SHOW GRANTS";
@@ -137,7 +157,7 @@ public class DaoDbServerSessionInfo {
      * @return a list of GRANT privilege strings for the passed role. Strings may contain multiple privileges listed (comma separated) on a single line. Some privileges may be role names.
      * @throws DaoException
      */
-    public static List<String> getPrivilegesForRole(String role) throws DaoException {
+    public List<String> getPrivilegesForRole(String role) throws DaoException {
         if (role == null || role.strip().length() == 0) {
             throw new DaoException("illegal empty role value");
         }
