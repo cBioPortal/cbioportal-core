@@ -45,14 +45,15 @@ import org.mskcc.cbio.portal.dao.DaoDbServerSessionInfo;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
- * A class to retrieve and examine the privilege grants given to the current user. A set of recommended
- * privileges are matched to the actual privilege grants and any unprovided recommendataion are output as a warning.
+ * Retrieve and check the privilege grants given to the current user. Actual privileges for the current user
+ * are analyzed with regard to a set of recommended privileges. Any uncovered recommendations are output
+ * in a warning message.
  */
 public class CheckDbPrivileges {
 
     /**
-     * A class to represent a Recommended Privilege. A data member contains a list of privileges which (if held)
-     * subsume the recommended privilege. For example, a user who holds 'GRANT SHOW ON *.*' also inherently
+     * Represents a Recommended Privilege. Data member 'subsumingPrivileges' holds a list of privileges which
+     * (if held) subsume the recommended privilege. For example, a user who holds 'GRANT SHOW ON *.*' also inherently
      * holds 'GRANT SHOW TABLE ON *.*' because that is subsumed by 'GRANT SHOW ON *.*'.
      *
     */
@@ -102,15 +103,34 @@ public class CheckDbPrivileges {
     private DaoDbServerSessionInfo daoDbServerSessionInfo; // dependency (initialized on constrution to allow mocking)
 
     /**
-     * A (not to be modified) set of all Recommended privileges. Because some privileges are version and
-     * server_setting specific, these recommnedations are represented as a linked equivalence group across
+     * A set of all Recommended privileges. Because some privileges are version and
+     * server_setting specific, those recommnedations are represented as a linked equivalence group across
      * version variations. Satisfaction of any one of the recommended privileges in the group satisfies
      * the entire group.
      */
     private Set<RecommendedPrivilege> recommendedPrivilegeSet = new HashSet<>();
 
     /**
-     * Constructor, which initializes dependency and initializes recommendation list
+     * Singleton pattern : all functionality accessed through a singleton object rather than
+     * static class methods. This enables convenient mocking for unit testing.
+     */
+    private static CheckDbPrivileges checkDbPrivileges = null;
+
+    /**
+     * Gets Global Singleton Instance.
+     *
+     * @return CheckDbPrivileges Singleton object.
+     */
+    public static CheckDbPrivileges getInstance() {
+        if (checkDbPrivileges == null) {
+            // create singleton
+            checkDbPrivileges = new CheckDbPrivileges(DaoDbServerSessionInfo.getInstance());
+        }
+        return checkDbPrivileges;
+    }
+
+    /**
+     * Constructor, which initializes our dependency and initializes recommendation list
      */
     public CheckDbPrivileges(DaoDbServerSessionInfo daoDbServerSessionInfo) {
         this.daoDbServerSessionInfo = daoDbServerSessionInfo;
@@ -120,7 +140,8 @@ public class CheckDbPrivileges {
     /**
      * Constructor - prohibit uninitialized construction
      */
-    private CheckDbPrivileges() {} // do not allow uninitialized construction
+    private CheckDbPrivileges() {
+    }
 
     private void initializeRecommendedPrivileges() {
         this.recommendedPrivilegeSet.add(new CheckDbPrivileges.RecommendedPrivilege( // SHOW TABLES ON current_database.*
@@ -216,6 +237,13 @@ public class CheckDbPrivileges {
                 RecommendedPrivilege.EQUIVALENCE_GROUP_REMOTE));
     }
 
+    /**
+     * find all roles which the current user has been granted. All grants to current user
+     * are examined, normal grants are ignored and role grants are noted. For every role
+     * grant, the grants for that role are also retrieved and added to the list of grants
+     * to be examined. To prevent infinite looping if "cyclical role grants" are present,
+     * roles are only expanded once.
+     */
     private List<String> apparentGrantedRoles(List<String> privilegesList) {
         Deque<String> unexpandedRawPrivileges = new LinkedList<String>(privilegesList);
         Set<String> expandedRoles = new HashSet<String>();
@@ -250,6 +278,12 @@ public class CheckDbPrivileges {
         return new ArrayList<String>(expandedRoles);
     }
 
+    /**
+     * expand the basic list of grants for the current user to include the grants for
+     * all roles which the user has access to. Because the grants per role have been
+     * expanded into the list of grants, the role grants themselves are filtered out
+     * (including any transitive role grants).
+     */
     private List<String> expandGrantedRolePrivileges(List<String> privilegesForCurrentUser) {
         List<String> expandedPrivileges = new ArrayList<String>();
         // filter out role grants
@@ -282,7 +316,11 @@ public class CheckDbPrivileges {
         return expandedPrivileges;
     }
 
-    // Function discards unparsable privileges without raising an exception
+    /**
+     * break comma separated grants into individual (single) privilege grants. This function also
+     * silently drops/ignores any unparsable simple direct privilege grants (role grants should have
+     * already been filtered from the input, but would also be filtered here if still present)
+     */
     private List<String> splitCombinedPrivilegeGrantStrings(List<String> combinedPrivilegesForCurrentUser) {
         List<String> splitPrivileges = new ArrayList<String>();
         if (combinedPrivilegesForCurrentUser == null || combinedPrivilegesForCurrentUser.size() == 0) {
@@ -343,6 +381,9 @@ public class CheckDbPrivileges {
         return actualTable.equals(recommended.onTable);
     }
 
+    /**
+     * determine whether a particular actual privilege grant satisfies a particular privilege recommendation.
+     */
     private boolean actualPrivilegeSatisfiesRecommendation(String privilegeString, CheckDbPrivileges.RecommendedPrivilege recommended, String currentDatabase) {
         int onPosition = privilegeString.lastIndexOf(" ON ");
         if (onPosition == -1) {
@@ -388,7 +429,7 @@ public class CheckDbPrivileges {
      * grant, the recommendation(s) is removed from the unsatisfied list. After all actual grants have been checked
      * a warning will be printed if any recommendations remain as unsatisfied.
      */
-    public void logWarningIfRecommendedPrivilegeIsAbsent() throws DaoException {
+    public void logWarningIfRecommendedPrivilegeIsAbsent() {
         try {
             String currentDatabase = daoDbServerSessionInfo.getDatabaseInUse();
             String currentUser = daoDbServerSessionInfo.getDatabaseCurrentUser();
@@ -452,7 +493,6 @@ public class CheckDbPrivileges {
         } catch (DaoException e) {
             String msg = "Error : exception occurred during CheckDbPrivileges.logWarningIfRecommendedPrivilegeIsAbsent() : " + e.getMessage();
             ProgressMonitor.setCurrentMessage(msg);
-            throw new DaoException(msg, e);
         }
     }
 
