@@ -34,8 +34,6 @@ package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
 import java.util.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.mskcc.cbio.portal.model.ClinicalAttribute;
 import org.mskcc.cbio.portal.model.CopyNumberSegment;
 
@@ -45,11 +43,7 @@ import org.mskcc.cbio.portal.model.CopyNumberSegment;
  */
 public final class DaoCopyNumberSegment {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DaoCopyNumberSegment.class);
-    private static final double FRACTION_GENOME_ALTERED_CUTOFF = 0.2;
     private static final String FRACTION_GENOME_ALTERED_ATTR_ID = "FRACTION_GENOME_ALTERED";
-    private static final int FGA_VISIBILITY_MAX_ATTEMPTS = 10;
-    private static final long FGA_VISIBILITY_RETRY_MILLIS = 500;
 
     private DaoCopyNumberSegment() {}
     
@@ -74,111 +68,38 @@ public final class DaoCopyNumberSegment {
     /**
      * Ensures FRACTION_GENOME_ALTERED clinical sample attribute is created and up to date.
      * @param cancerStudyId - id of the study to create the clinical attribute for
-     * @param sampleIds - specifies for which samples to calculate this attribute.
-     *                  if sampleIds=null, the calculation is done for all samples in the study
+     * @param fractionGenomeAltereds - values by sample id, computed by the importer from the
+     *                  segments it read (see FractionGenomeAlteredCalculator) rather than
+     *                  read back from copy_number_seg, which may not yet be visible on
+     *                  every ClickHouse replica
      * @param updateMode -  if true, updates the attribute if it exists
      * @throws DaoException
      */
 
-    public static void createFractionGenomeAlteredClinicalData(int cancerStudyId, Set<Integer> sampleIds, boolean updateMode) throws DaoException {
+    public static void createFractionGenomeAlteredClinicalData(int cancerStudyId, Map<Integer, String> fractionGenomeAltereds, boolean updateMode) throws DaoException {
         if (!ClickHouseBulkLoader.isBulkLoad()) {
             throw new DaoException("You have to turn on ClickHouseBulkLoader in order to insert Fraction Genome Altered");
         }
 
-        // Make sure we are seeing the latest data that has been inserted into the segment table
-        // for computing FRACTION_GENOME_ALTERED
+        // Flush pending segment inserts before writing clinical data
         ClickHouseBulkLoader.flushAll();
 
-        Connection con = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoCopyNumberSegment.class);
-            final Connection queryCon = con;
-
-            final String selectSql =
-                    "SELECT c1.`sample_id`, " +
-                    "CASE WHEN SUM(c1.`end` - c1.`start`) > 0 THEN " +
-                    "ROUND(SUM(CASE WHEN ABS(c1.`segment_mean`) >= ? THEN (c1.`end` - c1.`start`) ELSE 0 END) * 1.0 / " +
-                    "SUM(c1.`end` - c1.`start`), 4) " +
-                    "ELSE 0 END AS `value` " +
-                    "FROM `copy_number_seg` AS c1 " +
-                    "INNER JOIN `cancer_study` ON c1.`cancer_study_id` = cancer_study.`cancer_study_id` " +
-                    "WHERE cancer_study.`cancer_study_id`=? ";
-            final String groupSql =
-                    "GROUP BY cancer_study.`cancer_study_id`, c1.`sample_id` " +
-                    "HAVING SUM(c1.`end` - c1.`start`) > 0";
-
-            Map<Integer, String> fractionGenomeAltereds = ClickHouseBulkUploader.upload(sampleIds, stagingTable -> retryIncompleteFga(sampleIds, () -> {
-                String inClause = stagingTable == null ? "" : "AND c1.`sample_id` IN (SELECT id FROM " + stagingTable + ") ";
-                Map<Integer, String> result = new HashMap<>();
-                try (PreparedStatement stmt = queryCon.prepareStatement(selectSql + inClause + groupSql)) {
-                    stmt.setDouble(1, FRACTION_GENOME_ALTERED_CUTOFF);
-                    stmt.setInt(2, cancerStudyId);
-                    try (ResultSet resultSet = stmt.executeQuery()) {
-                        while (resultSet.next()) {
-                            result.put(resultSet.getInt(1), resultSet.getString(2));
-                        }
-                    }
-                }
-                return result;
-            }, FGA_VISIBILITY_MAX_ATTEMPTS, FGA_VISIBILITY_RETRY_MILLIS));
-
-            ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(FRACTION_GENOME_ALTERED_ATTR_ID, cancerStudyId);
-            if (clinicalAttribute == null) {
-                ClinicalAttribute attr = new ClinicalAttribute(FRACTION_GENOME_ALTERED_ATTR_ID, "Fraction Genome Altered", "Fraction Genome Altered", "NUMBER",
-                    false, "20", cancerStudyId);
-                DaoClinicalAttributeMeta.addDatum(attr);
-            }
-
-            if (updateMode) {
-                DaoClinicalData.removeSampleAttributesData(fractionGenomeAltereds.keySet(), FRACTION_GENOME_ALTERED_ATTR_ID);
-            }
-            for (Map.Entry<Integer, String> fractionGenomeAltered : fractionGenomeAltereds.entrySet()) {
-                DaoClinicalData.addSampleDatum(fractionGenomeAltered.getKey(), FRACTION_GENOME_ALTERED_ATTR_ID, fractionGenomeAltered.getValue());
-            }
-
-            // Necessary for deduplication
-            ClickHouseOptimizer.optimizeTables("clinical_sample");
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoCopyNumberSegment.class, con, null, null);
+        ClinicalAttribute clinicalAttribute = DaoClinicalAttributeMeta.getDatum(FRACTION_GENOME_ALTERED_ATTR_ID, cancerStudyId);
+        if (clinicalAttribute == null) {
+            ClinicalAttribute attr = new ClinicalAttribute(FRACTION_GENOME_ALTERED_ATTR_ID, "Fraction Genome Altered", "Fraction Genome Altered", "NUMBER",
+                false, "20", cancerStudyId);
+            DaoClinicalAttributeMeta.addDatum(attr);
         }
-    }
 
-    @FunctionalInterface
-    interface FgaQuery {
-        Map<Integer, String> execute() throws SQLException;
-    }
+        if (updateMode) {
+            DaoClinicalData.removeSampleAttributesData(fractionGenomeAltereds.keySet(), FRACTION_GENOME_ALTERED_ATTR_ID);
+        }
+        for (Map.Entry<Integer, String> fractionGenomeAltered : fractionGenomeAltereds.entrySet()) {
+            DaoClinicalData.addSampleDatum(fractionGenomeAltered.getKey(), FRACTION_GENOME_ALTERED_ATTR_ID, fractionGenomeAltered.getValue());
+        }
 
-    /**
-     * A staging-ID insert can succeed on one ClickHouse Cloud replica before a
-     * subsequent SELECT on another replica sees its rows. Never accept a partial
-     * FGA calculation as a successful import.
-     */
-    static Map<Integer, String> retryIncompleteFga(Set<Integer> expectedSampleIds, FgaQuery query,
-            int maxAttempts, long retryMillis) throws SQLException, DaoException {
-        if (maxAttempts < 1 || retryMillis < 0) {
-            throw new IllegalArgumentException("Invalid FGA visibility retry configuration");
-        }
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            Map<Integer, String> values = query.execute();
-            // The null case retains the public API's all-samples behavior.
-            if (expectedSampleIds == null || values.keySet().equals(expectedSampleIds)) {
-                return values;
-            }
-            LOG.warn("FGA query returned {} of {} expected samples (attempt {}/{})",
-                    values.size(), expectedSampleIds.size(), attempt, maxAttempts);
-            if (attempt < maxAttempts) {
-                try {
-                    Thread.sleep(retryMillis);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new DaoException("Interrupted while waiting for FGA data visibility");
-                }
-            }
-        }
-        throw new DaoException("FGA calculation did not return all " + expectedSampleIds.size()
-                + " expected samples after " + maxAttempts + " attempts");
+        // Necessary for deduplication
+        ClickHouseOptimizer.optimizeTables("clinical_sample");
     }
     
     public static long getLargestId() throws DaoException {
