@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 public class JdbcDataSource extends BasicDataSource {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcDataSource.class);
+    public static final Duration VALIDATION_QUERY_TIMEOUT = Duration.ofSeconds(10);
 
     class RequiredPropertyInfo {
         private String key; // the key string in the .properties file
@@ -68,20 +69,20 @@ public class JdbcDataSource extends BasicDataSource {
         // these values are from the production cbioportal application context for a jndi data source
         this.setMaxTotal(500);
         this.setMaxIdle(30);
-        this.setMaxWaitMillis(10000);
+        this.setMaxWait(Duration.ofSeconds(10));
         // Evict idle connections after 30s of idleness, checking every 10s
-        this.setMinEvictableIdleTimeMillis(30000);
-        this.setTimeBetweenEvictionRunsMillis(10000);
+        this.setMinEvictableIdle(Duration.ofSeconds(30));
+        this.setDurationBetweenEvictionRuns(Duration.ofSeconds(10));
         // Test connections before borrow and while idle to catch stale connections
         this.setTestOnBorrow(true);
         this.setTestWhileIdle(true);
         // Avoid connections living so long they go stale on the server side
-        this.setMaxConnLifetimeMillis(1800000); // 30 minutes
+        this.setMaxConn(Duration.ofMinutes(30));
         // Let DBCP call Connection.isValid(timeout) instead of executing a validation
         // query. ClickHouse JDBC bounds both connection and socket I/O in isValid,
         // including a TLS handshake that can otherwise inherit the long import
         // query socket timeout.
-        this.setValidationQueryTimeout(Duration.ofSeconds(10));
+        this.setValidationQueryTimeout(VALIDATION_QUERY_TIMEOUT);
     }
 
     private void logUsedDeprecatedProperties(DatabaseProperties dbProperties) {
