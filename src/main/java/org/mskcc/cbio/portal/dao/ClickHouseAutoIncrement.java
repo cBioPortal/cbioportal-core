@@ -90,6 +90,8 @@ public final class ClickHouseAutoIncrement {
         register("seq_copy_number_seg", "copy_number_seg", "seg_id");
         register("seq_copy_number_seg_file", "copy_number_seg_file", "seg_file_id");
         register("seq_clinical_event", "clinical_event", "clinical_event_id");
+        register("seq_ascn_cncf", "ascn_cncf", "seg_id");
+        register("seq_ascn_genes", "ascn_genes", "gene_id");
         registerShutdownHook();
     }
 
