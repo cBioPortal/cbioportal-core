@@ -16,7 +16,16 @@ public class TestFractionGenomeAlteredCalculator {
         calculator.addSegment(2, 50, 100, -0.3);
         calculator.addSegment(3, 0, 10, 0.19);
 
-        assertEquals(Map.of(1, "0.25", 2, "1.0", 3, "0.0"), calculator.getFractionGenomeAltered());
+        assertEquals(Map.of(1, "0.2500", 2, "1.0000", 3, "0.0000"), calculator.getFractionGenomeAltered());
+    }
+
+    @Test
+    public void neverUsesScientificNotation() {
+        FractionGenomeAlteredCalculator calculator = new FractionGenomeAlteredCalculator();
+        calculator.addSegment(1, 0, 2, 1.0);
+        calculator.addSegment(1, 2, 10000, 0.0);
+
+        assertEquals(Map.of(1, "0.0002"), calculator.getFractionGenomeAltered());
     }
 
     @Test

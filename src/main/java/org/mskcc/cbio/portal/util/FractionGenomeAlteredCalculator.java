@@ -27,8 +27,8 @@ public class FractionGenomeAlteredCalculator {
     }
 
     /**
-     * @return fraction genome altered per sample, rounded half-even to four
-     * decimal places. Samples without positive measured length are omitted.
+     * @return fraction genome altered per sample, rounded half-up to exactly
+     * four decimal places. Samples without positive measured length are omitted.
      */
     public Map<Integer, String> getFractionGenomeAltered() {
         Map<Integer, String> result = new HashMap<>();
@@ -38,11 +38,11 @@ public class FractionGenomeAlteredCalculator {
                 continue;
             }
             long altered = entry.getValue()[1];
-            // Formatted as a double, matching what the former SQL calculation stored
-            double fraction = BigDecimal.valueOf(altered)
-                    .divide(BigDecimal.valueOf(measured), 4, RoundingMode.HALF_EVEN)
-                    .doubleValue();
-            result.put(entry.getKey(), Double.toString(fraction));
+            // Fixed four decimal places, as MySQL DECIMAL division stored it before the
+            // ClickHouse port (e.g. "0.0002", not the Double.toString form "2.0E-4")
+            BigDecimal fraction = BigDecimal.valueOf(altered)
+                    .divide(BigDecimal.valueOf(measured), 4, RoundingMode.HALF_UP);
+            result.put(entry.getKey(), fraction.toPlainString());
         }
         return result;
     }
