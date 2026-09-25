@@ -295,7 +295,6 @@ public final class DaoCancerStudy {
         CancerStudy existing = getCancerStudyByStableId(stableId);
         if (existing!=null) {
             if (overwrite) {
-                //setStatus(Status.UNAVAILABLE, stableId);
                 deleteCancerStudy(existing.getInternalId());
             } else {
                 throw new DaoException("Cancer study " + stableId + "is already imported.");
@@ -458,7 +457,6 @@ public final class DaoCancerStudy {
     public static void deleteCancerStudy(String cancerStudyStableId) throws DaoException {
         CancerStudy study = getCancerStudyByStableId(cancerStudyStableId);
         if (study != null){
-            //setStatus(Status.UNAVAILABLE, cancerStudyStableId);
             deleteCancerStudy(study.getInternalId());
         }
     }
@@ -505,6 +503,10 @@ public final class DaoCancerStudy {
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
+            // The cancer_study row is deleted last; hide the study first so the portal does not
+            // serve it while its data is partially deleted.
+            setStatus(Status.UNAVAILABLE, null, internalCancerStudyId);
+
             // check whether should delete generic assay meta profile by profile
             DaoGenericAssay.checkAndDeleteGenericAssayMetaInStudy(internalCancerStudyId);
             

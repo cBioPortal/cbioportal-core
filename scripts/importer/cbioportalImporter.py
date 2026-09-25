@@ -58,8 +58,9 @@ REMOVE_SAMPLES = "remove-samples"
 REMOVE_PATIENTS = "remove-patients"
 IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
+ENABLE_STUDY = "enable-study"
 
-COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS]
+COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS, ENABLE_STUDY]
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -79,11 +80,11 @@ def import_study(jvm_args, meta_filename):
     args.append("--noprogress") # don't report memory usage and % progress
     run_java(*args)
 
-def update_study_status(jvm_args, study_id):
+def update_study_status(jvm_args, study_id, status="AVAILABLE"):
     args = jvm_args.split(' ')
     args.append(UPDATE_STUDY_STATUS_CLASS)
     args.append(study_id)
-    args.append("AVAILABLE")
+    args.append(status)
     args.append("--noprogress") # don't report memory usage and % progress
     run_java(*args)
 
@@ -268,6 +269,9 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity)
     elif command == IMPORT_CASE_LIST:
         import_case_list(jvm_args, meta_filename)
+    elif command == ENABLE_STUDY:
+        for study_id in study_ids.split(","):
+            update_study_status(jvm_args, study_id)
 
 def get_meta_filenames(data_directory):
     meta_filenames = [
@@ -466,8 +470,8 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     if study_meta_dictionary[study_meta_filename].get('add_global_case_list', 'false').lower() == 'true':
         add_global_case_list(jvm_args, study_id)
 
-    # enable study
-    update_study_status(jvm_args, study_id)
+    # the study stays UNAVAILABLE until the derived tables are rebuilt
+    return study_id
 
 def get_meta_filenames_by_type(data_directory) -> Dict[str, Tuple[str, Dict]]:
     """
@@ -546,8 +550,16 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
     if not_supported_meta_types:
         raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
+    # the study is not removed first, so hide it here until the derived tables are rebuilt
+    study_id = next(iter(meta_file_type_to_meta_files.values()))[0][1]['cancer_study_identifier']
+    update_study_status(jvm_args, study_id, "UNAVAILABLE")
     import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files)
     update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files)
+    return study_id
+
+def enable_study(args, study_id):
+    # main() has already put the jar path into args.java_opts
+    update_study_status("-Dspring.profiles.active=dbcp " + args.java_opts, study_id)
 
 def usage():
     # TODO : replace this by usage string from interface()
@@ -616,6 +628,10 @@ def interface(args=None):
                         help='Cancer Study ID(s) that contains sample(s). Comma separated, if multiple.')
     remove_patients.add_argument('--patient_ids', type=str, required=True,
                         help='Patient ID(s). Comma separated, if multiple.')
+
+    enable_study = subparsers.add_parser('enable-study', parents=[parent_parser], add_help=False)
+    enable_study.add_argument('-id', '--study_ids', type=str, required=True,
+                        help='Cancer Study ID(s) to mark AVAILABLE, comma separated')
 
     parser.add_argument('-c', '--command', type=str, required=False,
                         help='This argument is outdated. Please use the listed subcommands, without the -c flag. '
@@ -697,10 +713,10 @@ def main(args):
 
     if args.data_directory is not None:
         check_dir(args.data_directory)
-        process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity)
+        return process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity)
     elif args.study_directory is not None:
         check_dir(args.study_directory)
-        process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity)
+        return process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity)
     else:
         check_args(args.command)
         check_files(args.meta_filename, args.data_filename)
