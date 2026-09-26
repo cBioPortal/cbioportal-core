@@ -18,10 +18,13 @@ as JSON. `validateData.py` checks those rows against the WSI contract, and
 `metaImport.py` loads them with the other resource files. See
 [`docs/wsi-study-format.md`](docs/wsi-study-format.md).
 
-Legacy format-v3 `meta_wsi.txt`/`data_wsi.txt` pairs are no longer imported;
-convert them offline with `scripts/importer/convertWsiToResources.py`. Given
-`--study-dir`, it also merges the six `WSI_*` slide-count clinical attributes
-into copies of the study's clinical sample and patient files. The native WSI
+Legacy `meta_wsi.txt`/`data_wsi.txt` pairs (format v2 or v3) are no longer
+imported; convert them offline with `scripts/importer/convertWsiToResources.py`.
+Given `--study-dir`, it also merges the six `WSI_*` slide-count clinical
+attributes into copies of the study's clinical sample and patient files. Format
+v2 has no slide timing columns; the converter takes them from the study's
+pathology timeline file (found through `--study-dir`, or given with
+`--timeline-file`), which is only read. The native WSI
 tables and the `ImportWsiData` Java entry point are deprecated but retained.
 Thumbnail artifacts and slide metadata must still be prepared by an upstream
 artifact-generation/export pipeline; core does not generate thumbnails or write

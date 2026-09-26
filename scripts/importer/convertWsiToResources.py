@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a legacy format-v3 WSI file pair into standard cBioPortal study files.
+"""Convert a legacy WSI file pair (format v2 or v3) into standard cBioPortal study files.
 
 The converter is deliberately offline: it never connects to cBioPortal, a
 database, or an artifact store. It reads ``meta_wsi.txt``/``data_wsi.txt``,
@@ -21,14 +21,26 @@ each with its meta file. A generated data/meta pair is only written when it has 
 Timeline files are not produced: existing clinical timeline files stay in the
 study and are imported unchanged.
 
-The output is not validated here beyond what the native importer checked while
-parsing; run ``validateData.py`` on the study after adding the files.
+Format v3 carries the slide timing on every row. Format v2 has the same
+columns without the seven timing columns; their values are filled from the
+study's pathology timeline file (a ``TIMELINE`` clinical file with an
+``IMAGE_IDS`` column), which is only read. See ``timeline_timing`` for the
+mapping.
+
+Rows are streamed, so large studies convert in bounded memory; output is
+staged next to ``--output-dir`` and only moved there when the conversion
+succeeds. The output is not validated here beyond what the native importer
+checked while parsing; run ``validateData.py`` on the study after adding the
+files.
 """
 
 import argparse
 import json
+import os
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
@@ -50,6 +62,10 @@ COLUMNS = [
     "TIMELINE_DATE_STATUS", "TIMELINE_DATE_KIND", "TIMELINE_DATE_SOURCE",
     "TIMELINE_DATE_REASON", "TIMELINE_COORDINATE_SYSTEM", "TIMEPOINT_SOURCE",
 ]
+# Format v2 is format v3 without the trailing timing columns.
+TIMING_COLUMNS = COLUMNS[COLUMNS.index("TIMELINE_START_DAYS"):]
+V2_COLUMNS = COLUMNS[:len(COLUMNS) - len(TIMING_COLUMNS)]
+FORMAT_COLUMNS = {"2": V2_COLUMNS, "3": COLUMNS}
 
 # Public metadata keys, emitted in lower case. Values the backend reads with
 # JSONExtractString stay strings (e.g. PART_NUMBER, MAGNIFICATION).
@@ -68,6 +84,25 @@ TIMELINE_STATUSES = ("AVAILABLE", "MISSING_PROCEDURE_DATE", "MISSING_REFERENCE_S
 TIMELINE_KINDS = ("RECORDED", "ESTIMATED", "UNDATED")
 TIMELINE_COORDINATE_SYSTEM = "patient_first_tumor_sequencing_day_zero"
 SLIDE_TYPES = ("H&E", "IHC", "Other", "Unknown")
+
+# Format v2 timing from the pathology timeline (see timeline_timing).
+TIMELINE_REQUIRED_COLUMNS = ("PATIENT_ID", "START_DATE", "TIMEPOINT_SOURCE", "IMAGE_IDS")
+TIMELINE_DATE_SOURCE = "PATHOLOGY_TIMELINE"
+NO_REFERENCE_REASON = "NO_SEQUENCING_REFERENCE"
+# The timing of a slide in no timeline event: the upstream export's canonical
+# undated tuple (TIMEPOINT_SOURCE is then derived from the reason).
+UNDATED_TIMING = {
+    "TIMELINE_START_DAYS": "",
+    "TIMELINE_DATE_STATUS": "MISSING_PROCEDURE_DATE",
+    "TIMELINE_DATE_KIND": "UNDATED",
+    "TIMELINE_DATE_SOURCE": "NO_VERIFIED_PROCEDURE_DATE",
+    "TIMELINE_DATE_REASON": "MISSING_PROCEDURE_DATE",
+    "TIMELINE_COORDINATE_SYSTEM": TIMELINE_COORDINATE_SYSTEM,
+    "TIMEPOINT_SOURCE": "",
+}
+SEQUENCING_DAY_ZERO = re.compile(r"\brelative to first tumor sequencing\s*$", re.IGNORECASE)
+ESTIMATED_DATE = re.compile(r"\bestimated\b", re.IGNORECASE)
+DAY_ZERO_MISMATCH_POLICIES = ("error", "undated")
 
 # Names and descriptions must stay identical to ImportWsiData.insertSampleSlideCounts.
 SAMPLE_COUNT_ATTRIBUTES = [
@@ -123,8 +158,8 @@ def read_wsi_meta(path):
     meta = read_meta(path)
     if meta.get("genetic_alteration_type") != "PATHOLOGY_SLIDES" or meta.get("datatype") != "WSI":
         raise ConversionError(f"{path}: WSI metadata must use PATHOLOGY_SLIDES / WSI")
-    if meta.get("format_version") != "3":
-        raise ConversionError(f"{path}: unsupported WSI format_version; expected 3")
+    if meta.get("format_version") not in FORMAT_COLUMNS:
+        raise ConversionError(f"{path}: unsupported WSI format_version; expected 2 or 3")
     for field in ("cancer_study_identifier", "data_filename"):
         if not meta.get(field):
             raise ConversionError(f"{path}: {field} is required")
@@ -152,37 +187,62 @@ def viewer_url(base_url, study_id, patient_id, image_id):
             f"?studyId={quote(study_id, safe='')}&imageId={quote(image_id, safe='')}")
 
 
-def read_rows(data_path):
-    """Read the legacy data file: leading '#' rows, the exact v3 header, then slide rows."""
+def _iter_lines(path, what):
+    """Yield (line number, text) for each line of a UTF-8 file, split on LF only.
+
+    Splitting on LF alone (as the native importer did) keeps a stray CR inside a
+    value in its row, so it is reported instead of silently starting a new row.
+    """
     try:
-        with open(data_path, encoding="utf-8", newline="") as stream:
-            lines = stream.read().split("\n")
+        with open(path, "rb") as stream:
+            for line_number, raw in enumerate(stream, start=1):
+                if raw.endswith(b"\n"):
+                    raw = raw[:-1]
+                if raw.endswith(b"\r"):
+                    raw = raw[:-1]
+                try:
+                    yield line_number, raw.decode("utf-8")
+                except UnicodeDecodeError as error:
+                    raise ConversionError(f"{path}: line {line_number}: {what} is not valid UTF-8") from error
     except OSError as error:
-        raise ConversionError(f"{data_path}: cannot read WSI data file: {error}") from error
-    except UnicodeDecodeError as error:
-        raise ConversionError(f"{data_path}: file is not valid UTF-8") from error
-    if lines and lines[-1] == "":
-        lines.pop()
-    lines = [line[:-1] if line.endswith("\r") else line for line in lines]
-    index = 0
-    while index < len(lines) and lines[index].startswith("#"):
-        index += 1
-    if index >= len(lines) or lines[index].split("\t") != COLUMNS:
+        raise ConversionError(f"{path}: cannot read {what}: {error}") from error
+
+
+def iter_rows(data_path, columns=COLUMNS):
+    """Stream the legacy data file: leading '#' rows, the exact header, then slide rows.
+
+    Yields (line number, row dict with stripped values) and raises if the file
+    has no slide rows.
+    """
+    lines = _iter_lines(data_path, "WSI data file")
+    header = None
+    for line_number, line in lines:
+        if not line.startswith("#"):
+            header = line
+            break
+    if header is None or header.split("\t") != columns:
         raise ConversionError(f"{data_path}: WSI data has an invalid header or column order")
-    rows = []
-    for line_number, line in enumerate(lines[index + 1:], start=index + 2):
+    width = len(columns)
+    found = False
+    for line_number, line in lines:
         if line.startswith("#"):
             raise ConversionError(f"{data_path}: line {line_number}: WSI data row must not start with '#'")
         fields = line.split("\t")
-        if len(fields) != len(COLUMNS):
+        if len(fields) != width:
             raise ConversionError(
-                f"{data_path}: line {line_number}: expected {len(COLUMNS)} columns, found {len(fields)}")
-        if all(not field.strip() for field in fields):
+                f"{data_path}: line {line_number}: expected {width} columns, found {len(fields)}")
+        fields = [field.strip() for field in fields]
+        if not any(fields):
             raise ConversionError(f"{data_path}: line {line_number}: blank WSI row")
-        rows.append((line_number, dict(zip(COLUMNS, (field.strip() for field in fields)))))
-    if not rows:
+        found = True
+        yield line_number, dict(zip(columns, fields))
+    if not found:
         raise ConversionError(f"{data_path}: WSI data file contains no slide rows")
-    return rows
+
+
+def read_rows(data_path, columns=COLUMNS):
+    """Read every row of a legacy data file into a list (see iter_rows)."""
+    return list(iter_rows(data_path, columns))
 
 
 def _fail(line, message):
@@ -319,19 +379,21 @@ def normalize_row(row, line):
     return metadata
 
 
-def parse_slides(rows):
-    """Normalize every row and apply the cross-row checks of ImportWsiData.normalize."""
-    slides = []
-    image_ids = set()
-    patient_references = {}
-    parts = {}
-    blocks = {}
-    for line, row in rows:
+class SlideParser:
+    """Normalize rows one at a time, applying the cross-row checks of ImportWsiData.normalize."""
+
+    def __init__(self):
+        self.image_ids = set()
+        self.patient_references = {}
+        self.parts = {}
+        self.blocks = {}
+
+    def parse(self, line, row):
         patient_id = _require(row, "PATIENT_ID", line)
         image_id = _require(row, "IMAGE_ID", line)
-        if image_id in image_ids:
+        if image_id in self.image_ids:
             _fail(line, f"IMAGE_ID is not unique: {image_id}")
-        image_ids.add(image_id)
+        self.image_ids.add(image_id)
         part_key = _require(row, "PART_KEY", line)
         block_key = _require(row, "BLOCK_KEY", line)
         if "?" in part_key or "?" in block_key:
@@ -346,30 +408,34 @@ def parse_slides(rows):
             _fail(line, "matched rows require SAMPLE_ID")
         reference = row["REFERENCE_SAMPLE_ID"]
         reference = reference if reference and reference.upper() != "UNMATCHED" else None
-        if patient_id in patient_references and patient_references[patient_id] != reference:
+        if self.patient_references.setdefault(patient_id, reference) != reference:
             _fail(line, "patient has conflicting reference samples")
-        patient_references[patient_id] = reference
         part = tuple(row[field] for field in (
             "PART_NUMBER", "PART_DESIGNATOR", "PART_TYPE",
             "PART_DESCRIPTION", "SUBSPECIALTY", "PATH_DX_TITLE"))
-        if parts.setdefault((patient_id, part_key), part) != part:
+        if self.parts.setdefault((patient_id, part_key), part) != part:
             _fail(line, "conflicting part metadata")
         block = (row["BLOCK_NUMBER"], row["BLOCK_LABEL"])
-        if blocks.setdefault((patient_id, part_key, block_key), block) != block:
+        if self.blocks.setdefault((patient_id, part_key, block_key), block) != block:
             _fail(line, "conflicting block metadata")
         _require(row, "SPECIMEN_KEY", line)
         metadata = normalize_row(row, line)
-        slides.append({
+        return {
             "patient_id": patient_id,
             "sample_id": sample_id or None,
             "image_id": image_id,
             "match_level": match_level,
             "metadata": metadata,
-        })
-    return slides
+        }
 
 
-def count_slides(slides):
+def parse_slides(rows):
+    """Normalize every row (see SlideParser)."""
+    parser = SlideParser()
+    return [parser.parse(line, row) for line, row in rows]
+
+
+class SlideCounter:
     """Per-entity counts with the semantics of ImportWsiData.insertSampleSlideCounts.
 
     One count per IMAGE_ID. Sample counts cover matched slides only, so samples
@@ -378,19 +444,191 @@ def count_slides(slides):
     MATCH_LEVEL and zeros are written for entities that have a row. Slides that
     cannot serve tiles are counted.
     """
-    by_sample = {}
-    by_patient = {}
-    for slide in slides:
-        targets = [by_patient.setdefault(slide["patient_id"], [0, 0, 0])]
+
+    def __init__(self):
+        self.by_sample = {}
+        self.by_patient = {}
+
+    def add(self, slide):
+        targets = [self.by_patient.setdefault(slide["patient_id"], [0, 0, 0])]
         if slide["sample_id"] is not None:
-            targets.append(by_sample.setdefault((slide["patient_id"], slide["sample_id"]), [0, 0, 0]))
+            targets.append(self.by_sample.setdefault((slide["patient_id"], slide["sample_id"]), [0, 0, 0]))
         for counts in targets:
             counts[0] += 1
             if slide["match_level"] == "PART":
                 counts[1] += 1
             elif slide["match_level"] == "BLOCK":
                 counts[2] += 1
-    return by_sample, by_patient
+
+
+def count_slides(slides):
+    """Return (by_sample, by_patient) counts for a list of parsed slides (see SlideCounter)."""
+    counter = SlideCounter()
+    for slide in slides:
+        counter.add(slide)
+    return counter.by_sample, counter.by_patient
+
+
+def timeline_timing(start_days, timepoint_source, day_zero_mismatch="error"):
+    """Return the format-v3 timing columns for a slide listed in a pathology timeline event.
+
+    The event's ``TIMEPOINT_SOURCE`` names the day zero of its ``START_DATE``.
+    When it is first tumor sequencing (the contract's coordinate system, e.g.
+    "Recorded procedure date relative to first tumor sequencing"), the slide is
+    dated: ``AVAILABLE``, ``START_DATE`` as ``TIMELINE_START_DAYS``, kind
+    ``ESTIMATED`` when the text says the date is estimated and ``RECORDED``
+    otherwise, date source ``PATHOLOGY_TIMELINE`` and the event's text as
+    ``TIMEPOINT_SOURCE``.
+
+    Any other day zero (e.g. "Procedure date relative to first ICD-O
+    diagnosis") cannot be expressed in the contract's coordinate system, so the
+    offset is not copied. Returns None when ``day_zero_mismatch`` is "error";
+    with "undated" the slide keeps its procedure-date provenance without an
+    offset: ``MISSING_REFERENCE_SEQUENCING_DATE`` with reason
+    ``NO_SEQUENCING_REFERENCE``.
+    """
+    kind = "ESTIMATED" if ESTIMATED_DATE.search(timepoint_source) else "RECORDED"
+    timing = {
+        "TIMELINE_DATE_KIND": kind,
+        "TIMELINE_DATE_SOURCE": TIMELINE_DATE_SOURCE,
+        "TIMELINE_COORDINATE_SYSTEM": TIMELINE_COORDINATE_SYSTEM,
+        "TIMEPOINT_SOURCE": timepoint_source,
+    }
+    if SEQUENCING_DAY_ZERO.search(timepoint_source):
+        timing.update(TIMELINE_START_DAYS=str(start_days), TIMELINE_DATE_STATUS="AVAILABLE",
+                      TIMELINE_DATE_REASON="")
+        return timing
+    if day_zero_mismatch != "undated":
+        return None
+    timing.update(TIMELINE_START_DAYS="", TIMELINE_DATE_STATUS="MISSING_REFERENCE_SEQUENCING_DATE",
+                  TIMELINE_DATE_REASON=NO_REFERENCE_REASON)
+    return timing
+
+
+def _parse_image_ids(value, where):
+    """Parse an IMAGE_IDS cell: a JSON array of IDs, optionally CSV-quoted as a whole."""
+    text = value.strip()
+    if not text:
+        return []
+    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+        text = text[1:-1].replace('""', '"')
+    try:
+        ids = json.loads(text)
+    except ValueError:
+        ids = None
+    if not isinstance(ids, list) or not all(
+            isinstance(image, str) or (isinstance(image, int) and not isinstance(image, bool))
+            for image in ids):
+        raise ConversionError(f"{where}: IMAGE_IDS must be a JSON array of image IDs: {value!r}")
+    return [str(image).strip() for image in ids if str(image).strip()]
+
+
+def read_timeline_index(path, day_zero_mismatch="error"):
+    """Index a pathology timeline file by image.
+
+    Maps IMAGE_ID -> (patient, timing columns, line, (START_DATE, TIMEPOINT_SOURCE)).
+
+    Every event listing an image must agree on its patient, START_DATE and
+    TIMEPOINT_SOURCE. Events are counted per TIMEPOINT_SOURCE whose day zero is
+    not first tumor sequencing; with ``day_zero_mismatch`` "error" any such
+    event fails the conversion. The file is only read.
+    """
+    path = Path(path)
+    lines = _iter_lines(path, "timeline file")
+    header = None
+    for _, line in lines:
+        if not line.startswith("#") and line.strip():
+            header = [column.strip() for column in line.split("\t")]
+            break
+    if header is None:
+        raise ConversionError(f"{path}: timeline file has no header")
+    missing = [column for column in TIMELINE_REQUIRED_COLUMNS if column not in header]
+    if missing:
+        raise ConversionError(f"{path}: timeline file is missing column {', '.join(missing)}")
+    patient_index, start_index, source_index, ids_index = (
+        header.index(column) for column in TIMELINE_REQUIRED_COLUMNS)
+    index = {}
+    timings = {}  # (start, source) -> shared timing dict
+    mismatched = {}  # TIMEPOINT_SOURCE -> [events, images]
+    for line_number, line in lines:
+        if not line.strip() or line.startswith("#"):
+            continue
+        where = f"{path}: line {line_number}"
+        fields = line.split("\t")
+        if len(fields) != len(header):
+            raise ConversionError(f"{where}: expected {len(header)} columns, found {len(fields)}")
+        image_ids = _parse_image_ids(fields[ids_index], where)
+        if not image_ids:
+            continue
+        patient_id = fields[patient_index].strip()
+        if not patient_id:
+            raise ConversionError(f"{where}: PATIENT_ID is required")
+        try:
+            start_days = int(fields[start_index].strip())
+        except ValueError:
+            raise ConversionError(f"{where}: START_DATE must be an integer for an event with IMAGE_IDS: "
+                                  f"{fields[start_index]!r}") from None
+        source = fields[source_index].strip()
+        key = (start_days, source)
+        if key not in timings:
+            timings[key] = timeline_timing(start_days, source, day_zero_mismatch)
+        timing = timings[key]
+        if timing is None or timing["TIMELINE_DATE_STATUS"] != "AVAILABLE":
+            counts = mismatched.setdefault(source, [0, 0])
+            counts[0] += 1
+            counts[1] += len(image_ids)
+        for image_id in image_ids:
+            entry = (patient_id, timing, line_number, key)
+            previous = index.setdefault(image_id, entry)
+            if previous is entry or (previous[0], previous[3]) == (patient_id, key):
+                continue
+            first_line = previous[2]
+            if previous[0] != patient_id:
+                raise ConversionError(
+                    f"{where}: IMAGE_ID {image_id} is listed for patient {patient_id} here but for "
+                    f"{previous[0]} on line {first_line}")
+            raise ConversionError(
+                f"{where}: IMAGE_ID {image_id} is listed in events with conflicting timing "
+                f"(line {first_line} and here); an image can have only one procedure date")
+    if mismatched and day_zero_mismatch != "undated":
+        summary = "; ".join(f"{events} event(s) with {images} image(s): {source or '(blank)'!r}"
+                            for source, (events, images) in sorted(mismatched.items()))
+        raise ConversionError(
+            f"{path}: TIMEPOINT_SOURCE does not place day zero at first tumor sequencing, the "
+            f"only coordinate system the WSI timing contract supports, so START_DATE cannot be "
+            f"used as TIMELINE_START_DAYS ({summary}). Re-export the timeline relative to first "
+            f"tumor sequencing, or pass --day-zero-mismatch undated to keep these slides without "
+            f"an offset (MISSING_REFERENCE_SEQUENCING_DATE)")
+    return index
+
+
+def find_pathology_timeline(study_dir):
+    """Return the data file of the study's pathology timeline, or None.
+
+    That is the ``TIMELINE`` clinical file whose header has ``IMAGE_IDS``; more
+    than one is ambiguous.
+    """
+    study_dir = Path(study_dir)
+    found = []
+    for meta_path in sorted(study_dir.iterdir()):
+        if not meta_path.is_file() or "meta" not in meta_path.name.lower():
+            continue
+        try:
+            meta = read_meta(meta_path)
+        except ConversionError:
+            continue
+        if (meta.get("genetic_alteration_type") != "CLINICAL" or meta.get("datatype") != "TIMELINE"
+                or not meta.get("data_filename")):
+            continue
+        data_path = study_dir / meta["data_filename"]
+        if "IMAGE_IDS" in _data_header(data_path):
+            found.append((meta_path, data_path))
+    if len(found) > 1:
+        raise ConversionError(
+            "the study directory has more than one pathology timeline file (TIMELINE with an "
+            f"IMAGE_IDS column: {', '.join(meta.name for meta, _ in found)}); choose one with "
+            "--timeline-file")
+    return found[0][1] if found else None
 
 
 def _check_cell(value, file_name):
@@ -586,62 +824,175 @@ def merge_clinical_counts(data_path, attributes, key_columns, counts):
     return "".join(out)
 
 
-def convert(meta_wsi, output_dir, portal_base_url, study_dir=None):
+class _TsvWriter:
+    """Write raw TSV rows to a file opened on the first row (see render_tsv)."""
+
+    def __init__(self, path, header):
+        self.path = path
+        self.header = header
+        self.stream = None
+        self.rows = 0
+
+    def write(self, row):
+        if self.stream is None:
+            self.stream = open(self.path, "w", encoding="utf-8", newline="")
+            self._write(self.header)
+        self._write(row)
+        self.rows += 1
+
+    def _write(self, row):
+        self.stream.write("\t".join(_check_cell(value, self.path.name) for value in row) + "\n")
+
+    def close(self):
+        if self.stream is not None:
+            self.stream.close()
+
+
+def _print_warning(message):
+    print(f"convertWsiToResources.py: warning: {message}", file=sys.stderr)
+
+
+def convert(meta_wsi, output_dir, portal_base_url, study_dir=None, timeline_file=None,
+            day_zero_mismatch="error", warn=_print_warning):
     """Convert a legacy WSI pair; return the list of files written.
 
     Without ``study_dir`` the slide counts are written as standalone clinical file
     pairs. With it, the study's clinical sample and patient files are copied to
     ``output_dir`` under their own names with the count columns appended.
+
+    Format v2 input takes its timing from ``timeline_file`` or, when that is
+    omitted, from the pathology timeline found in ``study_dir``; see
+    ``timeline_timing`` for the mapping and ``day_zero_mismatch``. Slides in no
+    timeline event are undated. ``warn`` receives non-fatal messages.
+
+    Nothing is written to ``output_dir`` unless the whole conversion succeeds.
     """
     meta_wsi = Path(meta_wsi)
     output_dir = Path(output_dir)
     base_url = normalize_base_url(portal_base_url)
+    if day_zero_mismatch not in DAY_ZERO_MISMATCH_POLICIES:
+        raise ConversionError(f"--day-zero-mismatch must be one of {', '.join(DAY_ZERO_MISMATCH_POLICIES)}")
     meta = read_wsi_meta(meta_wsi)
+    format_version = meta["format_version"]
     study_id = meta["cancer_study_identifier"]
     data_path = meta_wsi.parent / meta["data_filename"]
+    if study_dir is not None:
+        study_dir = Path(study_dir)
+        if not study_dir.is_dir():
+            raise ConversionError(f"--study-dir is not a directory: {study_dir}")
+        if output_dir.resolve() == study_dir.resolve():
+            raise ConversionError("--output-dir must differ from --study-dir; the merged clinical "
+                                  "files are written under the study's own file names")
+        check_study_conflicts(study_dir)
+
+    timeline_index = None
+    if format_version == "3":
+        if timeline_file is not None:
+            raise ConversionError(
+                "--timeline-file is only used for format_version 2; format v3 rows carry their own timing")
+    else:
+        if timeline_file is None and study_dir is not None:
+            timeline_file = find_pathology_timeline(study_dir)
+        if timeline_file is None:
+            raise ConversionError(
+                f"{meta_wsi}: format_version 2 has no slide timing; pass --timeline-file with the "
+                f"study's pathology timeline file (the TIMELINE file with IMAGE_IDS), or --study-dir "
+                f"to find it through its meta file")
+        timeline_index = read_timeline_index(timeline_file, day_zero_mismatch)
+
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", suffix=".partial",
+                                    dir=output_dir.parent))
     try:
-        slides = parse_slides(read_rows(data_path))
-    except ConversionError as error:
-        raise ConversionError(f"{data_path}: {error}") from error
+        files = _convert_into(staging, data_path, format_version, timeline_index, timeline_file,
+                              study_id, base_url, study_dir, warn)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        written = []
+        for name in files:
+            os.replace(staging / name, output_dir / name)
+            written.append(output_dir / name)
+        return written
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
-    sample_rows, patient_rows = [], []
-    for slide in slides:
-        url = viewer_url(base_url, study_id, slide["patient_id"], slide["image_id"])
-        metadata = json.dumps(slide["metadata"], separators=(",", ":"), sort_keys=True, ensure_ascii=True)
-        if slide["sample_id"] is not None:
-            sample_rows.append([slide["patient_id"], slide["sample_id"], SAMPLE_RESOURCE_ID, url,
-                                slide["image_id"], RESOURCE_TYPE, metadata])
-        else:
-            patient_rows.append([slide["patient_id"], PATIENT_RESOURCE_ID, url,
-                                 slide["image_id"], RESOURCE_TYPE, metadata])
-    by_sample, by_patient = count_slides(slides)
 
-    files = {}  # output file name -> content (str, or bytes for verbatim copies)
+def _convert_into(staging, data_path, format_version, timeline_index, timeline_file, study_id,
+                  base_url, study_dir, warn):
+    """Write every output file into ``staging``; return their names in output order."""
+    files = []
 
-    def add_pair(data_file, rows, meta_file, meta_entries):
-        files[meta_file] = render_meta(meta_entries + [("data_filename", data_file)])
-        files[data_file] = render_tsv(data_file, rows)
+    def write_text(name, text):
+        with open(staging / name, "w", encoding="utf-8", newline="") as stream:
+            stream.write(text)
+        files.append(name)
+
+    def meta_entries(entries, data_file):
+        return render_meta(entries + [("data_filename", data_file)])
+
+    parser = SlideParser()
+    counter = SlideCounter()
+    sample_writer = _TsvWriter(staging / SAMPLE_RESOURCE_FILE, RESOURCE_HEADER_SAMPLE)
+    patient_writer = _TsvWriter(staging / PATIENT_RESOURCE_FILE, RESOURCE_HEADER_PATIENT)
+    try:
+        try:
+            for line, row in iter_rows(data_path, FORMAT_COLUMNS[format_version]):
+                if timeline_index is not None:
+                    event = timeline_index.pop(row["IMAGE_ID"], None)
+                    if event is None:
+                        row.update(UNDATED_TIMING)
+                    else:
+                        if event[0] != row["PATIENT_ID"]:
+                            _fail(line, f"IMAGE_ID {row['IMAGE_ID']} belongs to patient {event[0]} in "
+                                        f"{timeline_file} (line {event[2]}) but to {row['PATIENT_ID']} here")
+                        row.update(event[1])
+                slide = parser.parse(line, row)
+                counter.add(slide)
+                url = viewer_url(base_url, study_id, slide["patient_id"], slide["image_id"])
+                metadata = json.dumps(slide["metadata"], separators=(",", ":"), sort_keys=True,
+                                      ensure_ascii=True)
+                if slide["sample_id"] is not None:
+                    sample_writer.write([slide["patient_id"], slide["sample_id"], SAMPLE_RESOURCE_ID,
+                                         url, slide["image_id"], RESOURCE_TYPE, metadata])
+                else:
+                    patient_writer.write([slide["patient_id"], PATIENT_RESOURCE_ID, url,
+                                          slide["image_id"], RESOURCE_TYPE, metadata])
+        except ConversionError as error:
+            if str(error).startswith(str(data_path)):
+                raise
+            raise ConversionError(f"{data_path}: {error}") from error
+    finally:
+        sample_writer.close()
+        patient_writer.close()
+    if timeline_index:
+        examples = ", ".join(sorted(timeline_index)[:5])
+        warn(f"{timeline_file}: {len(timeline_index)} image(s) listed in timeline events are not in "
+             f"{data_path} (e.g. {examples}); the timeline file is imported unchanged")
+    by_sample, by_patient = counter.by_sample, counter.by_patient
 
     definitions = []
-    if sample_rows:
+    if sample_writer.rows:
         definitions.append([SAMPLE_RESOURCE_ID, "Pathology slides",
                             "Whole-slide images matched to a sample", "SAMPLE", "FALSE", "1"])
-    if patient_rows:
+    if patient_writer.rows:
         definitions.append([PATIENT_RESOURCE_ID, "Pathology slides",
                             "Whole-slide images not matched to a sample", "PATIENT", "FALSE", "1"])
-    add_pair(DEFINITION_FILE,
-             [["RESOURCE_ID", "DISPLAY_NAME", "DESCRIPTION", "RESOURCE_TYPE",
-               "OPEN_BY_DEFAULT", "PRIORITY"]] + definitions,
-             "meta_resource_definition.txt",
-             [("cancer_study_identifier", study_id), ("resource_type", "DEFINITION")])
-    if sample_rows:
-        add_pair(SAMPLE_RESOURCE_FILE, [RESOURCE_HEADER_SAMPLE] + sample_rows,
-                 "meta_resource_sample.txt",
-                 [("cancer_study_identifier", study_id), ("resource_type", "SAMPLE")])
-    if patient_rows:
-        add_pair(PATIENT_RESOURCE_FILE, [RESOURCE_HEADER_PATIENT] + patient_rows,
-                 "meta_resource_patient.txt",
-                 [("cancer_study_identifier", study_id), ("resource_type", "PATIENT")])
+    write_text("meta_resource_definition.txt",
+               meta_entries([("cancer_study_identifier", study_id), ("resource_type", "DEFINITION")],
+                            DEFINITION_FILE))
+    write_text(DEFINITION_FILE, render_tsv(DEFINITION_FILE, [
+        ["RESOURCE_ID", "DISPLAY_NAME", "DESCRIPTION", "RESOURCE_TYPE", "OPEN_BY_DEFAULT",
+         "PRIORITY"]] + definitions))
+    for writer, meta_file, resource_type in ((sample_writer, "meta_resource_sample.txt", "SAMPLE"),
+                                             (patient_writer, "meta_resource_patient.txt", "PATIENT")):
+        if writer.rows:
+            write_text(meta_file, meta_entries(
+                [("cancer_study_identifier", study_id), ("resource_type", resource_type)],
+                writer.path.name))
+            files.append(writer.path.name)
+
+    def add_pair(data_file, rows, meta_file, entries):
+        write_text(meta_file, meta_entries(entries, data_file))
+        write_text(data_file, render_tsv(data_file, rows))
 
     if study_dir is None:
         if by_sample:
@@ -666,54 +1017,38 @@ def convert(meta_wsi, output_dir, portal_base_url, study_dir=None):
                  [("cancer_study_identifier", study_id),
                   ("genetic_alteration_type", "CLINICAL"),
                   ("datatype", "PATIENT_ATTRIBUTES")])
-    else:
-        study_dir = Path(study_dir)
-        if not study_dir.is_dir():
-            raise ConversionError(f"--study-dir is not a directory: {study_dir}")
-        if output_dir.resolve() == study_dir.resolve():
-            raise ConversionError("--output-dir must differ from --study-dir; the merged clinical "
-                                  "files are written under the study's own file names")
-        check_study_conflicts(study_dir)
-        merges = (
-            ("SAMPLE_ATTRIBUTES", by_sample, ("PATIENT_ID", "SAMPLE_ID"), SAMPLE_COUNT_ATTRIBUTES),
-            ("PATIENT_ATTRIBUTES", {(patient,): counts for patient, counts in by_patient.items()},
-             ("PATIENT_ID",), PATIENT_COUNT_ATTRIBUTES),
-        )
-        for datatype, counts, key_columns, attributes in merges:
-            clinical = _find_clinical_meta(study_dir, datatype)
-            if clinical is None:
-                if counts:
-                    raise ConversionError(
-                        f"the study directory has no {datatype} clinical file to merge the WSI "
-                        f"slide counts into; add one that lists "
-                        f"{'the samples' if datatype == 'SAMPLE_ATTRIBUTES' else 'the patients'} "
-                        f"with slides")
-                continue
-            meta_path, clinical_data = clinical
-            if clinical_data.name in files or meta_path.name in files:
-                raise ConversionError(
-                    f"{meta_path.name}: its file names collide with a converted resource file")
-            files[meta_path.name] = meta_path.read_bytes()
-            files[clinical_data.name] = merge_clinical_counts(
-                clinical_data, attributes, key_columns, counts)
+        return files
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    written = []
-    for name, content in files.items():
-        path = output_dir / name
-        if isinstance(content, bytes):
-            path.write_bytes(content)
-        else:
-            with open(path, "w", encoding="utf-8", newline="") as stream:
-                stream.write(content)
-        written.append(path)
-    return written
+    merges = (
+        ("SAMPLE_ATTRIBUTES", by_sample, ("PATIENT_ID", "SAMPLE_ID"), SAMPLE_COUNT_ATTRIBUTES),
+        ("PATIENT_ATTRIBUTES", {(patient,): counts for patient, counts in by_patient.items()},
+         ("PATIENT_ID",), PATIENT_COUNT_ATTRIBUTES),
+    )
+    for datatype, counts, key_columns, attributes in merges:
+        clinical = _find_clinical_meta(study_dir, datatype)
+        if clinical is None:
+            if counts:
+                raise ConversionError(
+                    f"the study directory has no {datatype} clinical file to merge the WSI "
+                    f"slide counts into; add one that lists "
+                    f"{'the samples' if datatype == 'SAMPLE_ATTRIBUTES' else 'the patients'} "
+                    f"with slides")
+            continue
+        meta_path, clinical_data = clinical
+        if clinical_data.name in files or meta_path.name in files:
+            raise ConversionError(
+                f"{meta_path.name}: its file names collide with a converted resource file")
+        (staging / meta_path.name).write_bytes(meta_path.read_bytes())
+        files.append(meta_path.name)
+        write_text(clinical_data.name, merge_clinical_counts(
+            clinical_data, attributes, key_columns, counts))
+    return files
 
 
 def interface(args=None):
     parser = argparse.ArgumentParser(
-        description="Convert a legacy format-v3 meta_wsi/data_wsi pair into standard resource "
-                    "and clinical slide-count files. Runs offline.")
+        description="Convert a legacy meta_wsi/data_wsi pair (format_version 2 or 3) into standard "
+                    "resource and clinical slide-count files. Runs offline.")
     parser.add_argument("--meta-wsi", type=Path, required=True,
                         help="path to the legacy meta_wsi.txt (its data_filename is read next to it)")
     parser.add_argument("--output-dir", type=Path, required=True,
@@ -724,14 +1059,23 @@ def interface(args=None):
     parser.add_argument("--study-dir", type=Path,
                         help="study directory the output joins: its clinical sample/patient files "
                              "are copied to --output-dir with the WSI count columns appended, and "
-                             "it is checked for files the output would duplicate")
+                             "it is checked for files the output would duplicate; for format v2 "
+                             "its pathology timeline is used unless --timeline-file is given")
+    parser.add_argument("--timeline-file", type=Path,
+                        help="format v2 only: the pathology timeline data file (a TIMELINE clinical "
+                             "file with an IMAGE_IDS column) to take slide timing from; it is only read")
+    parser.add_argument("--day-zero-mismatch", choices=DAY_ZERO_MISMATCH_POLICIES, default="error",
+                        help="format v2 only: what to do with timeline events whose TIMEPOINT_SOURCE "
+                             "does not place day zero at first tumor sequencing: fail (default), or "
+                             "keep their slides without an offset as MISSING_REFERENCE_SEQUENCING_DATE")
     return parser.parse_args(args)
 
 
 def main(args=None):
     parsed = interface(args)
     try:
-        written = convert(parsed.meta_wsi, parsed.output_dir, parsed.portal_base_url, parsed.study_dir)
+        written = convert(parsed.meta_wsi, parsed.output_dir, parsed.portal_base_url, parsed.study_dir,
+                          parsed.timeline_file, parsed.day_zero_mismatch)
     except ConversionError as error:
         print(f"convertWsiToResources.py: error: {error}", file=sys.stderr)
         return 1
