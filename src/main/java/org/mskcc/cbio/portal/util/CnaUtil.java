@@ -87,7 +87,12 @@ public class CnaUtil {
     
     public long getEntrezSymbol(String[] parts) {
         String entrezAsString = TabDelimitedFileUtil.getPartString(getColumnIndex(CnaUtil.ENTREZ_GENE_ID), parts);
-        if (entrezAsString.isEmpty()) {
+        // TabDelimitedFileUtil.getPartString() returns "NA" when the Entrez_Gene_Id column is absent
+        // (column index -1), when the cell is empty, or when it literally contains "NA". In all of these
+        // cases an Entrez ID is simply not provided, which is allowed as long as a Hugo_Symbol is present
+        // (see https://docs.cbioportal.org/file-formats/#discrete-copy-number-data). Treat it as "no Entrez
+        // ID" and let the caller fall back to the Hugo symbol, without emitting a spurious warning per line.
+        if (entrezAsString.isEmpty() || entrezAsString.equals(TabDelimitedFileUtil.NA_STRING)) {
             return 0;
         } else if (!entrezAsString.matches("^\\d+$")) {
             ProgressMonitor.logWarning("Ignoring line with invalid Entrez_Id " + entrezAsString);
