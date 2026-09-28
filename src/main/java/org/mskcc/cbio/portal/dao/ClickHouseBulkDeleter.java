@@ -71,6 +71,7 @@ public class ClickHouseBulkDeleter {
 
     private static final Logger log = LoggerFactory.getLogger(ClickHouseBulkDeleter.class);
     private static final Map<String, ClickHouseBulkDeleter> BULK_DELETERS = new LinkedHashMap<>();
+    private static Boolean asyncLightweightDeleteSupported = null; // cached result of a server settings check
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
@@ -355,13 +356,15 @@ public class ClickHouseBulkDeleter {
 
     private long deleteRecordsReferencedInStagingTable() throws DaoException {
         long records_deleted;
-        // Return as soon as the delete is accepted; confirmDeletionIsComplete() then polls with short
-        // queries. Waiting inside the DELETE (lightweight_deletes_sync=2, the default) keeps the connection
-        // silent for as long as the delete runs (~6 minutes for genetic_alteration), longer than network
-        // idle timeouts, so the response is lost even though the delete succeeds.
+        // Where the server supports it, return as soon as the delete is accepted; confirmDeletionIsComplete()
+        // then polls with short queries. Waiting inside the DELETE (lightweight_deletes_sync=2, the default)
+        // keeps the connection silent for as long as the delete runs (~6 minutes for genetic_alteration),
+        // longer than network idle timeouts, so the response is lost even though the delete succeeds.
+        // Servers older than 24.4 lack the setting and always wait.
         String statementString = String.format(
-                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s) SETTINGS lightweight_deletes_sync = 0",
-                targetTable, idColumn, stagingTable);
+                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)%s",
+                targetTable, idColumn, stagingTable,
+                isAsyncLightweightDeleteSupported() ? " SETTINGS lightweight_deletes_sync = 0" : "");
         try {
             Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
             try (PreparedStatement stmt = con.prepareStatement(statementString)) {
@@ -374,6 +377,24 @@ public class ClickHouseBulkDeleter {
             throw new DaoException(e);
         }
         return records_deleted;
+    }
+
+    private static synchronized boolean isAsyncLightweightDeleteSupported() throws DaoException {
+        if (asyncLightweightDeleteSupported == null) {
+            try {
+                Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
+                try (PreparedStatement stmt = con.prepareStatement(
+                        "SELECT count() AS setting_count FROM system.settings WHERE name = 'lightweight_deletes_sync'");
+                        ResultSet rs = stmt.executeQuery()) {
+                    asyncLightweightDeleteSupported = rs.next() && rs.getLong("setting_count") > 0;
+                } finally {
+                    JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
+                }
+            } catch (SQLException e) {
+                throw new DaoException(e);
+            }
+        }
+        return asyncLightweightDeleteSupported;
     }
 
     private void dropStagingTable(boolean tolerateFailure) throws DaoException {
