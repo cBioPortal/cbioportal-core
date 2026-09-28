@@ -26,6 +26,12 @@ insert_table_data_result_filepath="$(pwd)/ccd_copy_table_data.txt"
 record_count_comparison_filepath="$(pwd)/ccd_table_record_count.txt"
 clickhouse_is_responsive_filepath="$(pwd)/ccd_clickhouse_is_responsive.txt"
 SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
+# Short statements (table list, CREATE, engine lookup, record counts) normally finish in well under a
+# second. A connection that stalls would otherwise hang for the client's default 300s timeout and then
+# cancel the whole clone, so bound them tightly and retry.
+QUICK_STATEMENT_MAX_ATTEMPTS=3
+QUICK_STATEMENT_TIMEOUT_SECONDS=120
+QUICK_STATEMENT_RETRY_DELAY_SECONDS=15
 
 function usage() {
     echo "usage: clone_clickhouse_database.sh properties_filepath database_to_clone_tables_from database_to_clone_tables_to" >&2
@@ -96,6 +102,29 @@ function shutdown_main_and_clean_up() {
     unset record_count_comparison_filepath
     unset clickhouse_is_responsive_filepath
     unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
+    unset QUICK_STATEMENT_MAX_ATTEMPTS
+    unset QUICK_STATEMENT_TIMEOUT_SECONDS
+    unset QUICK_STATEMENT_RETRY_DELAY_SECONDS
+}
+
+function execute_quick_sql_statement_with_retry() {
+    local statement=$1
+    local output_filepath=$2
+    local attempt=1
+    while true ; do
+        if execute_sql_statement_via_clickhouse_client "$statement" "$output_filepath" \
+                --connect_timeout=30 \
+                --send_timeout="$QUICK_STATEMENT_TIMEOUT_SECONDS" \
+                --receive_timeout="$QUICK_STATEMENT_TIMEOUT_SECONDS" ; then
+            return 0
+        fi
+        if [ "$attempt" -ge "$QUICK_STATEMENT_MAX_ATTEMPTS" ] ; then
+            return 1
+        fi
+        echo "retrying clickhouse statement (attempt $attempt failed) : $statement" >&2
+        attempt=$((attempt+1))
+        sleep $QUICK_STATEMENT_RETRY_DELAY_SECONDS
+    done
 }
 
 function clickhouse_is_responding() {
@@ -134,7 +163,7 @@ function destination_database_exists_and_is_empty() {
 function set_database_table_list() {
     local statement="SELECT name FROM system.tables WHERE database = '$source_database_name'"
     rm -f "$database_table_list_filepath"
-    if ! execute_sql_statement_via_clickhouse_client "$statement" "$database_table_list_filepath" ; then
+    if ! execute_quick_sql_statement_with_retry "$statement" "$database_table_list_filepath" ; then
         echo "Warning : failed to execute clickhouse statement : $statement" >&2
         return 1
     fi
@@ -148,9 +177,10 @@ function set_database_table_list() {
 
 function create_destination_database_table_schema_only() {
     local table_name=$1
-    # CREATE TABLE ... AS source copies the schema only (no data)
-    local statement="CREATE TABLE \`$destination_database_name\`.\`$table_name\` AS \`$source_database_name\`.\`$table_name\`"
-    if ! execute_sql_statement_via_clickhouse_client "$statement" "$create_table_result_filepath" ; then
+    # CREATE TABLE ... AS source copies the schema only (no data). IF NOT EXISTS lets a retry succeed
+    # when a stalled first attempt did create the table (the destination was verified empty at start).
+    local statement="CREATE TABLE IF NOT EXISTS \`$destination_database_name\`.\`$table_name\` AS \`$source_database_name\`.\`$table_name\`"
+    if ! execute_quick_sql_statement_with_retry "$statement" "$create_table_result_filepath" ; then
         return 1
     fi
     return 0
@@ -189,7 +219,7 @@ function get_table_record_count() {
     # ClickHouse Cloud) so that deduplication is applied at read time, giving a
     # consistent logical row count rather than the raw unmerged storage count.
     local engine_statement="SELECT engine FROM system.tables WHERE database = '$database_name' AND name = '$table_name'"
-    if ! execute_sql_statement_via_clickhouse_client "$engine_statement" "$record_count_comparison_filepath" ; then
+    if ! execute_quick_sql_statement_with_retry "$engine_statement" "$record_count_comparison_filepath" ; then
         echo "Warning : failed to get engine for table $database_name.$table_name" >&2
         return 1
     fi
@@ -205,7 +235,7 @@ function get_table_record_count() {
     # reads are eventually consistent and a count(*) immediately after INSERT may
     # otherwise return a stale result.
     local count_statement="SELECT count(*) FROM \`$database_name\`.\`$table_name\`$final_clause SETTINGS select_sequential_consistency = 1"
-    if ! execute_sql_statement_via_clickhouse_client "$count_statement" "$record_count_comparison_filepath" ; then
+    if ! execute_quick_sql_statement_with_retry "$count_statement" "$record_count_comparison_filepath" ; then
         echo "Warning : failed to get record count for table $database_name.$table_name" >&2
         return 1
     fi
