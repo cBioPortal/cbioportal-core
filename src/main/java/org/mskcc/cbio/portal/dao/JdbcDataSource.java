@@ -68,8 +68,14 @@ public class JdbcDataSource extends BasicDataSource {
         this.setMaxTotal(500);
         this.setMaxIdle(30);
         this.setMaxWaitMillis(10000);
+        // Evict idle connections after 30s of idleness, checking every 10s
         this.setMinEvictableIdleTimeMillis(30000);
+        this.setTimeBetweenEvictionRunsMillis(10000);
+        // Test connections before borrow and while idle to catch stale connections
         this.setTestOnBorrow(true);
+        this.setTestWhileIdle(true);
+        // Avoid connections living so long they go stale on the server side
+        this.setMaxConnLifetimeMillis(1800000); // 30 minutes
         this.setValidationQuery("SELECT 1");
     }
 

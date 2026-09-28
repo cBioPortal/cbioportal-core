@@ -143,19 +143,20 @@ public class GeneticProfileReader {
         }
 
         // add new genetic profile
+        // addGeneticProfile() assigns the internal id on this instance before the INSERT and
+        // caches this same instance, so geneticProfile.getGeneticProfileId() is authoritative
+        // from here on. No read-back is needed, which also avoids the ClickHouse Cloud
+        // (SharedMergeTree) window where a SELECT following an INSERT on another connection
+        // may still return a stale snapshot.
         DaoGeneticProfile.addGeneticProfile(geneticProfile);
 
         // add genetic profile link if set
         if (geneticProfileLink != null) {
             // Set `REFERRING_GENETIC_PROFILE_ID`
-            int geneticProfileId = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId()).getGeneticProfileId();
-            geneticProfileLink.setReferringGeneticProfileId(geneticProfileId);
+            geneticProfileLink.setReferringGeneticProfileId(geneticProfile.getGeneticProfileId());
             DaoGeneticProfileLink.addGeneticProfileLink(geneticProfileLink);
         }
 
-        // Get ID
-        GeneticProfile gp = DaoGeneticProfile.getGeneticProfileByStableId(geneticProfile.getStableId());
-        geneticProfile.setGeneticProfileId(gp.getGeneticProfileId());
         return geneticProfile;
     }
 
@@ -168,6 +169,17 @@ public class GeneticProfileReader {
             throw new RuntimeException("'source_stable_id' is required in meta file for " + geneticProfile.getStableId());
         }
         GeneticProfile referredGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(referredGeneticProfileStableId);
+        if (referredGeneticProfile == null) {
+            // Fallback: the referred profile may not be in the cache yet
+            DaoGeneticProfile.reCache();
+            referredGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(referredGeneticProfileStableId);
+        }
+        if (referredGeneticProfile == null) {
+            throw new RuntimeException("Referred genetic profile not found: "
+                    + referredGeneticProfileStableId
+                    + " (required by source_stable_id in meta file for "
+                    + geneticProfile.getStableId() + ")");
+        }
         geneticProfileLink.setReferredGeneticProfileId(referredGeneticProfile.getGeneticProfileId());
 
         // Decide reference type
