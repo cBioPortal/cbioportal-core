@@ -150,13 +150,21 @@ public class ClickHouseBulkDeleter {
             throw new RuntimeException("a ClickHouseBulkDeleter object had been flushed previously, and was attempted to be flushed a second time");
         }
         List<ClickHouseBulkDeleter> effectiveDeleters = deletersWithPendingDeletes(deleters);
+        boolean deletionSucceeded = false;
         try {
             dropExistingStagingTables(effectiveDeleters, false); // drop any leftover tables from previous crash/failure
             createStagingTables(effectiveDeleters);
             populateStagingTables(effectiveDeleters);
             totalDeleted = deleteRecordsReferencedInStagingTables(effectiveDeleters);
+            deletionSucceeded = true;
         } finally {
-            dropExistingStagingTables(effectiveDeleters, true);
+            if (deletionSucceeded) {
+                dropExistingStagingTables(effectiveDeleters, true);
+            } else {
+                // An exception is already propagating. Waiting for deletes that failed or never ran
+                // could only time out and replace that exception, so just clean up.
+                dropStagingTablesAfterFailure(effectiveDeleters);
+            }
             teardownDeleters(effectiveDeleters);
         }
         return totalDeleted;
@@ -247,6 +255,16 @@ public class ClickHouseBulkDeleter {
                 d.confirmDeletionIsComplete();
             }
             d.dropStagingTable(deletionHasBeenExecuted);
+        }
+    }
+
+    private static void dropStagingTablesAfterFailure(List<ClickHouseBulkDeleter> deleters) {
+        for (ClickHouseBulkDeleter d : deleters) {
+            try {
+                d.dropStagingTable(true);
+            } catch (DaoException e) {
+                log.warn("could not drop staging table {} after a failed delete; it will be dropped on the next run", d.stagingTable, e);
+            }
         }
     }
 
@@ -397,11 +415,11 @@ public class ClickHouseBulkDeleter {
     }
 
     private void confirmDeletionIsCompleteInData() throws DaoException {
-        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
+        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
             String exceptionMessageString = String.format(
                     "Failed to complete the delete operation on all replicas for table %s after retrying for %d seconds",
                     this.targetTable,
-                    DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
+                    CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
             throw new DaoException(exceptionMessageString);
         }
         // TODO: if condition fails a few times, we might start checking whether any

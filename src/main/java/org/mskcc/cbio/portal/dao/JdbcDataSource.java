@@ -64,6 +64,7 @@ public class JdbcDataSource extends BasicDataSource {
         this.setPassword(password);
         this.setUrl(connectionURL);
         this.setDriverClassName(driverClassName);
+        applyIdleConnectionKeepalive(connectionURL);
         // Disable this to avoid caching statements
         this.setPoolPreparedStatements(Boolean.valueOf(enablePooling));
         // these values are from the production cbioportal application context for a jndi data source
@@ -83,6 +84,33 @@ public class JdbcDataSource extends BasicDataSource {
         // including a TLS handshake that can otherwise inherit the long import
         // query socket timeout.
         this.setValidationQueryTimeout(VALIDATION_QUERY_TIMEOUT);
+    }
+
+    /**
+     * Have ClickHouse send progress headers while a statement runs. Without them, a statement that
+     * sends no bytes for longer than a network path's idle timeout (350s for AWS NAT gateways and
+     * NLBs) loses its response even though the server completes it, and the client then hangs until
+     * its socket timeout.
+     */
+    private void applyIdleConnectionKeepalive(String connectionURL) {
+        String settings = idleConnectionKeepaliveSettings(connectionURL);
+        if (settings != null) {
+            this.addConnectionProperty("custom_settings", settings);
+        } else if (connectionURL.startsWith("jdbc:clickhouse:") && !connectionURL.contains(SEND_PROGRESS_SETTING)) {
+            LOG.warn("spring.datasource.url already sets custom_settings; add " + IDLE_KEEPALIVE_SETTINGS +
+                    " to it so long-running statements survive network idle timeouts");
+        }
+    }
+
+    static final String SEND_PROGRESS_SETTING = "send_progress_in_http_headers";
+    static final String IDLE_KEEPALIVE_SETTINGS = SEND_PROGRESS_SETTING + "=1,http_headers_progress_interval_ms=60000";
+
+    /** Returns the custom_settings value to add, or null if the URL is not ClickHouse or already sets custom_settings. */
+    static String idleConnectionKeepaliveSettings(String connectionURL) {
+        if (connectionURL == null || !connectionURL.startsWith("jdbc:clickhouse:") || connectionURL.contains("custom_settings")) {
+            return null;
+        }
+        return IDLE_KEEPALIVE_SETTINGS;
     }
 
     private void logUsedDeprecatedProperties(DatabaseProperties dbProperties) {
