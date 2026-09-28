@@ -63,6 +63,7 @@ import org.slf4j.LoggerFactory;
 public class ClickHouseBulkDeleter {
 
     private boolean flushed; // once flushed, any particular deleter instance cannot not be flushed again
+    private boolean deleteIssued = false; // the DELETE was sent (it may be running even if the call failed)
     private final Set<Long> pendingIds = new HashSet<>();
     private final String idColumn;
     private final String stagingTable;
@@ -73,7 +74,7 @@ public class ClickHouseBulkDeleter {
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
-    private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 7 * 60;
+    private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 30 * 60;
     private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_RETRY_CYCLE_PERIOD_SECONDS = 10;
     private static final Integer DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT = 6;
@@ -260,6 +261,11 @@ public class ClickHouseBulkDeleter {
 
     private static void dropStagingTablesAfterFailure(List<ClickHouseBulkDeleter> deleters) {
         for (ClickHouseBulkDeleter d : deleters) {
+            if (d.deleteIssued) {
+                // an accepted asynchronous delete still reads its staging table; the next run drops it
+                log.warn("leaving staging table {} in place because its delete may still be running", d.stagingTable);
+                continue;
+            }
             try {
                 d.dropStagingTable(true);
             } catch (DaoException e) {
@@ -349,12 +355,17 @@ public class ClickHouseBulkDeleter {
 
     private long deleteRecordsReferencedInStagingTable() throws DaoException {
         long records_deleted;
+        // Return as soon as the delete is accepted; confirmDeletionIsComplete() then polls with short
+        // queries. Waiting inside the DELETE (lightweight_deletes_sync=2, the default) keeps the connection
+        // silent for as long as the delete runs (~6 minutes for genetic_alteration), longer than network
+        // idle timeouts, so the response is lost even though the delete succeeds.
         String statementString = String.format(
-                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)",
+                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s) SETTINGS lightweight_deletes_sync = 0",
                 targetTable, idColumn, stagingTable);
         try {
             Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
             try (PreparedStatement stmt = con.prepareStatement(statementString)) {
+                this.deleteIssued = true; // set before executing: a timed-out statement may still have been accepted
                 records_deleted = stmt.executeUpdate();
             } finally {
                 JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
