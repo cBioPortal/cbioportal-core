@@ -3897,7 +3897,8 @@ class ResourceDefinitionValidator(Validator):
 
 def new_wsi_row_state():
     """Return empty cross-row state for WsiRowChecks._check_wsi_row."""
-    return {'images': set(), 'parts': {}, 'blocks': {}}
+    return {'images': set(), 'parts': {}, 'blocks': {}, 'references': {},
+            'reference_conflicts': set()}
 
 
 def reset_wsi_resource_state():
@@ -4075,6 +4076,32 @@ class WsiRowChecks(object):
             return False
         return True
 
+    def _check_reference_sample(self, row, line_number, column, state, label):
+        """Require one reference sample per patient across all WSI rows of the study.
+
+        Mirrors convertWsiToResources.SlideParser: a blank or UNMATCHED
+        REFERENCE_SAMPLE_ID means "no reference sample" (the converter omits it
+        from the resource metadata), and every row of a patient must carry the
+        same reference sample or all must omit it. The portal takes the
+        reference sample from the patient's first row, so a mix would be
+        order-dependent. Reported once per patient, at the first disagreeing row.
+        """
+        patient_id = row['PATIENT_ID']
+        if not patient_id:
+            return
+        reference = row['REFERENCE_SAMPLE_ID']
+        if reference.upper() == 'UNMATCHED':
+            reference = ''
+        first = state['references'].setdefault(
+            patient_id, (reference, '%s line %d' % (self.filenameShort, line_number)))
+        if first[0] == reference or patient_id in state['reference_conflicts']:
+            return
+        state['reference_conflicts'].add(patient_id)
+        self._error('All WSI rows of a patient must have the same %s, or all omit it'
+                    % label('REFERENCE_SAMPLE_ID'), line_number, column('REFERENCE_SAMPLE_ID'),
+                    'patient %s: %s (%s) vs %s' % (
+                        patient_id, first[0] or '<none>', first[1], reference or '<none>'))
+
     def _check_wsi_row(self, row, line_number, column, state, label=None):
         """Check one normalized WSI row.
 
@@ -4208,6 +4235,8 @@ class WsiRowChecks(object):
                 if value and value.upper() != 'UNMATCHED' and SAMPLE_TO_PATIENT.get(value) != row['PATIENT_ID']:
                     self._error('%s belongs to a different patient' % name, line_number,
                                 column(name), value)
+
+        self._check_reference_sample(row, line_number, column, state, label)
 
         for name in ('SOURCE_URL', 'THUMBNAIL_URL'):
             if row[name] and not self._is_absolute_url(row[name]):
@@ -4387,6 +4416,11 @@ class ResourceValidator(WsiRowChecks, Validator):
         def label(name):
             return name if name in ('PATIENT_ID', 'SAMPLE_ID') else 'METADATA.' + name.lower()
 
+        if row['REFERENCE_SAMPLE_ID'].upper() == 'UNMATCHED':
+            # the portal reads this value verbatim as a sample ID; the converter omits it instead
+            self._error('WHOLE_SLIDE_IMAGE metadata reference_sample_id must be omitted, not UNMATCHED, '
+                        'when a patient has no reference sample', self.line_number, metadata_column,
+                        row['REFERENCE_SAMPLE_ID'])
         self._check_wsi_row(row, self.line_number, column, wsi_resource_state(), label)
 
     def url_validator(self, url):

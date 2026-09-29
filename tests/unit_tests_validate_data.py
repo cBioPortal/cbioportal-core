@@ -3271,6 +3271,23 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
             errors,
         )
 
+    def test_reference_sample_must_agree_per_patient(self):
+        lines = Path('test_data/data_wsi_valid.txt').read_text().splitlines()
+        values = lines[5].split('\t')
+        values[3] = 'IMAGE-2'
+        values[1] = 'UNMATCHED'  # the same as blank: no reference sample
+        unmatched = '\t'.join(values)
+        values[3] = 'IMAGE-3'
+        values[1] = 'TEST-SAMPLE-REF'
+        conflicting = '\t'.join(values)
+        with temp_inputfolder({'data_wsi.txt': '\n'.join(lines + [unmatched, conflicting]) + '\n'}) as study_dir:
+            validateData.WsiValidator(study_dir, {'data_filename': 'data_wsi.txt'}, PORTAL_INSTANCE,
+                                      self.logger, False, False).validate()
+        conflicts = [record for record in self.get_log_records()
+                     if record.getMessage().startswith('All WSI rows of a patient')]
+        self.assertEqual([(8, 'patient TEST-PAT1: <none> (data_wsi.txt line 6) vs TEST-SAMPLE-REF')],
+                         [(record.line_number, record.cause) for record in conflicts])
+
     def test_tile_metadata_requires_browser_contract(self):
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({}))
         self.assertFalse(validateData.WsiValidator._is_valid_tile_metadata({
@@ -3475,7 +3492,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
         return [patient, resource_id, 'https://portal.example/wsi/patient/' + patient + '/9',
                 'slide', resource_type, metadata]
 
-    def validate_resource(self, validator_class, rows, keep_state=False):
+    def validate_resource(self, validator_class, rows, keep_state=False, with_line=False):
         """Validate one resource file; study-wide WSI state is reset unless keep_state."""
         if not keep_state:
             validateData.reset_wsi_resource_state()
@@ -3487,6 +3504,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
                                         PORTAL_INSTANCE, self.logger, False, False)
             validator.validate()
         return [(record.getMessage(), getattr(record, 'cause', None))
+                + ((getattr(record, 'line_number', None),) if with_line else ())
                 for record in self.get_log_records() if record.levelno >= logging.ERROR]
 
     def test_valid_sample_and_patient_rows(self):
@@ -3578,6 +3596,60 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
         errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row(
             self.metadata(image_id='IMG-2', reference_sample_id='WSI-P2-S1'))])
         self.assertIn(('REFERENCE_SAMPLE_ID belongs to a different patient', 'WSI-P2-S1'), errors)
+
+    REFERENCE_CONFLICT = ('All WSI rows of a patient must have the same METADATA.reference_sample_id, '
+                          'or all omit it')
+
+    def validate_sample_then_patient(self, sample_refs, patient_refs):
+        """Validate WSI-P1 slides with the given reference samples (None omits it) in a
+        sample resource file and then a patient resource file of the same study."""
+        sample_rows = [self.sample_row(self.metadata(image_id='IMG-S%d' % index, reference_sample_id=ref))
+                       for index, ref in enumerate(sample_refs)]
+        patient_rows = [self.patient_row(self.metadata(image_id='IMG-P%d' % index, match_level='UNMATCHED',
+                                                       reference_sample_id=ref))
+                        for index, ref in enumerate(patient_refs)]
+        for index, row in enumerate(sample_rows + patient_rows):
+            row[-4] += '/%d' % index  # distinct URLs, so rows are not duplicate resources
+        errors = self.validate_resource(validateData.SampleResourceValidator, sample_rows,
+                                        with_line=True)
+        errors += self.validate_resource(validateData.PatientResourceValidator, patient_rows,
+                                         keep_state=True, with_line=True)
+        return errors
+
+    def test_consistent_reference_sample_passes(self):
+        self.assertEqual([], self.validate_sample_then_patient(['WSI-P1-S1'] * 2, ['WSI-P1-S1']))
+
+    def test_all_absent_reference_sample_passes(self):
+        self.assertEqual([], self.validate_sample_then_patient([None, None], [None]))
+
+    def test_conflicting_reference_samples_across_files_fail(self):
+        validateData.SAMPLE_TO_PATIENT['WSI-P1-S2'] = 'WSI-P1'
+        validateData.DEFINED_SAMPLE_IDS.add('WSI-P1-S2')
+        errors = self.validate_sample_then_patient(['WSI-P1-S1'], ['WSI-P1-S1', 'WSI-P1-S2', 'WSI-P1-S2'])
+        # reported once per patient, at the first disagreeing row (line 3 of the patient file)
+        self.assertEqual([(self.REFERENCE_CONFLICT,
+                           'patient WSI-P1: WSI-P1-S1 (data_resource.txt line 2) vs WSI-P1-S2', 3)], errors)
+
+    def test_present_and_absent_reference_sample_fail(self):
+        errors = self.validate_sample_then_patient([None, 'WSI-P1-S1'], [])
+        self.assertEqual([(self.REFERENCE_CONFLICT,
+                           'patient WSI-P1: <none> (data_resource.txt line 2) vs WSI-P1-S1', 3)], errors)
+        errors = self.validate_sample_then_patient(['WSI-P1-S1'], [None])
+        self.assertEqual([(self.REFERENCE_CONFLICT,
+                           'patient WSI-P1: WSI-P1-S1 (data_resource.txt line 2) vs <none>', 2)], errors)
+
+    def test_reference_samples_are_per_patient(self):
+        errors = self.validate_resource(validateData.SampleResourceValidator, [
+            self.sample_row(self.metadata(reference_sample_id='WSI-P1-S1')),
+            self.sample_row(self.metadata(image_id='IMG-2', reference_sample_id='WSI-P2-S1'),
+                            patient='WSI-P2', sample='WSI-P2-S1')])
+        self.assertEqual([], errors)
+
+    def test_unmatched_reference_sample_is_rejected_in_metadata(self):
+        errors = self.validate_resource(validateData.PatientResourceValidator, [self.patient_row(
+            self.metadata(image_id='IMG-9', match_level='UNMATCHED', reference_sample_id='UNMATCHED'))])
+        self.assertEqual([('WHOLE_SLIDE_IMAGE metadata reference_sample_id must be omitted, not UNMATCHED, '
+                           'when a patient has no reference sample', 'UNMATCHED')], errors)
 
     def test_match_level_matches_file_type(self):
         errors = self.validate_resource(validateData.PatientResourceValidator, [self.patient_row(
