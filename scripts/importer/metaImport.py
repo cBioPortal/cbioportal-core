@@ -129,11 +129,11 @@ def _print_need_to_update_derived_tables_warning():
         file=sys.stderr,
     )
 
-def _print_need_to_enable_study_message(study_id):
+def _print_need_to_make_study_available_message(study_id):
     print(
         Color.BOLD +
         'The study stays UNAVAILABLE until the derived tables are rebuilt. Then run:\n'
-        '    cbioportalImporter.py enable-study -id ' + study_id + '\n' +
+        '    cbioportalImporter.py make-studies-available -ids ' + study_id + '\n' +
         Color.END,
         file=sys.stderr,
     )
@@ -252,12 +252,12 @@ if __name__ == '__main__':
                               "The database may be in an inconsistent state." +
                               Color.END, file=sys.stderr)
                         exitcode = 1
-                        _print_need_to_enable_study_message(study_id)
+                        _print_need_to_make_study_available_message(study_id)
                     else:
-                        cbioportalImporter.enable_study(args, study_id)
+                        cbioportalImporter.make_study_available(args, study_id)
                 else:
                     _print_need_to_update_derived_tables_warning()
-                    _print_need_to_enable_study_message(study_id)
+                    _print_need_to_make_study_available_message(study_id)
             else:
                 print(Color.BOLD + "Warnings. Please fix your files or import with override warning option" + Color.END, file=sys.stderr)
                 print("#" * 71, file=sys.stderr)
@@ -278,12 +278,12 @@ if __name__ == '__main__':
                           "The database may be in an inconsistent state." +
                           Color.END, file=sys.stderr)
                     exitcode = 1
-                    _print_need_to_enable_study_message(study_id)
+                    _print_need_to_make_study_available_message(study_id)
                 else:
-                    cbioportalImporter.enable_study(args, study_id)
+                    cbioportalImporter.make_study_available(args, study_id)
             else:
                 _print_need_to_update_derived_tables_warning()
-                _print_need_to_enable_study_message(study_id)
+                _print_need_to_make_study_available_message(study_id)
     except KeyboardInterrupt:
         print(Color.BOLD + "\nProcess interrupted. You will have to run this again to make sure study is completely loaded." + Color.END, file=sys.stderr)
         print("#" * 71, file=sys.stderr)

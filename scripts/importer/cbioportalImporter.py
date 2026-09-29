@@ -58,9 +58,9 @@ REMOVE_SAMPLES = "remove-samples"
 REMOVE_PATIENTS = "remove-patients"
 IMPORT_STUDY_DATA = "import-study-data"
 IMPORT_CASE_LIST = "import-case-list"
-ENABLE_STUDY = "enable-study"
+MAKE_STUDIES_AVAILABLE = "make-studies-available"
 
-COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS, ENABLE_STUDY]
+COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIST, REMOVE_STUDY, REMOVE_SAMPLES, REMOVE_PATIENTS, MAKE_STUDIES_AVAILABLE]
 
 # ------------------------------------------------------------------------------
 # sub-routines
@@ -269,7 +269,7 @@ def process_command(jvm_args, command, meta_filename, data_filename, study_ids, 
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity)
     elif command == IMPORT_CASE_LIST:
         import_case_list(jvm_args, meta_filename)
-    elif command == ENABLE_STUDY:
+    elif command == MAKE_STUDIES_AVAILABLE:
         for study_id in study_ids.split(","):
             update_study_status(jvm_args, study_id)
 
@@ -557,7 +557,7 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files)
     return study_id
 
-def enable_study(args, study_id):
+def make_study_available(args, study_id):
     # main() has already put the jar path into args.java_opts
     update_study_status("-Dspring.profiles.active=dbcp " + args.java_opts, study_id)
 
@@ -629,8 +629,8 @@ def interface(args=None):
     remove_patients.add_argument('--patient_ids', type=str, required=True,
                         help='Patient ID(s). Comma separated, if multiple.')
 
-    enable_study = subparsers.add_parser('enable-study', parents=[parent_parser], add_help=False)
-    enable_study.add_argument('-id', '--study_ids', type=str, required=True,
+    make_studies_available = subparsers.add_parser('make-studies-available', parents=[parent_parser], add_help=False)
+    make_studies_available .add_argument('-ids', '--study_ids', type=str, required=True,
                         help='Cancer Study ID(s) to mark AVAILABLE, comma separated')
 
     parser.add_argument('-c', '--command', type=str, required=False,

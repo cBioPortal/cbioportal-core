@@ -178,13 +178,13 @@ class DataImporterTests(unittest.TestCase):
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
     @mock.patch('importer.cbioportalImporter.run_java')
-    def test_enable_study(self, run_java, locate_jar):
+    def test_make_studies_available(self, run_java, locate_jar):
         '''
-        Tests java commands enabling studies produces
+        Tests java commands that make-studies-available produces
         '''
         locate_jar.return_value = "test.jar"
 
-        args = ['enable-study', '--study_ids', 'STUDY1,STUDY2']
+        args = ['make-studies-available', '--study_ids', 'STUDY1,STUDY2']
         parsed_args = cbioportalImporter.interface(args)
         cbioportalImporter.main(parsed_args)
 
