@@ -1,8 +1,8 @@
-#Patient Identifier	WSI Slides per Patient	WSI Slides per Patient, Part-matched	WSI Slides per Patient, Block-matched
-#Patient identifier	Associated pathology slide count for the patient.	Associated pathology slides matched to a specimen part for the patient.	Associated pathology slides matched to a specimen block for the patient.
-#STRING	NUMBER	NUMBER	NUMBER
-#1	1	1	1
-PATIENT_ID	WSI_PATIENT_SLIDE_COUNT	WSI_PATIENT_PART_MATCHED_SLIDE_COUNT	WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT
-WSI-P1	4	1	2
-WSI-P2	1	1	0
-WSI+P3	1	0	0
+#Patient Identifier	WSI Slides per Patient	WSI Slides per Patient, Part-matched	WSI Slides per Patient, Block-matched	WSI Undated Viewable Slides per Patient
+#Patient identifier	Associated pathology slide count for the patient.	Associated pathology slides matched to a specimen part for the patient.	Associated pathology slides matched to a specimen block for the patient.	Viewable pathology slides without a procedure date, which the timeline does not show.
+#STRING	NUMBER	NUMBER	NUMBER	NUMBER
+#1	1	1	1	1
+PATIENT_ID	WSI_PATIENT_SLIDE_COUNT	WSI_PATIENT_PART_MATCHED_SLIDE_COUNT	WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT	WSI_PATIENT_UNDATED_SLIDE_COUNT
+WSI-P1	4	1	2	2
+WSI-P2	1	1	0	0
+WSI+P3	1	0	0	0

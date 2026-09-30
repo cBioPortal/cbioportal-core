@@ -104,7 +104,8 @@ SEQUENCING_DAY_ZERO = re.compile(r"\brelative to first tumor sequencing\s*$", re
 ESTIMATED_DATE = re.compile(r"\bestimated\b", re.IGNORECASE)
 DAY_ZERO_MISMATCH_POLICIES = ("error", "undated")
 
-# Names and descriptions must stay identical to ImportWsiData.insertSampleSlideCounts.
+# Names and descriptions must stay identical to ImportWsiData.insertSampleSlideCounts,
+# except WSI_PATIENT_UNDATED_SLIDE_COUNT, which only resource-data studies carry.
 SAMPLE_COUNT_ATTRIBUTES = [
     ("WSI_SAMPLE_SLIDE_COUNT", "WSI Slides per Sample",
      "Associated pathology slide count for the sample."),
@@ -120,6 +121,8 @@ PATIENT_COUNT_ATTRIBUTES = [
      "Associated pathology slides matched to a specimen part for the patient."),
     ("WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT", "WSI Slides per Patient, Block-matched",
      "Associated pathology slides matched to a specimen block for the patient."),
+    ("WSI_PATIENT_UNDATED_SLIDE_COUNT", "WSI Undated Viewable Slides per Patient",
+     "Viewable pathology slides without a procedure date, which the timeline does not show."),
 ]
 COUNT_ATTRIBUTE_IDS = frozenset(
     attribute[0] for attribute in SAMPLE_COUNT_ATTRIBUTES + PATIENT_COUNT_ATTRIBUTES)
@@ -442,7 +445,8 @@ class SlideCounter:
     without a matched slide get no row; patient counts include unmatched slides,
     so every patient with a slide gets a row. Part/block counts follow
     MATCH_LEVEL and zeros are written for entities that have a row. Slides that
-    cannot serve tiles are counted.
+    cannot serve tiles are counted, except in the patient's undated count, which
+    covers viewable slides without a procedure day.
     """
 
     def __init__(self):
@@ -450,7 +454,11 @@ class SlideCounter:
         self.by_patient = {}
 
     def add(self, slide):
-        targets = [self.by_patient.setdefault(slide["patient_id"], [0, 0, 0])]
+        patient_counts = self.by_patient.setdefault(slide["patient_id"], [0, 0, 0, 0])
+        metadata = slide["metadata"]
+        if metadata["can_serve_tiles"] and "timeline_start_days" not in metadata:
+            patient_counts[3] += 1
+        targets = [patient_counts]
         if slide["sample_id"] is not None:
             targets.append(self.by_sample.setdefault((slide["patient_id"], slide["sample_id"]), [0, 0, 0]))
         for counts in targets:
@@ -753,7 +761,7 @@ def merge_clinical_counts(data_path, attributes, key_columns, counts):
     """Return the clinical file text with the count attributes appended.
 
     ``key_columns`` names the identifier columns that key ``counts`` (a dict from
-    identifier tuples to three counts). Rows of entities without slides get NA,
+    identifier tuples to one count per attribute). Rows of entities without slides get NA,
     as the native importer wrote no value for them. Every existing line, value and
     line ending is kept; comment and blank lines after the header are unchanged.
     """

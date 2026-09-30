@@ -202,10 +202,11 @@ class ConvertedOutputTestCase(ConverterTestCase):
             data_rows(self.out / 'data_clinical_sample_wsi_counts.txt'))
         self.assertEqual(
             [['PATIENT_ID', 'WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
-              'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', '4', '1', '2'],
-             ['WSI-P2', '1', '1', '0'],
-             ['WSI+P3', '1', '0', '0']],
+              'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT', 'WSI_PATIENT_UNDATED_SLIDE_COUNT'],
+             # IMG-3 and IMG-4 are viewable without a procedure day; IMG-2 is not viewable
+             ['WSI-P1', '4', '1', '2', '2'],
+             ['WSI-P2', '1', '1', '0', '0'],
+             ['WSI+P3', '1', '0', '0', '0']],
             data_rows(self.out / 'data_clinical_patient_wsi_counts.txt'))
         header = (self.out / 'data_clinical_sample_wsi_counts.txt').read_text().splitlines()[:4]
         self.assertEqual(
@@ -219,12 +220,14 @@ class ConvertedOutputTestCase(ConverterTestCase):
         header = (self.out / 'data_clinical_patient_wsi_counts.txt').read_text().splitlines()[:4]
         self.assertEqual(
             ['#Patient Identifier\tWSI Slides per Patient\tWSI Slides per Patient, Part-matched\t'
-             'WSI Slides per Patient, Block-matched',
+             'WSI Slides per Patient, Block-matched\tWSI Undated Viewable Slides per Patient',
              '#Patient identifier\tAssociated pathology slide count for the patient.\t'
              'Associated pathology slides matched to a specimen part for the patient.\t'
-             'Associated pathology slides matched to a specimen block for the patient.',
-             '#STRING\tNUMBER\tNUMBER\tNUMBER',
-             '#1\t1\t1\t1'], header)
+             'Associated pathology slides matched to a specimen block for the patient.\t'
+             'Viewable pathology slides without a procedure date, which the timeline does not '
+             'show.',
+             '#STRING\tNUMBER\tNUMBER\tNUMBER\tNUMBER',
+             '#1\t1\t1\t1\t1'], header)
 
     def test_only_pairs_with_rows_are_written(self):
         match_level = converter.COLUMNS.index('MATCH_LEVEL')
@@ -366,10 +369,11 @@ class ClinicalMergeTestCase(ConverterTestCase):
             data_rows(self.out / 'data_clinical_samples.txt'))
         patients = data_rows(self.out / 'data_clinical_patients.txt')
         self.assertEqual(['WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
-                          'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'], patients[0][-3:])
-        self.assertEqual({'WSI-P1': ['4', '1', '2'], 'WSI-P2': ['1', '1', '0'],
-                          'WSI+P3': ['1', '0', '0'], 'WSI-P4': ['NA', 'NA', 'NA']},
-                         {row[0]: row[-3:] for row in patients[1:]})
+                          'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT',
+                          'WSI_PATIENT_UNDATED_SLIDE_COUNT'], patients[0][-4:])
+        self.assertEqual({'WSI-P1': ['4', '1', '2', '2'], 'WSI-P2': ['1', '1', '0', '0'],
+                          'WSI+P3': ['1', '0', '0', '0'], 'WSI-P4': ['NA', 'NA', 'NA', 'NA']},
+                         {row[0]: row[-4:] for row in patients[1:]})
         header = (self.out / 'data_clinical_samples.txt').read_text().splitlines()[:4]
         self.assertEqual(
             ['#Patient Identifier\tSample Identifier\tCancer Type\tTumor Purity\t'
@@ -606,9 +610,18 @@ class FormatV2TestCase(FormatV2Mixin, ConverterTestCase):
         for image in v3:
             self.assertEqual({k: v for k, v in v3[image].items() if k not in TIMING_KEYS},
                              {k: v for k, v in v2[image].items() if k not in TIMING_KEYS})
-        for name in ('data_clinical_sample_wsi_counts.txt', 'data_clinical_patient_wsi_counts.txt',
-                     'data_resource_definition.txt'):
+        for name in ('data_clinical_sample_wsi_counts.txt', 'data_resource_definition.txt'):
             self.assertEqual((self.out / name).read_text(), v2_files[name])
+        # Patient counts agree except the undated count, which follows timing: the
+        # v2 timeline dates IMG-3, which v3 leaves undated.
+        v2_patients = {line.split('\t')[0]: line.split('\t')[1:] for line
+                       in v2_files['data_clinical_patient_wsi_counts.txt'].splitlines()
+                       if not line.startswith('#')}
+        v3_patients = {row[0]: row[1:] for row in data_rows(
+            self.out / 'data_clinical_patient_wsi_counts.txt')}
+        self.assertEqual({patient: counts[:-1] for patient, counts in v3_patients.items()},
+                         {patient: counts[:-1] for patient, counts in v2_patients.items()})
+        self.assertEqual(['1', '2'], [v2_patients['WSI-P1'][-1], v3_patients['WSI-P1'][-1]])
 
     def test_csv_quoted_image_ids_and_repeated_listing(self):
         # the real export writes IMAGE_IDS CSV-quoted; listing an image twice with the same
