@@ -45,7 +45,7 @@ import org.mskcc.cbio.portal.model.AscnGeneLevelRecord;
 
 /**
  * DAO for ASCN gene-level data, derived from (but not directly mapped to)
- * ASCN CNCF segment calls (see {@link DaoAscnCncf}).
+ * ASCN Seg segment calls (see {@link DaoAscnSeg}).
  *
  * Rows are exclusively appended through {@link ClickHouseBulkLoader}. The
  * `ascn_genes` table is ordered by (cancer_study_id, sample_id,

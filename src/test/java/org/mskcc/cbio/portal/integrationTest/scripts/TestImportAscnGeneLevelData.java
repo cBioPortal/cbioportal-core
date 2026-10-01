@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Tests the import of ASCN gene-level data, derived from (but not directly
- * mapped to) ASCN CNCF segment calls.
+ * mapped to) ASCN Seg segment calls.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })

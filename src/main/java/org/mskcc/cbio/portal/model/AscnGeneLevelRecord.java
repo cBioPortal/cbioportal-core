@@ -34,7 +34,7 @@ package org.mskcc.cbio.portal.model;
 
 /**
  * A gene-level ASCN record, derived from (but not directly mapped 1:1 to)
- * CNCF segment calls. Represents the ASCN allele-specific copy number
+ * Seg segment calls. Represents the ASCN allele-specific copy number
  * summarized at a single gene's genomic locus for a sample.
  */
 public class AscnGeneLevelRecord extends AbstractAscnRecord {

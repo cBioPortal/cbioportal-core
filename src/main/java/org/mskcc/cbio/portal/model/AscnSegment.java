@@ -33,15 +33,15 @@
 package org.mskcc.cbio.portal.model;
 
 /**
- * A single ASCN CNCF (allele-specific copy number) segment call for a sample.
+ * A single ASCN Seg (allele-specific copy number) segment call for a sample.
  */
-public class AscnCncfSegment extends AbstractAscnRecord {
+public class AscnSegment extends AbstractAscnRecord {
 
-    public AscnCncfSegment() {
+    public AscnSegment() {
         super();
     }
 
-    public AscnCncfSegment(int cancerStudyId, int sampleId, String chr, long start, long end,
+    public AscnSegment(int cancerStudyId, int sampleId, String chr, long start, long end,
             Double tcn, Double lcn, Double cellularFraction, Double purity) {
         super(cancerStudyId, sampleId, chr, start, end, tcn, lcn, cellularFraction, purity);
     }
