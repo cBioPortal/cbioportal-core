@@ -99,7 +99,7 @@ INSERT INTO copy_number_seg (seg_id, cancer_study_id, sample_id) VALUES
 INSERT INTO copy_number_seg_file (seg_file_id, cancer_study_id) VALUES
 (910901, 900002);
 
-INSERT INTO ascn_cncf (seg_id, cancer_study_id, sample_id) VALUES
+INSERT INTO ascn_seg (seg_id, cancer_study_id, sample_id) VALUES
 (910902, 900002, 900004);
 
 INSERT INTO ascn_genes (gene_id, cancer_study_id, sample_id) VALUES

@@ -34,7 +34,7 @@ package org.mskcc.cbio.portal.model;
 
 /**
  * Common fields shared by allele-specific copy number (ASCN) records, whether
- * at the raw segment level ({@link AscnCncfSegment}) or the derived
+ * at the raw segment level ({@link AscnSegment}) or the derived
  * gene level ({@link AscnGeneLevelRecord}). FACETS is presently the only tool
  * producing data in this shape; the {@code datatype} values for these records
  * (e.g. {@code FACETS_CNCF}) name it explicitly, but the model/DAO/importer
