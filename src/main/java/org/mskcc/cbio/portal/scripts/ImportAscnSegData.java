@@ -35,44 +35,44 @@ package org.mskcc.cbio.portal.scripts;
 import java.util.Map;
 import java.util.Set;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoAscnCncf;
+import org.mskcc.cbio.portal.dao.DaoAscnSeg;
 import org.mskcc.cbio.portal.model.CancerStudy;
-import org.mskcc.cbio.portal.model.AscnCncfSegment;
+import org.mskcc.cbio.portal.model.AscnSegment;
 import org.mskcc.cbio.portal.model.Sample;
 
 /**
- * Imports ASCN CNCF (allele-specific copy number segment) data into the
- * {@code ascn_cncf} table.
+ * Imports ASCN Seg (allele-specific copy number segment) data into the
+ * {@code ascn_seg} table.
  *
  * Expected tab-delimited data file columns (any order):
  * SAMPLE_ID, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
  * CELLULAR_FRACTION, PURITY
  */
-public class ImportAscnCncfData extends AbstractImportAscnData {
+public class ImportAscnSegData extends AbstractImportAscnData {
 
-    public ImportAscnCncfData(String[] args) {
+    public ImportAscnSegData(String[] args) {
         super(args);
     }
 
     @Override
     protected String dataTypeLabel() {
-        return "ASCN CNCF";
+        return "ASCN Seg";
     }
 
     @Override
     protected boolean dataExistsForCancerStudy(int cancerStudyId) throws DaoException {
-        return DaoAscnCncf.ascnCncfDataExistForCancerStudy(cancerStudyId);
+        return DaoAscnSeg.ascnSegDataExistForCancerStudy(cancerStudyId);
     }
 
     @Override
     protected void deleteDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        DaoAscnCncf.deleteAscnCncfDataForSamples(cancerStudyId, sampleIds);
+        DaoAscnSeg.deleteAscnSegDataForSamples(cancerStudyId, sampleIds);
     }
 
     @Override
     protected boolean storeRow(CommonAscnFields common, String[] parts, Map<String, Integer> colIndex,
             CancerStudy study, Sample sample) throws DaoException {
-        AscnCncfSegment seg = new AscnCncfSegment(
+        AscnSegment seg = new AscnSegment(
                 study.getInternalId(),
                 sample.getInternalId(),
                 common.chr,
@@ -82,8 +82,8 @@ public class ImportAscnCncfData extends AbstractImportAscnData {
                 common.lcn,
                 common.cellularFraction,
                 common.purity);
-        seg.setId(DaoAscnCncf.getNextId());
-        DaoAscnCncf.addAscnCncfSegment(seg);
+        seg.setId(DaoAscnSeg.getNextId());
+        DaoAscnSeg.addAscnSegment(seg);
         return true;
     }
 
@@ -93,7 +93,7 @@ public class ImportAscnCncfData extends AbstractImportAscnData {
      * @param args the arguments given on the command line
      */
     public static void main(String[] args) {
-        ConsoleRunnable runner = new ImportAscnCncfData(args);
+        ConsoleRunnable runner = new ImportAscnSegData(args);
         runner.runInConsole();
     }
 }

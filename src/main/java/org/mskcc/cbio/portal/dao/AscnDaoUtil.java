@@ -40,7 +40,7 @@ import java.util.Collection;
 import java.util.Set;
 
 /**
- * Shared helper for the ASCN DAOs ({@link DaoAscnCncf}, {@link DaoAscnGenes}).
+ * Shared helper for the ASCN DAOs ({@link DaoAscnSeg}, {@link DaoAscnGenes}).
  * Both tables are plain, append-only ClickHouse MergeTree tables loaded exclusively
  * through {@link ClickHouseBulkLoader}, so the boilerplate for existence checks,
  * multi-sample queries and sample-scoped deletes is identical apart from the table

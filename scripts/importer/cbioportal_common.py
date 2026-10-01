@@ -422,7 +422,7 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.CNA_LOG2: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.CNA_CONTINUOUS: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.SEG: "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData",
-    MetaFileTypes.FACETS_CNCF: "org.mskcc.cbio.portal.scripts.ImportAscnCncfData",
+    MetaFileTypes.FACETS_CNCF: "org.mskcc.cbio.portal.scripts.ImportAscnSegData",
     MetaFileTypes.FACETS_GENE_LEVEL: "org.mskcc.cbio.portal.scripts.ImportAscnGeneLevelData",
     MetaFileTypes.EXPRESSION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.MUTATION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
@@ -449,7 +449,7 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
 IMPORTER_REQUIRES_METADATA = {
     "org.mskcc.cbio.portal.scripts.ImportClinicalData" : True,
     "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData" : True,
-    "org.mskcc.cbio.portal.scripts.ImportAscnCncfData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportAscnSegData" : True,
     "org.mskcc.cbio.portal.scripts.ImportAscnGeneLevelData" : True,
     "org.mskcc.cbio.portal.scripts.ImportGisticData" : False,
     "org.mskcc.cbio.portal.scripts.ImportMutSigData" : False,

@@ -45,7 +45,7 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
  * Imports ASCN gene-level data (derived from, but not directly mapped to,
- * ASCN CNCF segment calls) into the {@code ascn_genes} table.
+ * ASCN Seg segment calls) into the {@code ascn_genes} table.
  *
  * Expected tab-delimited data file columns (any order):
  * SAMPLE_ID, HUGO_SYMBOL, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,

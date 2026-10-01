@@ -55,7 +55,7 @@ import org.mskcc.cbio.portal.util.StableIdUtil;
 
 /**
  * Shared logic for importing ASCN allele-specific copy number data
- * ({@code ascn_cncf} and {@code ascn_genes}). Both data types carry the
+ * ({@code ascn_seg} and {@code ascn_genes}). Both data types carry the
  * same core columns (sample, genomic coordinates, tcn/lcn/cellular fraction,
  * purity); this class centralizes CLI parsing, coordinate/sample validation,
  * numeric parsing, and the bulk-load / incremental-update lifecycle, mirroring
@@ -84,7 +84,7 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         super(args);
     }
 
-    /** A human-readable label used in log/error messages (e.g. "ASCN CNCF"). */
+    /** A human-readable label used in log/error messages (e.g. "ASCN Seg"). */
     protected abstract String dataTypeLabel();
 
     /** @return true if data for this data type already exists for the given study. */
