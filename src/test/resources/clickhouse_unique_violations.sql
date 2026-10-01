@@ -255,8 +255,8 @@ INSERT INTO copy_number_seg_file (seg_file_id, cancer_study_id) VALUES
 (700220, 700010),
 (700220, 700011);
 
--- ascn_cncf
-INSERT INTO ascn_cncf (seg_id, cancer_study_id, sample_id) VALUES
+-- ascn_seg
+INSERT INTO ascn_seg (seg_id, cancer_study_id, sample_id) VALUES
 (700221, 700010, 700040),
 (700221, 700011, 700041);
 

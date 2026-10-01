@@ -15,7 +15,7 @@ DROP TABLE IF EXISTS cna_event;
 DROP TABLE IF EXISTS copy_number_seg;
 DROP TABLE IF EXISTS copy_number_seg_file;
 DROP TABLE IF EXISTS data_access_tokens;
-DROP TABLE IF EXISTS ascn_cncf;
+DROP TABLE IF EXISTS ascn_seg;
 DROP TABLE IF EXISTS ascn_genes;
 DROP TABLE IF EXISTS gene;
 DROP TABLE IF EXISTS gene_alias;
@@ -246,7 +246,7 @@ CREATE TABLE data_access_tokens
     ENGINE = MergeTree
 ORDER BY tuple();
 
-CREATE TABLE ascn_cncf
+CREATE TABLE ascn_seg
 (
     `seg_id` Int64,
     `cancer_study_id` Int64,

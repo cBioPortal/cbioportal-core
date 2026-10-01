@@ -296,9 +296,9 @@ public class ClickHouseConstraintChecker {
         fks.add(new ForeignKey("copy_number_seg", List.of("sample_id"), "sample", List.of("internal_id")));
         fks.add(new ForeignKey("copy_number_seg_file", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
 
-        // ascn_cncf / ascn_genes
-        fks.add(new ForeignKey("ascn_cncf", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
-        fks.add(new ForeignKey("ascn_cncf", List.of("sample_id"), "sample", List.of("internal_id")));
+        // ascn_seg / ascn_genes
+        fks.add(new ForeignKey("ascn_seg", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("ascn_seg", List.of("sample_id"), "sample", List.of("internal_id")));
         fks.add(new ForeignKey("ascn_genes", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
         fks.add(new ForeignKey("ascn_genes", List.of("sample_id"), "sample", List.of("internal_id")));
 
@@ -456,8 +456,8 @@ public class ClickHouseConstraintChecker {
         uniqueKeys.add(new UniqueKey("copy_number_seg", List.of("seg_id")));
         uniqueKeys.add(new UniqueKey("copy_number_seg_file", List.of("seg_file_id")));
 
-        // ascn_cncf / ascn_genes
-        uniqueKeys.add(new UniqueKey("ascn_cncf", List.of("seg_id")));
+        // ascn_seg / ascn_genes
+        uniqueKeys.add(new UniqueKey("ascn_seg", List.of("seg_id")));
         uniqueKeys.add(new UniqueKey("ascn_genes", List.of("gene_id")));
 
         // clinical_event

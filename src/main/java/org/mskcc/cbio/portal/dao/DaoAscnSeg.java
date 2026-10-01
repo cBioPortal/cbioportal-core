@@ -38,24 +38,24 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.mskcc.cbio.portal.model.AscnCncfSegment;
+import org.mskcc.cbio.portal.model.AscnSegment;
 
 /**
- * DAO for ASCN CNCF (allele-specific copy number segment) data.
+ * DAO for ASCN Seg (allele-specific copy number segment) data.
  *
  * Mirrors {@link DaoCopyNumberSegment}: rows are exclusively appended through
- * {@link ClickHouseBulkLoader}, and the `ascn_cncf` table is ordered by
+ * {@link ClickHouseBulkLoader}, and the `ascn_seg` table is ordered by
  * (cancer_study_id, sample_id, chr, start) to make genome-ordered, per-sample
  * segment reads (e.g. segment plots) efficient.
  */
-public final class DaoAscnCncf {
+public final class DaoAscnSeg {
 
-    private static final String TABLE = "ascn_cncf";
+    private static final String TABLE = "ascn_seg";
 
-    private DaoAscnCncf() {}
+    private DaoAscnSeg() {}
 
-    public static void addAscnCncfSegment(AscnCncfSegment seg) throws DaoException {
-        AscnDaoUtil.requireBulkLoad("insert ASCN CNCF data");
+    public static void addAscnSegment(AscnSegment seg) throws DaoException {
+        AscnDaoUtil.requireBulkLoad("insert ASCN Seg data");
         ClickHouseBulkLoader.getClickHouseBulkLoader(TABLE).insertRecord(
                 Long.toString(seg.getId()),
                 Integer.toString(seg.getCancerStudyId()),
@@ -70,38 +70,38 @@ public final class DaoAscnCncf {
         );
     }
 
-    public static void addAscnCncfSegments(List<AscnCncfSegment> segs) throws DaoException {
-        for (AscnCncfSegment seg : segs) {
-            addAscnCncfSegment(seg);
+    public static void addAscnSegments(List<AscnSegment> segs) throws DaoException {
+        for (AscnSegment seg : segs) {
+            addAscnSegment(seg);
         }
     }
 
     /**
-     * Reserves and returns the next unique id for a new `ascn_cncf` row.
-     * Callers should invoke this once per row before {@link #addAscnCncfSegment}.
+     * Reserves and returns the next unique id for a new `ascn_seg` row.
+     * Callers should invoke this once per row before {@link #addAscnSegment}.
      */
     public static long getNextId() throws DaoException {
-        return ClickHouseAutoIncrement.nextId("seq_ascn_cncf");
+        return ClickHouseAutoIncrement.nextId("seq_ascn_seg");
     }
 
-    public static List<AscnCncfSegment> getSegmentsForSample(int sampleId, int cancerStudyId) throws DaoException {
+    public static List<AscnSegment> getSegmentsForSample(int sampleId, int cancerStudyId) throws DaoException {
         return getSegmentsForSamples(Collections.singleton(sampleId), cancerStudyId);
     }
 
-    public static List<AscnCncfSegment> getSegmentsForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
-        return AscnDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoAscnCncf::mapRow);
+    public static List<AscnSegment> getSegmentsForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
+        return AscnDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoAscnSeg::mapRow);
     }
 
-    public static boolean ascnCncfDataExistForCancerStudy(int cancerStudyId) throws DaoException {
+    public static boolean ascnSegDataExistForCancerStudy(int cancerStudyId) throws DaoException {
         return AscnDaoUtil.dataExistsForCancerStudy(TABLE, cancerStudyId);
     }
 
-    public static void deleteAscnCncfDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
+    public static void deleteAscnSegDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
         AscnDaoUtil.deleteDataForSamples(TABLE, cancerStudyId, sampleIds);
     }
 
-    private static AscnCncfSegment mapRow(ResultSet rs) throws SQLException {
-        AscnCncfSegment seg = new AscnCncfSegment(
+    private static AscnSegment mapRow(ResultSet rs) throws SQLException {
+        AscnSegment seg = new AscnSegment(
                 rs.getInt("cancer_study_id"),
                 rs.getInt("sample_id"),
                 rs.getString("chr"),
