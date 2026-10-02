@@ -71,7 +71,7 @@ public class ClickHouseBulkDeleter {
 
     private static final Logger log = LoggerFactory.getLogger(ClickHouseBulkDeleter.class);
     private static final Map<String, ClickHouseBulkDeleter> BULK_DELETERS = new LinkedHashMap<>();
-    private static Boolean asyncLightweightDeleteSupported = null; // cached result of a server settings check
+    private static Boolean asyncLightweightDeleteSupported = null; // cached result of a read-only capability probe
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
@@ -383,10 +383,8 @@ public class ClickHouseBulkDeleter {
         if (asyncLightweightDeleteSupported == null) {
             try {
                 Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
-                try (PreparedStatement stmt = con.prepareStatement(
-                        "SELECT count() AS setting_count FROM system.settings WHERE name = 'lightweight_deletes_sync'");
-                        ResultSet rs = stmt.executeQuery()) {
-                    asyncLightweightDeleteSupported = rs.next() && rs.getLong("setting_count") > 0;
+                try {
+                    asyncLightweightDeleteSupported = supportsAsyncLightweightDelete(con);
                 } finally {
                     JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
                 }
@@ -395,6 +393,19 @@ public class ClickHouseBulkDeleter {
             }
         }
         return asyncLightweightDeleteSupported;
+    }
+
+    static boolean supportsAsyncLightweightDelete(Connection con) throws SQLException {
+        // Probe the setting without requiring SELECT on system.settings or issuing a DELETE.
+        try (PreparedStatement stmt = con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 0");
+                ResultSet rs = stmt.executeQuery()) {
+            return true;
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 115) { // UNKNOWN_SETTING on servers predating this setting
+                return false;
+            }
+            throw e; // permission and connection failures must not be mistaken for unsupported settings
+        }
     }
 
     private void dropStagingTable(boolean tolerateFailure) throws DaoException {
