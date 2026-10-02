@@ -63,6 +63,7 @@ import org.slf4j.LoggerFactory;
 public class ClickHouseBulkDeleter {
 
     private boolean flushed; // once flushed, any particular deleter instance cannot not be flushed again
+    private boolean deleteIssued = false; // the DELETE was sent (it may be running even if the call failed)
     private final Set<Long> pendingIds = new HashSet<>();
     private final String idColumn;
     private final String stagingTable;
@@ -70,10 +71,11 @@ public class ClickHouseBulkDeleter {
 
     private static final Logger log = LoggerFactory.getLogger(ClickHouseBulkDeleter.class);
     private static final Map<String, ClickHouseBulkDeleter> BULK_DELETERS = new LinkedHashMap<>();
+    private static Boolean asyncLightweightDeleteSupported = null; // cached result of a read-only capability probe
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
-    private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 7 * 60;
+    private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 30 * 60;
     private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_RETRY_CYCLE_PERIOD_SECONDS = 10;
     private static final Integer DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT = 6;
@@ -150,13 +152,21 @@ public class ClickHouseBulkDeleter {
             throw new RuntimeException("a ClickHouseBulkDeleter object had been flushed previously, and was attempted to be flushed a second time");
         }
         List<ClickHouseBulkDeleter> effectiveDeleters = deletersWithPendingDeletes(deleters);
+        boolean deletionSucceeded = false;
         try {
             dropExistingStagingTables(effectiveDeleters, false); // drop any leftover tables from previous crash/failure
             createStagingTables(effectiveDeleters);
             populateStagingTables(effectiveDeleters);
             totalDeleted = deleteRecordsReferencedInStagingTables(effectiveDeleters);
+            deletionSucceeded = true;
         } finally {
-            dropExistingStagingTables(effectiveDeleters, true);
+            if (deletionSucceeded) {
+                dropExistingStagingTables(effectiveDeleters, true);
+            } else {
+                // An exception is already propagating. Waiting for deletes that failed or never ran
+                // could only time out and replace that exception, so just clean up.
+                dropStagingTablesAfterFailure(effectiveDeleters);
+            }
             teardownDeleters(effectiveDeleters);
         }
         return totalDeleted;
@@ -250,6 +260,21 @@ public class ClickHouseBulkDeleter {
         }
     }
 
+    private static void dropStagingTablesAfterFailure(List<ClickHouseBulkDeleter> deleters) {
+        for (ClickHouseBulkDeleter d : deleters) {
+            if (d.deleteIssued) {
+                // an accepted asynchronous delete still reads its staging table; the next run drops it
+                log.warn("leaving staging table {} in place because its delete may still be running", d.stagingTable);
+                continue;
+            }
+            try {
+                d.dropStagingTable(true);
+            } catch (DaoException e) {
+                log.warn("could not drop staging table {} after a failed delete; it will be dropped on the next run", d.stagingTable, e);
+            }
+        }
+    }
+
 // --- instance methods ---
 
     public void addId(long id) {
@@ -331,12 +356,19 @@ public class ClickHouseBulkDeleter {
 
     private long deleteRecordsReferencedInStagingTable() throws DaoException {
         long records_deleted;
+        // Where the server supports it, return as soon as the delete is accepted; confirmDeletionIsComplete()
+        // then polls with short queries. Waiting inside the DELETE (lightweight_deletes_sync=2, the default)
+        // keeps the connection silent for as long as the delete runs (~6 minutes for genetic_alteration),
+        // longer than network idle timeouts, so the response is lost even though the delete succeeds.
+        // Servers older than 24.4 lack the setting and always wait.
         String statementString = String.format(
-                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)",
-                targetTable, idColumn, stagingTable);
+                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)%s",
+                targetTable, idColumn, stagingTable,
+                isAsyncLightweightDeleteSupported() ? " SETTINGS lightweight_deletes_sync = 0" : "");
         try {
             Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
             try (PreparedStatement stmt = con.prepareStatement(statementString)) {
+                this.deleteIssued = true; // set before executing: a timed-out statement may still have been accepted
                 records_deleted = stmt.executeUpdate();
             } finally {
                 JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
@@ -345,6 +377,35 @@ public class ClickHouseBulkDeleter {
             throw new DaoException(e);
         }
         return records_deleted;
+    }
+
+    private static synchronized boolean isAsyncLightweightDeleteSupported() throws DaoException {
+        if (asyncLightweightDeleteSupported == null) {
+            try {
+                Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
+                try {
+                    asyncLightweightDeleteSupported = supportsAsyncLightweightDelete(con);
+                } finally {
+                    JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
+                }
+            } catch (SQLException e) {
+                throw new DaoException(e);
+            }
+        }
+        return asyncLightweightDeleteSupported;
+    }
+
+    static boolean supportsAsyncLightweightDelete(Connection con) throws SQLException {
+        // Probe the setting without requiring SELECT on system.settings or issuing a DELETE.
+        try (PreparedStatement stmt = con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 0");
+                ResultSet rs = stmt.executeQuery()) {
+            return true;
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 115) { // UNKNOWN_SETTING on servers predating this setting
+                return false;
+            }
+            throw e; // permission and connection failures must not be mistaken for unsupported settings
+        }
     }
 
     private void dropStagingTable(boolean tolerateFailure) throws DaoException {
@@ -397,11 +458,11 @@ public class ClickHouseBulkDeleter {
     }
 
     private void confirmDeletionIsCompleteInData() throws DaoException {
-        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
+        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
             String exceptionMessageString = String.format(
                     "Failed to complete the delete operation on all replicas for table %s after retrying for %d seconds",
                     this.targetTable,
-                    DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
+                    CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
             throw new DaoException(exceptionMessageString);
         }
         // TODO: if condition fails a few times, we might start checking whether any
