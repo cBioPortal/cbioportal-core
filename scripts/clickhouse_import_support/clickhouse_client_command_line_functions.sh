@@ -60,15 +60,17 @@ function shutdown_clickhouse_client_command_line_functions() {
     unset clickhouse_client_database_table_list_filepath
 }
 
+# any arguments after the first two are passed through to clickhouse client (e.g. --receive_timeout=120)
 function execute_sql_statement_via_clickhouse_client() {
     local statement=$1
     local output_filepath=$2
+    shift 2
     #echo "Executing clickhouse statement : $statement" >&2
     if [ -e "$output_filepath" ] && ! rm -f "$output_filepath" ; then
         echo "Error : could not overwrite existing output file $output_filepath when executing clickhouse statement $statement" >&2
     fi
     (
-        clickhouse client --config-file="$configured_clickhouse_config_file_path" --format=TabSeparatedWithNames <<< "$statement" > "$output_filepath"
+        clickhouse client --config-file="$configured_clickhouse_config_file_path" --format=TabSeparatedWithNames "$@" <<< "$statement" > "$output_filepath"
     )
 }
 
