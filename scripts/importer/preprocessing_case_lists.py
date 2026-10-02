@@ -5,6 +5,7 @@ jar-case-list-generator/generate_case_lists_jar.py (AGPL-3.0).
 Keep these parsing rules aligned with that generator.
 Case membership rules match cmo-pipelines PR #1394; output ordering is irrelevant here.
 """
+from functools import lru_cache
 import os
 import re
 from pathlib import Path
@@ -73,27 +74,69 @@ def case_list_from_staging_file(study_dir, staging_filename):
     path = resolve_staging_path(study_dir, staging_filename)
     if path is None:
         return []
-    members = set()
-    id_column = None
-    with open(path) as stream:
-        for raw in stream:
-            line = raw.rstrip("\r\n")
-            if line.startswith('#'):
-                if line.startswith('#sequenced_samples:'):
-                    return set(line.split(':', 1)[1].strip().split())
-                continue
+    collector = StagingCaseCollector(staging_filename)
+    with open(path) as f:
+        for raw in f:
+            collector.feed(raw)
+            if not collector.active:
+                break
+    if collector.error:
+        raise collector.error
+    return collector.members
+
+
+@lru_cache(maxsize=1)
+def configured_staging_filenames():
+    return frozenset(name.lower() for spec in read_config(Path(__file__).with_name('case_list_config.tsv'))
+                     for name in re.split(r"[|&]", spec['staging_filenames']))
+
+
+class StagingCaseCollector:
+    """Collect generator-compatible IDs while the validator scans UTF-8.
+
+    Raw lines preserve the generator's comment, blank-row and trailing-tab rules.
+    Errors are deferred so collection never interrupts normal validation.
+    """
+    def __init__(self, filename):
+        self.filename = filename
+        self.members = set()
+        self.active = True
+        self.error = None
+        self.id_column = None
+
+    def feed(self, raw):
+        if not self.active:
+            return
+        line = raw.rstrip("\r\n")
+        prefix = "#sequenced_samples:"
+        if line.startswith('#'):
+            if line.startswith(prefix):
+                self.members = set(line[len(prefix):].strip().split())
+                self.active = False
+            return
+        # Split only through the sample column on rows, preserving PR1394's
+        # trailing empty values. Blank rows after the header are ignored.
+        if self.id_column is None:
             row = line.split('\t')
-            if id_column is None:
-                sample_headers = [column for column in SAMPLE_ID_COLUMN_HEADERS if column in row]
-                if not sample_headers:
-                    return {token for token in row if token.upper() not in NON_CASE_IDS}
-                id_column = row.index(sample_headers[0])
-            elif line.strip():
-                members.add(row[id_column])
-    return members
+        else:
+            if not line.strip():
+                return
+            row = line.split('\t', self.id_column + 1)
+        if self.id_column is None:
+            sample_headers = [column for column in SAMPLE_ID_COLUMN_HEADERS if column in row]
+            if sample_headers:
+                self.id_column = row.index(sample_headers[0])
+            else:
+                self.members = {token for token in row if token.upper() not in NON_CASE_IDS}
+                self.active = False
+        elif self.id_column >= len(row):
+            self.error = IndexError(f"{self.filename}: data row has no column {self.id_column}: {line[:80]}")
+            self.active = False
+        else:
+            self.members.add(row[self.id_column])
 
 
-def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=None):
+def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=None, scanned_members=None):
     """Yield lists that gap-fill preprocessing would create; never change inputs.
 
     Existing stable IDs (including virtual _all) count regardless of filename.
@@ -103,6 +146,7 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
     """
     config_path = config_path or Path(__file__).with_name('case_list_config.tsv')
     cache = {}
+    scanned_members = scanned_members or {}
     reported = set(defined_ids)
     categories = set()
     case_dir = Path(study_dir) / "case_lists"
@@ -137,8 +181,14 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
         members = None if intersection else set()
         for filename in filenames:
             if filename not in cache:
-                cache[filename] = set(map(get_sample_id,
-                                          case_list_from_staging_file(study_dir, filename)))
+                path = resolve_staging_path(study_dir, filename)
+                # The sidecar overrides mutation rows, including an empty sidecar.
+                override = ("data_mutations" in filename.lower() and
+                            os.path.exists(os.path.join(study_dir, "sequenced_samples.txt")))
+                key = str(Path(path).resolve()) if path else None
+                raw_members = (scanned_members[key] if key in scanned_members and not override
+                               else case_list_from_staging_file(study_dir, filename))
+                cache[filename] = set(map(get_sample_id, raw_members))
             found = cache[filename]
             if intersection:
                 members = found.copy() if members is None else members & found

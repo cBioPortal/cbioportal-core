@@ -62,7 +62,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
 
 from . import cbioportal_common
 from . import preprocessing
-from .preprocessing_case_lists import missing_generated_case_lists
+from .preprocessing_case_lists import (missing_generated_case_lists, StagingCaseCollector,
+                                      configured_staging_filenames)
 
 
 # ------------------------------------------------------------------------------
@@ -443,11 +444,18 @@ class Validator(object):
             self.logger.error('File could not be opened')
             return
 
+        # Reuse this mandatory scan for generator-compatible case membership.
+        collector = (StagingCaseCollector(Path(self.filename).name)
+                     if Path(self.filename).name.lower() in configured_staging_filenames() else None)
+        self.generated_case_members = None
         # Validate whether the file is correct UTF-8
         try:
             with open(self.filename, 'r', newline=None) as opened_file:
                 for line in opened_file:
-                    pass
+                    if collector is not None and collector.active:
+                        collector.feed(line)
+            if collector is not None and collector.error is None:
+                self.generated_case_members = collector.members
         except UnicodeDecodeError:
             self.logger.error("File contains invalid UTF-8 bytes. Please check values in file")
             return
@@ -523,7 +531,7 @@ class Validator(object):
             for unique_col_name in self.UNIQUE_COLUMNS:
                 col_index = _get_column_index(header_cols, unique_col_name)
                 if col_index > -1:
-                    self.unique_col_data[_get_column_index(header_cols, unique_col_name)] = []
+                    self.unique_col_data[col_index] = set()
 
             if self.checkHeader(header_cols) > 0:
                 if not self.relaxed_mode:
@@ -563,7 +571,7 @@ class Validator(object):
                                 cell_value, self.cols[unique_col_index])
                             continue
                         # add the value to the set for comparison with other rows
-                        previous_values.append(cell_value)
+                        previous_values.add(cell_value)
                     self.checkLine(fields)
 
             # (tuple of) string(s) of the newlines read (for 'rU' mode files)
@@ -1762,6 +1770,15 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
                                   'Missing %s' % (','.join(missing_ascn_columns)))
                 num_errors += 1
 
+        # Preserve first-column behavior for duplicate headers (already errors).
+        self._mutation_checks = [
+            (cols.index(name), getattr(self, self.CHECK_FUNCTION_MAP[name]))
+            for name in cols if name in self.CHECK_FUNCTION_MAP]
+        key_columns = (
+            "Entrez_Gene_Id", "Chromosome", "Start_Position", "End_Position",
+            "Variant_Classification", "Tumor_Seq_Allele2", "HGVSp_Short", "Tumor_Sample_Barcode")
+        self._mutation_key_indexes = (tuple(cols.index(name) for name in key_columns)
+                                      if all(name in cols for name in key_columns) else None)
         return num_errors
 
     def checkLine(self, data):
@@ -1785,35 +1802,21 @@ class MutationsExtendedValidator(CustomDriverAnnotationValidator, CustomNamespac
         # Validate duplicate mutations
         self.checkDuplicateMutation(data)
 
-        for col_index, col_name in enumerate(self.cols):
-            # validate the column if there's a function defined for it
-            try:
-                check_function_name = self.CHECK_FUNCTION_MAP[col_name]
-            except KeyError:
-                pass
-            else:
-                col_index = self.cols.index(col_name)
-                value = data[col_index]
-                # get the checking method for this column
-                checking_function = getattr(self, check_function_name)
-                if not checking_function(value):
-                    self.printDataInvalidStatement(value, col_index)
-                elif self.extra_exists or self.extra:
-                    raise RuntimeError(('Checking function %s set an error '
-                                        'message but reported no error') %
-                                       checking_function.__name__)
+        for col_index, checking_function in self._mutation_checks:
+            value = data[col_index]
+            if not checking_function(value):
+                self.printDataInvalidStatement(value, col_index)
+            elif self.extra_exists or self.extra:
+                raise RuntimeError(('Checking function %s set an error '
+                                    'message but reported no error') %
+                                   checking_function.__name__)
 
     def checkDuplicateMutation(self, data):
         """
         Check for duplicate mutations in the MAF file based on key columns.
         """
-        key_columns = [
-            "Entrez_Gene_Id", "Chromosome", "Start_Position", "End_Position",
-            "Variant_Classification", "Tumor_Seq_Allele2", "HGVSp_Short", "Tumor_Sample_Barcode"
-        ]
-
-        if all(col in self.cols for col in key_columns):
-            mutation_key = tuple(data[self.cols.index(col)].strip() for col in key_columns)
+        if self._mutation_key_indexes is not None:
+            mutation_key = tuple(data[index].strip() for index in self._mutation_key_indexes)
 
             if mutation_key in self.seen_mutations:
                 log_message = f"Duplicate mutation found: {mutation_key}"
@@ -4596,8 +4599,9 @@ class GenericAssayContinuousValidator(GenericAssayWiseFileValidator):
         stripped_value = value.strip()
         # if the value is prefixed with '>' or '<' remove this prefix
         # prior to evaluation of the numeric value
-        hasTruncSymbol = re.match("^[><]", stripped_value)
-        stripped_value = re.sub(r"^[><]\s*","", stripped_value)
+        hasTruncSymbol = stripped_value.startswith(('>', '<'))
+        if hasTruncSymbol:
+            stripped_value = stripped_value[1:].lstrip()
 
         # do not check null values
         # 'NA' is an allowed value. No further validations apply.
@@ -5685,9 +5689,13 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
         checked_ids.add(study_id + '_sequenced')
     if 'meta_CNA' in validators_by_meta_type:
         checked_ids.add(study_id + '_cna')
+    scanned_members = {
+        str(Path(validator.filename).resolve()): validator.generated_case_members
+        for validators in validators_by_meta_type.values() for validator in validators
+        if validator is not None and getattr(validator, 'generated_case_members', None) is not None}
     try:
         for stable_id, filename, count in missing_generated_case_lists(
-                study_dir, study_id, checked_ids):
+                study_dir, study_id, checked_ids, scanned_members=scanned_members):
             if (Path(study_dir) / 'case_lists' / filename).exists():
                 logger.error("Case-list filename '%s' is occupied by an unrelated list. "
                              "Resolve the stable-ID/category conflict without overwriting curated data.",
