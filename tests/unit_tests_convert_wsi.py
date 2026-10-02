@@ -241,6 +241,18 @@ class ConvertedOutputTestCase(ConverterTestCase):
         definitions = data_rows(self.out / 'data_resource_definition.txt')
         self.assertEqual(['WSI_PATIENT'], [row[0] for row in definitions[1:]])
 
+    def test_definitions_declare_identifier_keys_unfilterable(self):
+        self.convert()
+        header, *definitions = data_rows(self.out / 'data_resource_definition.txt')
+        self.assertEqual('CUSTOM_METADATA', header[-1])
+        for row in definitions:
+            contract = json.loads(row[-1])
+            self.assertEqual(1, contract['version'])
+            self.assertEqual(
+                {'image_id': False, 'barcode': False, 'part_key': False, 'block_key': False,
+                 'specimen_key': False, 'reference_sample_id': False},
+                {field['key']: field['filterable'] for field in contract['fields']})
+
     def test_java_fixture_is_current_converter_output(self):
         self.convert(base_url=BASE_URL)
         for name in EXPECTED_FILES:

@@ -153,9 +153,16 @@ when it has rows:
 
 | Files | Content |
 | --- | --- |
-| `meta_resource_definition.txt`, `data_resource_definition.txt` | `WSI_SAMPLE` and/or `WSI_PATIENT` definitions |
+| `meta_resource_definition.txt`, `data_resource_definition.txt` | `WSI_SAMPLE` and/or `WSI_PATIENT` definitions, each with a `CUSTOM_METADATA` contract |
 | `meta_resource_sample.txt`, `data_resource_sample.txt` | matched slides |
 | `meta_resource_patient.txt`, `data_resource_patient.txt` | unmatched slides |
+
+The `CUSTOM_METADATA` contract declares the per-slide identifier keys
+(`image_id`, `barcode`, `part_key`, `block_key`, `specimen_key` and
+`reference_sample_id`) as `"filterable": false`. Nearly every slide has its own
+value for these keys, so without the declaration the portal's resource table
+would list every value as a filter option. The columns stay visible, searchable
+and sortable.
 
 With `--study-dir`, it also writes merged copies of the study's clinical sample
 and patient files, under the study's own meta and data file names (for example

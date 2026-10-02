@@ -78,6 +78,15 @@ PUBLIC_STRING_FIELDS = [
     "TIMELINE_DATE_REASON", "TIMELINE_COORDINATE_SYSTEM",
 ]
 SERVING_KEY = "wsi_serving"
+# Public keys that identify a single slide or specimen, so nearly every row has its own value.
+# The definitions declare them non-filterable in their CUSTOM_METADATA contract; otherwise the
+# portal's resource table lists every distinct value as a filter option (over a million for
+# image_id on a large study). The columns stay visible, searchable and sortable.
+UNFILTERABLE_KEYS = ("image_id", "barcode", "part_key", "block_key", "specimen_key",
+                     "reference_sample_id")
+CUSTOM_METADATA = json.dumps(
+    {"version": 1, "fields": [{"key": key, "filterable": False} for key in UNFILTERABLE_KEYS]},
+    separators=(",", ":"))
 
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
 TIMELINE_STATUSES = ("AVAILABLE", "MISSING_PROCEDURE_DATE", "MISSING_REFERENCE_SEQUENCING_DATE")
@@ -980,16 +989,18 @@ def _convert_into(staging, data_path, format_version, timeline_index, timeline_f
     definitions = []
     if sample_writer.rows:
         definitions.append([SAMPLE_RESOURCE_ID, "Pathology slides",
-                            "Whole-slide images matched to a sample", "SAMPLE", "FALSE", "1"])
+                            "Whole-slide images matched to a sample", "SAMPLE", "FALSE", "1",
+                            CUSTOM_METADATA])
     if patient_writer.rows:
         definitions.append([PATIENT_RESOURCE_ID, "Pathology slides",
-                            "Whole-slide images not matched to a sample", "PATIENT", "FALSE", "1"])
+                            "Whole-slide images not matched to a sample", "PATIENT", "FALSE", "1",
+                            CUSTOM_METADATA])
     write_text("meta_resource_definition.txt",
                meta_entries([("cancer_study_identifier", study_id), ("resource_type", "DEFINITION")],
                             DEFINITION_FILE))
     write_text(DEFINITION_FILE, render_tsv(DEFINITION_FILE, [
         ["RESOURCE_ID", "DISPLAY_NAME", "DESCRIPTION", "RESOURCE_TYPE", "OPEN_BY_DEFAULT",
-         "PRIORITY"]] + definitions))
+         "PRIORITY", "CUSTOM_METADATA"]] + definitions))
     for writer, meta_file, resource_type in ((sample_writer, "meta_resource_sample.txt", "SAMPLE"),
                                              (patient_writer, "meta_resource_patient.txt", "PATIENT")):
         if writer.rows:
