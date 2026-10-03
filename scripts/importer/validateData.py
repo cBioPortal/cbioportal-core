@@ -52,6 +52,69 @@ WSI_TILE_METADATA_SCHEMA_VERSION = 2
 WSI_DECODE_POLICY_VERSION = 'geometry-v2;tile-max=16777216;thumbnail-max=16777216'
 WSI_MAX_DECODE_PIXELS = 16777216
 
+# De-identification of WSI rows (contract wsi-serving-v5, resource-data variant).
+# Specimen accession numbers (S##-#####, MSK:S...) must never reach the portal.
+WSI_ACCESSION = re.compile(r'(?i)(\bS\d{2}-\d{3,}|MSK:S\d)')
+# Opaque per-slide key computed upstream from a salted hash of image_id.
+WSI_SLIDE_KEY = re.compile(r'[0-9a-f]{32}')
+# Canonical part/block/specimen keys are built from slide_key hex; with exactly
+# this shape they are exempt from the date heuristics below.
+WSI_OPAQUE_KEY_PATTERNS = {
+    'PART_KEY': re.compile(r'part:[0-9a-f]{32}'),
+    'BLOCK_KEY': re.compile(r'block:[0-9a-f]{32}'),
+    'SPECIMEN_KEY': re.compile(r'(?:block|part|unmatched)::part:[0-9a-f]{32}::block:[0-9a-f]{32}'),
+}
+WSI_ABSOLUTE_DATE = re.compile(
+    r'(?<!\d)(?:19|20)\d{2}[-_/](?:0?[1-9]|1[0-2])[-_/](?:0?[1-9]|[12]\d|3[01])(?!\d)'
+)
+WSI_MONTH_FIRST_DATE = re.compile(
+    r'(?<!\d)(?:0?[1-9]|1[0-2])[-_/](?:0?[1-9]|[12]\d|3[01])[-_/](?:19|20)\d{2}(?!\d)'
+)
+WSI_DAY_FIRST_DATE = re.compile(
+    r'(?<!\d)(?:0?[1-9]|[12]\d|3[01])[-_/](?:0?[1-9]|1[0-2])[-_/](?:19|20)\d{2}(?!\d)'
+)
+WSI_NAMED_MONTH_DATE = re.compile(
+    r'(?i)(?<![a-z0-9])(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|'
+    r'may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|'
+    r'nov(?:ember)?|dec(?:ember)?)\s+(?:0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?'
+    r'(?:,)?\s+(?:19|20)\d{2}|(?:0?[1-9]|[12]\d|3[01])[-/\s]+'
+    r'(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
+    r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|'
+    r'dec(?:ember)?)[-/\s]+(?:19|20)\d{2})(?![a-z0-9])'
+)
+WSI_COMPACT_DATE = re.compile(r'(?<!\d)(?:19|20)\d{6}(?!\d)')
+WSI_LABELLED_MRN = re.compile(
+    r'(?i)\b(?:mrn|medical[ _-]?record(?:[ _-]?number)?)\b\s*[:=#-]?\s*\d{4,}'
+)
+
+
+def wsi_contains_date_or_mrn(value):
+    """Return whether free text looks like it carries an absolute date or a labelled MRN."""
+    return any(pattern.search(value) for pattern in (
+        WSI_ABSOLUTE_DATE, WSI_MONTH_FIRST_DATE, WSI_DAY_FIRST_DATE, WSI_NAMED_MONTH_DATE,
+        WSI_COMPACT_DATE, WSI_LABELLED_MRN))
+
+
+def wsi_accession_path(value, path):
+    """Return the path of the first string (or object key) in a JSON value holding an
+    accession number, or None. Used to report the location, never the value."""
+    if isinstance(value, str):
+        return path if WSI_ACCESSION.search(value) else None
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if WSI_ACCESSION.search(str(key)):
+                return path + '.<key>'  # the key itself is never echoed
+            child_path = '%s.%s' % (path, key)
+            found = wsi_accession_path(child, child_path)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = wsi_accession_path(child, '%s[%d]' % (path, index))
+            if found:
+                return found
+    return None
+
 # Configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module.
 if __name__ == "__main__" and (__package__ is None or __package__ == ''):
@@ -3512,6 +3575,7 @@ class TimelineValidator(Validator):
 
     def checkLine(self, data):
         super(TimelineValidator, self).checkLine(data)
+        self._check_pathology_slides_deid(data)
         # TODO check the values
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
@@ -3540,6 +3604,30 @@ class TimelineValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
+
+    def _check_pathology_slides_deid(self, data):
+        """PATHOLOGY SLIDES events reach the browser through the clinical-events
+        API: reject real slide ids and accession numbers (values never echoed)."""
+        if 'EVENT_TYPE' not in self.cols:
+            return
+        event_index = self.cols.index('EVENT_TYPE')
+        if event_index >= len(data) or data[event_index].strip() != 'PATHOLOGY SLIDES':
+            return
+        for col_index, col_name in enumerate(self.cols):
+            value = data[col_index].strip() if col_index < len(data) else ''
+            if col_name in ('IMAGE_ID', 'IMAGE_IDS') and value:
+                self.logger.error(
+                    'PATHOLOGY SLIDES events cannot carry real slide identifiers',
+                    extra={'line_number': self.line_number,
+                           'column_number': col_index + 1,
+                           'cause': col_name})
+            elif value and WSI_ACCESSION.search(value):
+                self.logger.error(
+                    'PATHOLOGY SLIDES value contains a specimen accession number',
+                    extra={'line_number': self.line_number,
+                           'column_number': col_index + 1,
+                           'cause': col_name})
+
 
 class CancerTypeValidator(Validator):
 
@@ -3897,7 +3985,7 @@ class ResourceDefinitionValidator(Validator):
 
 def new_wsi_row_state():
     """Return empty cross-row state for WsiRowChecks._check_wsi_row."""
-    return {'images': set(), 'parts': {}, 'blocks': {}, 'references': {},
+    return {'images': set(), 'slide_keys': set(), 'parts': {}, 'blocks': {}, 'references': {},
             'reference_conflicts': set()}
 
 
@@ -3932,14 +4020,36 @@ class WsiRowChecks(object):
         'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'TIMELINE_START_DAYS',
         'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
         'TIMELINE_DATE_REASON', 'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE',
+        'SLIDE_KEY',
     ]
     SLIDE_TYPES = ('H&E', 'IHC', 'Other', 'Unknown')
     REQUIRED_VALUES = {
         'PATIENT_ID', 'IMAGE_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
         'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES',
         'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
-        'TIMELINE_COORDINATE_SYSTEM',
+        'TIMELINE_COORDINATE_SYSTEM', 'SLIDE_KEY',
     }
+    # Fields the date/MRN heuristics skip: approved pseudonyms (the slide key is a
+    # hex digest whose digits can look like YYYYMMDD), non-text values, and the
+    # server-side artifact locations, which are validated as URLs instead.
+    DEID_EXEMPT_FIELDS = {
+        'PATIENT_ID', 'REFERENCE_SAMPLE_ID', 'SAMPLE_ID', 'IMAGE_ID', 'SLIDE_KEY',
+        'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES', 'FILE_SIZE_BYTES', 'THUMBNAIL_WIDTH',
+        'THUMBNAIL_HEIGHT', 'TIMELINE_START_DAYS', 'TILE_METADATA_JSON',
+        'SOURCE_URL', 'THUMBNAIL_URL', 'THUMBNAIL_CONTENT_TYPE',
+    }
+
+    def _check_wsi_deid_text(self, row, line_number, column, label):
+        """Reject absolute dates and labelled MRNs in WSI free text (values never echoed)."""
+        for name, value in row.items():
+            if not value or name in self.DEID_EXEMPT_FIELDS:
+                continue
+            opaque_key = WSI_OPAQUE_KEY_PATTERNS.get(name)
+            if opaque_key and opaque_key.fullmatch(value):
+                continue
+            if wsi_contains_date_or_mrn(value):
+                self._error('WSI value violates the de-identification contract', line_number,
+                            column(name), label(name))
 
     @staticmethod
     def _is_valid_tile_metadata(metadata):
@@ -4004,6 +4114,9 @@ class WsiRowChecks(object):
         if column is not None:
             extra['column_number'] = column + 1
         if cause is not None:
+            # Never echo a specimen accession number, whichever check reports it.
+            if WSI_ACCESSION.search(str(cause)):
+                cause = '<value withheld: specimen accession number>'
             extra['cause'] = cause
         self.logger.error(message, extra=extra)
 
@@ -4189,10 +4302,21 @@ class WsiRowChecks(object):
                         column('TIMELINE_DATE_KIND'))
 
         image_id = row['IMAGE_ID']
-        if image_id in state['images']:
+        if image_id and image_id in state['images']:
+            # image_id is server-side only; never echo it.
             self._error('IMAGE_ID must be unique within a study', line_number,
-                        column('IMAGE_ID'), image_id)
+                        column('IMAGE_ID'), label('IMAGE_ID'))
         state['images'].add(image_id)
+        slide_key = row['SLIDE_KEY']
+        if slide_key and not WSI_SLIDE_KEY.fullmatch(slide_key):
+            self._error('SLIDE_KEY must be 32 lowercase hex characters', line_number,
+                        column('SLIDE_KEY'), label('SLIDE_KEY'))
+        elif slide_key and slide_key in state['slide_keys']:
+            self._error('SLIDE_KEY must be unique within a study', line_number,
+                        column('SLIDE_KEY'), label('SLIDE_KEY'))
+        if slide_key:
+            state['slide_keys'].add(slide_key)
+        self._check_wsi_deid_text(row, line_number, column, label)
 
         if '?' in row['PART_KEY'] or '?' in row['BLOCK_KEY']:
             self._error('WSI part and block keys must not contain ?', line_number,
@@ -4239,13 +4363,14 @@ class WsiRowChecks(object):
         self._check_reference_sample(row, line_number, column, state, label)
 
         for name in ('SOURCE_URL', 'THUMBNAIL_URL'):
+            # Artifact URLs usually embed the server-side image ID; report the field only.
             if row[name] and not self._is_absolute_url(row[name]):
                 self._error('WSI URL must be absolute', line_number,
-                            column(name), row[name])
+                            column(name), label(name))
             elif row[name] and not self._is_safe_artifact_url(
                     row[name], 'source' if name == 'SOURCE_URL' else 'thumbnail'):
                 self._error('WSI URL is unsafe or outside the configured allowlist',
-                            line_number, column(name), row[name])
+                            line_number, column(name), label(name))
         if row['THUMBNAIL_CONTENT_TYPE'] and not self._is_image_content_type(
                 row['THUMBNAIL_CONTENT_TYPE']):
             self._error('WSI thumbnail content type must be an image media type',
@@ -4300,16 +4425,20 @@ class ResourceValidator(WsiRowChecks, Validator):
     WSI_RESOURCE_IDS = {'SAMPLE': 'WSI_SAMPLE', 'PATIENT': 'WSI_PATIENT'}
     # metadata keys (the lower-cased format-v3 column names) and their JSON types
     WSI_STRING_KEYS = (
-        'IMAGE_ID', 'REFERENCE_SAMPLE_ID', 'PART_KEY', 'PART_NUMBER', 'PART_DESIGNATOR',
-        'PART_TYPE', 'PART_DESCRIPTION', 'SUBSPECIALTY', 'PATH_DX_TITLE', 'BLOCK_KEY',
+        'SLIDE_KEY', 'REFERENCE_SAMPLE_ID', 'PART_KEY', 'PART_NUMBER',
+        'PART_TYPE', 'PART_DESCRIPTION', 'SUBSPECIALTY', 'BLOCK_KEY',
         'BLOCK_NUMBER', 'BLOCK_LABEL', 'MATCH_LEVEL', 'SPECIMEN_KEY', 'STAIN_NAME',
-        'STAIN_GROUP', 'MAGNIFICATION', 'BARCODE', 'SLIDE_TYPE', 'TIMELINE_DATE_STATUS',
+        'STAIN_GROUP', 'MAGNIFICATION', 'SLIDE_TYPE', 'TIMELINE_DATE_STATUS',
         'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE', 'TIMELINE_DATE_REASON',
         'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE')
     WSI_BOOLEAN_KEYS = ('IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES')
     WSI_INTEGER_KEYS = ('FILE_SIZE_BYTES', 'TIMELINE_START_DAYS')
+    # Top-level (public) metadata keys that would expose a real slide identifier,
+    # an accession-bearing specimen label or a raw artifact location.
+    WSI_FORBIDDEN_PUBLIC_KEYS = ('image_id', 'barcode', 'source_url', 'thumbnail_url',
+                                 'part_designator', 'path_dx_title')
     WSI_SERVING_KEY = 'wsi_serving'
-    WSI_SERVING_STRING_KEYS = ('SOURCE_URL', 'THUMBNAIL_URL', 'THUMBNAIL_CONTENT_TYPE')
+    WSI_SERVING_STRING_KEYS = ('IMAGE_ID', 'SOURCE_URL', 'THUMBNAIL_URL', 'THUMBNAIL_CONTENT_TYPE')
     WSI_SERVING_INTEGER_KEYS = ('THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT')
 
     def __init__(self, *args, **kwargs):
@@ -4399,11 +4528,33 @@ class ResourceValidator(WsiRowChecks, Validator):
             metadata = json.loads(values.get('METADATA', ''))
         except ValueError:
             metadata = None
+        # Accession numbers must never reach the portal: check the URL, the display
+        # name and every METADATA string, wsi_serving included. Only the location is
+        # reported, never the value.
+        for name in ('URL', 'DISPLAY_NAME'):
+            if WSI_ACCESSION.search(values.get(name, '')):
+                self._error('WHOLE_SLIDE_IMAGE value contains a specimen accession number',
+                            self.line_number, column_index.get(name), name)
+        if isinstance(metadata, (dict, list)):
+            found = wsi_accession_path(metadata, 'METADATA')
+        else:
+            found = 'METADATA' if WSI_ACCESSION.search(values.get('METADATA', '')) else None
+        if found:
+            self._error('WHOLE_SLIDE_IMAGE value contains a specimen accession number',
+                        self.line_number, metadata_column, found)
+        if values.get('DISPLAY_NAME') and wsi_contains_date_or_mrn(values['DISPLAY_NAME']):
+            self._error('WSI value violates the de-identification contract', self.line_number,
+                        column_index.get('DISPLAY_NAME'), 'DISPLAY_NAME')
         if not isinstance(metadata, dict):
             # a present but malformed value was already reported by checkLine
             self._error('%s resources require a METADATA JSON object' % self.WSI_RESOURCE_TYPE,
                         self.line_number, metadata_column)
             return
+        for key in self.WSI_FORBIDDEN_PUBLIC_KEYS:
+            if key in metadata:
+                self._error('WHOLE_SLIDE_IMAGE public metadata must not contain %s; server-side '
+                            'values belong in wsi_serving' % key,
+                            self.line_number, metadata_column, 'METADATA.' + key)
         row = self._wsi_row_from_metadata(metadata, metadata_column)
         row['PATIENT_ID'] = values.get('PATIENT_ID', '')
         row['SAMPLE_ID'] = values.get('SAMPLE_ID', '') if resource_level == 'SAMPLE' else ''
@@ -4413,8 +4564,15 @@ class ResourceValidator(WsiRowChecks, Validator):
                 return column_index.get(name)
             return metadata_column
 
+        serving_fields = set(self.WSI_SERVING_STRING_KEYS + self.WSI_SERVING_INTEGER_KEYS)
+        serving_fields.add('TILE_METADATA_JSON')
+
         def label(name):
-            return name if name in ('PATIENT_ID', 'SAMPLE_ID') else 'METADATA.' + name.lower()
+            if name in ('PATIENT_ID', 'SAMPLE_ID'):
+                return name
+            if name in serving_fields:
+                return 'METADATA.%s.%s' % (self.WSI_SERVING_KEY, name.lower())
+            return 'METADATA.' + name.lower()
 
         if row['REFERENCE_SAMPLE_ID'].upper() == 'UNMATCHED':
             # the portal reads this value verbatim as a sample ID; the converter omits it instead
@@ -4430,9 +4588,19 @@ class ResourceValidator(WsiRowChecks, Validator):
         except:
             return False
 
+    def _is_wsi_line(self, data):
+        """Whether a line is a WHOLE_SLIDE_IMAGE row (by TYPE or WSI resource ID)."""
+        values = {col_name: data[col_index].strip() if col_index < len(data) else ''
+                  for col_index, col_name in enumerate(self.cols)}
+        return (values.get('TYPE') == self.WSI_RESOURCE_TYPE
+                or values.get('RESOURCE_ID') in self.WSI_RESOURCE_IDS.values())
+
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(ResourceValidator, self).checkLine(data)
+        # WHOLE_SLIDE_IMAGE URLs and metadata can carry server-side identifiers;
+        # their errors name the column instead of echoing the value.
+        wsi_line = self._is_wsi_line(data)
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4470,7 +4638,7 @@ class ResourceValidator(WsiRowChecks, Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'column_name': col_name,
-                               'cause': value})
+                               'cause': col_name if wsi_line else value})
             # make sure that PATIENT_ID is present
             if col_name == 'PATIENT_ID':
                 if value.strip().lower() in self.NULL_VALUES:
@@ -4497,13 +4665,13 @@ class ResourceValidator(WsiRowChecks, Validator):
                             'METADATA must be a JSON object (key-value map), not an array or scalar',
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
-                                   'cause': value[:80]})
+                                   'cause': col_name if wsi_line else value[:80]})
                 except ValueError:
                     self.logger.error(
                         'METADATA value is not valid JSON',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
-                               'cause': value[:80]})
+                               'cause': col_name if wsi_line else value[:80]})
 
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
@@ -5086,6 +5254,12 @@ class WsiValidator(WsiRowChecks, Validator):
                 continue
             rows += 1
             row = dict(zip(self.EXPECTED_HEADERS, (value.strip() for value in values)))
+            # Accession numbers are rejected in every column, identifier, key, URL and
+            # tile metadata columns included; only the column name is reported.
+            for name, value in row.items():
+                if WSI_ACCESSION.search(value):
+                    self._error('WSI value contains a specimen accession number', line_number,
+                                self.EXPECTED_HEADERS.index(name), name)
             self._check_wsi_row(row, line_number, self.EXPECTED_HEADERS.index, state)
 
         if rows == 0:

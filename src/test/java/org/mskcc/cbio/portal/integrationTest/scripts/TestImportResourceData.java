@@ -80,8 +80,12 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals("WSI-P1-S1", first.sampleId());
         assertEquals("WHOLE_SLIDE_IMAGE", first.type());
         assertEquals("https://portal.example.org/cbioportal/wsi/patient/WSI-P1"
-            + "?studyId=wsi_convert_test&imageId=IMG-1", first.url());
+            + "?studyId=wsi_convert_test&slideKey=2c96f13783250ad2c6bcfcd5b7c3ef22", first.url());
         JsonNode metadata = JSON.readTree(first.metadata());
+        assertEquals("2c96f13783250ad2c6bcfcd5b7c3ef22", metadata.get("slide_key").textValue());
+        for (String removed : List.of("image_id", "barcode", "part_designator", "path_dx_title")) {
+            assertFalse(removed, metadata.has(removed));
+        }
         assertTrue(metadata.get("is_hne").isBoolean());
         assertTrue(metadata.get("is_hne").booleanValue());
         assertFalse(metadata.get("is_ihc").booleanValue());
@@ -98,7 +102,8 @@ public class TestImportResourceData extends IntegrationTestBase {
         JsonNode unservable = JSON.readTree(rows.get("IMG-2").metadata());
         assertEquals(-17, unservable.get("timeline_start_days").intValue());
         assertFalse(unservable.get("can_serve_tiles").booleanValue());
-        assertEquals(0, unservable.get("wsi_serving").size());
+        assertEquals(1, unservable.get("wsi_serving").size());
+        assertEquals("IMG-2", unservable.at("/wsi_serving/image_id").textValue());
 
         ResourceRow encoded = rows.get("IMG 7/A&B");
         assertEquals("WSI-P2-S1", encoded.sampleId());
@@ -110,7 +115,7 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals("WSI+P3", unmatched.patientId());
         assertNull(unmatched.sampleId());
         assertEquals("https://portal.example.org/cbioportal/wsi/patient/WSI%2BP3"
-            + "?studyId=wsi_convert_test&imageId=IMG-6", unmatched.url());
+            + "?studyId=wsi_convert_test&slideKey=3474b861eb683902b420f4ee95dfe0fa", unmatched.url());
         assertEquals("WSI-P1", rows.get("IMG-4").patientId());
         assertNull(rows.get("IMG-4").sampleId());
 
@@ -200,7 +205,7 @@ public class TestImportResourceData extends IntegrationTestBase {
                     ResourceRow row = new ResourceRow(result.getLong(1), result.getString(2),
                         result.getString(3), result.getString(4), result.getString(5),
                         result.getString(6), result.getString(7), result.getString(8));
-                    rows.put(JSON.readTree(row.metadata()).get("image_id").textValue(), row);
+                    rows.put(JSON.readTree(row.metadata()).at("/wsi_serving/image_id").textValue(), row);
                 }
             }
         }

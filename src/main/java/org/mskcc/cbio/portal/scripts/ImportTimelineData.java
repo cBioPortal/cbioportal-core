@@ -43,6 +43,7 @@ import org.mskcc.cbio.portal.model.ClinicalEvent;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.WsiDeidentification;
 
 /**
  * Imports timeline data for display in patient view
@@ -50,6 +51,29 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
  * @author jgao, inodb
  */
 public class ImportTimelineData extends ConsoleRunnable {
+
+	private static final String PATHOLOGY_SLIDES_EVENT = "PATHOLOGY SLIDES";
+	private static final Set<String> FORBIDDEN_PATHOLOGY_ATTRIBUTES = Set.of("IMAGE_ID", "IMAGE_IDS");
+
+	/**
+	 * Pathology slide events reach the browser through the clinical-events API, so they must
+	 * carry neither real slide identifiers nor specimen accession numbers. Values are never echoed.
+	 */
+	static void validatePathologySlidesEvent(String[] headers, String[] fields, String eventType, int line) {
+		if (!PATHOLOGY_SLIDES_EVENT.equals(eventType)) {
+			return;
+		}
+		for (int i = 0; i < fields.length && i < headers.length; i++) {
+			if (FORBIDDEN_PATHOLOGY_ATTRIBUTES.contains(headers[i]) && !fields[i].isEmpty()) {
+				throw new IllegalArgumentException(
+					"Line " + line + ": PATHOLOGY SLIDES events cannot carry " + headers[i]);
+			}
+			if (WsiDeidentification.containsAccession(fields[i])) {
+				throw new IllegalArgumentException(
+					"Line " + line + ": PATHOLOGY SLIDES " + headers[i] + " contains a specimen accession number");
+			}
+		}
+	}
 
 	private static void importData(String dataFile, int cancerStudyId, boolean overwriteExisting) throws IOException, DaoException {
 		ClickHouseBulkLoader.bulkLoadOn();
@@ -77,8 +101,10 @@ public class ImportTimelineData extends ConsoleRunnable {
 
 			long clinicalEventId = DaoClinicalEvent.getLargestClinicalEventId();
 			Set<Integer> processedPatientIds = new HashSet<>();
+			int lineNumber = 1;
 
 			while ((line = buff.readLine()) != null) {
+				lineNumber++;
 				line = line.trim();
 	
 				String[] fields = line.split("\t");
@@ -87,6 +113,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 					ProgressMonitor.logWarning("more attributes than header: " + line + ". Skipping entry.");
 					continue;
 				}
+				validatePathologySlidesEvent(headers, fields, fields[indexCategorySpecificField - 1], lineNumber);
 				String patientId = fields[0];
 				Patient patient = DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudyId, patientId);
 				if (patient == null) {

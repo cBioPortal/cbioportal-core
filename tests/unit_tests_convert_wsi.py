@@ -68,7 +68,7 @@ def data_rows(path):
 def rows_by_image(path):
     header, *rows = data_rows(path)
     records = [dict(zip(header, row)) for row in rows]
-    return {json.loads(record['METADATA'])['image_id']: record for record in records}
+    return {json.loads(record['METADATA'])['wsi_serving']['image_id']: record for record in records}
 
 
 class ConverterTestCase(unittest.TestCase):
@@ -142,11 +142,11 @@ class ConvertedOutputTestCase(ConverterTestCase):
         patients = rows_by_image(self.out / 'data_resource_patient.txt')
         self.assertEqual(
             'https://portal.example.org/cbioportal/wsi/patient/WSI-P2'
-            '?studyId=wsi_convert_test&imageId=IMG%207%2FA%26B',
+            '?studyId=wsi_convert_test&slideKey=a72487fd68ef59b99fcee054e738f893',
             samples['IMG 7/A&B']['URL'])
         self.assertEqual(
             'https://portal.example.org/cbioportal/wsi/patient/WSI%2BP3'
-            '?studyId=wsi_convert_test&imageId=IMG-6',
+            '?studyId=wsi_convert_test&slideKey=3474b861eb683902b420f4ee95dfe0fa',
             patients['IMG-6']['URL'])
 
     def test_raw_tsv_metadata_round_trips(self):
@@ -164,7 +164,9 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertEqual(716956681, first['file_size_bytes'])
         self.assertEqual('1', first['part_number'])
         self.assertEqual('Left "upper" lobe \\ wedge', first['part_description'])
-        self.assertEqual("Adenocarcinoma, 'acinar'", first['path_dx_title'])
+        self.assertEqual('2c96f13783250ad2c6bcfcd5b7c3ef22', first['slide_key'])
+        for removed in ('image_id', 'barcode', 'part_designator', 'path_dx_title'):
+            self.assertNotIn(removed, first)
         self.assertEqual('WSI-P1-S1', first['reference_sample_id'])
         self.assertEqual('Recorded procedure date relative to first tumor sequencing',
                          first['timepoint_source'])
@@ -188,8 +190,8 @@ class ConvertedOutputTestCase(ConverterTestCase):
         # IMG-2 has a SOURCE_URL and a thumbnail width in the legacy row but CAN_SERVE_TILES=FALSE
         second = json.loads(samples['IMG-2']['METADATA'])
         self.assertIs(False, second['can_serve_tiles'])
-        self.assertEqual({}, second['wsi_serving'])
-        self.assertEqual({}, json.loads(patients['IMG-6']['METADATA'])['wsi_serving'])
+        self.assertEqual({'image_id': 'IMG-2'}, second['wsi_serving'])
+        self.assertEqual({'image_id': 'IMG-6'}, json.loads(patients['IMG-6']['METADATA'])['wsi_serving'])
 
     def test_count_rows_match_native_semantics(self):
         self.convert()
@@ -249,7 +251,7 @@ class ConvertedOutputTestCase(ConverterTestCase):
             contract = json.loads(row[-1])
             self.assertEqual(1, contract['version'])
             self.assertEqual(
-                {'image_id': False, 'barcode': False, 'part_key': False, 'block_key': False,
+                {'slide_key': False, 'part_key': False, 'block_key': False,
                  'specimen_key': False, 'reference_sample_id': False},
                 {field['key']: field['filterable'] for field in contract['fields']})
 
@@ -309,7 +311,8 @@ class ConverterInputTestCase(ConverterTestCase):
 
     def test_line_break_in_output_cell_is_rejected(self):
         rows = self.fixture_rows()
-        rows[0] = rows[0].replace('\tIMG-1\t', '\tIMG\r1\t', 1)
+        # STAIN_NAME reaches DISPLAY_NAME verbatim
+        rows[0] = rows[0].replace('\tH&E\tH&E\tTRUE\t', '\tH\r&E\tH&E\tTRUE\t', 1)
         self.assertConversionError('tab or line break', meta=self.write_legacy(rows))
         with self.assertRaises(converter.ConversionError):
             converter.write_tsv(Path(self.tmp.name) / 'x.txt', [['a\tb']])
@@ -480,299 +483,196 @@ class ClinicalMergeTestCase(ConverterTestCase):
         self.assertConversionError("expected the four '#' attribute header rows", study_dir=study)
 
 
-TIMELINE_COLUMNS = ['PATIENT_ID', 'START_DATE', 'STOP_DATE', 'EVENT_TYPE', 'SAMPLE_ID', 'SUBTYPE',
-                    'MATCH_LEVEL', 'SPECIMEN', 'IMAGE_COUNT', 'NON_SERVABLE_IMAGE_COUNT',
-                    'TOTAL_IMAGE_COUNT', 'TIMEPOINT_SOURCE', 'IMAGE_IDS', 'LINKOUT']
-RECORDED = 'Recorded procedure date relative to first tumor sequencing'
-ESTIMATED = 'Verified estimated procedure date relative to first tumor sequencing'
-ICDO = 'Procedure date relative to first ICD-O diagnosis'
-# Dated events for the fixture slides; IMG-4 and IMG-6 are in no event.
-DATED_EVENTS = [
-    ('WSI-P1', '0', RECORDED, ['IMG-1']),
-    ('WSI-P1', '-17', ESTIMATED, ['IMG-2', 'IMG-3']),
-    ('WSI-P2', '-365', RECORDED, ['IMG 7/A&B']),
-]
-TIMING_KEYS = {'timeline_start_days', 'timeline_date_status', 'timeline_date_kind',
-               'timeline_date_source', 'timeline_date_reason', 'timeline_coordinate_system',
-               'timepoint_source'}
+class V3OnlyTestCase(ConverterTestCase):
 
+    """Only format v3 (39 columns, SLIDE_KEY last) is converted."""
 
-class FormatV2Mixin(object):
-
-    def write_v2(self, rows=None, header=None):
-        """Write a format-v2 pair: the fixture without its seven timing columns."""
-        width = len(converter.V2_COLUMNS)
-        source = (FIXTURE_DIR / 'data_wsi.txt').read_text(encoding='utf-8').splitlines()
-        lines = ['\t'.join(line.split('\t')[:width]) for line in source]
-        if rows is not None:
-            lines = lines[:5] + rows
-        if header is not None:
-            lines[4] = header
-        legacy = Path(self.tmp.name) / 'legacy_v2'
-        legacy.mkdir(exist_ok=True)
-        (legacy / 'meta_wsi.txt').write_text(
-            (FIXTURE_DIR / 'meta_wsi.txt').read_text().replace('format_version: 3', 'format_version: 2'))
-        (legacy / 'data_wsi.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
-        return legacy / 'meta_wsi.txt'
-
-    def v2_rows(self):
-        width = len(converter.V2_COLUMNS)
-        return ['\t'.join(row.split('\t')[:width]) for row in self.fixture_rows()]
-
-    def write_timeline(self, events, directory=None, name='data_clinical_timeline_pathology_slides.txt',
-                       csv_quoted=False):
-        """Write a pathology timeline file; events are (patient, start, source, image IDs)."""
-        directory = Path(directory or self.tmp.name)
-        lines = ['\t'.join(TIMELINE_COLUMNS)]
-        for patient, start, source, images in events:
-            image_ids = json.dumps(images, separators=(',', ':'))
-            if csv_quoted:
-                image_ids = '"' + image_ids.replace('"', '""') + '"'
-            values = {'PATIENT_ID': patient, 'START_DATE': start, 'EVENT_TYPE': 'PATHOLOGY SLIDES',
-                      'SUBTYPE': 'H&E', 'MATCH_LEVEL': 'PART', 'IMAGE_COUNT': str(len(images)),
-                      'NON_SERVABLE_IMAGE_COUNT': '0', 'TOTAL_IMAGE_COUNT': str(len(images)),
-                      'TIMEPOINT_SOURCE': source, 'IMAGE_IDS': image_ids, 'LINKOUT': '/patient'}
-            lines.append('\t'.join(values.get(column, '') for column in TIMELINE_COLUMNS))
-        path = directory / name
-        path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-        return path
-
-    def add_study_timeline(self, study, events, name='pathology_slides'):
-        data = self.write_timeline(events, study, 'data_clinical_timeline_%s.txt' % name)
-        (study / ('meta_clinical_timeline_%s.txt' % name)).write_text(
-            'cancer_study_identifier: wsi_convert_test\ngenetic_alteration_type: CLINICAL\n'
-            'datatype: TIMELINE\ndata_filename: %s\n' % data.name)
-        return data
-
-    def convert_v2(self, events=DATED_EVENTS, meta=None, **kwargs):
-        timeline = self.write_timeline(events) if events is not None else None
-        return converter.convert(meta or self.write_v2(), self.out, BASE_URL,
-                                 timeline_file=timeline, **kwargs)
-
-    def metadata_by_image(self):
-        records = {}
-        for name in ('data_resource_sample.txt', 'data_resource_patient.txt'):
-            if (self.out / name).exists():
-                records.update({image: json.loads(record['METADATA'])
-                                for image, record in rows_by_image(self.out / name).items()})
-        return records
-
-
-class FormatV2TestCase(FormatV2Mixin, ConverterTestCase):
-
-    """Format v2 takes its slide timing from the study's pathology timeline."""
-
-    def assertConversionError(self, text, **kwargs):
+    def assertConversionError(self, text, meta):
         with self.assertRaises(converter.ConversionError) as context:
-            self.convert_v2(**kwargs)
+            converter.convert(meta, self.out, BASE_URL)
         self.assertIn(text, str(context.exception))
-        self.assertFalse(self.out.exists(), 'nothing may be written after a failure')
-
-    def test_v2_header_is_v3_without_timing_columns(self):
-        self.assertEqual(converter.COLUMNS[:31], converter.V2_COLUMNS)
-        self.assertEqual('THUMBNAIL_CONTENT_TYPE', converter.V2_COLUMNS[-1])
-        self.assertEqual(['TIMELINE_START_DAYS', 'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND',
-                          'TIMELINE_DATE_SOURCE', 'TIMELINE_DATE_REASON',
-                          'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE'], converter.TIMING_COLUMNS)
-        # a v2 meta with a v3 data file (and the reverse) is rejected
-        meta = self.write_v2()
-        shutil.copy(FIXTURE_DIR / 'data_wsi.txt', meta.parent / 'data_wsi.txt')
-        self.assertConversionError('invalid header', meta=meta)
-        meta = self.write_legacy(self.v2_rows(), '\t'.join(converter.V2_COLUMNS))
-        self.assertConversionError('invalid header', meta=meta, events=None)
-
-    def test_unsupported_format_version(self):
-        meta = self.write_v2()
-        meta.write_text(meta.read_text().replace('format_version: 2', 'format_version: 1'))
-        self.assertConversionError('expected 2 or 3', meta=meta)
-
-    def test_dated_and_undated_slides(self):
-        self.convert_v2()
-        metadata = self.metadata_by_image()
-        self.assertEqual({
-            'timeline_start_days': 0, 'timeline_date_status': 'AVAILABLE',
-            'timeline_date_kind': 'RECORDED', 'timeline_date_source': 'PATHOLOGY_TIMELINE',
-            'timeline_coordinate_system': 'patient_first_tumor_sequencing_day_zero',
-            'timepoint_source': RECORDED,
-        }, {key: value for key, value in metadata['IMG-1'].items() if key in TIMING_KEYS})
-        # both slides of a multi-image event get its day; "estimated" in the source is ESTIMATED
-        for image in ('IMG-2', 'IMG-3'):
-            self.assertEqual(-17, metadata[image]['timeline_start_days'])
-            self.assertEqual('ESTIMATED', metadata[image]['timeline_date_kind'])
-            self.assertEqual(ESTIMATED, metadata[image]['timepoint_source'])
-        self.assertEqual(-365, metadata['IMG 7/A&B']['timeline_start_days'])
-        # slides in no event are undated, like the upstream export's undated rows
-        for image in ('IMG-4', 'IMG-6'):
-            self.assertEqual({
-                'timeline_date_status': 'MISSING_PROCEDURE_DATE', 'timeline_date_kind': 'UNDATED',
-                'timeline_date_source': 'NO_VERIFIED_PROCEDURE_DATE',
-                'timeline_date_reason': 'MISSING_PROCEDURE_DATE',
-                'timeline_coordinate_system': 'patient_first_tumor_sequencing_day_zero',
-                'timepoint_source': 'MISSING_PROCEDURE_DATE',
-            }, {key: value for key, value in metadata[image].items() if key in TIMING_KEYS})
-
-    def test_v2_matches_v3_apart_from_timing(self):
-        self.convert_v2()
-        v2 = self.metadata_by_image()
-        v2_files = {path.name: path.read_text() for path in self.out.iterdir()}
-        self.out = Path(self.tmp.name) / 'v3'
-        self.convert()
-        v3 = self.metadata_by_image()
-        self.assertEqual(list(v3), list(v2))
-        for image in v3:
-            self.assertEqual({k: v for k, v in v3[image].items() if k not in TIMING_KEYS},
-                             {k: v for k, v in v2[image].items() if k not in TIMING_KEYS})
-        for name in ('data_clinical_sample_wsi_counts.txt', 'data_resource_definition.txt'):
-            self.assertEqual((self.out / name).read_text(), v2_files[name])
-        # Patient counts agree except the undated count, which follows timing: the
-        # v2 timeline dates IMG-3, which v3 leaves undated.
-        v2_patients = {line.split('\t')[0]: line.split('\t')[1:] for line
-                       in v2_files['data_clinical_patient_wsi_counts.txt'].splitlines()
-                       if not line.startswith('#')}
-        v3_patients = {row[0]: row[1:] for row in data_rows(
-            self.out / 'data_clinical_patient_wsi_counts.txt')}
-        self.assertEqual({patient: counts[:-1] for patient, counts in v3_patients.items()},
-                         {patient: counts[:-1] for patient, counts in v2_patients.items()})
-        self.assertEqual(['1', '2'], [v2_patients['WSI-P1'][-1], v3_patients['WSI-P1'][-1]])
-
-    def test_csv_quoted_image_ids_and_repeated_listing(self):
-        # the real export writes IMAGE_IDS CSV-quoted; listing an image twice with the same
-        # timing is not a conflict
-        events = DATED_EVENTS + [('WSI-P1', '0', RECORDED, ['IMG-1'])]
-        timeline = self.write_timeline(events, csv_quoted=True)
-        converter.convert(self.write_v2(), self.out, BASE_URL, timeline_file=timeline)
-        self.assertEqual(-17, self.metadata_by_image()['IMG-3']['timeline_start_days'])
-
-    def test_conflicting_days_fail(self):
-        events = DATED_EVENTS + [('WSI-P1', '5', RECORDED, ['IMG-1'])]
-        self.assertConversionError('IMAGE_ID IMG-1 is listed in events with conflicting timing',
-                                   events=events)
-        events = DATED_EVENTS + [('WSI-P1', '0', ESTIMATED, ['IMG-1'])]
-        self.assertConversionError('conflicting timing', events=events)
-
-    def test_image_listed_for_another_patient_fails(self):
-        events = DATED_EVENTS + [('WSI-P2', '0', RECORDED, ['IMG-4'])]
-        self.assertConversionError('IMAGE_ID IMG-4 belongs to patient WSI-P2', events=events)
-        events = DATED_EVENTS + [('WSI-P2', '0', RECORDED, ['IMG-1'])]
-        self.assertConversionError('IMAGE_ID IMG-1 is listed for patient WSI-P2 here but for WSI-P1',
-                                   events=events)
-
-    def test_image_missing_from_wsi_warns(self):
-        warnings = []
-        events = DATED_EVENTS + [('WSI-P1', '3', RECORDED, ['IMG-99', 'IMG-4'])]
-        self.convert_v2(events=events, warn=warnings.append)
-        self.assertEqual(1, len(warnings))
-        self.assertIn('1 image(s) listed in timeline events are not in', warnings[0])
-        self.assertIn('IMG-99', warnings[0])
-        self.assertEqual(3, self.metadata_by_image()['IMG-4']['timeline_start_days'])
-
-    def test_invalid_timeline_values_fail(self):
-        self.assertConversionError('START_DATE must be an integer',
-                                   events=[('WSI-P1', '', RECORDED, ['IMG-1'])])
-        timeline = self.write_timeline(DATED_EVENTS)
-        timeline.write_text(timeline.read_text().replace('["IMG-1"]', '[IMG-1]'))
-        with self.assertRaises(converter.ConversionError) as context:
-            converter.convert(self.write_v2(), self.out, BASE_URL, timeline_file=timeline)
-        self.assertIn('IMAGE_IDS must be a JSON array', str(context.exception))
-        timeline.write_text(timeline.read_text().replace('TIMEPOINT_SOURCE', 'SOURCE'))
-        with self.assertRaises(converter.ConversionError) as context:
-            converter.convert(self.write_v2(), self.out, BASE_URL, timeline_file=timeline)
-        self.assertIn('missing column TIMEPOINT_SOURCE', str(context.exception))
-
-    def test_day_zero_other_than_sequencing_fails_by_default(self):
-        events = [('WSI-P1', '9657', ICDO, ['IMG-1', 'IMG-2']), ('WSI-P1', '12', 'resolved', ['IMG-3'])]
-        with self.assertRaises(converter.ConversionError) as context:
-            self.convert_v2(events=events)
-        message = str(context.exception)
-        self.assertIn('does not place day zero at first tumor sequencing', message)
-        self.assertIn("1 event(s) with 2 image(s): %r" % ICDO, message)
-        self.assertIn("1 event(s) with 1 image(s): 'resolved'", message)
-        self.assertIn('--day-zero-mismatch undated', message)
         self.assertFalse(self.out.exists())
 
-    def test_day_zero_mismatch_undated_keeps_provenance_without_offset(self):
-        events = [('WSI-P1', '9657', ICDO, ['IMG-1'])] + DATED_EVENTS[1:]
-        self.convert_v2(events=events, day_zero_mismatch='undated')
-        metadata = self.metadata_by_image()
-        self.assertEqual({
-            'timeline_date_status': 'MISSING_REFERENCE_SEQUENCING_DATE',
-            'timeline_date_kind': 'RECORDED', 'timeline_date_source': 'PATHOLOGY_TIMELINE',
-            'timeline_date_reason': 'NO_SEQUENCING_REFERENCE',
-            'timeline_coordinate_system': 'patient_first_tumor_sequencing_day_zero',
-            'timepoint_source': ICDO,
-        }, {key: value for key, value in metadata['IMG-1'].items() if key in TIMING_KEYS})
-        # events on the sequencing day zero stay dated
-        self.assertEqual(-17, metadata['IMG-2']['timeline_start_days'])
+    def test_columns(self):
+        self.assertEqual(39, len(converter.COLUMNS))
+        self.assertEqual('SLIDE_KEY', converter.COLUMNS[-1])
+        self.assertEqual('TIMEPOINT_SOURCE', converter.COLUMNS[-2])
+        self.assertEqual(list(converter.TIMING_COLUMNS), converter.COLUMNS[31:38])
+        for name in ('V2_COLUMNS', 'FORMAT_COLUMNS', 'TIMELINE_REQUIRED_COLUMNS',
+                     'find_pathology_timeline', 'read_timeline_index', '_parse_image_ids'):
+            self.assertFalse(hasattr(converter, name), name)
 
-    def test_timeline_found_through_study_dir(self):
-        study = self.copy_study()
-        timeline = self.add_study_timeline(study, DATED_EVENTS)
-        # another timeline without IMAGE_IDS is not a pathology timeline
-        other = study / 'data_timeline_treatment.txt'
-        other.write_text('PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE\nWSI-P1\t0\t\tTREATMENT\n')
-        (study / 'meta_timeline_treatment.txt').write_text(
-            'cancer_study_identifier: wsi_convert_test\ngenetic_alteration_type: CLINICAL\n'
-            'datatype: TIMELINE\ndata_filename: data_timeline_treatment.txt\n')
-        before = timeline.read_bytes()
-        written = converter.convert(self.write_v2(), self.out, BASE_URL, study)
-        self.assertEqual(MERGED_FILES, sorted(path.name for path in written))
-        self.assertEqual(-17, self.metadata_by_image()['IMG-2']['timeline_start_days'])
-        self.assertEqual(before, timeline.read_bytes(), 'the timeline file is only read')
-        # an explicit --timeline-file wins over the study's
-        self.out = Path(self.tmp.name) / 'explicit'
-        explicit = self.write_timeline([('WSI-P1', '42', RECORDED, ['IMG-2'])])
-        converter.convert(self.write_v2(), self.out, BASE_URL, study, timeline_file=explicit)
-        self.assertEqual(42, self.metadata_by_image()['IMG-2']['timeline_start_days'])
-        self.assertNotIn('timeline_start_days', self.metadata_by_image()['IMG-1'])
+    def test_format_v2_is_rejected(self):
+        meta = self.write_legacy(self.fixture_rows())
+        meta.write_text(meta.read_text().replace('format_version: 3', 'format_version: 2'))
+        self.assertConversionError('unsupported WSI format_version; expected 3', meta)
 
-    def test_multiple_pathology_timelines_in_study_fail(self):
-        study = self.copy_study()
-        self.add_study_timeline(study, DATED_EVENTS)
-        self.add_study_timeline(study, DATED_EVENTS, name='pathology_slides_2')
-        with self.assertRaises(converter.ConversionError) as context:
-            converter.convert(self.write_v2(), self.out, BASE_URL, study)
-        self.assertIn('more than one pathology timeline file', str(context.exception))
+    def test_38_column_file_is_rejected(self):
+        source = (FIXTURE_DIR / 'data_wsi.txt').read_text(encoding='utf-8').splitlines()
+        rows = ['\t'.join(row.split('\t')[:38]) for row in source[5:]]
+        header = '\t'.join(source[4].split('\t')[:38])
+        self.assertConversionError('invalid header', self.write_legacy(rows, header))
 
-    def test_missing_timeline_fails(self):
-        self.assertConversionError('format_version 2 has no slide timing', events=None)
-        study = self.copy_study()
-        with self.assertRaises(converter.ConversionError) as context:
-            converter.convert(self.write_v2(), self.out, BASE_URL, study)
-        self.assertIn('--timeline-file', str(context.exception))
-        self.assertFalse(self.out.exists())
-
-    def test_timeline_file_is_rejected_for_v3(self):
-        timeline = self.write_timeline(DATED_EVENTS)
-        with self.assertRaises(converter.ConversionError) as context:
-            converter.convert(FIXTURE_DIR / 'meta_wsi.txt', self.out, BASE_URL, timeline_file=timeline)
-        self.assertIn('--timeline-file is only used for format_version 2', str(context.exception))
-
-    def test_v3_study_timeline_is_not_used(self):
-        study = self.copy_study()
-        self.add_study_timeline(study, [('WSI-P1', '42', RECORDED, ['IMG-1'])])
-        self.convert(study_dir=study)
-        self.assertEqual(0, self.metadata_by_image()['IMG-1']['timeline_start_days'])
+    def test_timeline_options_are_gone(self):
+        with patch('sys.stderr'), self.assertRaises(SystemExit):
+            converter.interface(['--meta-wsi', 'm', '--output-dir', 'o', '--portal-base-url', BASE_URL,
+                                 '--timeline-file', 't'])
 
     def test_failure_late_in_the_file_leaves_no_output(self):
-        rows = self.v2_rows()
-        rows[-1] = rows[-1].replace('\tUNMATCHED\t', '\tNOPE\t', 1)
-        self.assertConversionError('invalid MATCH_LEVEL', meta=self.write_v2(rows))
+        rows = self.fixture_rows()
+        rows[-1] = rows[-1].replace('\tUNMATCHED\t', '\tSOMETIMES\t', 1)
+        self.assertConversionError('invalid MATCH_LEVEL', self.write_legacy(rows))
         self.assertEqual([], [path.name for path in Path(self.tmp.name).iterdir()
                               if path.name.endswith('.partial')])
 
     def test_command_line(self):
-        timeline = self.write_timeline([('WSI-P1', '9657', ICDO, ['IMG-1'])])
-        args = ['--meta-wsi', str(self.write_v2()), '--output-dir', str(self.out),
-                '--portal-base-url', BASE_URL, '--timeline-file', str(timeline)]
-        with patch('sys.stderr'):
-            self.assertEqual(1, converter.main(args))
+        args = ['--meta-wsi', str(FIXTURE_DIR / 'meta_wsi.txt'), '--output-dir', str(self.out),
+                '--portal-base-url', BASE_URL]
         with patch('sys.stdout'):
-            self.assertEqual(0, converter.main(args + ['--day-zero-mismatch', 'undated']))
-        self.assertEqual('MISSING_REFERENCE_SEQUENCING_DATE',
-                         self.metadata_by_image()['IMG-1']['timeline_date_status'])
+            self.assertEqual(0, converter.main(args))
+        self.assertEqual(EXPECTED_FILES, sorted(path.name for path in self.out.iterdir()))
+        with patch('sys.stderr'):
+            self.assertEqual(1, converter.main(args[:-1] + ['not-a-url']))
 
 
-class ConvertedFilesValidationTestCase(FormatV2Mixin, ConverterTestCase):
+SLIDE_KEY = converter.COLUMNS.index('SLIDE_KEY')
+ACCESSIONS = ('S21-12345', 'msk:s1', 'part-s21-123')
+
+
+class SlideKeyAndDeidTestCase(ConverterTestCase):
+
+    """Slide keys and the de-identification rules of contract wsi-serving-v5 (R1/R2)."""
+
+    def with_cell(self, column, value, row=0):
+        rows = self.fixture_rows()
+        fields = rows[row].split('\t')
+        fields[column] = value
+        rows[row] = '\t'.join(fields)
+        return self.write_legacy(rows)
+
+    def conversion_error(self, meta):
+        with self.assertRaises(converter.ConversionError) as context:
+            converter.convert(meta, self.out, BASE_URL)
+        self.assertFalse(self.out.exists())
+        return str(context.exception)
+
+    def test_slide_key_is_required_and_must_be_lowercase_hex(self):
+        for value in ('', '2C96F13783250AD2C6BCFCD5B7C3EF22', '2c96f13783250ad2', 'g' * 32,
+                      '2c96f13783250ad2c6bcfcd5b7c3ef22a'):
+            message = self.conversion_error(self.with_cell(SLIDE_KEY, value))
+            self.assertIn('SLIDE_KEY', message, value)
+
+    def test_slide_key_must_be_unique(self):
+        rows = self.fixture_rows()
+        duplicate = rows[1].split('\t')
+        duplicate[SLIDE_KEY] = rows[0].split('\t')[SLIDE_KEY]
+        rows[1] = '\t'.join(duplicate)
+        self.assertIn('line 7: SLIDE_KEY is not unique', self.conversion_error(self.write_legacy(rows)))
+
+    def test_duplicate_image_id_is_not_echoed(self):
+        rows = self.fixture_rows()
+        duplicate = rows[0].split('\t')
+        duplicate[SLIDE_KEY] = 'f' * 32
+        message = self.conversion_error(self.write_legacy(rows + ['\t'.join(duplicate)]))
+        self.assertIn('IMAGE_ID is not unique', message)
+        self.assertNotIn('IMG-1', message)
+
+    def test_accession_is_rejected_in_every_input_cell_without_echo(self):
+        for column, name in enumerate(converter.COLUMNS):
+            for accession in ACCESSIONS:
+                message = self.conversion_error(self.with_cell(column, accession))
+                self.assertIn('line 6: %s contains a specimen accession number' % name, message)
+                self.assertNotIn(accession.lower(), message.lower())
+
+    def test_accession_inside_urls_and_tile_metadata_is_rejected(self):
+        source = converter.COLUMNS.index('SOURCE_URL')
+        message = self.conversion_error(self.with_cell(
+            source, 'https://slides.example.org/wsi/S21-12345.svs'))
+        self.assertIn('SOURCE_URL contains a specimen accession number', message)
+        self.assertNotIn('S21-12345', message)
+        tile = converter.COLUMNS.index('TILE_METADATA_JSON')
+        tile_metadata = self.fixture_rows()[0].split('\t')[tile].replace('Scan', 'MSK:S1 Scan')
+        message = self.conversion_error(self.with_cell(tile, tile_metadata))
+        self.assertIn('TILE_METADATA_JSON contains a specimen accession number', message)
+        self.assertNotIn('MSK:S1', message)
+
+    def test_generated_values_are_checked(self):
+        # an accession can only appear in generated values through the input, which is
+        # checked first; the generated-value guard is exercised directly
+        for url, name, metadata, where in (
+                ('https://x/wsi/patient/S21-12345', 'H&E', {}, 'URL'),
+                ('https://x', 'S21-12345', {}, 'DISPLAY_NAME'),
+                ('https://x', 'H&E', {'stain_name': 'MSK:S1'}, 'METADATA.stain_name'),
+                ('https://x', 'H&E', {'wsi_serving': {'image_id': 'S21-12345'}},
+                 'METADATA.wsi_serving.image_id'),
+                ('https://x', 'H&E', {'wsi_serving': {'tile_metadata_json': {'v': ['ok', 'S21-123']}}},
+                 'METADATA.wsi_serving.tile_metadata_json.v[1]')):
+            with self.assertRaises(converter.ConversionError) as context:
+                converter.check_output_accessions(url, name, metadata, 9)
+            message = str(context.exception)
+            self.assertEqual('line 9: generated %s contains a specimen accession number' % where, message)
+        converter.check_output_accessions('https://x', 'H&E', {'a': [1, True, None, 'S2-1']}, 9)
+
+    def test_url_display_name_and_metadata_shape(self):
+        self.convert()
+        for name in ('data_resource_sample.txt', 'data_resource_patient.txt'):
+            header, *records = data_rows(self.out / name)
+            for record in records:
+                row = dict(zip(header, record))
+                metadata = json.loads(row['METADATA'])
+                self.assertRegex(metadata['slide_key'], '^[0-9a-f]{32}$')
+                self.assertTrue(row['URL'].endswith('&slideKey=' + metadata['slide_key']))
+                for field in ('URL', 'DISPLAY_NAME'):
+                    # the image ID only appears inside the private wsi_serving object
+                    for value in ('IMG', 'imageId', 'BC-0001'):
+                        self.assertNotIn(value, row[field])
+                public = {key for key in metadata if key != 'wsi_serving'}
+                self.assertFalse(public & {'image_id', 'barcode', 'part_designator', 'path_dx_title',
+                                           'source_url', 'thumbnail_url'}, public)
+                self.assertLessEqual(public, PUBLIC_KEYS)
+                public_text = json.dumps({key: metadata[key] for key in public})
+                for value in (metadata['wsi_serving']['image_id'], 'BC-0001', 'Adenocarcinoma'):
+                    self.assertNotIn(value, public_text)
+        samples = rows_by_image(self.out / 'data_resource_sample.txt')
+        self.assertEqual('H&E \u00b7 Specimen 1 / Block 1', samples['IMG-1']['DISPLAY_NAME'])
+        self.assertEqual('PD-L1 (22C3) \u00b7 Specimen 2 / Block 1', samples['IMG-3']['DISPLAY_NAME'])
+        patients = rows_by_image(self.out / 'data_resource_patient.txt')
+        self.assertEqual('H&E \u00b7 Specimen 1', patients['IMG-6']['DISPLAY_NAME'])
+
+    def test_display_name_fallbacks(self):
+        row = {name: '' for name in converter.COLUMNS}
+        self.assertEqual('Slide', converter.display_name(row))
+        row.update(SLIDE_TYPE='IHC', BLOCK_NUMBER='3')
+        self.assertEqual('IHC \u00b7 Block 3', converter.display_name(row))
+
+    def test_wsi_serving_carries_image_id(self):
+        self.convert()
+        samples = rows_by_image(self.out / 'data_resource_sample.txt')
+        serving = json.loads(samples['IMG-1']['METADATA'])['wsi_serving']
+        self.assertEqual(
+            {'image_id', 'source_url', 'tile_metadata_json', 'thumbnail_url', 'thumbnail_width',
+             'thumbnail_height', 'thumbnail_content_type'}, set(serving))
+        self.assertEqual('IMG-1', serving['image_id'])
+        # non-servable rows keep only the image ID
+        self.assertEqual({'image_id': 'IMG-2'}, json.loads(samples['IMG-2']['METADATA'])['wsi_serving'])
+
+    def test_tab_in_output_is_not_echoed(self):
+        with self.assertRaises(converter.ConversionError) as context:
+            converter.write_tsv(Path(self.tmp.name) / 'x.txt', [['IMG\t1']])
+        self.assertNotIn('IMG', str(context.exception))
+
+
+PUBLIC_KEYS = {
+    'slide_key', 'reference_sample_id', 'part_key', 'part_number', 'part_type',
+    'part_description', 'subspecialty', 'block_key', 'block_number', 'block_label', 'match_level',
+    'specimen_key', 'stain_name', 'stain_group', 'magnification', 'slide_type', 'is_hne', 'is_ihc',
+    'can_serve_tiles', 'file_size_bytes', 'timeline_start_days', 'timeline_date_status',
+    'timeline_date_kind', 'timeline_date_source', 'timeline_date_reason',
+    'timeline_coordinate_system', 'timepoint_source',
+}
+
+
+class ConvertedFilesValidationTestCase(ConverterTestCase):
 
     """Run the emitted files through the real validateData validators."""
 
@@ -823,21 +723,6 @@ class ConvertedFilesValidationTestCase(FormatV2Mixin, ConverterTestCase):
         self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems])
         _, problems = self.run_validator(validateData.PatientResourceValidator, 'data_resource_patient.txt')
         self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems])
-
-    def test_v2_resource_files_pass_validation(self):
-        for events, policy in ((DATED_EVENTS, 'error'),
-                               ([('WSI-P1', '9657', ICDO, ['IMG-1', 'IMG-2'])], 'undated')):
-            shutil.rmtree(self.out, ignore_errors=True)
-            validateData.reset_wsi_resource_state()
-            self.convert_v2(events=events, day_zero_mismatch=policy)
-            validator, problems = self.run_validator(validateData.ResourceDefinitionValidator,
-                                                     'data_resource_definition.txt')
-            self.assertEqual([], [r.getMessage() for r in problems])
-            validateData.RESOURCE_DEFINITION_DICTIONARY = validator.resource_definition_dictionary
-            for validator_class, name in ((validateData.SampleResourceValidator, 'data_resource_sample.txt'),
-                                          (validateData.PatientResourceValidator, 'data_resource_patient.txt')):
-                _, problems = self.run_validator(validator_class, name)
-                self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems])
 
     def test_count_files_pass_clinical_validation(self):
         self.convert()

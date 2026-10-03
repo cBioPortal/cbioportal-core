@@ -23,6 +23,7 @@ import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MissingValues;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
+import org.mskcc.cbio.portal.util.WsiDeidentification;
 
 public class ImportResourceData extends ConsoleRunnable {
 
@@ -37,6 +38,9 @@ public class ImportResourceData extends ConsoleRunnable {
     public static final String DISPLAY_NAME_COLUMN_NAME = "DISPLAY_NAME";
     public static final String TYPE_COLUMN_NAME = "TYPE";
     public static final String METADATA_COLUMN_NAME = "METADATA";
+    // Whole-slide-image rows (contract wsi-serving-v5, resource-data variant)
+    static final String WSI_RESOURCE_TYPE = "WHOLE_SLIDE_IMAGE";
+    static final Set<String> WSI_RESOURCE_IDS = Set.of("WSI_SAMPLE", "WSI_PATIENT");
     private int numSampleSpecificResourcesAdded = 0;
     private int numPatientSpecificResourcesAdded = 0;
     private int numStudySpecificResourcesAdded = 0;
@@ -54,6 +58,8 @@ public class ImportResourceData extends ConsoleRunnable {
     // Resource IDs encountered while reading the file, used to delete stale existing rows for
     // this study/resource-ID combination before the new rows are flushed (see importData()).
     private final Set<String> resourceIdsInFile = new HashSet<>();
+    // 1-based line number of the row being imported (the header is line 1).
+    private int lineNumber = 1;
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -144,15 +150,49 @@ public class ImportResourceData extends ConsoleRunnable {
         int resourceIdIndex = findResourceIdColumn(headerIndexMap);
 
         while ((line = buff.readLine()) != null) {
+            lineNumber++;
             if (skipLine(line.trim())) {
                 continue;
             }
 
             String[] fieldValues = getFieldValues(line, headerIndexMap);
+            validateWholeSlideImageRow(
+                resourceIdIndex >= 0 ? fieldValues[resourceIdIndex] : null,
+                getOptionalField(fieldValues, headerIndexMap, TYPE_COLUMN_NAME),
+                getOptionalField(fieldValues, headerIndexMap, URL_COLUMN_NAME),
+                getOptionalField(fieldValues, headerIndexMap, DISPLAY_NAME_COLUMN_NAME),
+                getOptionalField(fieldValues, headerIndexMap, METADATA_COLUMN_NAME),
+                lineNumber);
             if (resourceIdIndex >= 0 && !MissingValues.has(fieldValues[resourceIdIndex])) {
                 resourceIdsInFile.add(fieldValues[resourceIdIndex]);
             }
             addDatum(fieldValues, resources, resourceMap, headerIndexMap, patientResourceIdSet, sampleResourceIdSet, studyResourceIdSet);
+        }
+    }
+
+    /**
+     * Backstop for whole-slide-image rows (TYPE WHOLE_SLIDE_IMAGE, or the WSI_SAMPLE/WSI_PATIENT
+     * resources): reject specimen accession numbers in the URL, the display name and every
+     * METADATA string (wsi_serving included). validateData.py and the offline converter apply
+     * the full contract; this only guarantees an accession never reaches ClickHouse. The
+     * message names the column or JSON path, never the value.
+     */
+    static void validateWholeSlideImageRow(String resourceId, String type, String url,
+                                           String displayName, String metadata, int line) {
+        if (!WSI_RESOURCE_TYPE.equals(type) && !WSI_RESOURCE_IDS.contains(resourceId)) {
+            return;
+        }
+        String location = null;
+        if (WsiDeidentification.containsAccession(url)) {
+            location = URL_COLUMN_NAME;
+        } else if (WsiDeidentification.containsAccession(displayName)) {
+            location = DISPLAY_NAME_COLUMN_NAME;
+        } else {
+            location = WsiDeidentification.findAccessionInJson(metadata, METADATA_COLUMN_NAME);
+        }
+        if (location != null) {
+            throw new IllegalArgumentException("Line " + line + ": " + WSI_RESOURCE_TYPE + " " + location
+                + " contains a specimen accession number");
         }
     }
 
@@ -175,8 +215,9 @@ public class ImportResourceData extends ConsoleRunnable {
 
         // validate: if number of fields is incorrect, give exception
         if (fieldValues.length != headerIndexMap.size()) {
-            throw new IllegalArgumentException("Number of columns in line is not as expected. Expected: "
-                    + headerIndexMap.size() + " columns, found: " + fieldValues.length + ", for line: " + line);
+            // The line itself is not echoed: resource rows can carry server-side identifiers.
+            throw new IllegalArgumentException("Number of columns in line " + lineNumber + " is not as expected. Expected: "
+                    + headerIndexMap.size() + " columns, found: " + fieldValues.length);
         }
 
         // now iterate over lines and trim each value:
