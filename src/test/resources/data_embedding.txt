@@ -1,0 +1,9 @@
+EMBEDDING_ID	PATIENT_ID	SAMPLE_ID	X	Y	CUSTOM_ATTRIBUTES
+umap_1	TCGA-A2-A04P		1.2	3.4	{"data_split":"train"}
+umap_1	TCGA-A1-A0SK		2.1	0.8	{"data_split":"train"}
+umap_1	TCGA-A2-A0CM		4.5	1.1	{"data_split":"validation"}
+umap_1	TCGA-AR-A1AR		3.3	2.2	{"data_split":"test"}
+pca_1	TCGA-B6-A0WX	TCGA-B6-A0WX-01	0.5	1.9	{"data_split":"train"}
+pca_1	TCGA-BH-A1F0	TCGA-BH-A1F0-01	2.7	3.1	{"data_split":"validation"}
+pca_1	TCGA-B6-A0I6	TCGA-B6-A0I6-01	1.8	0.4	{"data_split":"test"}
+pca_1	TCGA-BH-A18V	TCGA-BH-A18V-01	3.9	2.6	{"data_split":"test"}
