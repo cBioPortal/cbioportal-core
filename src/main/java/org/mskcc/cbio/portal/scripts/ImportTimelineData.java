@@ -110,7 +110,8 @@ public class ImportTimelineData extends ConsoleRunnable {
 				String[] fields = line.split("\t");
 				if (fields.length > headers.length) {
 					//TODO - should better throw an exception here...
-					ProgressMonitor.logWarning("more attributes than header: " + line + ". Skipping entry.");
+					// Report the position only: the line may carry identifiers.
+					ProgressMonitor.logWarning("Line " + lineNumber + ": more attributes than header. Skipping entry.");
 					continue;
 				}
 				validatePathologySlidesEvent(headers, fields, fields[indexCategorySpecificField - 1], lineNumber);
