@@ -8,6 +8,7 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.collections4.map.MultiKeyMap;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkDeleter;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoPatient;
@@ -113,6 +114,12 @@ public class ImportResourceData extends ConsoleRunnable {
         DaoResourceData.deleteResourceData(cancerStudy.getInternalId(), resourceIdsInFile);
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
+            // The deleter has to be flushed here, not left to a later stage: importing a resource
+            // file is the whole job when it is run on its own, so nothing afterwards would execute
+            // the queued deletions and the re-imported rows would be added to the stale ones
+            // rather than replacing them. ClickHouseBulkLoader.flushAll() below flushes inserts
+            // only; it is a different queue.
+            ClickHouseBulkDeleter.flushAll();
             ClickHouseBulkLoader.flushAll();
             ClickHouseBulkLoader.relaxedModeOff();
         }
