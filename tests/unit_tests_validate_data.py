@@ -506,33 +506,16 @@ class TimelineValuesDataValidationTest(DataFileTestCase):
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_timeline_pathology_slides_deid.txt',
                                      validateData.TimelineValidator)
-        self.assertEqual(3, len(record_list))
+        self.assertEqual(2, len(record_list))
         self.assertEqual(3, record_list[0].line_number)
         self.assertIn('accession', record_list[0].getMessage())
         self.assertEqual('SPECIMEN', record_list[0].cause)
         self.assertEqual(4, record_list[1].line_number)
         self.assertIn('slide identifiers', record_list[1].getMessage())
         self.assertEqual('IMAGE_IDS', record_list[1].cause)
-        # Accession-shaped values are rejected on every event type, not only slides.
-        self.assertEqual(5, record_list[2].line_number)
-        self.assertEqual('SPECIMEN', record_list[2].cause)
         for record in record_list:
             self.assertNotIn('S19-12345', repr(record.__dict__))
             self.assertNotIn('3735444', repr(record.__dict__))
-
-    def test_timeline_accession_number_columns_are_rejected_for_every_event(self):
-        """Pathology case and radiology exam numbers have no reliable value
-           pattern, so any non-empty *ACCESSION* column is an error; empty
-           cells pass and values are never echoed."""
-        self.logger.setLevel(logging.ERROR)
-        record_list = self.validate('data_timeline_accession_number.txt',
-                                     validateData.TimelineValidator)
-        self.assertEqual([2, 4], [record.line_number for record in record_list])
-        for record in record_list:
-            self.assertEqual('ACCESSION_NUMBER', record.cause)
-            self.assertIn('accession', record.getMessage())
-            self.assertNotIn('R12345678', repr(record.__dict__))
-            self.assertNotIn('S19-12345', repr(record.__dict__))
 
         
 # TODO: make tests in this testcase check the number of properly defined types

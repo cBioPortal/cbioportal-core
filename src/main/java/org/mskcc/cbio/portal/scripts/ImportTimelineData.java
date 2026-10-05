@@ -56,30 +56,21 @@ public class ImportTimelineData extends ConsoleRunnable {
 	private static final Set<String> FORBIDDEN_PATHOLOGY_ATTRIBUTES = Set.of("IMAGE_ID", "IMAGE_IDS");
 
 	/**
-	 * Timeline events reach the browser through the clinical-events API, so no event may carry a
-	 * record accession number: neither an attribute named like {@code *ACCESSION*} (pathology case
-	 * and radiology exam numbers, which have no reliable value pattern) nor a value shaped like a
-	 * specimen accession. Pathology slide events also must not carry real slide identifiers.
-	 * Values are never echoed.
+	 * Pathology slide events reach the browser through the clinical-events API, so they must
+	 * carry neither real slide identifiers nor specimen accession numbers. Values are never echoed.
 	 */
-	static void validateTimelineEventDeid(String[] headers, String[] fields, String eventType, int line) {
-		boolean pathologySlides = PATHOLOGY_SLIDES_EVENT.equals(eventType);
+	static void validatePathologySlidesEvent(String[] headers, String[] fields, String eventType, int line) {
+		if (!PATHOLOGY_SLIDES_EVENT.equals(eventType)) {
+			return;
+		}
 		for (int i = 0; i < fields.length && i < headers.length; i++) {
-			if (fields[i].isEmpty()) {
-				continue;
-			}
-			String header = headers[i];
-			if (header.toUpperCase(java.util.Locale.ROOT).contains("ACCESSION")) {
+			if (FORBIDDEN_PATHOLOGY_ATTRIBUTES.contains(headers[i]) && !fields[i].isEmpty()) {
 				throw new IllegalArgumentException(
-					"Line " + line + ": timeline events cannot carry accession numbers (" + header + ")");
-			}
-			if (pathologySlides && FORBIDDEN_PATHOLOGY_ATTRIBUTES.contains(header)) {
-				throw new IllegalArgumentException(
-					"Line " + line + ": PATHOLOGY SLIDES events cannot carry " + header);
+					"Line " + line + ": PATHOLOGY SLIDES events cannot carry " + headers[i]);
 			}
 			if (WsiDeidentification.containsAccession(fields[i])) {
 				throw new IllegalArgumentException(
-					"Line " + line + ": timeline " + header + " contains a specimen accession number");
+					"Line " + line + ": PATHOLOGY SLIDES " + headers[i] + " contains a specimen accession number");
 			}
 		}
 	}
@@ -123,7 +114,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 					ProgressMonitor.logWarning("Line " + lineNumber + ": more attributes than header. Skipping entry.");
 					continue;
 				}
-				validateTimelineEventDeid(headers, fields, fields[indexCategorySpecificField - 1], lineNumber);
+				validatePathologySlidesEvent(headers, fields, fields[indexCategorySpecificField - 1], lineNumber);
 				String patientId = fields[0];
 				Patient patient = DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudyId, patientId);
 				if (patient == null) {

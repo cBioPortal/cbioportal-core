@@ -248,14 +248,12 @@ in the study's existing clinical timeline files, which are imported unchanged.
 The slide timing fields in `METADATA` drive the WSI hierarchy (including the
 undated section) and do not create clinical events.
 
-Timeline events reach the browser through the clinical events API, so
-`validateData.py` and `ImportTimelineData` reject, for every event type, a
-non-blank column whose name contains `ACCESSION` (pathology case and radiology
-exam numbers have no reliable value pattern) and any value shaped like a
-specimen accession number. `PATHOLOGY SLIDES` events must also not carry real
-slide identifiers: a non-blank `IMAGE_ID` or `IMAGE_IDS` column is rejected.
-Errors name the column, never the value. `SPECIMEN`/`LINKOUT` carry only the
-opaque specimen key.
+`PATHOLOGY SLIDES` timeline events reach the browser through the clinical
+events API, so they must not carry real slide identifiers: `validateData.py`
+and `ImportTimelineData` reject such events when they have a non-blank
+`IMAGE_ID` or `IMAGE_IDS` column, or an accession number in any column
+(again without echoing the value). `SPECIMEN`/`LINKOUT` carry only the opaque
+specimen key.
 
 ## Legacy format v3
 
