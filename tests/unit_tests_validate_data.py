@@ -2890,22 +2890,66 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
         self.assertIn('Missing RESOURCE_ID', record.getMessage())
 
     def test_resource_definition_custom_metadata(self):
+        """CUSTOM_METADATA is rejected both for invalid JSON and for valid JSON that is not a
+        contract the portal can read."""
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_resource_definition_invalid_custom_metadata.txt',
                             validateData.ResourceDefinitionValidator)
-        self.assertEqual(3, len(record_list))
-        record = record_list.pop()
-        self.assertEqual(logging.ERROR, record.levelno)
-        self.assertIn('Invalid JSON in CUSTOM_METADATA column', record.getMessage())
-        self.assertEqual(record.cause, '["item1", "item2",]')
-        record = record_list.pop()
-        self.assertEqual(logging.ERROR, record.levelno)
-        self.assertIn('Invalid JSON in CUSTOM_METADATA column', record.getMessage())
-        self.assertEqual(record.cause, '{key: "value"}')
-        record = record_list.pop()
-        self.assertEqual(logging.ERROR, record.levelno)
-        self.assertIn('Invalid JSON in CUSTOM_METADATA column', record.getMessage())
-        self.assertEqual(record.cause, '{"key": "value", "number": 123,}')
+
+        self.assertEqual(7, len(record_list))
+        self.assertTrue(all(r.levelno == logging.ERROR for r in record_list))
+
+        malformed_json = [r.cause for r in record_list
+                          if 'Invalid JSON in CUSTOM_METADATA column' in r.getMessage()]
+        self.assertEqual(
+            ['{"key": "value", "number": 123,}', '{key: "value"}', '["item1", "item2",]'],
+            malformed_json)
+
+        # Valid JSON that carries no contract is reported too: the portal would silently ignore
+        # it, so validation is the only place a curator finds out.
+        not_a_contract = [r.getMessage() for r in record_list
+                          if 'Invalid JSON in CUSTOM_METADATA column' not in r.getMessage()]
+        self.assertEqual(4, len(not_a_contract))
+        self.assertEqual(
+            3, sum("has no 'fields' key" in m for m in not_a_contract))
+        self.assertEqual(
+            1, sum('must be a JSON object' in m for m in not_a_contract))
+
+    def test_custom_metadata_contract_shape_errors(self):
+        """Shapes the portal cannot read at all are errors: it would fall back to "no contract"
+        and the curator would never hear about it."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_definition_contract_shapes.txt',
+                            validateData.ResourceDefinitionValidator)
+
+        self.assertTrue(all(r.levelno == logging.ERROR for r in record_list))
+        messages = [r.getMessage() for r in record_list]
+        self.assertEqual(5, len(messages))
+        self.assertEqual(1, sum("has no 'fields' key" in m for m in messages))
+        self.assertEqual(1, sum("'fields' must be a list" in m for m in messages))
+        self.assertEqual(1, sum('field entry must be a JSON object' in m for m in messages))
+        self.assertEqual(1, sum("field entry has no 'key'" in m for m in messages))
+        self.assertEqual(1, sum('CUSTOM_METADATA must be a JSON object' in m for m in messages))
+
+        # The well-formed contract on line 2 produces nothing.
+        self.assertNotIn(2, [r.line_number for r in record_list])
+
+    def test_custom_metadata_contract_field_warnings(self):
+        """A single misdeclared field is a warning: the rest of the contract still applies and
+        only that column's presentation is affected."""
+        self.logger.setLevel(logging.WARNING)
+        record_list = self.validate('data_resource_definition_contract_shapes.txt',
+                            validateData.ResourceDefinitionValidator)
+
+        warnings = [r for r in record_list if r.levelno == logging.WARNING]
+        messages = [r.getMessage() for r in warnings]
+        self.assertEqual(3, len(warnings))
+        self.assertEqual(1, sum("field 'type' is not one of" in m for m in messages))
+        self.assertEqual(1, sum("field 'filterable' is not true or false" in m for m in messages))
+        self.assertEqual(1, sum('keys the portal does not read' in m for m in messages))
+
+        # Warnings name the offending field so a curator can find it.
+        self.assertTrue(all('stain' in w.cause for w in warnings))
 
 class ResourceWiseTestCase(PostClinicalDataFileTestCase):
     def test_resource_is_not_url(self):
@@ -2920,6 +2964,27 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('not an url', record.getMessage())
         # reset RESOURCE_DEFINITION_DICTIONARY
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_resource_metadata_must_be_a_json_object(self):
+        """METADATA carries the per-item fields the resource table filters on, so the portal
+        treats it as a key-value map. Arrays, scalars and malformed JSON are rejected; an empty
+        value or NA is fine, since the column is optional."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_sample_metadata.txt',
+                            validateData.ResourceValidator)
+
+        self.assertEqual(3, len(record_list))
+        self.assertTrue(all(r.levelno == logging.ERROR for r in record_list))
+
+        by_line = {r.line_number: r.getMessage() for r in record_list}
+        self.assertIn('METADATA must be a JSON object', by_line[5])   # an array
+        self.assertIn('METADATA must be a JSON object', by_line[6])   # a scalar
+        self.assertIn('METADATA value is not valid JSON', by_line[7])
+
+        # Lines 2-4: a well-formed object, an empty value and NA all pass.
+        self.assertEqual(set(), {2, 3, 4} & set(by_line))
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
     # sample resources tests

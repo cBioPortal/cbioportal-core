@@ -276,7 +276,7 @@ INSERT INTO resource_definition (resource_id, cancer_study_id) VALUES
 ('RES_DEF_DUP', 700010);
 
 -- resource_data
-INSERT INTO resource_data (RESOURCE_DATA_ID, RESOURCE_ID, CANCER_STUDY_ID, ENTITY_TYPE, PATIENT_ID, URL) VALUES
+INSERT INTO resource_data (resource_data_id, resource_id, cancer_study_id, entity_type, patient_id, url) VALUES
 (700300, 'RES_DATA_DUP', 700010, 'PATIENT', 'PATIENT_A', 'http://patient-a'),
 (700300, 'RES_DATA_DUP', 700010, 'PATIENT', 'PATIENT_B', 'http://patient-b');
 

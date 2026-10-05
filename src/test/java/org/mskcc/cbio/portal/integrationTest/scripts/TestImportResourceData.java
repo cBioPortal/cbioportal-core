@@ -143,13 +143,13 @@ public class TestImportResourceData extends IntegrationTestBase {
         DaoResourceData.addResourceDatum(study.getInternalId(), "WSI_PATIENT", "PATIENT", "WSI-P1",
             null, "https://portal.example.org/cbioportal/direct", "direct", "LINK", null);
         long directId = singleLong(
-            "SELECT RESOURCE_DATA_ID FROM resource_data WHERE CANCER_STUDY_ID = ? AND DISPLAY_NAME = 'direct'",
+            "SELECT resource_data_id FROM resource_data WHERE cancer_study_id = ? AND display_name = 'direct'",
             study.getInternalId());
         assertNotEquals(0L, directId);
         assertFalse(firstIds.contains(directId) || secondIds.contains(directId));
 
         DaoCancerStudy.deleteCancerStudy(study.getInternalId());
-        assertEquals(0L, singleLong("SELECT count() FROM resource_data WHERE CANCER_STUDY_ID = ?",
+        assertEquals(0L, singleLong("SELECT count() FROM resource_data WHERE cancer_study_id = ?",
             study.getInternalId()));
         assertEquals(0L, singleLong("SELECT count() FROM resource_definition WHERE cancer_study_id = ?",
             study.getInternalId()));
@@ -167,7 +167,7 @@ public class TestImportResourceData extends IntegrationTestBase {
         long maxStudyId = singleLong("SELECT max(cancer_study_id) FROM cancer_study");
         assertTrue(ClickHouseAutoIncrement.nextId("seq_cancer_study") > maxStudyId);
         assertTrue(ClickHouseAutoIncrement.nextId("seq_clinical_event") > 0);
-        long maxResourceId = singleLong("SELECT max(RESOURCE_DATA_ID) FROM resource_data");
+        long maxResourceId = singleLong("SELECT max(resource_data_id) FROM resource_data");
         assertTrue(ClickHouseAutoIncrement.nextId("seq_resource_data") > maxResourceId);
     }
 
@@ -196,9 +196,9 @@ public class TestImportResourceData extends IntegrationTestBase {
         Map<String, ResourceRow> rows = new LinkedHashMap<>();
         try (Connection connection = JdbcUtil.getDbConnection(TestImportResourceData.class);
              PreparedStatement statement = connection.prepareStatement(
-                 "SELECT RESOURCE_DATA_ID, RESOURCE_ID, ENTITY_TYPE, PATIENT_ID, SAMPLE_ID, URL, TYPE, METADATA "
-                     + "FROM resource_data WHERE CANCER_STUDY_ID = ? AND TYPE = 'WHOLE_SLIDE_IMAGE' "
-                     + "ORDER BY RESOURCE_ID DESC, RESOURCE_DATA_ID")) {
+                 "SELECT resource_data_id, resource_id, entity_type, patient_id, sample_id, url, type, metadata "
+                     + "FROM resource_data WHERE cancer_study_id = ? AND type = 'WHOLE_SLIDE_IMAGE' "
+                     + "ORDER BY resource_id DESC, resource_data_id")) {
             statement.setInt(1, study.getInternalId());
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
@@ -233,8 +233,8 @@ public class TestImportResourceData extends IntegrationTestBase {
 
     private static void assertUniquePositiveIds(java.util.Collection<ResourceRow> rows) {
         Set<Long> ids = ids(rows);
-        assertEquals("RESOURCE_DATA_ID values must be unique", rows.size(), ids.size());
-        assertTrue("RESOURCE_DATA_ID values must be allocated", ids.stream().allMatch(id -> id > 0));
+        assertEquals("resource_data_id values must be unique", rows.size(), ids.size());
+        assertTrue("resource_data_id values must be allocated", ids.stream().allMatch(id -> id > 0));
     }
 
     private static boolean disjoint(Set<Long> left, Set<Long> right) {

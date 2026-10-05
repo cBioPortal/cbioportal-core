@@ -36,6 +36,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -89,14 +90,12 @@ public final class ClickHouseAutoIncrement {
         register("seq_copy_number_seg", "copy_number_seg", "seg_id");
         register("seq_copy_number_seg_file", "copy_number_seg_file", "seg_file_id");
         register("seq_clinical_event", "clinical_event", "clinical_event_id");
-        register("seq_resource_data", "resource_data", "RESOURCE_DATA_ID");
+        register("seq_resource_data", "resource_data", "resource_data_id");
         registerShutdownHook();
     }
 
-    // ClickHouse identifiers are case-sensitive, so the column is kept exactly as
-    // declared in the schema (e.g. resource_data.RESOURCE_DATA_ID is upper case).
     private static void register(String sequenceName, String tableName, String columnName) {
-        CONFIG.put(sequenceName, new SequenceConfig(tableName, columnName));
+        CONFIG.put(sequenceName, new SequenceConfig(tableName, columnName.toLowerCase(Locale.ROOT)));
     }
 
     private static void registerShutdownHook() {
@@ -192,9 +191,7 @@ public final class ClickHouseAutoIncrement {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(ClickHouseAutoIncrement.class);
-            stmt = con.prepareStatement(
-                "SELECT max(" + quoteIdentifier(config.columnName) + ") FROM "
-                    + quoteIdentifier(config.tableName));
+            stmt = con.prepareStatement("SELECT max(" + config.columnName + ") FROM " + config.tableName);
             rs = stmt.executeQuery();
             if (rs.next()) {
                 return rs.getLong(1);
@@ -205,10 +202,6 @@ public final class ClickHouseAutoIncrement {
         } finally {
             JdbcUtil.closeAll(ClickHouseAutoIncrement.class, con, stmt, rs);
         }
-    }
-
-    private static String quoteIdentifier(String identifier) {
-        return "`" + identifier.replace("`", "``") + "`";
     }
 
     private static void persistLastValue(String sequenceName, long value) throws DaoException {

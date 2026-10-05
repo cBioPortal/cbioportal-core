@@ -206,10 +206,10 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
         addFk(keys, "allele_specific_copy_number", "genetic_profile_id", "genetic_profile", "genetic_profile_id");
         addFk(keys, "allele_specific_copy_number", "sample_id", "sample", "internal_id");
         addFk(keys, "resource_definition", "cancer_study_id", "cancer_study", "cancer_study_id");
-        addFk(keys, "resource_data", "CANCER_STUDY_ID", "cancer_study", "cancer_study_id");
-        addFk(keys, "resource_data", "RESOURCE_ID,CANCER_STUDY_ID", "resource_definition", "resource_id,cancer_study_id");
-        addFk(keys, "resource_data", "CANCER_STUDY_ID,PATIENT_ID", "patient", "cancer_study_id,stable_id");
-        addFk(keys, "resource_data", "SAMPLE_ID", "sample", "stable_id");
+        addFk(keys, "resource_data", "cancer_study_id", "cancer_study", "cancer_study_id");
+        addFk(keys, "resource_data", "resource_id,cancer_study_id", "resource_definition", "resource_id,cancer_study_id");
+        addFk(keys, "resource_data", "cancer_study_id,patient_id", "patient", "cancer_study_id,stable_id");
+        addFk(keys, "resource_data", "sample_id", "sample", "stable_id");
         return keys;
     }
 
@@ -254,7 +254,7 @@ public class TestClickHouseConstraintChecker extends IntegrationTestBase {
         addUk(keys, "reference_genome_gene", "entrez_gene_id,reference_genome_id");
         addUk(keys, "data_access_tokens", "token");
         addUk(keys, "resource_definition", "resource_id,cancer_study_id");
-        addUk(keys, "resource_data", "RESOURCE_DATA_ID");
+        addUk(keys, "resource_data", "resource_data_id");
         addUk(keys, "reference_genome", "build_name");
         addUk(keys, "cancer_study", "cancer_study_identifier");
         addUk(keys, "sample_list", "stable_id");

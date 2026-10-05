@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -141,11 +142,10 @@ public class ClickHouseConstraintChecker {
             if (childCols.size() != parentCols.size()) {
                 throw new IllegalArgumentException("FK arity mismatch: childCols=" + childCols + " parentCols=" + parentCols);
             }
-            // ClickHouse identifiers are case-sensitive: keep names exactly as declared in the schema.
-            this.childTable = childTable;
-            this.childCols = List.copyOf(childCols);
-            this.parentTable = parentTable;
-            this.parentCols = List.copyOf(parentCols);
+            this.childTable = childTable.toLowerCase(Locale.ROOT);
+            this.childCols = childCols.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList();
+            this.parentTable = parentTable.toLowerCase(Locale.ROOT);
+            this.parentCols = parentCols.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList();
         }
 
         private String childColsCsv() {
@@ -168,8 +168,8 @@ public class ClickHouseConstraintChecker {
             if (columns.isEmpty()) {
                 throw new IllegalArgumentException("Unique key column list cannot be empty: " + table);
             }
-            this.table = table;
-            this.columns = List.copyOf(columns);
+            this.table = table.toLowerCase(Locale.ROOT);
+            this.columns = columns.stream().map(s -> s.toLowerCase(Locale.ROOT)).toList();
         }
 
         private String columnsCsv() {
@@ -178,7 +178,7 @@ public class ClickHouseConstraintChecker {
     }
 
     /**
-     * Foreign key list for the ClickHouse schema (names as declared in the schema).
+     * Foreign key list for the ClickHouse schema (lower-case names).
      * Keep this in sync with the canonical init/schema.sql.
      */
     private static List<ForeignKey> schemaForeignKeys() {
@@ -315,19 +315,19 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         fks.add(new ForeignKey("resource_definition", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
 
-        // resource_data (upper-case columns; PATIENT_ID and SAMPLE_ID hold stable IDs)
-        fks.add(new ForeignKey("resource_data", List.of("CANCER_STUDY_ID"), "cancer_study", List.of("cancer_study_id")));
-        fks.add(new ForeignKey("resource_data", List.of("RESOURCE_ID", "CANCER_STUDY_ID"),
+        // resource_data (patient_id and sample_id hold stable IDs)
+        fks.add(new ForeignKey("resource_data", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("resource_data", List.of("resource_id", "cancer_study_id"),
                 "resource_definition", List.of("resource_id", "cancer_study_id")));
-        fks.add(new ForeignKey("resource_data", List.of("CANCER_STUDY_ID", "PATIENT_ID"),
+        fks.add(new ForeignKey("resource_data", List.of("cancer_study_id", "patient_id"),
                 "patient", List.of("cancer_study_id", "stable_id")));
-        fks.add(new ForeignKey("resource_data", List.of("SAMPLE_ID"), "sample", List.of("stable_id")));
+        fks.add(new ForeignKey("resource_data", List.of("sample_id"), "sample", List.of("stable_id")));
 
         return List.copyOf(fks);
     }
 
     /**
-     * Unique key list for the ClickHouse schema (names as declared in the schema).
+     * Unique key list for the ClickHouse schema (lower-case names).
      * Keep this in sync with the canonical init/schema.sql.
      */
     private static List<UniqueKey> schemaUniqueKeys() {
@@ -466,7 +466,7 @@ public class ClickHouseConstraintChecker {
         uniqueKeys.add(new UniqueKey("resource_definition", List.of("resource_id", "cancer_study_id")));
 
         // resource_data
-        uniqueKeys.add(new UniqueKey("resource_data", List.of("RESOURCE_DATA_ID")));
+        uniqueKeys.add(new UniqueKey("resource_data", List.of("resource_data_id")));
 
         // allele_specific_copy_number
         uniqueKeys.add(new UniqueKey("allele_specific_copy_number", List.of("mutation_event_id", "genetic_profile_id", "sample_id")));
