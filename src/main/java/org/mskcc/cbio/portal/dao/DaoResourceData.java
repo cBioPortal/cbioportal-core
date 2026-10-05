@@ -60,8 +60,8 @@ public final class DaoResourceData {
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             // Column order matches DESCRIBE TABLE resource_data:
-            // RESOURCE_DATA_ID, RESOURCE_ID, CANCER_STUDY_ID, ENTITY_TYPE,
-            // PATIENT_ID, SAMPLE_ID, URL, DISPLAY_NAME, TYPE, METADATA
+            // resource_data_id, resource_id, cancer_study_id, entity_type,
+            // patient_id, sample_id, url, display_name, type, metadata
             //
             // Nulls are passed through rather than substituted with "": the loader encodes a
             // null as \N, which ClickHouse stores as a real NULL, and these columns are
@@ -91,9 +91,9 @@ public final class DaoResourceData {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
             pstmt = con.prepareStatement(
                 "INSERT INTO `" + RESOURCE_DATA_TABLE + "` "
-                + "(`RESOURCE_ID`,`CANCER_STUDY_ID`,`ENTITY_TYPE`,"
-                + "`PATIENT_ID`,`SAMPLE_ID`,`URL`,"
-                + "`DISPLAY_NAME`,`TYPE`,`METADATA`) "
+                + "(`resource_id`,`cancer_study_id`,`entity_type`,"
+                + "`patient_id`,`sample_id`,`url`,"
+                + "`display_name`,`type`,`metadata`) "
                 + "VALUES (?,?,?,?,?,?,?,?,?)"
             );
             pstmt.setString(1, resourceId);
@@ -129,7 +129,7 @@ public final class DaoResourceData {
         if (idsToDelete.isEmpty()) {
             return;
         }
-        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "RESOURCE_DATA_ID").addIds(idsToDelete);
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
         ClickHouseBulkDeleter.flushAll();
     }
 
@@ -142,8 +142,8 @@ public final class DaoResourceData {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
             String placeholders = resourceIds.stream().map(id -> "?").collect(Collectors.joining(","));
             pstmt = con.prepareStatement(
-                "SELECT `RESOURCE_DATA_ID` FROM `" + RESOURCE_DATA_TABLE + "` "
-                + "WHERE `CANCER_STUDY_ID` = ? AND `RESOURCE_ID` IN (" + placeholders + ")"
+                "SELECT `resource_data_id` FROM `" + RESOURCE_DATA_TABLE + "` "
+                + "WHERE `cancer_study_id` = ? AND `resource_id` IN (" + placeholders + ")"
             );
             int paramIndex = 1;
             pstmt.setInt(paramIndex++, cancerStudyId);
@@ -152,7 +152,7 @@ public final class DaoResourceData {
             }
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                ids.add(rs.getLong("RESOURCE_DATA_ID"));
+                ids.add(rs.getLong("resource_data_id"));
             }
         } catch (SQLException e) {
             throw new DaoException(e);
