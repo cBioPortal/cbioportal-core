@@ -3575,7 +3575,7 @@ class TimelineValidator(Validator):
 
     def checkLine(self, data):
         super(TimelineValidator, self).checkLine(data)
-        self._check_pathology_slides_deid(data)
+        self._check_timeline_deid(data)
         # TODO check the values
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
@@ -3605,28 +3605,32 @@ class TimelineValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
 
-    def _check_pathology_slides_deid(self, data):
-        """PATHOLOGY SLIDES events reach the browser through the clinical-events
-        API: reject real slide ids and accession numbers (values never echoed)."""
-        if 'EVENT_TYPE' not in self.cols:
-            return
-        event_index = self.cols.index('EVENT_TYPE')
-        if event_index >= len(data) or data[event_index].strip() != 'PATHOLOGY SLIDES':
-            return
+    def _check_timeline_deid(self, data):
+        """Timeline events reach the browser through the clinical-events API: no
+        event may carry a record accession number (an *ACCESSION* attribute, or a
+        specimen-accession-shaped value), and PATHOLOGY SLIDES events may not carry
+        real slide ids. Values are never echoed; the cause is the column name."""
+        event_type = ''
+        if 'EVENT_TYPE' in self.cols:
+            event_index = self.cols.index('EVENT_TYPE')
+            if event_index < len(data):
+                event_type = data[event_index].strip()
         for col_index, col_name in enumerate(self.cols):
             value = data[col_index].strip() if col_index < len(data) else ''
-            if col_name in ('IMAGE_ID', 'IMAGE_IDS') and value:
+            if not value:
+                continue
+            extra = {'line_number': self.line_number,
+                     'column_number': col_index + 1,
+                     'cause': col_name}
+            if 'ACCESSION' in col_name.upper():
                 self.logger.error(
-                    'PATHOLOGY SLIDES events cannot carry real slide identifiers',
-                    extra={'line_number': self.line_number,
-                           'column_number': col_index + 1,
-                           'cause': col_name})
-            elif value and WSI_ACCESSION.search(value):
+                    'Timeline events cannot carry accession numbers', extra=extra)
+            elif event_type == 'PATHOLOGY SLIDES' and col_name in ('IMAGE_ID', 'IMAGE_IDS'):
                 self.logger.error(
-                    'PATHOLOGY SLIDES value contains a specimen accession number',
-                    extra={'line_number': self.line_number,
-                           'column_number': col_index + 1,
-                           'cause': col_name})
+                    'PATHOLOGY SLIDES events cannot carry real slide identifiers', extra=extra)
+            elif WSI_ACCESSION.search(value):
+                self.logger.error(
+                    'Timeline value contains a specimen accession number', extra=extra)
 
 
 class CancerTypeValidator(Validator):
