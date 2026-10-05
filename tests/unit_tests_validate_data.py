@@ -500,22 +500,17 @@ class TimelineValuesDataValidationTest(DataFileTestCase):
             self.assertEqual("ERROR", error.levelname)
             self.assertIn("Invalid START_DATE", error.getMessage())
 
-    def test_pathology_slides_events_reject_image_ids_and_accessions(self):
-        """PATHOLOGY SLIDES rows reach the browser: no IMAGE_IDS, no accessions,
-           and the offending value is never echoed."""
+    def test_pathology_slides_events_reject_image_ids(self):
+        """PATHOLOGY SLIDES rows reach the browser: no IMAGE_IDS, and the
+           offending value is never echoed."""
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_timeline_pathology_slides_deid.txt',
                                      validateData.TimelineValidator)
-        self.assertEqual(2, len(record_list))
+        self.assertEqual(1, len(record_list))
         self.assertEqual(3, record_list[0].line_number)
-        self.assertIn('accession', record_list[0].getMessage())
-        self.assertEqual('SPECIMEN', record_list[0].cause)
-        self.assertEqual(4, record_list[1].line_number)
-        self.assertIn('slide identifiers', record_list[1].getMessage())
-        self.assertEqual('IMAGE_IDS', record_list[1].cause)
-        for record in record_list:
-            self.assertNotIn('S19-12345', repr(record.__dict__))
-            self.assertNotIn('3735444', repr(record.__dict__))
+        self.assertIn('slide identifiers', record_list[0].getMessage())
+        self.assertEqual('IMAGE_IDS', record_list[0].cause)
+        self.assertNotIn('3735444', repr(record_list[0].__dict__))
 
         
 # TODO: make tests in this testcase check the number of properly defined types
@@ -3439,7 +3434,8 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         lines[5] = '\t'.join(values)
         return '\n'.join(lines) + '\n'
 
-    def test_server_side_wsi_values_are_not_date_scanned(self):
+    def test_wsi_free_text_is_not_deid_scanned(self):
+        """De-identifying free text is the data provider's responsibility."""
         content = Path('test_data/data_wsi_valid.txt').read_text()
         content = content.replace('file:///fixture.svs', 'https://slides.example/20210314/scan.custom')
         content = content.replace('file:///fixture.jpg', 'gs://thumbnails.example/thumbnail.webp')
@@ -3447,35 +3443,10 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
                                   '"tile_size":256,"vendor":"March 14, 2021 MRN: 123456"}')
         content = content.replace('image/jpeg', 'image/webp')
         self.assertEqual([], self.validate_wsi_content(content))
-
-    def test_public_wsi_text_is_date_and_mrn_scanned(self):
         for name, value in (('PART_KEY', 'PART-2021-03-14'), ('BLOCK_KEY', 'BLOCK-MRN:123456'),
                             ('PART_DESCRIPTION', 'Resected March 14, 2021'),
-                            ('TIMEPOINT_SOURCE', 'surgery 20210314'), ('PART_KEY', 'part:20190412')):
-            records = self.validate_wsi_content(self.with_cell(name, value))
-            self.assertEqual([('WSI value violates the de-identification contract', name)],
-                             [(record.getMessage(), getattr(record, 'cause', None)) for record in records], name)
-
-    def test_canonical_keys_and_slide_key_with_date_like_hex_are_accepted(self):
-        key = '20190412' + 'a' * 24
-        content = self.with_cell('SLIDE_KEY', 'abc20210314def0123456789abcdef01')
-        for name, value in (('PART_KEY', 'part:' + key), ('BLOCK_KEY', 'block:' + key),
-                            ('SPECIMEN_KEY', 'unmatched::part:%s::block:%s' % (key, key))):
-            lines = content.splitlines()
-            values = lines[5].split('\t')
-            values[validateData.WsiValidator.EXPECTED_HEADERS.index(name)] = value
-            lines[5] = '\t'.join(values)
-            content = '\n'.join(lines) + '\n'
-        self.assertEqual([], self.validate_wsi_content(content))
-
-    def test_accession_is_rejected_in_every_column_without_echoing_it(self):
-        for name in validateData.WsiValidator.EXPECTED_HEADERS:
-            for accession in ('S21-12345', 'msk:s1'):
-                records = self.validate_wsi_content(self.with_cell(name, accession))
-                self.assertIn(('WSI value contains a specimen accession number', name),
-                              [(record.getMessage(), getattr(record, 'cause', None)) for record in records], name)
-                for record in records:
-                    self.assertNotIn(accession, repr(record.__dict__), name)
+                            ('TIMEPOINT_SOURCE', 'surgery 20210314')):
+            self.assertEqual([], self.validate_wsi_content(self.with_cell(name, value)), name)
 
     def test_slide_key_is_required_lowercase_hex_and_unique(self):
         self.assertEqual('SLIDE_KEY', validateData.WsiValidator.EXPECTED_HEADERS[-1])
@@ -3808,43 +3779,14 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             keep_state=True)
         self.assertEqual([('SLIDE_KEY must be unique within a study', 'METADATA.slide_key')], errors)
 
-    def test_accession_rejected_in_url_display_name_and_metadata_without_echo(self):
-        accession = 'S21-12345'
-        serving = json.loads(self.metadata())['wsi_serving']
-        nested = dict(serving, tile_metadata_json=dict(self.TILE_METADATA, vendor=['ok', 'msk:s1']))
-        cases = (
-            (self.sample_row(), 3, 'https://portal.example/wsi/patient/WSI-P1?slideKey=' + accession, 'URL'),
-            (self.sample_row(), 4, 'H&E ' + accession, 'DISPLAY_NAME'),
-            (self.sample_row(self.metadata(part_description='from ' + accession)), None, None,
-             'METADATA.part_description'),
-            (self.sample_row(self.metadata(wsi_serving=dict(serving, source_url=(
-                'https://slides.example/%s.svs' % accession)))), None, None,
-             'METADATA.wsi_serving.source_url'),
-            (self.sample_row(self.metadata(wsi_serving=nested)), None, None,
-             'METADATA.wsi_serving.tile_metadata_json.vendor[1]'),
-        )
-        for row, index, value, where in cases:
-            if index is not None:
-                row[index] = value
-            errors = self.validate_resource(validateData.SampleResourceValidator, [row])
-            self.assertIn(('WHOLE_SLIDE_IMAGE value contains a specimen accession number', where), errors)
-            self.assertNotIn(accession, str(errors), where)
-            self.assertNotIn('msk:s1', str(errors), where)
-
-    def test_public_text_dates_are_rejected_and_opaque_keys_exempt(self):
+    def test_public_free_text_is_not_deid_scanned(self):
+        """De-identifying free text is the data provider's responsibility."""
         errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row(
             self.metadata(part_description='Resected 2021-03-14'))])
-        self.assertEqual([('WSI value violates the de-identification contract',
-                           'METADATA.part_description')], errors)
+        self.assertEqual([], errors)
         row = self.sample_row()
         row[4] = 'H&E 03/14/2021'
         errors = self.validate_resource(validateData.SampleResourceValidator, [row])
-        self.assertEqual([('WSI value violates the de-identification contract', 'DISPLAY_NAME')], errors)
-        key = '20190412' + 'a' * 24
-        errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row(
-            self.metadata(slide_key='abc20210314def0123456789abcdef01', part_key='part:' + key,
-                          block_key='block:' + key,
-                          specimen_key='block::part:%s::block:%s' % (key, key)))])
         self.assertEqual([], errors)
 
     def test_wsi_url_and_metadata_errors_are_not_echoed(self):

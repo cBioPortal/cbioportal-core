@@ -43,7 +43,6 @@ import org.mskcc.cbio.portal.model.ClinicalEvent;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
-import org.mskcc.cbio.portal.util.WsiDeidentification;
 
 /**
  * Imports timeline data for display in patient view
@@ -56,8 +55,9 @@ public class ImportTimelineData extends ConsoleRunnable {
 	private static final Set<String> FORBIDDEN_PATHOLOGY_ATTRIBUTES = Set.of("IMAGE_ID", "IMAGE_IDS");
 
 	/**
-	 * Pathology slide events reach the browser through the clinical-events API, so they must
-	 * carry neither real slide identifiers nor specimen accession numbers. Values are never echoed.
+	 * Pathology slide events reach the browser through the clinical-events API, so they must not
+	 * carry real slide identifiers; slides are addressed by their opaque slide key. Values are
+	 * never echoed.
 	 */
 	static void validatePathologySlidesEvent(String[] headers, String[] fields, String eventType, int line) {
 		if (!PATHOLOGY_SLIDES_EVENT.equals(eventType)) {
@@ -67,10 +67,6 @@ public class ImportTimelineData extends ConsoleRunnable {
 			if (FORBIDDEN_PATHOLOGY_ATTRIBUTES.contains(headers[i]) && !fields[i].isEmpty()) {
 				throw new IllegalArgumentException(
 					"Line " + line + ": PATHOLOGY SLIDES events cannot carry " + headers[i]);
-			}
-			if (WsiDeidentification.containsAccession(fields[i])) {
-				throw new IllegalArgumentException(
-					"Line " + line + ": PATHOLOGY SLIDES " + headers[i] + " contains a specimen accession number");
 			}
 		}
 	}

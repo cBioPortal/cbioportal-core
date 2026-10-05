@@ -536,7 +536,6 @@ class V3OnlyTestCase(ConverterTestCase):
 
 
 SLIDE_KEY = converter.COLUMNS.index('SLIDE_KEY')
-ACCESSIONS = ('S21-12345', 'msk:s1', 'part-s21-123')
 
 
 class SlideKeyAndDeidTestCase(ConverterTestCase):
@@ -576,42 +575,6 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
         message = self.conversion_error(self.write_legacy(rows + ['\t'.join(duplicate)]))
         self.assertIn('IMAGE_ID is not unique', message)
         self.assertNotIn('IMG-1', message)
-
-    def test_accession_is_rejected_in_every_input_cell_without_echo(self):
-        for column, name in enumerate(converter.COLUMNS):
-            for accession in ACCESSIONS:
-                message = self.conversion_error(self.with_cell(column, accession))
-                self.assertIn('line 6: %s contains a specimen accession number' % name, message)
-                self.assertNotIn(accession.lower(), message.lower())
-
-    def test_accession_inside_urls_and_tile_metadata_is_rejected(self):
-        source = converter.COLUMNS.index('SOURCE_URL')
-        message = self.conversion_error(self.with_cell(
-            source, 'https://slides.example.org/wsi/S21-12345.svs'))
-        self.assertIn('SOURCE_URL contains a specimen accession number', message)
-        self.assertNotIn('S21-12345', message)
-        tile = converter.COLUMNS.index('TILE_METADATA_JSON')
-        tile_metadata = self.fixture_rows()[0].split('\t')[tile].replace('Scan', 'MSK:S1 Scan')
-        message = self.conversion_error(self.with_cell(tile, tile_metadata))
-        self.assertIn('TILE_METADATA_JSON contains a specimen accession number', message)
-        self.assertNotIn('MSK:S1', message)
-
-    def test_generated_values_are_checked(self):
-        # an accession can only appear in generated values through the input, which is
-        # checked first; the generated-value guard is exercised directly
-        for url, name, metadata, where in (
-                ('https://x/wsi/patient/S21-12345', 'H&E', {}, 'URL'),
-                ('https://x', 'S21-12345', {}, 'DISPLAY_NAME'),
-                ('https://x', 'H&E', {'stain_name': 'MSK:S1'}, 'METADATA.stain_name'),
-                ('https://x', 'H&E', {'wsi_serving': {'image_id': 'S21-12345'}},
-                 'METADATA.wsi_serving.image_id'),
-                ('https://x', 'H&E', {'wsi_serving': {'tile_metadata_json': {'v': ['ok', 'S21-123']}}},
-                 'METADATA.wsi_serving.tile_metadata_json.v[1]')):
-            with self.assertRaises(converter.ConversionError) as context:
-                converter.check_output_accessions(url, name, metadata, 9)
-            message = str(context.exception)
-            self.assertEqual('line 9: generated %s contains a specimen accession number' % where, message)
-        converter.check_output_accessions('https://x', 'H&E', {'a': [1, True, None, 'S2-1']}, 9)
 
     def test_url_display_name_and_metadata_shape(self):
         self.convert()

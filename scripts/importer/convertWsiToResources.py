@@ -27,8 +27,8 @@ opaque ``SLIDE_KEY`` (32 lowercase hex characters, unique per study) last.
 De-identification (contract wsi-serving-v5, resource-data variant): the real
 ``IMAGE_ID`` is kept only in the private ``wsi_serving`` metadata, the URL and
 ``DISPLAY_NAME`` never contain it, ``BARCODE``/``PART_DESIGNATOR``/
-``PATH_DX_TITLE`` are not written, and specimen accession numbers are rejected
-in every input cell and every generated value. Error messages name columns,
+``PATH_DX_TITLE`` are not written. The data provider is responsible for
+de-identifying the remaining free-text cells. Error messages name columns,
 never values.
 
 Rows are streamed, so large studies convert in bounded memory; output is
@@ -98,8 +98,6 @@ CUSTOM_METADATA = json.dumps(
 
 # Opaque per-slide key computed upstream from a salted hash of image_id.
 SLIDE_KEY_PATTERN = re.compile(r"[0-9a-f]{32}")
-# Specimen accession numbers (S##-#####, MSK:S...) must never reach the portal.
-ACCESSION_PATTERN = re.compile(r"(?i)(\bS\d{2}-\d{3,}|MSK:S\d)")
 
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
 TIMELINE_STATUSES = ("AVAILABLE", "MISSING_PROCEDURE_DATE", "MISSING_REFERENCE_SEQUENCING_DATE")
@@ -206,34 +204,6 @@ def display_name(row):
     return f"{stain} \u00b7 {' / '.join(location)}" if location else stain
 
 
-def _accession_path(value, path):
-    """Return the path of the first string (or object key) in ``value`` holding an accession."""
-    if isinstance(value, str):
-        return path if ACCESSION_PATTERN.search(value) else None
-    if isinstance(value, dict):
-        for key, child in value.items():
-            if ACCESSION_PATTERN.search(str(key)):
-                return f"{path}.<key>"  # the key itself is never echoed
-            child_path = f"{path}.{key}"
-            found = _accession_path(child, child_path)
-            if found:
-                return found
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            found = _accession_path(child, f"{path}[{index}]")
-            if found:
-                return found
-    return None
-
-
-def check_output_accessions(url, name, metadata, line):
-    """Reject generated values holding an accession number; only the field is named."""
-    for field, value in (("URL", url), ("DISPLAY_NAME", name), ("METADATA", metadata)):
-        found = _accession_path(value, field)
-        if found:
-            _fail(line, f"generated {found} contains a specimen accession number")
-
-
 def _iter_lines(path, what):
     """Yield (line number, text) for each line of a UTF-8 file, split on LF only.
 
@@ -281,11 +251,6 @@ def iter_rows(data_path, columns=COLUMNS):
         fields = [field.strip() for field in fields]
         if not any(fields):
             raise ConversionError(f"{data_path}: line {line_number}: blank WSI row")
-        for column, field in zip(columns, fields):
-            # Checked on every cell, identifiers, keys and URLs included; never echoed.
-            if ACCESSION_PATTERN.search(field):
-                raise ConversionError(
-                    f"{data_path}: line {line_number}: {column} contains a specimen accession number")
         found = True
         yield line_number, dict(zip(columns, fields))
     if not found:
@@ -817,7 +782,6 @@ def _convert_into(staging, data_path, study_id, base_url, study_dir):
                 counter.add(slide)
                 url = viewer_url(base_url, study_id, slide["patient_id"], slide["slide_key"])
                 name = slide["display_name"]
-                check_output_accessions(url, name, slide["metadata"], line)
                 metadata = json.dumps(slide["metadata"], separators=(",", ":"), sort_keys=True,
                                       ensure_ascii=True)
                 if slide["sample_id"] is not None:

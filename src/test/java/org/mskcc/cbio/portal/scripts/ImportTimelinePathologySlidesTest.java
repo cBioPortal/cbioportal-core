@@ -21,18 +21,6 @@ public class ImportTimelinePathologySlidesTest {
     }
 
     @Test
-    public void accessionInPathologyEventIsRejectedWithoutEchoingIt() {
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-            () -> ImportTimelineData.validatePathologySlidesEvent(
-                HEADERS,
-                new String[] {"P-1", "-5", "", "PATHOLOGY SLIDES", "S19-12345 A1", ""},
-                "PATHOLOGY SLIDES", 7));
-        assertTrue(error.getMessage().contains("Line 7"));
-        assertTrue(error.getMessage().contains("SPECIMEN"));
-        assertFalse(error.getMessage().contains("S19-12345"));
-    }
-
-    @Test
     public void imageIdsAttributeIsRejected() {
         String[] headers = {"PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "IMAGE_IDS"};
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
@@ -40,6 +28,8 @@ public class ImportTimelinePathologySlidesTest {
                 headers,
                 new String[] {"P-1", "-5", "", "PATHOLOGY SLIDES", "[\"3735444\"]"},
                 "PATHOLOGY SLIDES", 3));
+        assertTrue(error.getMessage().contains("Line 3"));
+        assertTrue(error.getMessage().contains("IMAGE_IDS"));
         assertFalse(error.getMessage().contains("3735444"));
     }
 
@@ -47,7 +37,7 @@ public class ImportTimelinePathologySlidesTest {
     public void otherEventTypesAreNotAffected() {
         ImportTimelineData.validatePathologySlidesEvent(
             HEADERS,
-            new String[] {"P-1", "-5", "", "SPECIMEN", "S19-12345", ""},
+            new String[] {"P-1", "-5", "", "SPECIMEN", "Part 1", ""},
             "SPECIMEN", 2);
     }
 }

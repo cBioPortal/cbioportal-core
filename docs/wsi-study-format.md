@@ -95,19 +95,12 @@ belonging to the row's patient, and the `wsi_serving` shape and URL safety
 rules. The row's `RESOURCE_ID` must be `WSI_SAMPLE` in sample files and
 `WSI_PATIENT` in patient files.
 
-De-identification checks (values are never echoed in messages; only the
-column or JSON path is reported):
-
-- specimen accession numbers, matching `(?i)(\bS\d{2}-\d{3,}|MSK:S\d)`, are
-  rejected in `URL`, `DISPLAY_NAME` and every string (and key) of `METADATA`,
-  `wsi_serving` and its tile metadata included. `ImportResourceData` repeats
-  this check as a backstop and refuses to load such a row;
-- absolute dates and labelled MRNs are rejected in `DISPLAY_NAME` and the
-  public free-text metadata. `slide_key`, the patient/sample identifiers and
-  canonical opaque keys (`part:<32 hex>`, `block:<32 hex>`,
-  `<level>::part:<32 hex>::block:<32 hex>`) are exempt, since hex digits can
-  look like `YYYYMMDD`; the private `wsi_serving` values are validated as
-  artifact URLs instead.
+Error messages for `WHOLE_SLIDE_IMAGE` rows never echo values; only the
+column or JSON path is reported. Core does not scan free text (`DISPLAY_NAME`,
+part and block descriptions, stain names, tile metadata and similar) for
+protected health information or institution-specific identifiers such as
+specimen accession numbers: the data provider is responsible for
+de-identifying free text before export.
 
 `URL` is the link opened from the Files & Links tab. The supported viewer link
 is the standalone viewer route:
@@ -155,13 +148,11 @@ with `SAMPLE_ID`, `SLIDE_TYPE` and the stain flags must satisfy the native
 `wsi_slide` constraints above, an `UNMATCHED` reference sample is dropped, a missing
 `TIMEPOINT_SOURCE` is derived from the timing provenance, and serving fields
 are dropped when `CAN_SERVE_TILES=FALSE`. `SLIDE_KEY` is required, must be 32
-lowercase hex characters and unique, and `IMAGE_ID` must be unique. An
-accession number in any input cell, or in any generated `URL`, `DISPLAY_NAME`
-or `METADATA` value (including `wsi_serving` and the tile metadata), fails the
-conversion; error messages name the column, never the value. Run
+lowercase hex characters and unique, and `IMAGE_ID` must be unique. Error
+messages name the column, never the value. Free-text cells are copied as
+given; de-identifying them is the data provider's responsibility. Run
 `validateData.py` on the study afterwards; the converter does not
-re-implement URL allowlists, the date/MRN heuristics or the tile metadata
-contract.
+re-implement URL allowlists or the tile metadata contract.
 
 Rows are streamed, so memory does not grow with the slide metadata. The output is staged
 in a hidden `.<output dir name>.*.partial` directory next to `--output-dir`
@@ -251,9 +242,10 @@ undated section) and do not create clinical events.
 `PATHOLOGY SLIDES` timeline events reach the browser through the clinical
 events API, so they must not carry real slide identifiers: `validateData.py`
 and `ImportTimelineData` reject such events when they have a non-blank
-`IMAGE_ID` or `IMAGE_IDS` column, or an accession number in any column
-(again without echoing the value). `SPECIMEN`/`LINKOUT` carry only the opaque
-specimen key.
+`IMAGE_ID` or `IMAGE_IDS` column (again without echoing the value); slides
+are addressed by their opaque key. `SPECIMEN`/`LINKOUT` should carry only the
+opaque specimen key; other free-text columns are the data provider's
+responsibility to de-identify.
 
 ## Legacy format v3
 
@@ -307,10 +299,9 @@ extension, or thumbnail URI extension; those choices belong to the serving
 layer. Deployments may restrict source and thumbnail roots with the
 `WSI_ALLOWED_SOURCE_PREFIXES` and `WSI_ALLOWED_THUMBNAIL_PREFIXES` environment
 variables.
-The converter drops those artifact columns for non-servable rows. Core only
-applies the narrow de-identification checks described above (accession
-numbers everywhere, dates and labelled MRNs in public free text); upstream
-publication pipelines remain responsible for removing protected health
+The converter drops those artifact columns for non-servable rows. Core does
+not perform de-identification scanning of free text; the data provider
+(upstream publication pipeline) is responsible for removing protected health
 information and deployment-specific identifiers before export. Production deployments should set both URI prefix
 allowlists; development may explicitly include `file:///app/testdata/`.
 
