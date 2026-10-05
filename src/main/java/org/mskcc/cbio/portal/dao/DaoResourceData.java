@@ -3,7 +3,6 @@ package org.mskcc.cbio.portal.dao;
 import java.sql.*;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -27,9 +26,15 @@ public final class DaoResourceData {
 
     public static final String RESOURCE_DATA_TABLE = "resource_data";
 
-    // Monotonically increasing ID for bulk-load inserts into resource_data.
-    // ClickHouse has no AUTO_INCREMENT; uniqueness is not enforced by the engine.
-    private static final AtomicLong resourceDataIdSeq = new AtomicLong(System.currentTimeMillis());
+    /**
+     * resource_data_id comes from the shared sequence machinery rather than a local counter.
+     * ClickHouse has no AUTO_INCREMENT, and seeding from the system clock does not guarantee
+     * uniqueness: the clock can be wrong or move backwards, and an import on a second machine
+     * knows nothing about ids the first one issued. ClickHouseAutoIncrement seeds from
+     * max(persisted value, current table max) and persists as it goes.
+     */
+    private static final String RESOURCE_DATA_SEQUENCE = "seq_resource_data";
+
 
     private DaoResourceData() {
     }
@@ -70,7 +75,7 @@ public final class DaoResourceData {
             // neither that nor "SAMPLE_ID IN (...)", so such rows would be silently dropped from
             // every cohort-scoped query and miscounted by the distinct-sample count.
             ClickHouseBulkLoader.getClickHouseBulkLoader(RESOURCE_DATA_TABLE).insertRecord(
-                Long.toString(resourceDataIdSeq.incrementAndGet()),
+                Long.toString(ClickHouseAutoIncrement.nextId(RESOURCE_DATA_SEQUENCE)),
                 resourceId,
                 Integer.toString(cancerStudyId),
                 entityType,
@@ -129,8 +134,12 @@ public final class DaoResourceData {
         if (idsToDelete.isEmpty()) {
             return;
         }
+        // Queued, not flushed: flushAll() executes every datatype's pending deletions, and there
+        // is no dependency here that needs them applied now. The ids collected above belong only
+        // to rows that already existed, and ClickHouseAutoIncrement seeds each counter from
+        // max(persisted, current table max), so the rows this import is about to insert get ids
+        // above every one of them. The deletion is therefore correct whenever it runs.
         ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
-        ClickHouseBulkDeleter.flushAll();
     }
 
     private static Set<Long> findResourceDataIds(int cancerStudyId, Set<String> resourceIds) throws DaoException {
