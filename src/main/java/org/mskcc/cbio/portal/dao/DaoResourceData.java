@@ -138,8 +138,8 @@ public final class DaoResourceData {
         if (idsToDelete.isEmpty()) {
             return;
         }
-        // Queued, not flushed: flushAll() executes every datatype's pending deletions, and there
-        // is no dependency here that needs them applied now. The ids collected above belong only
+        // Queued, not flushed: the caller runs ClickHouseBulkDeleter.flushAll() (ImportResourceData
+        // does so before writing its inserts). ClickHouseBulkLoader.flushAll() does not run deletions. The ids collected above belong only
         // to rows that already existed, and ClickHouseAutoIncrement seeds each counter from
         // max(persisted, current table max), so the rows this import is about to insert get ids
         // above every one of them. The deletion is therefore correct whenever it runs.

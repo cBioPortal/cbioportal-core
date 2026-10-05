@@ -133,6 +133,10 @@ public class TestImportResourceData extends IntegrationTestBase {
         importConvertedResources(study);
         Map<String, ResourceRow> reimported = rowsByImage(study);
         assertEquals("reimport replaces rows instead of duplicating them", 6, reimported.size());
+        // rowsByImage collapses duplicates by key, so also count the stored rows directly.
+        assertEquals("reimport leaves exactly one row per slide", 6L, singleLong(
+            "SELECT count() FROM resource_data WHERE cancer_study_id = ? AND type = 'WHOLE_SLIDE_IMAGE'",
+            study.getInternalId()));
         Set<Long> secondIds = ids(reimported.values());
         assertUniquePositiveIds(reimported.values());
         assertTrue("reimported IDs must not reuse earlier IDs: " + firstIds + " / " + secondIds,

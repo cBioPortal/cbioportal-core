@@ -8,6 +8,7 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.collections4.map.MultiKeyMap;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkDeleter;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoPatient;
@@ -113,6 +114,10 @@ public class ImportResourceData extends ConsoleRunnable {
         // file) replaces stale rows instead of accumulating duplicates. Safe to do here because
         // ClickHouseBulkLoader only buffers inserts in memory until flushAll() is called next.
         DaoResourceData.deleteResourceData(cancerStudy.getInternalId(), resourceIdsInFile);
+        // deleteResourceData only queues the stale ids; ClickHouseBulkLoader.flushAll() writes
+        // inserts but does not run queued deletions, so execute them here (before the inserts are
+        // written, which cannot collide: new ids are allocated above every existing one).
+        ClickHouseBulkDeleter.flushAll();
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();
