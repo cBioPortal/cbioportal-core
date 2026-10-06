@@ -35,10 +35,9 @@ package org.mskcc.cbio.portal.model;
 /**
  * Common fields shared by allele-specific copy number (ASCN) records, whether
  * at the raw segment level ({@link AscnSegment}) or the derived
- * gene level ({@link AscnGeneLevelRecord}). FACETS is presently the only tool
- * producing data in this shape; the {@code datatype} values for these records
- * (e.g. {@code FACETS_CNCF}) name it explicitly, but the model/DAO/importer
- * classes are named after the general ASCN concept.
+ * gene level ({@link AscnGeneLevelRecord}). The {@code datatype} values for
+ * these records ({@code ASCN_SEG} / {@code ASCN_GENE_LEVEL}) and the
+ * model/DAO/importer classes are all named after the general ASCN concept.
  */
 public abstract class AbstractAscnRecord {
 
