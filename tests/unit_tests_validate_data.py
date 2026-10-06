@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-"""
-Copyright (c) 2016 The Hyve B.V.
-This code is licensed under the GNU Affero General Public License (AGPL),
-version 3, or (at your option) any later version.
-"""
+#
+# Copyright (c) 2016 The Hyve B.V.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 
 import unittest
 from unittest.mock import Mock
