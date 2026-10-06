@@ -27,6 +27,7 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import validateData
+from .check_oncotree_preprocessing import add_arguments as add_oncotree_arguments
 from . import cbioportalImporter
 from . import importOncokbMutation
 from . import importOncokbDiscreteCNA
@@ -62,6 +63,7 @@ def interface():
                                    type=str, help='path to study directory.')
     data_source_group.add_argument('-d', '--data_directory',
                                    type=str, help='path to data directory for incremental upload.')
+    add_oncotree_arguments(parser)
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
                                    type=str,
