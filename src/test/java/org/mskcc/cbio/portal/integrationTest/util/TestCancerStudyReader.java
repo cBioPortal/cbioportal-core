@@ -59,6 +59,7 @@ public class TestCancerStudyReader extends IntegrationTestBase {
       
       CancerStudy expectedCancerStudy = DaoCancerStudy.getCancerStudyByStableId( "test_brca" );
       assertEquals(expectedCancerStudy, cancerStudy);
+      assertEquals("CC-BY-4.0", cancerStudy.getLicense());
       // TBD: change this to use getResourceAsStream()
       file = new File("src/test/resources/cancer_study_bad.txt");
       try {

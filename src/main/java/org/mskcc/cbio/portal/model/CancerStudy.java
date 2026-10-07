@@ -55,6 +55,7 @@ public class CancerStudy {
     private boolean publicStudy;  // if true, a public study, otherwise private
     private String pmid;
     private String citation;
+    private String license;
     private Set<String> groups;
     private Date importDate;
     private String referenceGenome;
@@ -181,6 +182,14 @@ public class CancerStudy {
 
     public void setCitation(String citation) {
         this.citation = citation;
+    }
+
+    public String getLicense() {
+        return license;
+    }
+
+    public void setLicense(String license) {
+        this.license = license;
     }
     
     public String getReferenceGenome() { return referenceGenome; }

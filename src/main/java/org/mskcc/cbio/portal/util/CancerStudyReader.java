@@ -112,6 +112,7 @@ public class CancerStudyReader {
                                                   typeOfCancer, publicStudy(properties));
         cancerStudy.setPmid(properties.getProperty("pmid"));
         cancerStudy.setCitation(properties.getProperty("citation"));
+        cancerStudy.setLicense(properties.getProperty("license"));
         cancerStudy.setGroupsInUpperCase(properties.getProperty("groups"));
         String referenceGenome = properties.getProperty("reference_genome");
         

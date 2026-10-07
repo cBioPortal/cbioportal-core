@@ -84,9 +84,11 @@ public class TestDaoCancerStudy extends IntegrationTestBase {
         assertEquals("gbm", cancerStudy.getCancerStudyStableId());
         assertEquals("GBM", cancerStudy.getName());
         assertEquals("Glioblastoma", cancerStudy.getDescription());
+        assertEquals(null, cancerStudy.getLicense());
 
         CancerStudy cancerStudy2 = new CancerStudy("Breast", "Breast Description", "breast", "brca", false);
         cancerStudy2.setReferenceGenome("hg19");
+        cancerStudy2.setLicense("CC-BY-4.0");
         DaoCancerStudy.addCancerStudy(cancerStudy2);
         
         // Removed testing that depends on internal ids
@@ -96,6 +98,7 @@ public class TestDaoCancerStudy extends IntegrationTestBase {
         cancerStudy2 = DaoCancerStudy.getCancerStudyByInternalId(testInternalId);
         assertEquals("Breast Description", cancerStudy2.getDescription());
         assertEquals("Breast", cancerStudy2.getName());
+        assertEquals("CC-BY-4.0", cancerStudy2.getLicense());
 
         ArrayList<CancerStudy> list = DaoCancerStudy.getAllCancerStudies();
         assertEquals(3, list.size());
