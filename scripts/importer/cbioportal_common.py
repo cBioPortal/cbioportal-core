@@ -103,6 +103,7 @@ META_FIELD_MAP = {
         'name': True,
         'description': True,
         'citation': False,
+        'license': False,
         'pmid': False,
         'groups': False,
         'add_global_case_list': False,

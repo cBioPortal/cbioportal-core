@@ -309,7 +309,7 @@ public final class DaoCancerStudy {
             pstmt = con.prepareStatement("INSERT INTO cancer_study " +
                     "( `cancer_study_id`, `cancer_study_identifier`, `name`, "
                     + "`description`, `public`, `type_of_cancer_id`, "
-                    + "`pmid`, `citation`, `groups`, `status`,`reference_genome_id`, `import_date` ) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())");
+                    + "`pmid`, `citation`, `license`, `groups`, `status`,`reference_genome_id`, `import_date` ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
             pstmt.setLong(1, cancerStudyId);
             pstmt.setString(2, stableId);
             pstmt.setString(3, cancerStudy.getName());
@@ -318,19 +318,20 @@ public final class DaoCancerStudy {
             pstmt.setString(6, cancerStudy.getTypeOfCancerId());
             pstmt.setString(7, cancerStudy.getPmid());
             pstmt.setString(8, cancerStudy.getCitation());
+            pstmt.setString(9, cancerStudy.getLicense());
             Set<String> groups = cancerStudy.getGroups();
             if (groups==null) {
-                pstmt.setString(9, null);
+                pstmt.setString(10, null);
             } else {
-                pstmt.setString(9, StringUtils.join(groups, ";"));
+                pstmt.setString(10, StringUtils.join(groups, ";"));
             }
             //status is UNAVAILABLE until other data is loaded for this study. Once all is loaded, the
             //data loading process can set this to AVAILABLE:
             //TODO - use this field in parts of the system that build up the list of studies to display in home page:
-            pstmt.setInt(10, Status.UNAVAILABLE.ordinal());
+            pstmt.setInt(11, Status.UNAVAILABLE.ordinal());
             try {
                 ReferenceGenome referenceGenome = DaoReferenceGenome.getReferenceGenomeByGenomeName(cancerStudy.getReferenceGenome());
-                pstmt.setInt(11, referenceGenome.getReferenceGenomeId());
+                pstmt.setInt(12, referenceGenome.getReferenceGenomeId());
             }
             catch (NullPointerException e) {
                 throw new DaoException("Unsupported reference genome");
@@ -643,6 +644,7 @@ public final class DaoCancerStudy {
                     rs.getBoolean("public"));
             cancerStudy.setPmid(rs.getString("pmid"));
             cancerStudy.setCitation(rs.getString("citation"));
+            cancerStudy.setLicense(rs.getString("license"));
             cancerStudy.setGroupsInUpperCase(rs.getString("groups"));
             cancerStudy.setInternalId(rs.getInt("cancer_study_id"));
             cancerStudy.setImportDate(rs.getDate("import_date"));
