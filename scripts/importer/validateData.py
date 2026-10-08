@@ -43,18 +43,24 @@ import json
 import yaml
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from base64 import urlsafe_b64encode
+import binascii
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 import math
 from abc import ABCMeta, abstractmethod
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
 WSI_TILE_METADATA_SCHEMA_VERSION = 2
 WSI_DECODE_POLICY_VERSION = 'geometry-v2;tile-max=16777216;thumbnail-max=16777216'
 WSI_MAX_DECODE_PIXELS = 16777216
 
-# Opaque per-slide key computed upstream (e.g. a salted hash of the server-side
+# Opaque per-slide key computed upstream (e.g. a salted hash of the pathology
 # image ID); it is the only slide identifier exposed in public metadata.
 WSI_SLIDE_KEY = re.compile(r'[0-9a-f]{32}')
+# Sealed slide source (contract wsi-serving-v6): unpadded base64url of
+# nonce(12) || ciphertext || tag(16), opened only by the tile server.
+WSI_SEALED_SOURCE = re.compile(r'[A-Za-z0-9_-]+')
+WSI_SEALED_SOURCE_MIN_BYTES = 12 + 1 + 16
+WSI_SEALED_SOURCE_MAX_LENGTH = 4096
 
 # Configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module.
@@ -87,7 +93,7 @@ sample_ids_panel_dict = {}
 RESOURCE_DEFINITION_DICTIONARY = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 # study-wide cross-row state for WHOLE_SLIDE_IMAGE resource rows (see WsiRowChecks);
-# shared by the sample and patient resource files so IMAGE_ID stays unique per study
+# shared by the sample and patient resource files so SLIDE_KEY stays unique per study
 WSI_RESOURCE_STATE = None
 
 # globals required for gene set scoring validation
@@ -3921,7 +3927,7 @@ class ResourceDefinitionValidator(Validator):
 
 def new_wsi_row_state():
     """Return empty cross-row state for WsiRowChecks._check_wsi_row."""
-    return {'images': set(), 'slide_keys': set(), 'parts': {}, 'blocks': {}, 'references': {},
+    return {'slide_keys': set(), 'parts': {}, 'blocks': {}, 'references': {},
             'reference_conflicts': set()}
 
 
@@ -3941,21 +3947,21 @@ class WsiRowChecks(object):
     """Whole-slide-image row contract shared by the legacy WSI file validator and
     WHOLE_SLIDE_IMAGE rows in standard sample/patient resource files.
 
-    Rows are dicts keyed by the format-v3 column names with stripped string
+    Rows are dicts keyed by the format-v4 column names with stripped string
     values ('' for missing), so both inputs go through the same checks.
     """
 
     EXPECTED_HEADERS = [
-        'PATIENT_ID', 'REFERENCE_SAMPLE_ID', 'SAMPLE_ID', 'IMAGE_ID',
+        'PATIENT_ID', 'REFERENCE_SAMPLE_ID', 'SAMPLE_ID',
         'PART_KEY', 'PART_NUMBER', 'PART_DESIGNATOR', 'PART_TYPE',
         'PART_DESCRIPTION', 'SUBSPECIALTY', 'PATH_DX_TITLE', 'BLOCK_KEY',
         'BLOCK_NUMBER', 'BLOCK_LABEL', 'MATCH_LEVEL', 'SPECIMEN_KEY',
         'STAIN_NAME', 'STAIN_GROUP', 'IS_HNE', 'IS_IHC', 'MAGNIFICATION',
-        'FILE_SIZE_BYTES', 'BARCODE', 'SLIDE_TYPE', 'CAN_SERVE_TILES', 'SOURCE_URL',
-        'TILE_METADATA_JSON', 'THUMBNAIL_URL', 'THUMBNAIL_WIDTH',
-        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'SLIDE_KEY',
+        'FILE_SIZE_BYTES', 'BARCODE', 'SLIDE_TYPE', 'CAN_SERVE_TILES',
+        'TILE_METADATA_JSON', 'THUMBNAIL_WIDTH',
+        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'SLIDE_KEY', 'SEALED_SOURCE',
     ]
-    # Slide-timing columns that older files still carry before SLIDE_KEY. They are
+    # Slide-timing columns that some files still carry before SLIDE_KEY. They are
     # accepted but ignored: neither required, validated nor imported.
     IGNORED_TIMING_HEADERS = [
         'TIMELINE_START_DAYS', 'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND',
@@ -3963,10 +3969,12 @@ class WsiRowChecks(object):
         'TIMEPOINT_SOURCE',
     ]
     EXPECTED_HEADERS_WITH_IGNORED_TIMING = (
-        EXPECTED_HEADERS[:-1] + IGNORED_TIMING_HEADERS + EXPECTED_HEADERS[-1:])
+        EXPECTED_HEADERS[:-2] + IGNORED_TIMING_HEADERS + EXPECTED_HEADERS[-2:])
+    # Format-v3 columns that carry the image ID or an object URI embedding it.
+    REMOVED_HEADERS = ('IMAGE_ID', 'SOURCE_URL', 'THUMBNAIL_URL')
     SLIDE_TYPES = ('H&E', 'IHC', 'Other', 'Unknown')
     REQUIRED_VALUES = {
-        'PATIENT_ID', 'IMAGE_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
+        'PATIENT_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
         'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES', 'SLIDE_KEY',
     }
     @staticmethod
@@ -4036,14 +4044,6 @@ class WsiRowChecks(object):
         self.logger.error(message, extra=extra)
 
     @staticmethod
-    def _is_absolute_url(value):
-        try:
-            parsed = urlparse(value)
-        except ValueError:
-            return False
-        return bool(parsed.scheme and (parsed.netloc or parsed.path))
-
-    @staticmethod
     def _is_media_type_token(value):
         return bool(value) and all(
             ('a' <= character <= 'z' or 'A' <= character <= 'Z'
@@ -4060,49 +4060,15 @@ class WsiRowChecks(object):
         return WsiRowChecks._is_media_type_token(media_type[len('image/'):])
 
     @staticmethod
-    def _uri_prefixes(name):
-        return tuple(
-            value.strip().rstrip('/')
-            for value in os.environ.get(name, '').split(',')
-            if value.strip()
-        )
-
-    @classmethod
-    def _is_safe_artifact_url(cls, value, kind):
-        # Match URI parsers such as Java's: every percent sign in the original
-        # URI must begin a complete percent-encoded byte, even though
-        # urllib.parse.unquote itself leaves malformed escapes untouched.
-        if re.search(r'%(?![0-9a-fA-F]{2})', value):
+    def _is_sealed_source(value):
+        """Whether a non-empty SEALED_SOURCE has the sealed-source shape."""
+        if len(value) > WSI_SEALED_SOURCE_MAX_LENGTH or not WSI_SEALED_SOURCE.fullmatch(value):
             return False
         try:
-            parsed = urlparse(value)
-        except ValueError:
+            decoded = urlsafe_b64decode(value + '=' * (-len(value) % 4))
+        except (binascii.Error, ValueError):
             return False
-        if (
-            not parsed.scheme
-            or not (parsed.netloc or parsed.path)
-            or parsed.username
-            or parsed.password
-            or parsed.query
-            or parsed.fragment
-        ):
-            return False
-        if parsed.scheme.lower() == 'file' and (
-                parsed.netloc not in ('', 'localhost') or not parsed.path.startswith('/')):
-            return False
-        path = unquote(unquote(parsed.path))
-        if (not path or path.endswith('/')
-                or any(segment in ('.', '..') for segment in path.split('/'))):
-            return False
-        prefixes = cls._uri_prefixes(
-            'WSI_ALLOWED_SOURCE_PREFIXES'
-            if kind == 'source'
-            else 'WSI_ALLOWED_THUMBNAIL_PREFIXES'
-        )
-        prefix_match = bool(prefixes and any(value.startswith(prefix + '/') for prefix in prefixes))
-        if prefixes and not prefix_match:
-            return False
-        return True
+        return len(decoded) >= WSI_SEALED_SOURCE_MIN_BYTES
 
     def _check_reference_sample(self, row, line_number, column, state, label):
         """Require one reference sample per patient across all WSI rows of the study.
@@ -4177,12 +4143,6 @@ class WsiRowChecks(object):
                             column('SLIDE_TYPE'),
                             '%s: IS_HNE=%s, IS_IHC=%s' % (slide_type, row['IS_HNE'], row['IS_IHC']))
 
-        image_id = row['IMAGE_ID']
-        if image_id and image_id in state['images']:
-            # image_id is server-side only; never echo it.
-            self._error('IMAGE_ID must be unique within a study', line_number,
-                        column('IMAGE_ID'), label('IMAGE_ID'))
-        state['images'].add(image_id)
         slide_key = row['SLIDE_KEY']
         if slide_key and not WSI_SLIDE_KEY.fullmatch(slide_key):
             self._error('SLIDE_KEY must be 32 lowercase hex characters', line_number,
@@ -4237,15 +4197,16 @@ class WsiRowChecks(object):
 
         self._check_reference_sample(row, line_number, column, state, label)
 
-        for name in ('SOURCE_URL', 'THUMBNAIL_URL'):
-            # Artifact URLs usually embed the server-side image ID; report the field only.
-            if row[name] and not self._is_absolute_url(row[name]):
-                self._error('WSI URL must be absolute', line_number,
-                            column(name), label(name))
-            elif row[name] and not self._is_safe_artifact_url(
-                    row[name], 'source' if name == 'SOURCE_URL' else 'thumbnail'):
-                self._error('WSI URL is unsafe or outside the configured allowlist',
-                            line_number, column(name), label(name))
+        # SEALED_SOURCE is opaque and only the tile server can open it; report the field only.
+        sealed_source = row['SEALED_SOURCE']
+        if sealed_source and not self._is_sealed_source(sealed_source):
+            self._error('WSI SEALED_SOURCE must be unpadded base64url of at least %d bytes and '
+                        'at most %d characters'
+                        % (WSI_SEALED_SOURCE_MIN_BYTES, WSI_SEALED_SOURCE_MAX_LENGTH),
+                        line_number, column('SEALED_SOURCE'), label('SEALED_SOURCE'))
+        if sealed_source and row['CAN_SERVE_TILES'] == 'FALSE':
+            self._error('WSI SEALED_SOURCE must be empty when CAN_SERVE_TILES is FALSE',
+                        line_number, column('SEALED_SOURCE'), label('SEALED_SOURCE'))
         if row['THUMBNAIL_CONTENT_TYPE'] and not self._is_image_content_type(
                 row['THUMBNAIL_CONTENT_TYPE']):
             self._error('WSI thumbnail content type must be an image media type',
@@ -4264,12 +4225,12 @@ class WsiRowChecks(object):
                             column('TILE_METADATA_JSON'))
 
         if row['CAN_SERVE_TILES'] == 'TRUE':
-            for name in ('SOURCE_URL', 'TILE_METADATA_JSON', 'THUMBNAIL_URL',
+            for name in ('SEALED_SOURCE', 'TILE_METADATA_JSON',
                          'THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT',
                          'THUMBNAIL_CONTENT_TYPE'):
                 if not row[name]:
                     self._error('Servable WSI rows require complete pixel artifacts', line_number,
-                                column(name), name)
+                                column(name), label(name))
             if not metadata_valid:
                 self._error('Servable WSI rows require valid tile metadata', line_number,
                             column('TILE_METADATA_JSON'))
@@ -4298,7 +4259,7 @@ class ResourceValidator(WsiRowChecks, Validator):
     WSI_RESOURCE_TYPE = 'WHOLE_SLIDE_IMAGE'
     # resource definition ID required for WSI rows in each resource file type
     WSI_RESOURCE_IDS = {'SAMPLE': 'WSI_SAMPLE', 'PATIENT': 'WSI_PATIENT'}
-    # metadata keys (the lower-cased format-v3 column names) and their JSON types
+    # metadata keys (the lower-cased format-v4 column names) and their JSON types
     WSI_STRING_KEYS = (
         'SLIDE_KEY', 'REFERENCE_SAMPLE_ID', 'PART_KEY', 'PART_NUMBER',
         'PART_TYPE', 'PART_DESCRIPTION', 'SUBSPECIALTY', 'BLOCK_KEY',
@@ -4306,12 +4267,16 @@ class ResourceValidator(WsiRowChecks, Validator):
         'STAIN_GROUP', 'MAGNIFICATION', 'SLIDE_TYPE')
     WSI_BOOLEAN_KEYS = ('IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES')
     WSI_INTEGER_KEYS = ('FILE_SIZE_BYTES',)
+    # Keys that would carry the pathology image ID or an object URI embedding it.
+    # They are rejected both in the public metadata and inside wsi_serving: those
+    # values exist only inside the sealed source.
+    WSI_UNSEALED_SOURCE_KEYS = ('image_id', 'source_url', 'thumbnail_url')
     # Top-level (public) metadata keys that would expose a real slide identifier,
-    # a free-text specimen label or a raw artifact location.
-    WSI_FORBIDDEN_PUBLIC_KEYS = ('image_id', 'barcode', 'source_url', 'thumbnail_url',
-                                 'part_designator', 'path_dx_title')
+    # a free-text specimen label, a raw artifact location or the sealed source.
+    WSI_FORBIDDEN_PUBLIC_KEYS = WSI_UNSEALED_SOURCE_KEYS + (
+        'barcode', 'part_designator', 'path_dx_title', 'sealed_source')
     WSI_SERVING_KEY = 'wsi_serving'
-    WSI_SERVING_STRING_KEYS = ('IMAGE_ID', 'SOURCE_URL', 'THUMBNAIL_URL', 'THUMBNAIL_CONTENT_TYPE')
+    WSI_SERVING_STRING_KEYS = ('SEALED_SOURCE', 'THUMBNAIL_CONTENT_TYPE')
     WSI_SERVING_INTEGER_KEYS = ('THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT')
 
     def __init__(self, *args, **kwargs):
@@ -4319,7 +4284,7 @@ class ResourceValidator(WsiRowChecks, Validator):
         super(ResourceValidator, self).__init__(*args, **kwargs)
 
     def _wsi_value(self, value, expected, key, metadata_column):
-        """Render a typed metadata value as the format-v3 string, logging type errors."""
+        """Render a typed metadata value as the format-v4 string, logging type errors."""
         if value is None:
             return ''
         if expected == 'string':
@@ -4336,7 +4301,7 @@ class ResourceValidator(WsiRowChecks, Validator):
         return value.strip() if isinstance(value, str) else str(value)
 
     def _wsi_row_from_metadata(self, metadata, metadata_column):
-        """Map WHOLE_SLIDE_IMAGE resource metadata onto a format-v3 WSI row dict."""
+        """Map WHOLE_SLIDE_IMAGE resource metadata onto a format-v4 WSI row dict."""
         row = {name: '' for name in self.EXPECTED_HEADERS}
         for keys, expected in ((self.WSI_STRING_KEYS, 'string'),
                                (self.WSI_BOOLEAN_KEYS, 'boolean'),
@@ -4364,8 +4329,15 @@ class ResourceValidator(WsiRowChecks, Validator):
                 self._error('WHOLE_SLIDE_IMAGE metadata wsi_serving.tile_metadata_json must be a '
                             'JSON object', self.line_number, metadata_column,
                             type(tile_metadata).__name__)
+        for key in self.WSI_UNSEALED_SOURCE_KEYS:
+            if key in serving:
+                self._error('WHOLE_SLIDE_IMAGE metadata must not contain %s; the image ID and '
+                            'object URIs are only carried inside sealed_source' % key,
+                            self.line_number, metadata_column,
+                            'METADATA.%s.%s' % (self.WSI_SERVING_KEY, key))
         known = {name.lower() for name in self.WSI_SERVING_STRING_KEYS + self.WSI_SERVING_INTEGER_KEYS}
         known.add('tile_metadata_json')
+        known.update(self.WSI_UNSEALED_SOURCE_KEYS)
         unknown = sorted(set(serving) - known)
         if unknown:
             self.logger.warning(
@@ -4408,8 +4380,7 @@ class ResourceValidator(WsiRowChecks, Validator):
             return
         for key in self.WSI_FORBIDDEN_PUBLIC_KEYS:
             if key in metadata:
-                self._error('WHOLE_SLIDE_IMAGE public metadata must not contain %s; server-side '
-                            'values belong in wsi_serving' % key,
+                self._error('WHOLE_SLIDE_IMAGE public metadata must not contain %s' % key,
                             self.line_number, metadata_column, 'METADATA.' + key)
         row = self._wsi_row_from_metadata(metadata, metadata_column)
         row['PATIENT_ID'] = values.get('PATIENT_ID', '')
@@ -5087,6 +5058,11 @@ class WsiValidator(WsiRowChecks, Validator):
             return
 
         header = lines[4].rstrip('\r\n').split('\t')
+        removed = [name for name in self.REMOVED_HEADERS if name in header]
+        if removed:
+            self._error('WSI file has columns of format v3 or older; format v4 replaces them with '
+                        'SEALED_SOURCE, so re-export data_wsi.txt', 5, cause=', '.join(removed))
+            return
         if header not in (self.EXPECTED_HEADERS, self.EXPECTED_HEADERS_WITH_IGNORED_TIMING):
             self._error('Invalid WSI column header or column order', 5,
                         cause=', '.join(header))
@@ -5453,7 +5429,7 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         if meta_file_type is None:
             continue
         if meta_file_type == cbioportal_common.MetaFileTypes.WSI:
-            # Legacy format-v3 WSI pairs are converted offline; the importer rejects them.
+            # Legacy WSI pairs are converted offline; the importer rejects them.
             logger.error(cbioportal_common.LEGACY_WSI_IMPORT_MESSAGE,
                          extra={'filename_': filename})
             continue

@@ -85,7 +85,7 @@ class MetaFileTypes(object):
     RESOURCES_DEFINITION = 'meta_resource_definition'
     WSI = 'meta_wsi'
 
-# Legacy format-v3 WSI files are no longer imported directly; both the importer and the
+# Legacy WSI files are no longer imported directly; both the importer and the
 # validator reject a study that still contains them with this message.
 LEGACY_WSI_IMPORT_MESSAGE = (
     'Legacy meta_wsi input is no longer imported. Convert it with '
@@ -1003,9 +1003,9 @@ def parse_metadata_file(filename,
                 'WSI metadata must use genetic_alteration_type PATHOLOGY_SLIDES and datatype WSI',
                 extra={'filename_': filename})
             meta_dictionary['meta_file_type'] = None
-        elif meta_dictionary.get('format_version') != '3':
+        elif meta_dictionary.get('format_version') != '4':
             logger.error(
-                "Unsupported WSI format_version; expected '3'",
+                "Unsupported WSI format_version; expected '4'",
                 extra={'filename_': filename,
                        'cause': meta_dictionary.get('format_version')})
             meta_dictionary['meta_file_type'] = None

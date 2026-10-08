@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a legacy WSI file pair (format v3) into standard cBioPortal study files.
+"""Convert a legacy WSI file pair (format v4) into standard cBioPortal study files.
 
 The converter is deliberately offline: it never connects to cBioPortal, a
 database, or an artifact store. It reads ``meta_wsi.txt``/``data_wsi.txt``,
@@ -22,13 +22,18 @@ each with its meta file. A generated data/meta pair is only written when it has 
 Timeline files are not produced: existing clinical timeline files stay in the
 study and are imported unchanged.
 
-Only format v3 is accepted: 32 columns with the opaque ``SLIDE_KEY`` (32
-lowercase hex characters, unique per study) last. Files that still carry the
-seven slide-timing columns before ``SLIDE_KEY`` (39 columns) are accepted, but
-those columns are ignored: they are neither validated nor written.
-De-identification (contract wsi-serving-v5, resource-data variant): the real
-``IMAGE_ID`` is kept only in the private ``wsi_serving`` metadata, the URL and
-``DISPLAY_NAME`` never contain it, ``BARCODE``/``PART_DESIGNATOR``/
+Only format v4 is accepted: 30 columns ending with the opaque ``SLIDE_KEY``
+(32 lowercase hex characters, unique per study) and ``SEALED_SOURCE``. Files
+that also carry the seven slide-timing columns before ``SLIDE_KEY`` (37
+columns) are accepted, but those columns are ignored: they are neither
+validated nor written. Files with an ``IMAGE_ID``, ``SOURCE_URL`` or
+``THUMBNAIL_URL`` column (format v3 and older) are rejected.
+De-identification (contract wsi-serving-v6, sealed source): the pathology
+image ID and the object URIs that embed it never reach the study files. The
+upstream pipeline seals them into ``SEALED_SOURCE``, an opaque value only the
+tile server can open; it is copied verbatim into the private ``wsi_serving``
+metadata of servable slides. The URL and ``DISPLAY_NAME`` carry only the
+slide key and non-identifying labels, and ``BARCODE``/``PART_DESIGNATOR``/
 ``PATH_DX_TITLE`` are not written. The data provider is responsible for
 de-identifying the remaining free-text cells. Error messages name columns,
 never values.
@@ -41,6 +46,8 @@ files.
 """
 
 import argparse
+import base64
+import binascii
 import json
 import os
 import re
@@ -55,32 +62,35 @@ SAMPLE_RESOURCE_ID = "WSI_SAMPLE"
 PATIENT_RESOURCE_ID = "WSI_PATIENT"
 RESOURCE_TYPE = "WHOLE_SLIDE_IMAGE"
 
-# Slide-timing columns that older format-v3 files still carry before SLIDE_KEY.
+# Slide-timing columns that some files still carry before SLIDE_KEY.
 # They are accepted but ignored: neither validated nor written to the metadata.
 IGNORED_TIMING_COLUMNS = (
     "TIMELINE_START_DAYS", "TIMELINE_DATE_STATUS", "TIMELINE_DATE_KIND",
     "TIMELINE_DATE_SOURCE", "TIMELINE_DATE_REASON", "TIMELINE_COORDINATE_SYSTEM",
     "TIMEPOINT_SOURCE",
 )
-# Format version 3 (32 columns): ImportWsiData.COLUMNS followed by SLIDE_KEY.
+# Format version 4 (30 columns).
 COLUMNS = [
-    "PATIENT_ID", "REFERENCE_SAMPLE_ID", "SAMPLE_ID", "IMAGE_ID",
+    "PATIENT_ID", "REFERENCE_SAMPLE_ID", "SAMPLE_ID",
     "PART_KEY", "PART_NUMBER", "PART_DESIGNATOR", "PART_TYPE",
     "PART_DESCRIPTION", "SUBSPECIALTY", "PATH_DX_TITLE", "BLOCK_KEY",
     "BLOCK_NUMBER", "BLOCK_LABEL", "MATCH_LEVEL", "SPECIMEN_KEY",
     "STAIN_NAME", "STAIN_GROUP", "IS_HNE", "IS_IHC", "MAGNIFICATION",
-    "FILE_SIZE_BYTES", "BARCODE", "SLIDE_TYPE", "CAN_SERVE_TILES", "SOURCE_URL",
-    "TILE_METADATA_JSON", "THUMBNAIL_URL", "THUMBNAIL_WIDTH",
+    "FILE_SIZE_BYTES", "BARCODE", "SLIDE_TYPE", "CAN_SERVE_TILES",
+    "TILE_METADATA_JSON", "THUMBNAIL_WIDTH",
     "THUMBNAIL_HEIGHT", "THUMBNAIL_CONTENT_TYPE",
-    "SLIDE_KEY",
+    "SLIDE_KEY", "SEALED_SOURCE",
 ]
-# The same with the ignored timing columns (39 columns).
-COLUMNS_WITH_IGNORED_TIMING = COLUMNS[:-1] + list(IGNORED_TIMING_COLUMNS) + COLUMNS[-1:]
-FORMAT_VERSION = "3"
+# The same with the ignored timing columns before SLIDE_KEY (37 columns).
+COLUMNS_WITH_IGNORED_TIMING = COLUMNS[:-2] + list(IGNORED_TIMING_COLUMNS) + COLUMNS[-2:]
+# Format-v3 columns that carry the image ID or an object URI embedding it. A header
+# with any of them is rejected outright.
+REMOVED_COLUMNS = ("IMAGE_ID", "SOURCE_URL", "THUMBNAIL_URL")
+FORMAT_VERSION = "4"
 
 # Public metadata keys, emitted in lower case. Values the backend reads with
-# JSONExtractString stay strings (e.g. PART_NUMBER, MAGNIFICATION). IMAGE_ID,
-# BARCODE, PART_DESIGNATOR and PATH_DX_TITLE are never public.
+# JSONExtractString stay strings (e.g. PART_NUMBER, MAGNIFICATION). BARCODE,
+# PART_DESIGNATOR and PATH_DX_TITLE are never written; SEALED_SOURCE is private.
 PUBLIC_STRING_FIELDS = [
     "SLIDE_KEY", "PART_KEY", "PART_NUMBER", "PART_TYPE",
     "PART_DESCRIPTION", "SUBSPECIALTY", "BLOCK_KEY",
@@ -100,6 +110,11 @@ CUSTOM_METADATA = json.dumps(
 
 # Opaque per-slide key computed upstream from a salted hash of image_id.
 SLIDE_KEY_PATTERN = re.compile(r"[0-9a-f]{32}")
+# SEALED_SOURCE is unpadded base64url of nonce(12) || ciphertext || tag(16), so it
+# decodes to at least 29 bytes.
+SEALED_SOURCE_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
+SEALED_SOURCE_MIN_BYTES = 12 + 1 + 16
+SEALED_SOURCE_MAX_LENGTH = 4096
 
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
 SLIDE_TYPES = ("H&E", "IHC", "Other", "Unknown")
@@ -160,8 +175,9 @@ def read_wsi_meta(path):
         raise ConversionError(f"{path}: WSI metadata must use PATHOLOGY_SLIDES / WSI")
     if meta.get("format_version") != FORMAT_VERSION:
         raise ConversionError(
-            f"{path}: unsupported WSI format_version; expected {FORMAT_VERSION} (format v2 is no "
-            f"longer converted: re-export data_wsi.txt as format v3 with SLIDE_KEY)")
+            f"{path}: unsupported WSI format_version; expected {FORMAT_VERSION} (older formats are "
+            f"no longer converted: re-export data_wsi.txt as format v4 with SLIDE_KEY and "
+            f"SEALED_SOURCE)")
     for field in ("cancer_study_identifier", "data_filename"):
         if not meta.get(field):
             raise ConversionError(f"{path}: {field} is required")
@@ -236,6 +252,12 @@ def iter_rows(data_path, columns=None):
         if not line.startswith("#"):
             header = line
             break
+    removed = [column for column in REMOVED_COLUMNS
+               if header is not None and column in header.split("\t")]
+    if removed:
+        raise ConversionError(
+            f"{data_path}: WSI data has {', '.join(removed)} column(s) of format v3 or older; "
+            f"format v4 replaces them with SEALED_SOURCE: re-export data_wsi.txt")
     if header is None or header.split("\t") not in accepted:
         raise ConversionError(f"{data_path}: WSI data has an invalid header or column order")
     columns = header.split("\t")
@@ -287,6 +309,17 @@ def _optional_int(row, field, line):
         _fail(line, f"invalid {field}")
 
 
+def sealed_source_valid(value):
+    """Whether a non-empty SEALED_SOURCE has the sealed-source shape (contract wsi-serving-v6)."""
+    if len(value) > SEALED_SOURCE_MAX_LENGTH or not SEALED_SOURCE_PATTERN.fullmatch(value):
+        return False
+    try:
+        decoded = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    except (binascii.Error, ValueError):
+        return False
+    return len(decoded) >= SEALED_SOURCE_MIN_BYTES
+
+
 def stain_flags_valid(slide_type, is_hne, is_ihc):
     """Mirror the native wsi_slide_stain_flags_valid CHECK constraint."""
     return (not (is_hne and is_ihc)
@@ -335,24 +368,28 @@ def normalize_row(row, line):
         if not isinstance(tile_metadata, dict):
             _fail(line, "TILE_METADATA_JSON must be a JSON object")
 
-    # The real image ID is server-side only: it lives in the private serving object.
-    serving = {"image_id": row["IMAGE_ID"]}
-    if can_serve:
-        for field in ("SOURCE_URL", "TILE_METADATA_JSON", "THUMBNAIL_URL", "THUMBNAIL_CONTENT_TYPE"):
-            _require(row, field, line)
-        for value in (thumbnail_width, thumbnail_height):
-            if value is None or not 1 <= value <= 8192:
-                _fail(line, "servable thumbnail dimensions must be between 1 and 8192")
-        serving.update({
-            "source_url": row["SOURCE_URL"],
-            "tile_metadata_json": tile_metadata,
-            "thumbnail_url": row["THUMBNAIL_URL"],
-            "thumbnail_width": thumbnail_width,
-            "thumbnail_height": thumbnail_height,
-            "thumbnail_content_type": row["THUMBNAIL_CONTENT_TYPE"],
-        })
-    # Non-servable rows carry only the image ID, as the native importer stored the rest as null.
-    metadata[SERVING_KEY] = serving
+    # SEALED_SOURCE is opaque and may only be opened by the tile server; never echo it.
+    sealed_source = row["SEALED_SOURCE"]
+    if sealed_source and not sealed_source_valid(sealed_source):
+        _fail(line, "SEALED_SOURCE must be unpadded base64url of at least "
+                    f"{SEALED_SOURCE_MIN_BYTES} bytes and at most {SEALED_SOURCE_MAX_LENGTH} characters")
+    if not can_serve:
+        if sealed_source:
+            _fail(line, "SEALED_SOURCE must be empty when CAN_SERVE_TILES is FALSE")
+        # Non-servable rows have no private serving object.
+        return metadata
+    for field in ("SEALED_SOURCE", "TILE_METADATA_JSON", "THUMBNAIL_CONTENT_TYPE"):
+        _require(row, field, line)
+    for value in (thumbnail_width, thumbnail_height):
+        if value is None or not 1 <= value <= 8192:
+            _fail(line, "servable thumbnail dimensions must be between 1 and 8192")
+    metadata[SERVING_KEY] = {
+        "sealed_source": sealed_source,
+        "tile_metadata_json": tile_metadata,
+        "thumbnail_width": thumbnail_width,
+        "thumbnail_height": thumbnail_height,
+        "thumbnail_content_type": row["THUMBNAIL_CONTENT_TYPE"],
+    }
     return metadata
 
 
@@ -360,7 +397,6 @@ class SlideParser:
     """Normalize rows one at a time, applying the cross-row checks of ImportWsiData.normalize."""
 
     def __init__(self):
-        self.image_ids = set()
         self.slide_keys = set()
         self.patient_references = {}
         self.parts = {}
@@ -368,11 +404,6 @@ class SlideParser:
 
     def parse(self, line, row):
         patient_id = _require(row, "PATIENT_ID", line)
-        image_id = _require(row, "IMAGE_ID", line)
-        if image_id in self.image_ids:
-            # image_id is server-side only; never echo it.
-            _fail(line, "IMAGE_ID is not unique")
-        self.image_ids.add(image_id)
         slide_key = _require(row, "SLIDE_KEY", line)
         if not SLIDE_KEY_PATTERN.fullmatch(slide_key):
             _fail(line, "SLIDE_KEY must be 32 lowercase hex characters")
@@ -408,7 +439,6 @@ class SlideParser:
         return {
             "patient_id": patient_id,
             "sample_id": sample_id or None,
-            "image_id": image_id,
             "slide_key": slide_key,
             "display_name": display_name(row),
             "match_level": match_level,
@@ -425,7 +455,8 @@ def parse_slides(rows):
 class SlideCounter:
     """Per-entity counts with the semantics of ImportWsiData.insertSampleSlideCounts.
 
-    One count per IMAGE_ID. Sample counts cover matched slides only, so samples
+    One count per slide (SLIDE_KEY, unique per study as SlideParser enforces).
+    Sample counts cover matched slides only, so samples
     without a matched slide get no row; patient counts include unmatched slides,
     so every patient with a slide gets a row. Part/block counts follow
     MATCH_LEVEL and zeros are written for entities that have a row. Slides that
@@ -675,7 +706,7 @@ class _TsvWriter:
 
 
 def convert(meta_wsi, output_dir, portal_base_url, study_dir=None):
-    """Convert a legacy format-v3 WSI pair; return the list of files written.
+    """Convert a legacy format-v4 WSI pair; return the list of files written.
 
     Without ``study_dir`` the slide counts are written as standalone clinical file
     pairs. With it, the study's clinical sample and patient files are copied to
@@ -833,7 +864,8 @@ def _convert_into(staging, data_path, study_id, base_url, study_dir):
 
 def interface(args=None):
     parser = argparse.ArgumentParser(
-        description="Convert a legacy meta_wsi/data_wsi pair (format_version 3, with SLIDE_KEY) into "
+        description="Convert a legacy meta_wsi/data_wsi pair (format_version 4, with SLIDE_KEY and "
+                    "SEALED_SOURCE) into "
                     "standard resource and clinical slide-count files. Runs offline.")
     parser.add_argument("--meta-wsi", type=Path, required=True,
                         help="path to the legacy meta_wsi.txt (its data_filename is read next to it)")

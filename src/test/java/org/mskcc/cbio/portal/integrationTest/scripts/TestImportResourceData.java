@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,6 +54,16 @@ public class TestImportResourceData extends IntegrationTestBase {
     private static final String STUDY_ID = "wsi_convert_test";
     private static final String FIXTURE_DIR = "src/test/resources/wsi_resources/";
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String SLIDE_1 = "2c96f13783250ad2c6bcfcd5b7c3ef22";
+    private static final String SLIDE_2 = "90f033ed369247b19bd7a252e7ae86c8";
+    private static final String SLIDE_3 = "f9bce50b1498c94fa0fa6cce809f64f2";
+    private static final String SLIDE_4 = "c66ee336f70e8b59e48bd7afbf0e606d";
+    private static final String SLIDE_5 = "a72487fd68ef59b99fcee054e738f893";
+    private static final String SLIDE_6 = "3474b861eb683902b420f4ee95dfe0fa";
+    // contract wsi-serving-v6 test vector, the fixture's sealed source for SLIDE_1
+    private static final String SEALED_SOURCE_VECTOR =
+        "AAECAwQFBgcICQoLNpOTYnY8HVb-KcPzu1F5HPykr7D0YY_UhVbbyjOFRlxC63fxCt09YO1aYC-phb85wDhN5PPPpC0X46RS"
+            + "D0K0bRRgSptRb9wDiqMLtftFQ6VpBGfGILaddEV_s-Zsmpp28fG5Z3XTNWnyoBRa9qfr9t209wS7V-LhGl8i";
 
     private record ResourceRow(long resourceDataId, String resourceId, String entityType,
                                String patientId, String sampleId, String url, String type,
@@ -69,11 +80,11 @@ public class TestImportResourceData extends IntegrationTestBase {
         CancerStudy study = createStudy();
         importConvertedResources(study);
 
-        Map<String, ResourceRow> rows = rowsByImage(study);
-        assertEquals(List.of("IMG-1", "IMG-2", "IMG-3", "IMG 7/A&B", "IMG-4", "IMG-6"),
+        Map<String, ResourceRow> rows = rowsBySlideKey(study);
+        assertEquals(List.of(SLIDE_1, SLIDE_2, SLIDE_3, SLIDE_5, SLIDE_4, SLIDE_6),
             new ArrayList<>(rows.keySet()));
 
-        ResourceRow first = rows.get("IMG-1");
+        ResourceRow first = rows.get(SLIDE_1);
         assertEquals("WSI_SAMPLE", first.resourceId());
         assertEquals("SAMPLE", first.entityType());
         assertEquals("WSI-P1", first.patientId());
@@ -83,7 +94,8 @@ public class TestImportResourceData extends IntegrationTestBase {
             + "?studyId=wsi_convert_test&slideKey=2c96f13783250ad2c6bcfcd5b7c3ef22", first.url());
         JsonNode metadata = JSON.readTree(first.metadata());
         assertEquals("2c96f13783250ad2c6bcfcd5b7c3ef22", metadata.get("slide_key").textValue());
-        for (String removed : List.of("image_id", "barcode", "part_designator", "path_dx_title")) {
+        for (String removed : List.of("image_id", "barcode", "part_designator", "path_dx_title",
+                "source_url", "thumbnail_url", "sealed_source")) {
             assertFalse(removed, metadata.has(removed));
         }
         // slide timing is not part of the foundation metadata
@@ -97,28 +109,29 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals("1", metadata.get("part_number").textValue());
         assertEquals("Left \"upper\" lobe \\ wedge", metadata.get("part_description").textValue());
         JsonNode serving = metadata.get("wsi_serving");
+        assertEquals(List.of("sealed_source", "thumbnail_content_type", "thumbnail_height",
+            "thumbnail_width", "tile_metadata_json"), fieldNames(serving));
+        assertEquals(SEALED_SOURCE_VECTOR, serving.get("sealed_source").textValue());
         assertEquals(256, serving.get("thumbnail_width").intValue());
         assertEquals(1024, serving.at("/tile_metadata_json/dimensions/width").intValue());
         assertEquals("Scan \"Q\" \\ 40", serving.at("/tile_metadata_json/vendor/scanner/model").textValue());
         assertTrue(serving.at("/tile_metadata_json/vendor/scanner/calibrated").booleanValue());
 
-        JsonNode unservable = JSON.readTree(rows.get("IMG-2").metadata());
+        JsonNode unservable = JSON.readTree(rows.get(SLIDE_2).metadata());
         assertFalse(unservable.get("can_serve_tiles").booleanValue());
-        assertEquals(1, unservable.get("wsi_serving").size());
-        assertEquals("IMG-2", unservable.at("/wsi_serving/image_id").textValue());
+        assertFalse(unservable.has("wsi_serving"));
 
-        ResourceRow encoded = rows.get("IMG 7/A&B");
-        assertEquals("WSI-P2-S1", encoded.sampleId());
+        assertEquals("WSI-P2-S1", rows.get(SLIDE_5).sampleId());
 
-        ResourceRow unmatched = rows.get("IMG-6");
+        ResourceRow unmatched = rows.get(SLIDE_6);
         assertEquals("WSI_PATIENT", unmatched.resourceId());
         assertEquals("PATIENT", unmatched.entityType());
         assertEquals("WSI+P3", unmatched.patientId());
         assertNull(unmatched.sampleId());
         assertEquals("https://portal.example.org/cbioportal/wsi/patient/WSI%2BP3"
             + "?studyId=wsi_convert_test&slideKey=3474b861eb683902b420f4ee95dfe0fa", unmatched.url());
-        assertEquals("WSI-P1", rows.get("IMG-4").patientId());
-        assertNull(rows.get("IMG-4").sampleId());
+        assertEquals("WSI-P1", rows.get(SLIDE_4).patientId());
+        assertNull(rows.get(SLIDE_4).sampleId());
 
         assertUniquePositiveIds(rows.values());
     }
@@ -127,14 +140,14 @@ public class TestImportResourceData extends IntegrationTestBase {
     public void testResourceIdsStayUniqueAcrossProcessesAndStudyReimport() throws Exception {
         CancerStudy study = createStudy();
         importConvertedResources(study);
-        Set<Long> firstIds = ids(rowsByImage(study).values());
+        Set<Long> firstIds = ids(rowsBySlideKey(study).values());
 
         // A second importer process starts with empty in-memory counters.
         ClickHouseAutoIncrement.resetCounters();
         importConvertedResources(study);
-        Map<String, ResourceRow> reimported = rowsByImage(study);
+        Map<String, ResourceRow> reimported = rowsBySlideKey(study);
         assertEquals("reimport replaces rows instead of duplicating them", 6, reimported.size());
-        // rowsByImage collapses duplicates by key, so also count the stored rows directly.
+        // rowsBySlideKey collapses duplicates by key, so also count the stored rows directly.
         assertEquals("reimport leaves exactly one row per slide", 6L, singleLong(
             "SELECT count() FROM resource_data WHERE cancer_study_id = ? AND type = 'WHOLE_SLIDE_IMAGE'",
             study.getInternalId()));
@@ -163,7 +176,7 @@ public class TestImportResourceData extends IntegrationTestBase {
         ClickHouseAutoIncrement.resetCounters();
         CancerStudy recreated = createStudy();
         importConvertedResources(recreated);
-        Map<String, ResourceRow> afterDelete = rowsByImage(recreated);
+        Map<String, ResourceRow> afterDelete = rowsBySlideKey(recreated);
         assertEquals(6, afterDelete.size());
         assertUniquePositiveIds(afterDelete.values());
 
@@ -197,7 +210,7 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals(2, patients.getNumPatientSpecificResourcesAdded());
     }
 
-    private static Map<String, ResourceRow> rowsByImage(CancerStudy study) throws Exception {
+    private static Map<String, ResourceRow> rowsBySlideKey(CancerStudy study) throws Exception {
         Map<String, ResourceRow> rows = new LinkedHashMap<>();
         try (Connection connection = JdbcUtil.getDbConnection(TestImportResourceData.class);
              PreparedStatement statement = connection.prepareStatement(
@@ -210,11 +223,18 @@ public class TestImportResourceData extends IntegrationTestBase {
                     ResourceRow row = new ResourceRow(result.getLong(1), result.getString(2),
                         result.getString(3), result.getString(4), result.getString(5),
                         result.getString(6), result.getString(7), result.getString(8));
-                    rows.put(JSON.readTree(row.metadata()).at("/wsi_serving/image_id").textValue(), row);
+                    rows.put(JSON.readTree(row.metadata()).get("slide_key").textValue(), row);
                 }
             }
         }
         return rows;
+    }
+
+    private static List<String> fieldNames(JsonNode node) {
+        List<String> names = new ArrayList<>();
+        node.fieldNames().forEachRemaining(names::add);
+        Collections.sort(names);
+        return names;
     }
 
     private static long singleLong(String sql, Object... parameters) throws Exception {

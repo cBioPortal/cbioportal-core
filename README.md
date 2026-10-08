@@ -20,12 +20,17 @@ as JSON. `validateData.py` checks those rows against the WSI contract, and
 
 Legacy `meta_wsi.txt`/`data_wsi.txt` pairs are no longer imported; convert
 them offline with `scripts/importer/convertWsiToResources.py`, which accepts
-only format v3 (32 columns, ending with the opaque `SLIDE_KEY`; slide-timing
-columns, if present, are ignored for now). Given
+only format v4 (30 columns, ending with the opaque `SLIDE_KEY` and
+`SEALED_SOURCE`; slide-timing columns, if present, are ignored for now). Files
+that still have `IMAGE_ID`, `SOURCE_URL` or `THUMBNAIL_URL` columns (format v3
+and older) are rejected. Given
 `--study-dir`, it also merges the six `WSI_*` slide-count clinical
 attributes into copies of the study's clinical sample and patient files. Viewer
-links and public metadata identify slides only by `slide_key`; the real image
-ID stays in the private `wsi_serving` metadata. The data provider is
+links and public metadata identify slides only by `slide_key`. The pathology
+image ID and the object URIs that embed it are never stored in the study files
+or the database: the upstream pipeline seals them into `SEALED_SOURCE`, which
+only the tile server can open, and servable slides carry it in the private
+`wsi_serving` metadata. The data provider is
 responsible for de-identifying free-text values before export. The native WSI
 tables and the `ImportWsiData` Java entry point are deprecated but retained.
 Thumbnail artifacts and slide metadata must still be prepared by an upstream
