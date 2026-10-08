@@ -3723,9 +3723,14 @@ class ResourceDefinitionValidator(Validator):
 
     @staticmethod
     def declaredKeys(contract):
-        """The metadata keys a parsed contract declares, for checking data files against."""
+        """The metadata keys a parsed contract declares, for checking data files against.
+
+        Returns None for a contract the portal cannot read. Such a contract is reported
+        separately and the portal falls back to deriving columns from the data, so the keys
+        a file carries are not undeclared - there is no contract to declare them against.
+        """
         if not isinstance(contract, dict) or not isinstance(contract.get('fields'), list):
-            return set()
+            return None
         return {field['key'] for field in contract['fields']
                 if isinstance(field, dict) and field.get('key')}
 
@@ -3877,7 +3882,9 @@ class ResourceDefinitionValidator(Validator):
                     try:
                         contract = json.loads(custom_metadata_value)
                         self.checkCustomMetadataContract(contract, col_index)
-                        self.resource_contract_keys[resource_id] = self.declaredKeys(contract)
+                        declared = self.declaredKeys(contract)
+                        if declared is not None:
+                            self.resource_contract_keys[resource_id] = declared
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             'Invalid JSON in CUSTOM_METADATA column.',

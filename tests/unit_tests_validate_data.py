@@ -3001,6 +3001,22 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
                                            validateData.ResourceValidator))
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
+    def test_an_unreadable_contract_declares_nothing_rather_than_declaring_no_keys(self):
+        """A contract the portal cannot read is reported on its own and leaves the data alone.
+
+        The portal falls back to deriving columns from the data, so the file's keys are not
+        undeclared -- telling a curator to remove them points at the wrong file.
+        """
+        self.assertIsNone(
+            validateData.ResourceDefinitionValidator.declaredKeys({'version': 1, 'field': []}))
+        self.assertIsNone(
+            validateData.ResourceDefinitionValidator.declaredKeys({'fields': {'key': 'stain'}}))
+        self.assertIsNone(validateData.ResourceDefinitionValidator.declaredKeys([]))
+        self.assertEqual(
+            {'stain'},
+            validateData.ResourceDefinitionValidator.declaredKeys(
+                {'version': 1, 'fields': [{'key': 'stain'}]}))
+
     def test_declared_key_that_no_row_carries_is_a_warning(self):
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
         validateData.RESOURCE_CONTRACT_KEYS = {
