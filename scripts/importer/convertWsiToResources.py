@@ -13,8 +13,9 @@ writes:
   links to the standalone viewer by its opaque ``slide_key`` and carries the
   slide metadata as JSON;
 * the six ``WSI_*`` slide-count attributes the native importer used to
-  generate: with ``--study-dir``, merged into copies of the study's clinical
-  sample and patient files (same file names); without it, as standalone
+  generate, counting only viewable (``CAN_SERVE_TILES``) slides: with
+  ``--study-dir``, merged into copies of the study's clinical sample and
+  patient files (same file names); without it, as standalone
   ``data_clinical_sample_wsi_counts.txt``/``data_clinical_patient_wsi_counts.txt``
   pairs for studies without clinical files of their own or for hand merging;
 
@@ -119,22 +120,23 @@ SEALED_SOURCE_MAX_LENGTH = 4096
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
 SLIDE_TYPES = ("H&E", "IHC", "Other", "Unknown")
 
-# Names and descriptions of the count attributes the retired native importer wrote.
+# The count attributes (the retired native importer wrote the same IDs). They count only
+# slides the viewer can open.
 SAMPLE_COUNT_ATTRIBUTES = [
-    ("WSI_SAMPLE_SLIDE_COUNT", "WSI Slides per Sample",
-     "Associated pathology slide count for the sample."),
-    ("WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT", "WSI Slides per Sample, Part-matched",
-     "Associated pathology slides matched to a specimen part."),
-    ("WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT", "WSI Slides per Sample, Block-matched",
-     "Associated pathology slides matched to a specimen block."),
+    ("WSI_SAMPLE_SLIDE_COUNT", "WSI Viewable Slides per Sample",
+     "Pathology slides the slide viewer can open, for the sample."),
+    ("WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT", "WSI Viewable Slides per Sample, Part-matched",
+     "Pathology slides the slide viewer can open, for the sample, matched to a specimen part."),
+    ("WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT", "WSI Viewable Slides per Sample, Block-matched",
+     "Pathology slides the slide viewer can open, for the sample, matched to a specimen block."),
 ]
 PATIENT_COUNT_ATTRIBUTES = [
-    ("WSI_PATIENT_SLIDE_COUNT", "WSI Slides per Patient",
-     "Associated pathology slide count for the patient."),
-    ("WSI_PATIENT_PART_MATCHED_SLIDE_COUNT", "WSI Slides per Patient, Part-matched",
-     "Associated pathology slides matched to a specimen part for the patient."),
-    ("WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT", "WSI Slides per Patient, Block-matched",
-     "Associated pathology slides matched to a specimen block for the patient."),
+    ("WSI_PATIENT_SLIDE_COUNT", "WSI Viewable Slides per Patient",
+     "Pathology slides the slide viewer can open, for the patient."),
+    ("WSI_PATIENT_PART_MATCHED_SLIDE_COUNT", "WSI Viewable Slides per Patient, Part-matched",
+     "Pathology slides the slide viewer can open, for the patient, matched to a specimen part."),
+    ("WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT", "WSI Viewable Slides per Patient, Block-matched",
+     "Pathology slides the slide viewer can open, for the patient, matched to a specimen block."),
 ]
 COUNT_ATTRIBUTE_IDS = frozenset(
     attribute[0] for attribute in SAMPLE_COUNT_ATTRIBUTES + PATIENT_COUNT_ATTRIBUTES)
@@ -453,24 +455,36 @@ def parse_slides(rows):
 
 
 class SlideCounter:
-    """Per-entity slide counts with the semantics of the retired native importer.
+    """Per-entity counts of the slides the viewer can open.
 
-    One count per slide (SLIDE_KEY, unique per study as SlideParser enforces).
-    Sample counts cover matched slides only, so samples
-    without a matched slide get no row; patient counts include unmatched slides,
-    so every patient with a slide gets a row. Part/block counts follow
-    MATCH_LEVEL and zeros are written for entities that have a row. Slides that
-    cannot serve tiles are counted.
+    Only viewable slides (CAN_SERVE_TILES=TRUE) are counted, one count per
+    slide (SLIDE_KEY, unique per study as SlideParser enforces). Sample counts
+    cover matched slides only, so samples without a viewable matched slide get
+    no row; patient counts include unmatched slides, so every patient with a
+    viewable slide gets a row. Part/block counts follow MATCH_LEVEL and zeros
+    are written for entities that have a row.
+
+    ``sample_keys`` and ``patient_keys`` record every entity with any slide,
+    viewable or not, since the resource rows reference all of them.
     """
 
     def __init__(self):
         self.by_sample = {}
         self.by_patient = {}
+        self.sample_keys = {}
+        self.patient_keys = {}
 
     def add(self, slide):
-        targets = [self.by_patient.setdefault(slide["patient_id"], [0, 0, 0])]
+        sample_key = None
+        self.patient_keys.setdefault((slide["patient_id"],), None)
         if slide["sample_id"] is not None:
-            targets.append(self.by_sample.setdefault((slide["patient_id"], slide["sample_id"]), [0, 0, 0]))
+            sample_key = (slide["patient_id"], slide["sample_id"])
+            self.sample_keys.setdefault(sample_key, None)
+        if not slide["metadata"]["can_serve_tiles"]:
+            return
+        targets = [self.by_patient.setdefault(slide["patient_id"], [0, 0, 0])]
+        if sample_key is not None:
+            targets.append(self.by_sample.setdefault(sample_key, [0, 0, 0]))
         for counts in targets:
             counts[0] += 1
             if slide["match_level"] == "PART":
@@ -606,12 +620,14 @@ def _split_lines(text):
     return lines
 
 
-def merge_clinical_counts(data_path, attributes, key_columns, counts):
+def merge_clinical_counts(data_path, attributes, key_columns, counts, slide_keys=None):
     """Return the clinical file text with the count attributes appended.
 
     ``key_columns`` names the identifier columns that key ``counts`` (a dict from
-    identifier tuples to one count per attribute). Rows of entities without slides get NA,
-    as the native importer wrote no value for them. Every existing line, value and
+    identifier tuples to one count per attribute). ``slide_keys`` lists every entity
+    with a slide, viewable or not (default: the keys of ``counts``); each must be in
+    the clinical file. Rows of entities without a viewable slide get NA, as the native
+    importer wrote no value for them. Every existing line, value and
     line ending is kept; comment and blank lines after the header are unchanged.
     """
     name = data_path.name
@@ -649,7 +665,9 @@ def merge_clinical_counts(data_path, attributes, key_columns, counts):
     content, ending = lines[preamble]
     out.append(content + "\t" + "\t".join(attribute[0] for attribute in attributes) + ending)
 
-    counts_by_id = {key[-1]: (key, value) for key, value in counts.items()}
+    if slide_keys is None:
+        slide_keys = counts
+    counts_by_id = {key[-1]: (key, counts.get(key)) for key in slide_keys}
     seen = {}
     for line_number, (content, ending) in enumerate(lines[preamble + 1:], start=preamble + 2):
         if content.startswith("#") or not content.strip():
@@ -670,7 +688,8 @@ def merge_clinical_counts(data_path, attributes, key_columns, counts):
                 raise ConversionError(
                     f"{name}: line {line_number}: {key_columns[-1]} {identifier} belongs to "
                     f"{row_key[0]} here but to {key[0]} in the WSI file")
-            values = [str(count) for count in value]
+            values = (["NA"] * len(attributes) if value is None
+                      else [str(count) for count in value])
             seen[identifier] = True
         out.append(content + "\t" + "\t".join(values) + ending)
     absent = [identifier for identifier in counts_by_id if identifier not in seen]
@@ -811,40 +830,47 @@ def _convert_into(staging, data_path, study_id, base_url, study_dir):
         write_text(meta_file, meta_entries(entries, data_file))
         write_text(data_file, render_tsv(data_file, rows))
 
+    def count_values(counts):
+        # NA (no value) for an entity whose slides are all non-viewable: its row
+        # still defines the sample or patient its resource rows refer to.
+        return ["NA"] * 3 if counts is None else [str(count) for count in counts]
+
     if study_dir is None:
-        if by_sample:
+        if counter.sample_keys:
             add_pair(SAMPLE_COUNTS_FILE,
                      _clinical_header_rows(
                          [("Patient Identifier", "Patient identifier", "PATIENT_ID"),
                           ("Sample Identifier", "Sample identifier", "SAMPLE_ID")],
                          SAMPLE_COUNT_ATTRIBUTES)
-                     + [[patient, sample] + [str(count) for count in counts]
-                        for (patient, sample), counts in by_sample.items()],
+                     + [[patient, sample] + count_values(by_sample.get((patient, sample)))
+                        for patient, sample in counter.sample_keys],
                      "meta_clinical_sample_wsi_counts.txt",
                      [("cancer_study_identifier", study_id),
                       ("genetic_alteration_type", "CLINICAL"),
                       ("datatype", "SAMPLE_ATTRIBUTES")])
-        add_pair(PATIENT_COUNTS_FILE,
-                 _clinical_header_rows(
-                     [("Patient Identifier", "Patient identifier", "PATIENT_ID")],
-                     PATIENT_COUNT_ATTRIBUTES)
-                 + [[patient] + [str(count) for count in counts]
-                    for patient, counts in by_patient.items()],
-                 "meta_clinical_patient_wsi_counts.txt",
-                 [("cancer_study_identifier", study_id),
-                  ("genetic_alteration_type", "CLINICAL"),
-                  ("datatype", "PATIENT_ATTRIBUTES")])
+        if counter.patient_keys:
+            add_pair(PATIENT_COUNTS_FILE,
+                     _clinical_header_rows(
+                         [("Patient Identifier", "Patient identifier", "PATIENT_ID")],
+                         PATIENT_COUNT_ATTRIBUTES)
+                     + [[patient] + count_values(by_patient.get(patient))
+                        for (patient,) in counter.patient_keys],
+                     "meta_clinical_patient_wsi_counts.txt",
+                     [("cancer_study_identifier", study_id),
+                      ("genetic_alteration_type", "CLINICAL"),
+                      ("datatype", "PATIENT_ATTRIBUTES")])
         return files
 
     merges = (
-        ("SAMPLE_ATTRIBUTES", by_sample, ("PATIENT_ID", "SAMPLE_ID"), SAMPLE_COUNT_ATTRIBUTES),
+        ("SAMPLE_ATTRIBUTES", by_sample, counter.sample_keys, ("PATIENT_ID", "SAMPLE_ID"),
+         SAMPLE_COUNT_ATTRIBUTES),
         ("PATIENT_ATTRIBUTES", {(patient,): counts for patient, counts in by_patient.items()},
-         ("PATIENT_ID",), PATIENT_COUNT_ATTRIBUTES),
+         counter.patient_keys, ("PATIENT_ID",), PATIENT_COUNT_ATTRIBUTES),
     )
-    for datatype, counts, key_columns, attributes in merges:
+    for datatype, counts, slide_keys, key_columns, attributes in merges:
         clinical = _find_clinical_meta(study_dir, datatype)
         if clinical is None:
-            if counts:
+            if slide_keys:
                 raise ConversionError(
                     f"the study directory has no {datatype} clinical file to merge the WSI "
                     f"slide counts into; add one that lists "
@@ -858,7 +884,7 @@ def _convert_into(staging, data_path, study_id, base_url, study_dir):
         (staging / meta_path.name).write_bytes(meta_path.read_bytes())
         files.append(meta_path.name)
         write_text(clinical_data.name, merge_clinical_counts(
-            clinical_data, attributes, key_columns, counts))
+            clinical_data, attributes, key_columns, counts, slide_keys))
     return files
 
 

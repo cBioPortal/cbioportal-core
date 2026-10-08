@@ -206,35 +206,91 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertEqual(
             [['PATIENT_ID', 'SAMPLE_ID', 'WSI_SAMPLE_SLIDE_COUNT', 'WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT',
               'WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', 'WSI-P1-S1', '2', '1', '1'],
+             ['WSI-P1', 'WSI-P1-S1', '1', '0', '1'],
              ['WSI-P1', 'WSI-P1-S2', '1', '0', '1'],
              ['WSI-P2', 'WSI-P2-S1', '1', '1', '0']],
             data_rows(self.out / 'data_clinical_sample_wsi_counts.txt'))
         self.assertEqual(
             [['PATIENT_ID', 'WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
               'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', '4', '1', '2'],
+             ['WSI-P1', '3', '0', '2'],
              ['WSI-P2', '1', '1', '0'],
-             ['WSI+P3', '1', '0', '0']],
+             ['WSI+P3', 'NA', 'NA', 'NA']],
             data_rows(self.out / 'data_clinical_patient_wsi_counts.txt'))
         header = (self.out / 'data_clinical_sample_wsi_counts.txt').read_text().splitlines()[:4]
         self.assertEqual(
-            ['#Patient Identifier\tSample Identifier\tWSI Slides per Sample\t'
-             'WSI Slides per Sample, Part-matched\tWSI Slides per Sample, Block-matched',
-             '#Patient identifier\tSample identifier\tAssociated pathology slide count for the sample.\t'
-             'Associated pathology slides matched to a specimen part.\t'
-             'Associated pathology slides matched to a specimen block.',
+            ['#Patient Identifier\tSample Identifier\tWSI Viewable Slides per Sample\t'
+             'WSI Viewable Slides per Sample, Part-matched\t'
+             'WSI Viewable Slides per Sample, Block-matched',
+             '#Patient identifier\tSample identifier\t'
+             'Pathology slides the slide viewer can open, for the sample.\t'
+             'Pathology slides the slide viewer can open, for the sample, matched to a specimen part.\t'
+             'Pathology slides the slide viewer can open, for the sample, matched to a specimen block.',
              '#STRING\tSTRING\tNUMBER\tNUMBER\tNUMBER',
              '#1\t1\t1\t1\t1'], header)
         header = (self.out / 'data_clinical_patient_wsi_counts.txt').read_text().splitlines()[:4]
         self.assertEqual(
-            ['#Patient Identifier\tWSI Slides per Patient\tWSI Slides per Patient, Part-matched\t'
-             'WSI Slides per Patient, Block-matched',
-             '#Patient identifier\tAssociated pathology slide count for the patient.\t'
-             'Associated pathology slides matched to a specimen part for the patient.\t'
-             'Associated pathology slides matched to a specimen block for the patient.',
+            ['#Patient Identifier\tWSI Viewable Slides per Patient\t'
+             'WSI Viewable Slides per Patient, Part-matched\t'
+             'WSI Viewable Slides per Patient, Block-matched',
+             '#Patient identifier\t'
+             'Pathology slides the slide viewer can open, for the patient.\t'
+             'Pathology slides the slide viewer can open, for the patient, matched to a specimen part.\t'
+             'Pathology slides the slide viewer can open, for the patient, matched to a specimen block.',
              '#STRING\tNUMBER\tNUMBER\tNUMBER',
              '#1\t1\t1\t1'], header)
+
+    def test_only_viewable_slides_are_counted(self):
+        can_serve = converter.COLUMNS.index('CAN_SERVE_TILES')
+        sealed = converter.COLUMNS.index('SEALED_SOURCE')
+        only_s2_slide = 'f9bce50b1498c94fa0fa6cce809f64f2'  # the only slide of WSI-P1-S2
+        rows = self.fixture_rows()
+        for index, row in enumerate(rows):
+            fields = row.split('\t')
+            if fields[SLIDE_KEY] == only_s2_slide:
+                fields[can_serve] = 'FALSE'
+                fields[sealed] = ''
+                rows[index] = '\t'.join(fields)
+        self.convert(meta=self.write_legacy(rows))
+        # The fixture's non-viewable slide and WSI-P1-S2's only slide are not counted. WSI-P1-S2 and
+        # WSI+P3, whose only slides are non-viewable, get no count: NA, which the
+        # importer stores as no value, so the row only keeps the entity defined.
+        self.assertEqual(
+            [['WSI-P1', 'WSI-P1-S1', '1', '0', '1'],
+             ['WSI-P1', 'WSI-P1-S2', 'NA', 'NA', 'NA'],
+             ['WSI-P2', 'WSI-P2-S1', '1', '1', '0']],
+            data_rows(self.out / 'data_clinical_sample_wsi_counts.txt')[1:])
+        self.assertEqual(
+            [['WSI-P1', '2', '0', '1'],
+             ['WSI-P2', '1', '1', '0'],
+             ['WSI+P3', 'NA', 'NA', 'NA']],
+            data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[1:])
+        by_sample, by_patient = converter.count_slides(
+            converter.parse_slides(converter.iter_rows(self.write_legacy(rows).parent / 'data_wsi.txt')))
+        self.assertEqual({('WSI-P1', 'WSI-P1-S1'): [1, 0, 1], ('WSI-P2', 'WSI-P2-S1'): [1, 1, 0]},
+                         by_sample)
+        self.assertEqual({'WSI-P1': [2, 0, 1], 'WSI-P2': [1, 1, 0]}, by_patient)
+        # the non-viewable slides are still converted to resources
+        samples = rows_by_slide(self.out / 'data_resource_sample.txt')
+        self.assertIn('slide-3', samples)
+
+    def test_entities_without_viewable_slides_get_no_counts(self):
+        can_serve = converter.COLUMNS.index('CAN_SERVE_TILES')
+        rows = [row for row in self.fixture_rows() if row.split('\t')[can_serve] == 'FALSE']
+        self.assertEqual(2, len(rows))  # IMG-2 (WSI-P1-S1) and IMG-6 (WSI+P3, unmatched)
+        self.convert(meta=self.write_legacy(rows))
+        self.assertEqual([['WSI-P1', 'WSI-P1-S1', 'NA', 'NA', 'NA']],
+                         data_rows(self.out / 'data_clinical_sample_wsi_counts.txt')[1:])
+        self.assertEqual([['WSI-P1', 'NA', 'NA', 'NA'], ['WSI+P3', 'NA', 'NA', 'NA']],
+                         data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[1:])
+
+    def test_merge_requires_entities_with_only_non_viewable_slides(self):
+        # WSI+P3 has no counts, but its slide is still a resource, so the
+        # clinical file must still list it; its count columns are NA.
+        study = self.copy_study()
+        self.convert(study_dir=study)
+        patients = {row[0]: row[-3:] for row in data_rows(self.out / 'data_clinical_patients.txt')}
+        self.assertEqual(['NA', 'NA', 'NA'], patients['WSI+P3'])
 
     def test_only_pairs_with_rows_are_written(self):
         match_level = converter.COLUMNS.index('MATCH_LEVEL')
@@ -408,7 +464,7 @@ class ClinicalMergeTestCase(ConverterTestCase):
         self.assertEqual(
             [['PATIENT_ID', 'SAMPLE_ID', 'CANCER_TYPE', 'TUMOR_PURITY', 'WSI_SAMPLE_SLIDE_COUNT',
               'WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT', 'WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', 'WSI-P1-S1', 'Breast Cancer', '0.45', '2', '1', '1'],
+             ['WSI-P1', 'WSI-P1-S1', 'Breast Cancer', '0.45', '1', '0', '1'],
              ['WSI-P1', 'WSI-P1-S2', 'Breast Cancer', 'NA', '1', '0', '1'],
              ['WSI-P2', 'WSI-P2-S1', 'Breast Cancer', '0.8', '1', '1', '0'],
              ['WSI+P3', 'WSI+P3-S1', 'Breast Cancer', '', 'NA', 'NA', 'NA'],
@@ -417,18 +473,18 @@ class ClinicalMergeTestCase(ConverterTestCase):
         patients = data_rows(self.out / 'data_clinical_patients.txt')
         self.assertEqual(['WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
                           'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'], patients[0][-3:])
-        self.assertEqual({'WSI-P1': ['4', '1', '2'], 'WSI-P2': ['1', '1', '0'],
-                          'WSI+P3': ['1', '0', '0'], 'WSI-P4': ['NA', 'NA', 'NA']},
+        self.assertEqual({'WSI-P1': ['3', '0', '2'], 'WSI-P2': ['1', '1', '0'],
+                          'WSI+P3': ['NA', 'NA', 'NA'], 'WSI-P4': ['NA', 'NA', 'NA']},
                          {row[0]: row[-3:] for row in patients[1:]})
         header = (self.out / 'data_clinical_samples.txt').read_text().splitlines()[:4]
         self.assertEqual(
             ['#Patient Identifier\tSample Identifier\tCancer Type\tTumor Purity\t'
-             'WSI Slides per Sample\tWSI Slides per Sample, Part-matched\t'
-             'WSI Slides per Sample, Block-matched',
+             'WSI Viewable Slides per Sample\tWSI Viewable Slides per Sample, Part-matched\t'
+             'WSI Viewable Slides per Sample, Block-matched',
              '#Patient identifier\tSample identifier\tCancer type\tEstimated tumor purity\t'
-             'Associated pathology slide count for the sample.\t'
-             'Associated pathology slides matched to a specimen part.\t'
-             'Associated pathology slides matched to a specimen block.',
+             'Pathology slides the slide viewer can open, for the sample.\t'
+             'Pathology slides the slide viewer can open, for the sample, matched to a specimen part.\t'
+             'Pathology slides the slide viewer can open, for the sample, matched to a specimen block.',
              '#STRING\tSTRING\tSTRING\tNUMBER\tNUMBER\tNUMBER\tNUMBER',
              '#1\t1\t1\t1\t1\t1\t1'], header)
 
@@ -709,16 +765,17 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
 
     def test_each_slide_key_counts_once(self):
         rows = self.fixture_rows()
-        # another slide on the first row's sample: a new slide key adds one to its counts
+        # another viewable, block-matched slide on the first row's sample: a new slide key adds
+        # one to its counts (only viewable slides are counted)
         extra = rows[0].split('\t')
         extra[SLIDE_KEY] = 'e' * 32
         self.convert(meta=self.write_legacy(rows + ['\t'.join(extra)]))
         samples = {tuple(row[:2]): row[2:] for row in data_rows(
             self.out / 'data_clinical_sample_wsi_counts.txt')[1:]}
-        self.assertEqual(['3', '1', '2'], samples[('WSI-P1', 'WSI-P1-S1')])
+        self.assertEqual(['2', '0', '2'], samples[('WSI-P1', 'WSI-P1-S1')])
         patients = {row[0]: row[1:] for row in data_rows(
             self.out / 'data_clinical_patient_wsi_counts.txt')[1:]}
-        self.assertEqual(['5', '1', '3'], patients['WSI-P1'])
+        self.assertEqual(['4', '0', '3'], patients['WSI-P1'])
         # the same slide key again is one slide listed twice, which is rejected
         shutil.rmtree(self.out)
         message = self.conversion_error(self.write_legacy(rows + rows[:1]))

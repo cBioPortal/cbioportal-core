@@ -25,14 +25,15 @@ only format v4 (30 columns, ending with the opaque `SLIDE_KEY` and
 that still have `IMAGE_ID`, `SOURCE_URL` or `THUMBNAIL_URL` columns (format v3
 and older) are rejected. Given
 `--study-dir`, it also merges the six `WSI_*` slide-count clinical
-attributes into copies of the study's clinical sample and patient files. Viewer
-links and public metadata identify slides only by `slide_key`. The pathology
-image ID and the object URIs that embed it are never stored in the study files
-or the database: the upstream pipeline seals them into `SEALED_SOURCE`, which
-only the tile server can open, and servable slides carry it in the private
-`wsi_serving` metadata. The data provider is
-responsible for de-identifying free-text values before export. WSI data is
-stored only as resource data; core has no native WSI tables or importer.
+attributes, which count only slides the viewer can open (`CAN_SERVE_TILES`),
+into copies of the study's clinical sample and patient files. Viewer links and
+public metadata identify slides only by `slide_key`. The pathology image ID and
+the object URIs that embed it are never stored in the study files or the
+database: the upstream pipeline seals them into `SEALED_SOURCE`, which only the
+tile server can open, and servable slides carry it in the private `wsi_serving`
+metadata. The data provider is responsible for de-identifying free-text values
+before export. WSI data is stored only as resource data; core has no native WSI
+tables or importer.
 Thumbnail artifacts and slide metadata must still be prepared by an upstream
 artifact-generation/export pipeline; core does not generate thumbnails or write
 the object store. Pathology procedure events shown on the patient timeline are

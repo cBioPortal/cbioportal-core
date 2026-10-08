@@ -203,8 +203,8 @@ Without `--study-dir`, it writes the counts as standalone pairs instead:
 
 | Files | Content |
 | --- | --- |
-| `meta_clinical_sample_wsi_counts.txt`, `data_clinical_sample_wsi_counts.txt` | sample slide counts (only when a slide is matched) |
-| `meta_clinical_patient_wsi_counts.txt`, `data_clinical_patient_wsi_counts.txt` | patient slide counts |
+| `meta_clinical_sample_wsi_counts.txt`, `data_clinical_sample_wsi_counts.txt` | sample viewable-slide counts (only when a slide is matched) |
+| `meta_clinical_patient_wsi_counts.txt`, `data_clinical_patient_wsi_counts.txt` | patient viewable-slide counts |
 
 A study may contain only one clinical sample file and one clinical patient
 file, so the standalone pairs are only for studies without clinical files of
@@ -216,7 +216,7 @@ With `--study-dir`, the converter fails without writing anything if:
 - a sample or patient with slides is missing from the clinical sample or
   patient file, or a sample belongs to a different patient there;
 - the study has more than one clinical sample or clinical patient meta file;
-- the study has no clinical patient file (every slide needs a patient count),
+- the study has no clinical patient file (every slide's patient must be listed),
   or no clinical sample file while some slide is matched to a sample;
 - a clinical file to merge lacks the four `#` attribute header rows;
 - the study already has a resource definition, sample resource, or patient
@@ -229,23 +229,27 @@ The count files carry the attributes the native importer used to write, as
 
 | Attribute | Display name |
 | --- | --- |
-| `WSI_SAMPLE_SLIDE_COUNT` | WSI Slides per Sample |
-| `WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT` | WSI Slides per Sample, Part-matched |
-| `WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT` | WSI Slides per Sample, Block-matched |
-| `WSI_PATIENT_SLIDE_COUNT` | WSI Slides per Patient |
-| `WSI_PATIENT_PART_MATCHED_SLIDE_COUNT` | WSI Slides per Patient, Part-matched |
-| `WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT` | WSI Slides per Patient, Block-matched |
+| `WSI_SAMPLE_SLIDE_COUNT` | WSI Viewable Slides per Sample |
+| `WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Sample, Part-matched |
+| `WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Sample, Block-matched |
+| `WSI_PATIENT_SLIDE_COUNT` | WSI Viewable Slides per Patient |
+| `WSI_PATIENT_PART_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Patient, Part-matched |
+| `WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Patient, Block-matched |
 
-Each slide (`SLIDE_KEY`, unique within the study) counts once. Sample counts cover matched slides only, so only
-samples with a matched slide get values. Patient counts include unmatched
-slides, so every patient with a slide gets values. Part and block counts
-follow `MATCH_LEVEL`, and zero is written for an entity that has values. In a
-merged clinical file, the rows of samples or patients without slides get `NA`,
-matching the native importer, which wrote no value for them. The merge appends
+Only viewable slides, those with `CAN_SERVE_TILES=TRUE` that the slide viewer
+can open, are counted, and each slide (`SLIDE_KEY`, unique within the study)
+counts once. Sample counts cover matched slides only, so only samples with a
+viewable matched slide get values. Patient counts include unmatched slides, so
+every patient with a viewable slide gets values. A sample or patient whose
+slides are all non-viewable gets no values. Part and block counts follow
+`MATCH_LEVEL`, and zero is written for an entity that has values. In a merged
+clinical file, the rows of samples or patients without a viewable slide get
+`NA`. The standalone count files list every sample or patient with a slide,
+giving `NA` to those without a viewable slide, so the entities their resource
+rows refer to stay defined; `NA` is imported as no value. The merge appends
 the six columns and their four header rows (display name, description,
 `NUMBER`, priority `1`); every existing line, value and line ending is kept,
-including comment and blank lines. Slides that
-cannot serve tiles are counted. Study View uses the patient-level values so
+including comment and blank lines. Study View uses the patient-level values so
 pagination cannot produce partial totals. Because the counts are ordinary
 clinical data, re-importing corrected files replaces them.
 

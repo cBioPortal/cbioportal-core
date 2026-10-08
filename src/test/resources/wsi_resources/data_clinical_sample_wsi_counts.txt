@@ -1,8 +1,8 @@
-#Patient Identifier	Sample Identifier	WSI Slides per Sample	WSI Slides per Sample, Part-matched	WSI Slides per Sample, Block-matched
-#Patient identifier	Sample identifier	Associated pathology slide count for the sample.	Associated pathology slides matched to a specimen part.	Associated pathology slides matched to a specimen block.
+#Patient Identifier	Sample Identifier	WSI Viewable Slides per Sample	WSI Viewable Slides per Sample, Part-matched	WSI Viewable Slides per Sample, Block-matched
+#Patient identifier	Sample identifier	Pathology slides the slide viewer can open, for the sample.	Pathology slides the slide viewer can open, for the sample, matched to a specimen part.	Pathology slides the slide viewer can open, for the sample, matched to a specimen block.
 #STRING	STRING	NUMBER	NUMBER	NUMBER
 #1	1	1	1	1
 PATIENT_ID	SAMPLE_ID	WSI_SAMPLE_SLIDE_COUNT	WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT	WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT
-WSI-P1	WSI-P1-S1	2	1	1
+WSI-P1	WSI-P1-S1	1	0	1
 WSI-P1	WSI-P1-S2	1	0	1
 WSI-P2	WSI-P2-S1	1	1	0
