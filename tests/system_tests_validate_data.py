@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-'''
-Copyright (c) 2016 The Hyve B.V.
-This code is licensed under the GNU Affero General Public License (AGPL),
-version 3, or (at your option) any later version.
-
-Modifications copyright (c) 2025 SE4BIO.
-'''
+#
+# Copyright (c) 2016 The Hyve B.V.
+# Modifications copyright (c) 2025 SE4BIO.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 
 import unittest
 import os
