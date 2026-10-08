@@ -541,17 +541,18 @@ public final class DaoCancerStudy {
             ClickHouseBulkDeleter.getBulkDeleter("sample_list_list", "list_id").addIds(sampleListIds);
 
             ClickHouseBulkDeleter.getBulkDeleter("clinical_sample", "internal_id").addIds(sampleIds);
-            ClickHouseBulkDeleter.getBulkDeleter("resource_sample", "internal_id").addIds(sampleIds);
 
             ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(sampleIds);
             ClickHouseBulkDeleter.getBulkDeleter("clinical_patient", "internal_id").addIds(patientIds);
-            ClickHouseBulkDeleter.getBulkDeleter("resource_patient", "internal_id").addIds(patientIds);
 
             ClickHouseBulkDeleter.flushAll();
 
             deleteByStudyId("DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
-            deleteByStudyId("DELETE FROM resource_study WHERE internal_id=?", internalCancerStudyId);
+            // One statement for every resource row the study owns, whatever entity it hangs off:
+            // resource_data carries cancer_study_id, where the three tables it replaced had to be
+            // reached through the sample's and patient's internal ids and the study's own id.
+            deleteByStudyId("DELETE FROM resource_data WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM cancer_study_tags WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM copy_number_seg WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM copy_number_seg_file WHERE cancer_study_id=?", internalCancerStudyId);
