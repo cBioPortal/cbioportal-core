@@ -1,2 +1,2 @@
-RESOURCE_ID	URL
-STUDY_SPONSORS	http://url-to-study-sponsors
+RESOURCE_ID	URL	DISPLAY_NAME	TYPE	METADATA
+STUDY_SPONSORS	https://example.com/sponsors.pdf	Study Sponsors	PDF	{"pages": 3, "year": 2024}

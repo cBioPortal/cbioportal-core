@@ -3881,10 +3881,27 @@ class ResourceValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
 
+            if col_name == 'METADATA' and value and value.strip().lower() not in self.NULL_VALUES:
+                try:
+                    parsed = json.loads(value)
+                    if not isinstance(parsed, dict):
+                        self.logger.error(
+                            'METADATA must be a JSON object (key-value map), not an array or scalar',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value[:80]})
+                except ValueError:
+                    self.logger.error(
+                        'METADATA value is not valid JSON',
+                        extra={'line_number': self.line_number,
+                               'column_number': col_index + 1,
+                               'cause': value[:80]})
+
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
 
     REQUIRED_HEADERS = ['SAMPLE_ID', 'PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a SampleResourceValidator with the given parameters."""
@@ -3948,6 +3965,7 @@ class SampleResourceValidator(ResourceValidator):
 class PatientResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a PatientResourceValidator with the given parameters."""
@@ -4000,6 +4018,7 @@ class PatientResourceValidator(ResourceValidator):
 class StudyResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a StudyResourceValidator with the given parameters."""
