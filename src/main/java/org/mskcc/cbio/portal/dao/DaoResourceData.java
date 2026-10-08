@@ -1,7 +1,10 @@
 package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * Data Access Object for the unified {@code resource_data} table.
@@ -9,6 +12,16 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Legacy split tables (resource_sample, resource_patient, resource_study) are no
  * longer written to by the importer.  Existing data in those tables can be migrated
  * to resource_data via the migration.sql script bundled with the backend.</p>
+ *
+ * <p>{@code resource_data} rows are never updated in place: ClickHouse's MergeTree
+ * engine makes single-row updates expensive, and the importer has no way to know
+ * which existing row (if any) corresponds to a given input line. Instead, a re-import
+ * of a resource file for a study first deletes any existing rows for the resource IDs
+ * present in that file (see {@link #deleteResourceData(int, Set)}), then re-inserts
+ * everything from the file. This mirrors the delete-then-insert pattern used elsewhere
+ * in the importer for reloadable data types, and ensures curator corrections to an
+ * existing file (e.g. filling in previously-empty metadata) are reflected instead of
+ * silently accumulating as duplicate rows.</p>
  */
 public final class DaoResourceData {
 
@@ -95,6 +108,55 @@ public final class DaoResourceData {
         } finally {
             JdbcUtil.closeAll(DaoResourceData.class, con, pstmt, rs);
         }
+    }
+
+    /**
+     * Deletes all existing {@code resource_data} rows for the given study that belong to any
+     * of the given resource IDs. Intended to be called before re-inserting a resource file for
+     * that study/resource-ID set, so a re-import replaces stale rows instead of duplicating them.
+     *
+     * @param cancerStudyId internal cancer-study ID
+     * @param resourceIds   resource IDs present in the file being (re-)imported; a no-op if empty
+     */
+    public static void deleteResourceData(int cancerStudyId, Set<String> resourceIds) throws DaoException {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            return;
+        }
+        Set<Long> idsToDelete = findResourceDataIds(cancerStudyId, resourceIds);
+        if (idsToDelete.isEmpty()) {
+            return;
+        }
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "RESOURCE_DATA_ID").addIds(idsToDelete);
+        ClickHouseBulkDeleter.flushAll();
+    }
+
+    private static Set<Long> findResourceDataIds(int cancerStudyId, Set<String> resourceIds) throws DaoException {
+        Set<Long> ids = new HashSet<>();
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoResourceData.class);
+            String placeholders = resourceIds.stream().map(id -> "?").collect(Collectors.joining(","));
+            pstmt = con.prepareStatement(
+                "SELECT `RESOURCE_DATA_ID` FROM `" + RESOURCE_DATA_TABLE + "` "
+                + "WHERE `CANCER_STUDY_ID` = ? AND `RESOURCE_ID` IN (" + placeholders + ")"
+            );
+            int paramIndex = 1;
+            pstmt.setInt(paramIndex++, cancerStudyId);
+            for (String resourceId : resourceIds) {
+                pstmt.setString(paramIndex++, resourceId);
+            }
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                ids.add(rs.getLong("RESOURCE_DATA_ID"));
+            }
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoResourceData.class, con, pstmt, rs);
+        }
+        return ids;
     }
 }
 

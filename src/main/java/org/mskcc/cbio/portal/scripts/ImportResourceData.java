@@ -51,6 +51,9 @@ public class ImportResourceData extends ConsoleRunnable {
     private boolean relaxed;
     private Set<String> patientIds = new HashSet<String>();
     private Map<String, ResourceDefinition> resourceDefinitionMap = new HashMap<>();
+    // Resource IDs encountered while reading the file, used to delete stale existing rows for
+    // this study/resource-ID combination before the new rows are flushed (see importData()).
+    private final Set<String> resourceIdsInFile = new HashSet<>();
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -60,10 +63,9 @@ public class ImportResourceData extends ConsoleRunnable {
     }
 
     public void importData() throws Exception {
-        // if bulkLoading is ever turned off,
-        // code has to be added to check whether
-        // a resource data update should be
-        // perform instead of an insert
+        // Resource data is delete-then-insert on re-import (see DaoResourceData javadoc):
+        // ClickHouse bulk-loads inserts, so this must run before the buffered inserts below are
+        // flushed.
         ClickHouseBulkLoader.bulkLoadOn();
 
         if (relaxed) {
@@ -104,6 +106,12 @@ public class ImportResourceData extends ConsoleRunnable {
         importData(buff, resources, headerIndexMap);
         buff.close();
 
+        // Delete any existing resource_data rows for the resource IDs seen in this file before
+        // flushing the newly-buffered inserts below, so a re-import (e.g. a curator's corrected
+        // file) replaces stale rows instead of accumulating duplicates. Safe to do here because
+        // ClickHouseBulkLoader only buffers inserts in memory until flushAll() is called next.
+        DaoResourceData.deleteResourceData(cancerStudy.getInternalId(), resourceIdsInFile);
+
         if (ClickHouseBulkLoader.isBulkLoad()) {
             ClickHouseBulkLoader.flushAll();
             ClickHouseBulkLoader.relaxedModeOff();
@@ -133,12 +141,17 @@ public class ImportResourceData extends ConsoleRunnable {
                 .map(resource -> resource.getResourceId())
                 .collect(Collectors.toSet());
 
+        int resourceIdIndex = findResourceIdColumn(headerIndexMap);
+
         while ((line = buff.readLine()) != null) {
             if (skipLine(line.trim())) {
                 continue;
             }
 
             String[] fieldValues = getFieldValues(line, headerIndexMap);
+            if (resourceIdIndex >= 0 && !MissingValues.has(fieldValues[resourceIdIndex])) {
+                resourceIdsInFile.add(fieldValues[resourceIdIndex]);
+            }
             addDatum(fieldValues, resources, resourceMap, headerIndexMap, patientResourceIdSet, sampleResourceIdSet, studyResourceIdSet);
         }
     }
