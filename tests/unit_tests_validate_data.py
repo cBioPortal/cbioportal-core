@@ -2286,6 +2286,29 @@ class GenePanelMatrixValidationTestCase(PostClinicalDataFileTestCase):
 
     """Test for validations in Gene Panel Matrix."""
 
+    def setUp(self):
+        super(GenePanelMatrixValidationTestCase, self).setUp()
+        self.original_study_meta_dictionary = validateData.study_meta_dictionary
+        self.original_sample_ids_panel_dict = validateData.sample_ids_panel_dict
+        validateData.study_meta_dictionary = {
+            'mutations': {
+                'genetic_alteration_type': 'MUTATION_EXTENDED',
+                'datatype': 'MAF',
+                'stable_id': 'mutations'
+            },
+            'gistic': {
+                'genetic_alteration_type': 'COPY_NUMBER_ALTERATION',
+                'datatype': 'DISCRETE',
+                'stable_id': 'gistic'
+            }
+        }
+        validateData.sample_ids_panel_dict = {}
+
+    def tearDown(self):
+        validateData.study_meta_dictionary = self.original_study_meta_dictionary
+        validateData.sample_ids_panel_dict = self.original_sample_ids_panel_dict
+        super(GenePanelMatrixValidationTestCase, self).tearDown()
+
     def test_duplicate_sample(self):
         """Test if duplicate samples are detected"""
         # set level according to this test case:
@@ -2295,6 +2318,24 @@ class GenePanelMatrixValidationTestCase(PostClinicalDataFileTestCase):
 
         self.assertEqual(1, len(record_list))
         self.assertIn("duplicated sample id.", record_list[0].getMessage().lower())
+
+    def test_sequenced_sample_cannot_have_na_mutation_panel(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_gene_matrix_sequenced_na.txt',
+                                    validateData.GenePanelMatrixValidator)
+
+        self.assertEqual(1, len(record_list))
+        self.assertIn("has na mutation gene panel", record_list[0].getMessage().lower())
+        self.assertEqual("TCGA-A1-A0SB-01", record_list[0].cause)
+
+    def test_sequenced_sample_must_exist_in_mutation_column(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_gene_matrix_missing_sequenced_sample.txt',
+                                    validateData.GenePanelMatrixValidator)
+
+        self.assertEqual(1, len(record_list))
+        self.assertIn("missing in the mutation column", record_list[0].getMessage().lower())
+        self.assertEqual("TCGA-A1-A0SB-01", record_list[0].cause)
 
 class StudyCompositionTestCase(LogBufferTestCase):
 
