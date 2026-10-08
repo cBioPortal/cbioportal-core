@@ -545,7 +545,7 @@ INSERT INTO authorities (`email`, `authority`) values ('Dhorak@yahoo.com','ROLE_
 INSERT INTO authorities (`email`, `authority`) values ('Dhorak@yahoo.com','ROLE_MANAGER');
 
 INSERT INTO `info` (`db_schema_version`, `geneset_version`)
-VALUES ('3.0.0', 'test_geneset_version');
+VALUES ('3.0.1', 'test_geneset_version');
 
 --geneset
 INSERT INTO geneset (`id`, `genetic_entity_id`, `external_id`, `name`, `description`, `ref_link`) VALUES (1, 1, 'HGNC:1100', 'BRCA1', 'Breast cancer type 1 susceptibility protein', 'https://www.ncbi.nlm.nih.gov/gene/672');
