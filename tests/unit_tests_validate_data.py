@@ -3509,13 +3509,12 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         content = content.replace('image/jpeg', 'image/webp')
         self.assertEqual([], self.validate_wsi_content(content))
         for name, value in (('PART_KEY', 'PART-2021-03-14'), ('BLOCK_KEY', 'BLOCK-MRN:123456'),
-                            ('PART_DESCRIPTION', 'Resected March 14, 2021'),
-                            ('TIMEPOINT_SOURCE', 'surgery 20210314')):
+                            ('PART_DESCRIPTION', 'Resected March 14, 2021')):
             self.assertEqual([], self.validate_wsi_content(self.with_cell(name, value)), name)
 
     def test_slide_key_is_required_lowercase_hex_and_unique(self):
         self.assertEqual('SLIDE_KEY', validateData.WsiValidator.EXPECTED_HEADERS[-1])
-        self.assertEqual(39, len(validateData.WsiValidator.EXPECTED_HEADERS))
+        self.assertEqual(32, len(validateData.WsiValidator.EXPECTED_HEADERS))
         records = self.validate_wsi_content(self.with_cell('SLIDE_KEY', ''))
         self.assertIn(('Required WSI value is blank', 'SLIDE_KEY'),
                       [(record.getMessage(), getattr(record, 'cause', None)) for record in records])
@@ -3529,6 +3528,28 @@ class WsiValidatorTestCase(PostClinicalDataFileTestCase):
         records = self.validate_wsi_content('\n'.join(lines + ['\t'.join(values)]) + '\n')
         self.assertEqual([('SLIDE_KEY must be unique within a study', 'SLIDE_KEY')],
                          [(record.getMessage(), getattr(record, 'cause', None)) for record in records])
+
+    def test_timing_columns_are_accepted_and_ignored(self):
+        """Older files carry seven slide-timing columns before SLIDE_KEY; they are not checked."""
+        timing = validateData.WsiValidator.IGNORED_TIMING_HEADERS
+        lines = Path('test_data/data_wsi_valid.txt').read_text().splitlines()
+
+        def with_timing(line, values):
+            fields = line.split('\t')
+            return '\t'.join(fields[:-1] + values + fields[-1:])
+
+        # values the removed timing checks rejected, and blanks where they required values
+        values = ['not-a-day', 'BOGUS', '', '', 'reason', 'other_coordinates', 'surgery 20210314']
+        content = [with_timing(line, ['#' + name for name in timing]) for line in lines[:4]]
+        content.append(with_timing(lines[4], list(timing)))
+        content += [with_timing(line, values) for line in lines[5:]]
+        self.assertEqual([], self.validate_wsi_content('\n'.join(content) + '\n'))
+        # the timing columns must keep their place before SLIDE_KEY
+        header = lines[4].split('\t') + list(timing)
+        content = lines[:4] + ['\t'.join(header)] + [line + '\t' * len(timing) for line in lines[5:]]
+        records = self.validate_wsi_content('\n'.join(content) + '\n')
+        self.assertEqual(['Invalid WSI column header or column order'],
+                         [record.getMessage() for record in records])
 
     def test_duplicate_image_id_and_bad_urls_are_not_echoed(self):
         lines = Path('test_data/data_wsi_valid.txt').read_text().splitlines()
@@ -3587,10 +3608,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             'slide_key': self.slide_key(image_id), 'part_key': 'PART-A', 'block_key': 'BLOCK-A1',
             'match_level': 'BLOCK', 'specimen_key': 'SPEC-1', 'is_hne': True, 'is_ihc': False,
             'slide_type': 'H&E',
-            'can_serve_tiles': True, 'timeline_start_days': -3,
-            'timeline_date_status': 'AVAILABLE', 'timeline_date_kind': 'RECORDED',
-            'timeline_date_source': 'PATHOLOGY_REPORT',
-            'timeline_coordinate_system': 'patient_first_tumor_sequencing_day_zero',
+            'can_serve_tiles': True,
             'wsi_serving': {
                 'source_url': 'https://slides.example/IMG-1.svs',
                 'tile_metadata_json': self.TILE_METADATA,
@@ -3672,9 +3690,9 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
                                         [self.sample_row(self.metadata(is_hne='TRUE'))])
         self.assertEqual([('WHOLE_SLIDE_IMAGE metadata value must be a JSON boolean', 'is_hne')], errors)
         errors = self.validate_resource(validateData.SampleResourceValidator,
-                                        [self.sample_row(self.metadata(timeline_start_days='-3'))])
+                                        [self.sample_row(self.metadata(file_size_bytes='3'))])
         self.assertEqual([('WHOLE_SLIDE_IMAGE metadata value must be a JSON integer',
-                           'timeline_start_days')], errors)
+                           'file_size_bytes')], errors)
         errors = self.validate_resource(validateData.SampleResourceValidator,
                                         [self.sample_row(self.metadata(part_number=1))])
         self.assertEqual([('WHOLE_SLIDE_IMAGE metadata value must be a JSON string', 'part_number')], errors)
@@ -3699,14 +3717,12 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             self.metadata(slide_type='Unknown', is_hne=False))])
         self.assertEqual([], errors)
 
-    def test_consistent_timing(self):
-        errors = self.validate_resource(validateData.SampleResourceValidator,
-                                        [self.sample_row(self.metadata(timeline_start_days=None))])
-        self.assertIn(('WSI AVAILABLE timing is inconsistent', None), errors)
+    def test_timing_metadata_is_not_checked(self):
+        # slide timing is not part of the WSI metadata contract yet
         errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row(
-            self.metadata(timeline_date_status='MISSING_PROCEDURE_DATE'))])
-        self.assertIn(('WSI non-AVAILABLE timing cannot have an offset', None), errors)
-        self.assertIn(('WSI missing procedure dates must be UNDATED', None), errors)
+            self.metadata(timeline_start_days='-3', timeline_date_status='MISSING_PROCEDURE_DATE',
+                          timeline_date_kind='BOGUS'))])
+        self.assertEqual([], errors)
 
     def test_image_id_unique_across_resource_files(self):
         errors = self.validate_resource(validateData.SampleResourceValidator,

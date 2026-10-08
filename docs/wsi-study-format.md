@@ -56,11 +56,9 @@ These public keys may be returned to the browser:
 - strings: `slide_key`, `reference_sample_id`, `part_key`, `part_number`,
   `part_type`, `part_description`, `subspecialty`, `block_key`,
   `block_number`, `block_label`, `match_level`, `specimen_key`, `stain_name`,
-  `stain_group`, `magnification`, `slide_type`, `timeline_date_status`,
-  `timeline_date_kind`, `timeline_date_source`, `timeline_date_reason`,
-  `timeline_coordinate_system`, `timepoint_source`;
+  `stain_group`, `magnification`, `slide_type`;
 - JSON booleans: `is_hne`, `is_ihc`, `can_serve_tiles`;
-- JSON integers: `file_size_bytes`, `timeline_start_days`;
+- JSON integers: `file_size_bytes`;
 
 and one private key:
 
@@ -83,7 +81,7 @@ as absent values.
 
 For every `WHOLE_SLIDE_IMAGE` row, `validateData.py` applies the same checks
 as the legacy WSI validator described under [Legacy format](#legacy-format-v3):
-required hierarchy keys, typed values, consistent timing, `match_level`
+required hierarchy keys, typed values, `match_level`
 agreement with the file type (sample rows are matched, patient rows are
 unmatched), `slide_type` being `H&E`, `IHC`, `Other`, or `Unknown` with
 consistent stain flags (never both `is_hne` and `is_ihc`; `H&E` requires
@@ -119,10 +117,9 @@ to the slide type, and omitting missing parts).
 
 `scripts/importer/convertWsiToResources.py` converts a legacy pair offline. It
 never contacts cBioPortal, a database, or the artifact store. It accepts only
-[format v3](#legacy-format-v3), which carries the slide timing and the
-`SLIDE_KEY` on every row. Format v2 (which took the slide timing from the
-`IMAGE_IDS` column of the pathology timeline) is no longer converted; re-export
-such studies as format v3.
+[format v3](#legacy-format-v3), which carries the `SLIDE_KEY` on every row.
+Format v2 (without `SLIDE_KEY`) is no longer converted; re-export such studies
+as format v3.
 
 ```bash
 python scripts/importer/convertWsiToResources.py \
@@ -145,9 +142,8 @@ python scripts/importer/convertWsiToResources.py \
 Rows are parsed like the retired native importer: leading `#` rows are
 skipped, the header must match format v3 exactly, `MATCH_LEVEL` must agree
 with `SAMPLE_ID`, `SLIDE_TYPE` and the stain flags must satisfy the native
-`wsi_slide` constraints above, an `UNMATCHED` reference sample is dropped, a missing
-`TIMEPOINT_SOURCE` is derived from the timing provenance, and serving fields
-are dropped when `CAN_SERVE_TILES=FALSE`. `SLIDE_KEY` is required, must be 32
+`wsi_slide` constraints above, an `UNMATCHED` reference sample is dropped, and
+serving fields are dropped when `CAN_SERVE_TILES=FALSE`. `SLIDE_KEY` is required, must be 32
 lowercase hex characters and unique, and `IMAGE_ID` must be unique. Error
 messages name the column, never the value. Free-text cells are copied as
 given; de-identifying them is the data provider's responsibility. Run
@@ -236,8 +232,7 @@ clinical data, re-importing corrected files replaces them.
 
 The converter does not produce timeline data. Pathology procedure events stay
 in the study's existing clinical timeline files, which are imported unchanged.
-The slide timing fields in `METADATA` drive the WSI hierarchy (including the
-undated section) and do not create clinical events.
+Slides carry no timing in `METADATA`.
 
 `PATHOLOGY SLIDES` timeline events reach the browser through the clinical
 events API, so they must not carry real slide identifiers: `validateData.py`
@@ -266,18 +261,15 @@ pair. The data file follows the normal cBioPortal five-row preamble: four
 comment rows, followed by this exact header:
 
 ```text
-PATIENT_ID  REFERENCE_SAMPLE_ID  SAMPLE_ID  IMAGE_ID  PART_KEY  PART_NUMBER  PART_DESIGNATOR  PART_TYPE  PART_DESCRIPTION  SUBSPECIALTY  PATH_DX_TITLE  BLOCK_KEY  BLOCK_NUMBER  BLOCK_LABEL  MATCH_LEVEL  SPECIMEN_KEY  STAIN_NAME  STAIN_GROUP  IS_HNE  IS_IHC  MAGNIFICATION  FILE_SIZE_BYTES  BARCODE  SLIDE_TYPE  CAN_SERVE_TILES  SOURCE_URL  TILE_METADATA_JSON  THUMBNAIL_URL  THUMBNAIL_WIDTH  THUMBNAIL_HEIGHT  THUMBNAIL_CONTENT_TYPE  TIMELINE_START_DAYS  TIMELINE_DATE_STATUS  TIMELINE_DATE_KIND  TIMELINE_DATE_SOURCE  TIMELINE_DATE_REASON  TIMELINE_COORDINATE_SYSTEM  TIMEPOINT_SOURCE  SLIDE_KEY
+PATIENT_ID  REFERENCE_SAMPLE_ID  SAMPLE_ID  IMAGE_ID  PART_KEY  PART_NUMBER  PART_DESIGNATOR  PART_TYPE  PART_DESCRIPTION  SUBSPECIALTY  PATH_DX_TITLE  BLOCK_KEY  BLOCK_NUMBER  BLOCK_LABEL  MATCH_LEVEL  SPECIMEN_KEY  STAIN_NAME  STAIN_GROUP  IS_HNE  IS_IHC  MAGNIFICATION  FILE_SIZE_BYTES  BARCODE  SLIDE_TYPE  CAN_SERVE_TILES  SOURCE_URL  TILE_METADATA_JSON  THUMBNAIL_URL  THUMBNAIL_WIDTH  THUMBNAIL_HEIGHT  THUMBNAIL_CONTENT_TYPE  SLIDE_KEY
 ```
 
-Values are tab-delimited; a row has 39 columns. `SLIDE_KEY` (last) is the
-opaque slide key described under [Resource files](#resource-files). Format v3 carries the de-identified relative timing
-contract on every row. `TIMELINE_START_DAYS` is relative to the patient's first
-tumor-sequencing sample; day zero is valid. `TIMELINE_DATE_KIND` is `RECORDED`,
-`ESTIMATED`, or `UNDATED`, and `TIMELINE_DATE_SOURCE` and
-`TIMELINE_DATE_REASON` preserve provenance. The coordinate system must be
-`patient_first_tumor_sequencing_day_zero`. Missing procedure dates remain in the
-WSI hierarchy and are represented by the adjacent undated UI section; they are
-not converted into dated clinical events.
+Values are tab-delimited; a row has 32 columns. `SLIDE_KEY` (last) is the
+opaque slide key described under [Resource files](#resource-files). Files that
+still carry the seven slide-timing columns (`TIMELINE_START_DAYS` through
+`TIMEPOINT_SOURCE`) between `THUMBNAIL_CONTENT_TYPE` and `SLIDE_KEY` (39
+columns) are accepted, but those columns are ignored for now: they are neither
+required, validated nor converted.
 Required values are `PATIENT_ID`, `IMAGE_ID`,
 `PART_KEY`, `BLOCK_KEY`, `MATCH_LEVEL`, `SPECIMEN_KEY`, `IS_HNE`, `IS_IHC`,
 `CAN_SERVE_TILES` and `SLIDE_KEY`. `MATCH_LEVEL` is `BLOCK`, `PART`, or `UNMATCHED`;
@@ -319,7 +311,7 @@ Re-importing a resource file replaces the study's rows for the resource IDs in
 that file, and study deletion removes them.
 
 The native WSI tables (`wsi_patient`, `wsi_part`, `wsi_block`, `wsi_slide`,
-`wsi_slide_placement`, `wsi_slide_timing`) and the `ImportWsiData` Java entry
+`wsi_slide_placement`) and the `ImportWsiData` Java entry
 point are deprecated but retained; nothing in the resource import path writes
 them. Study deletion still removes any rows a study has in them. Retiring the
 tables is a separate change.

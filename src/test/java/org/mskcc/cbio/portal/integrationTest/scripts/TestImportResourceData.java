@@ -86,10 +86,13 @@ public class TestImportResourceData extends IntegrationTestBase {
         for (String removed : List.of("image_id", "barcode", "part_designator", "path_dx_title")) {
             assertFalse(removed, metadata.has(removed));
         }
+        // slide timing is not part of the foundation metadata
+        for (String timing : List.of("timeline_start_days", "timeline_date_status", "timepoint_source")) {
+            assertFalse(timing, metadata.has(timing));
+        }
         assertTrue(metadata.get("is_hne").isBoolean());
         assertTrue(metadata.get("is_hne").booleanValue());
         assertFalse(metadata.get("is_ihc").booleanValue());
-        assertEquals(0, metadata.get("timeline_start_days").intValue());
         assertEquals(716956681L, metadata.get("file_size_bytes").longValue());
         assertEquals("1", metadata.get("part_number").textValue());
         assertEquals("Left \"upper\" lobe \\ wedge", metadata.get("part_description").textValue());
@@ -100,14 +103,12 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertTrue(serving.at("/tile_metadata_json/vendor/scanner/calibrated").booleanValue());
 
         JsonNode unservable = JSON.readTree(rows.get("IMG-2").metadata());
-        assertEquals(-17, unservable.get("timeline_start_days").intValue());
         assertFalse(unservable.get("can_serve_tiles").booleanValue());
         assertEquals(1, unservable.get("wsi_serving").size());
         assertEquals("IMG-2", unservable.at("/wsi_serving/image_id").textValue());
 
         ResourceRow encoded = rows.get("IMG 7/A&B");
         assertEquals("WSI-P2-S1", encoded.sampleId());
-        assertEquals(-365, JSON.readTree(encoded.metadata()).get("timeline_start_days").intValue());
 
         ResourceRow unmatched = rows.get("IMG-6");
         assertEquals("WSI_PATIENT", unmatched.resourceId());

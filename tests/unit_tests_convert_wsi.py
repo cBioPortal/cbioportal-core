@@ -160,7 +160,6 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertIs(True, first['is_hne'])
         self.assertIs(False, first['is_ihc'])
         self.assertIs(True, first['can_serve_tiles'])
-        self.assertEqual(0, first['timeline_start_days'])
         self.assertEqual(716956681, first['file_size_bytes'])
         self.assertEqual('1', first['part_number'])
         self.assertEqual('Left "upper" lobe \\ wedge', first['part_description'])
@@ -168,19 +167,14 @@ class ConvertedOutputTestCase(ConverterTestCase):
         for removed in ('image_id', 'barcode', 'part_designator', 'path_dx_title'):
             self.assertNotIn(removed, first)
         self.assertEqual('WSI-P1-S1', first['reference_sample_id'])
-        self.assertEqual('Recorded procedure date relative to first tumor sequencing',
-                         first['timepoint_source'])
         serving = first['wsi_serving']
         self.assertEqual(256, serving['thumbnail_width'])
         self.assertEqual(192, serving['thumbnail_height'])
         self.assertEqual({'height': 768, 'width': 1024}, serving['tile_metadata_json']['dimensions'])
         self.assertEqual({'model': 'Scan "Q" \\ 40', 'objective_power': 40, 'calibrated': True},
                          serving['tile_metadata_json']['vendor']['scanner'])
-        second = json.loads(samples['IMG-2']['METADATA'])
-        self.assertEqual(-17, second['timeline_start_days'])
         # UNMATCHED reference samples are dropped, as the native importer stored null
         self.assertNotIn('reference_sample_id', json.loads(samples['IMG 7/A&B']['METADATA']))
-        self.assertEqual(-365, json.loads(samples['IMG 7/A&B']['METADATA'])['timeline_start_days'])
         self.assertEqual(0, json.loads(samples['IMG 7/A&B']['METADATA'])['file_size_bytes'])
 
     def test_unservable_slides_have_no_serving_fields(self):
@@ -204,11 +198,10 @@ class ConvertedOutputTestCase(ConverterTestCase):
             data_rows(self.out / 'data_clinical_sample_wsi_counts.txt'))
         self.assertEqual(
             [['PATIENT_ID', 'WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
-              'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT', 'WSI_PATIENT_UNDATED_SLIDE_COUNT'],
-             # IMG-3 and IMG-4 are viewable without a procedure day; IMG-2 is not viewable
-             ['WSI-P1', '4', '1', '2', '2'],
-             ['WSI-P2', '1', '1', '0', '0'],
-             ['WSI+P3', '1', '0', '0', '0']],
+              'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'],
+             ['WSI-P1', '4', '1', '2'],
+             ['WSI-P2', '1', '1', '0'],
+             ['WSI+P3', '1', '0', '0']],
             data_rows(self.out / 'data_clinical_patient_wsi_counts.txt'))
         header = (self.out / 'data_clinical_sample_wsi_counts.txt').read_text().splitlines()[:4]
         self.assertEqual(
@@ -222,14 +215,12 @@ class ConvertedOutputTestCase(ConverterTestCase):
         header = (self.out / 'data_clinical_patient_wsi_counts.txt').read_text().splitlines()[:4]
         self.assertEqual(
             ['#Patient Identifier\tWSI Slides per Patient\tWSI Slides per Patient, Part-matched\t'
-             'WSI Slides per Patient, Block-matched\tWSI Undated Viewable Slides per Patient',
+             'WSI Slides per Patient, Block-matched',
              '#Patient identifier\tAssociated pathology slide count for the patient.\t'
              'Associated pathology slides matched to a specimen part for the patient.\t'
-             'Associated pathology slides matched to a specimen block for the patient.\t'
-             'Viewable pathology slides without a procedure date, which the timeline does not '
-             'show.',
-             '#STRING\tNUMBER\tNUMBER\tNUMBER\tNUMBER',
-             '#1\t1\t1\t1\t1'], header)
+             'Associated pathology slides matched to a specimen block for the patient.',
+             '#STRING\tNUMBER\tNUMBER\tNUMBER',
+             '#1\t1\t1\t1'], header)
 
     def test_only_pairs_with_rows_are_written(self):
         match_level = converter.COLUMNS.index('MATCH_LEVEL')
@@ -304,10 +295,37 @@ class ConverterInputTestCase(ConverterTestCase):
         rows = self.fixture_rows()
         self.assertConversionError('IMAGE_ID is not unique', meta=self.write_legacy(rows + rows[:1]))
 
-    def test_inconsistent_timing_is_rejected(self):
-        rows = self.fixture_rows()
-        rows[1] = rows[1].replace('\t-17\tAVAILABLE\t', '\t\tAVAILABLE\t', 1)
-        self.assertConversionError('AVAILABLE timing is inconsistent', meta=self.write_legacy(rows))
+    def test_timing_columns_are_ignored(self):
+        # Older files carry seven slide-timing columns before SLIDE_KEY. They are accepted
+        # without being required or validated, and never reach the metadata.
+        reference = Path(self.tmp.name) / 'reference'
+        written = converter.convert(FIXTURE_DIR / 'meta_wsi.txt', reference, BASE_URL)
+        timing_values = [
+            ['0', 'AVAILABLE', 'RECORDED', 'PATHOLOGY_REPORT', '',
+             'patient_first_tumor_sequencing_day_zero', 'surgery 20210314'],
+            # values the removed timing checks rejected
+            ['not-a-day', 'BOGUS', '', '', 'reason', 'other_coordinates', ''],
+        ]
+        source = (FIXTURE_DIR / 'data_wsi.txt').read_text(encoding='utf-8').splitlines()
+
+        def with_timing(line, values):
+            fields = line.split('\t')
+            return '\t'.join(fields[:-1] + values + fields[-1:])
+
+        header = with_timing(source[4], list(converter.IGNORED_TIMING_COLUMNS))
+        self.assertEqual(converter.COLUMNS_WITH_IGNORED_TIMING, header.split('\t'))
+        rows = [with_timing(row, timing_values[index % 2])
+                for index, row in enumerate(self.fixture_rows())]
+        self.convert(meta=self.write_legacy(rows, header), base_url=BASE_URL)
+        for path in written:
+            self.assertEqual(path.read_bytes(), (self.out / path.name).read_bytes(), path.name)
+        for name in ('data_resource_sample.txt', 'data_resource_patient.txt'):
+            for record in rows_by_image(self.out / name).values():
+                metadata = json.loads(record['METADATA'])
+                self.assertFalse([key for key in metadata
+                                  if key.startswith(('timeline_', 'timepoint_'))], metadata)
+        patients = data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[0]
+        self.assertNotIn('WSI_PATIENT_UNDATED_SLIDE_COUNT', patients)
 
     def test_line_break_in_output_cell_is_rejected(self):
         rows = self.fixture_rows()
@@ -384,11 +402,10 @@ class ClinicalMergeTestCase(ConverterTestCase):
             data_rows(self.out / 'data_clinical_samples.txt'))
         patients = data_rows(self.out / 'data_clinical_patients.txt')
         self.assertEqual(['WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
-                          'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT',
-                          'WSI_PATIENT_UNDATED_SLIDE_COUNT'], patients[0][-4:])
-        self.assertEqual({'WSI-P1': ['4', '1', '2', '2'], 'WSI-P2': ['1', '1', '0', '0'],
-                          'WSI+P3': ['1', '0', '0', '0'], 'WSI-P4': ['NA', 'NA', 'NA', 'NA']},
-                         {row[0]: row[-4:] for row in patients[1:]})
+                          'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'], patients[0][-3:])
+        self.assertEqual({'WSI-P1': ['4', '1', '2'], 'WSI-P2': ['1', '1', '0'],
+                          'WSI+P3': ['1', '0', '0'], 'WSI-P4': ['NA', 'NA', 'NA']},
+                         {row[0]: row[-3:] for row in patients[1:]})
         header = (self.out / 'data_clinical_samples.txt').read_text().splitlines()[:4]
         self.assertEqual(
             ['#Patient Identifier\tSample Identifier\tCancer Type\tTumor Purity\t'
@@ -485,7 +502,7 @@ class ClinicalMergeTestCase(ConverterTestCase):
 
 class V3OnlyTestCase(ConverterTestCase):
 
-    """Only format v3 (39 columns, SLIDE_KEY last) is converted."""
+    """Only format v3 (32 columns, SLIDE_KEY last; 39 with ignored timing columns) is converted."""
 
     def assertConversionError(self, text, meta):
         with self.assertRaises(converter.ConversionError) as context:
@@ -494,10 +511,13 @@ class V3OnlyTestCase(ConverterTestCase):
         self.assertFalse(self.out.exists())
 
     def test_columns(self):
-        self.assertEqual(39, len(converter.COLUMNS))
+        self.assertEqual(32, len(converter.COLUMNS))
         self.assertEqual('SLIDE_KEY', converter.COLUMNS[-1])
-        self.assertEqual('TIMEPOINT_SOURCE', converter.COLUMNS[-2])
-        self.assertEqual(list(converter.TIMING_COLUMNS), converter.COLUMNS[31:38])
+        self.assertEqual('THUMBNAIL_CONTENT_TYPE', converter.COLUMNS[-2])
+        self.assertEqual(39, len(converter.COLUMNS_WITH_IGNORED_TIMING))
+        self.assertEqual(list(converter.IGNORED_TIMING_COLUMNS),
+                         converter.COLUMNS_WITH_IGNORED_TIMING[31:38])
+        self.assertEqual('SLIDE_KEY', converter.COLUMNS_WITH_IGNORED_TIMING[-1])
         for name in ('V2_COLUMNS', 'FORMAT_COLUMNS', 'TIMELINE_REQUIRED_COLUMNS',
                      'find_pathology_timeline', 'read_timeline_index', '_parse_image_ids'):
             self.assertFalse(hasattr(converter, name), name)
@@ -507,10 +527,15 @@ class V3OnlyTestCase(ConverterTestCase):
         meta.write_text(meta.read_text().replace('format_version: 3', 'format_version: 2'))
         self.assertConversionError('unsupported WSI format_version; expected 3', meta)
 
-    def test_38_column_file_is_rejected(self):
+    def test_file_without_slide_key_is_rejected(self):
         source = (FIXTURE_DIR / 'data_wsi.txt').read_text(encoding='utf-8').splitlines()
-        rows = ['\t'.join(row.split('\t')[:38]) for row in source[5:]]
-        header = '\t'.join(source[4].split('\t')[:38])
+        rows = ['\t'.join(row.split('\t')[:-1]) for row in source[5:]]
+        header = '\t'.join(source[4].split('\t')[:-1])
+        self.assertConversionError('invalid header', self.write_legacy(rows, header))
+        # nor with the ignored timing columns (the 38-column format-v1 layout)
+        timing = ['' for _ in converter.IGNORED_TIMING_COLUMNS]
+        rows = ['\t'.join(row.split('\t')[:-1] + timing) for row in source[5:]]
+        header = '\t'.join(source[4].split('\t')[:-1] + list(converter.IGNORED_TIMING_COLUMNS))
         self.assertConversionError('invalid header', self.write_legacy(rows, header))
 
     def test_timeline_options_are_gone(self):
@@ -629,9 +654,7 @@ PUBLIC_KEYS = {
     'slide_key', 'reference_sample_id', 'part_key', 'part_number', 'part_type',
     'part_description', 'subspecialty', 'block_key', 'block_number', 'block_label', 'match_level',
     'specimen_key', 'stain_name', 'stain_group', 'magnification', 'slide_type', 'is_hne', 'is_ihc',
-    'can_serve_tiles', 'file_size_bytes', 'timeline_start_days', 'timeline_date_status',
-    'timeline_date_kind', 'timeline_date_source', 'timeline_date_reason',
-    'timeline_coordinate_system', 'timepoint_source',
+    'can_serve_tiles', 'file_size_bytes',
 }
 
 

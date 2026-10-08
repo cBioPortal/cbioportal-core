@@ -22,8 +22,10 @@ each with its meta file. A generated data/meta pair is only written when it has 
 Timeline files are not produced: existing clinical timeline files stay in the
 study and are imported unchanged.
 
-Only format v3 is accepted: 39 columns, the slide timing on every row and the
-opaque ``SLIDE_KEY`` (32 lowercase hex characters, unique per study) last.
+Only format v3 is accepted: 32 columns with the opaque ``SLIDE_KEY`` (32
+lowercase hex characters, unique per study) last. Files that still carry the
+seven slide-timing columns before ``SLIDE_KEY`` (39 columns) are accepted, but
+those columns are ignored: they are neither validated nor written.
 De-identification (contract wsi-serving-v5, resource-data variant): the real
 ``IMAGE_ID`` is kept only in the private ``wsi_serving`` metadata, the URL and
 ``DISPLAY_NAME`` never contain it, ``BARCODE``/``PART_DESIGNATOR``/
@@ -53,13 +55,14 @@ SAMPLE_RESOURCE_ID = "WSI_SAMPLE"
 PATIENT_RESOURCE_ID = "WSI_PATIENT"
 RESOURCE_TYPE = "WHOLE_SLIDE_IMAGE"
 
-# The seven slide-timing columns of format v3.
-TIMING_COLUMNS = (
+# Slide-timing columns that older format-v3 files still carry before SLIDE_KEY.
+# They are accepted but ignored: neither validated nor written to the metadata.
+IGNORED_TIMING_COLUMNS = (
     "TIMELINE_START_DAYS", "TIMELINE_DATE_STATUS", "TIMELINE_DATE_KIND",
     "TIMELINE_DATE_SOURCE", "TIMELINE_DATE_REASON", "TIMELINE_COORDINATE_SYSTEM",
     "TIMEPOINT_SOURCE",
 )
-# Format version 3 (39 columns): ImportWsiData.COLUMNS followed by SLIDE_KEY.
+# Format version 3 (32 columns): ImportWsiData.COLUMNS followed by SLIDE_KEY.
 COLUMNS = [
     "PATIENT_ID", "REFERENCE_SAMPLE_ID", "SAMPLE_ID", "IMAGE_ID",
     "PART_KEY", "PART_NUMBER", "PART_DESIGNATOR", "PART_TYPE",
@@ -69,9 +72,10 @@ COLUMNS = [
     "FILE_SIZE_BYTES", "BARCODE", "SLIDE_TYPE", "CAN_SERVE_TILES", "SOURCE_URL",
     "TILE_METADATA_JSON", "THUMBNAIL_URL", "THUMBNAIL_WIDTH",
     "THUMBNAIL_HEIGHT", "THUMBNAIL_CONTENT_TYPE",
-    *TIMING_COLUMNS,
     "SLIDE_KEY",
 ]
+# The same with the ignored timing columns (39 columns).
+COLUMNS_WITH_IGNORED_TIMING = COLUMNS[:-1] + list(IGNORED_TIMING_COLUMNS) + COLUMNS[-1:]
 FORMAT_VERSION = "3"
 
 # Public metadata keys, emitted in lower case. Values the backend reads with
@@ -82,8 +86,6 @@ PUBLIC_STRING_FIELDS = [
     "PART_DESCRIPTION", "SUBSPECIALTY", "BLOCK_KEY",
     "BLOCK_NUMBER", "BLOCK_LABEL", "MATCH_LEVEL", "SPECIMEN_KEY", "STAIN_NAME",
     "STAIN_GROUP", "MAGNIFICATION", "SLIDE_TYPE",
-    "TIMELINE_DATE_STATUS", "TIMELINE_DATE_KIND", "TIMELINE_DATE_SOURCE",
-    "TIMELINE_DATE_REASON", "TIMELINE_COORDINATE_SYSTEM",
 ]
 SERVING_KEY = "wsi_serving"
 # Public keys that identify a single slide or specimen, so nearly every row has its own value.
@@ -100,13 +102,9 @@ CUSTOM_METADATA = json.dumps(
 SLIDE_KEY_PATTERN = re.compile(r"[0-9a-f]{32}")
 
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
-TIMELINE_STATUSES = ("AVAILABLE", "MISSING_PROCEDURE_DATE", "MISSING_REFERENCE_SEQUENCING_DATE")
-TIMELINE_KINDS = ("RECORDED", "ESTIMATED", "UNDATED")
-TIMELINE_COORDINATE_SYSTEM = "patient_first_tumor_sequencing_day_zero"
 SLIDE_TYPES = ("H&E", "IHC", "Other", "Unknown")
 
-# Names and descriptions must stay identical to ImportWsiData.insertSampleSlideCounts,
-# except WSI_PATIENT_UNDATED_SLIDE_COUNT, which only resource-data studies carry.
+# Names and descriptions must stay identical to ImportWsiData.insertSampleSlideCounts.
 SAMPLE_COUNT_ATTRIBUTES = [
     ("WSI_SAMPLE_SLIDE_COUNT", "WSI Slides per Sample",
      "Associated pathology slide count for the sample."),
@@ -122,8 +120,6 @@ PATIENT_COUNT_ATTRIBUTES = [
      "Associated pathology slides matched to a specimen part for the patient."),
     ("WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT", "WSI Slides per Patient, Block-matched",
      "Associated pathology slides matched to a specimen block for the patient."),
-    ("WSI_PATIENT_UNDATED_SLIDE_COUNT", "WSI Undated Viewable Slides per Patient",
-     "Viewable pathology slides without a procedure date, which the timeline does not show."),
 ]
 COUNT_ATTRIBUTE_IDS = frozenset(
     attribute[0] for attribute in SAMPLE_COUNT_ATTRIBUTES + PATIENT_COUNT_ATTRIBUTES)
@@ -225,20 +221,24 @@ def _iter_lines(path, what):
         raise ConversionError(f"{path}: cannot read {what}: {error}") from error
 
 
-def iter_rows(data_path, columns=COLUMNS):
+def iter_rows(data_path, columns=None):
     """Stream the legacy data file: leading '#' rows, the exact header, then slide rows.
 
-    Yields (line number, row dict with stripped values) and raises if the file
-    has no slide rows.
+    The header must be ``columns`` or, by default, ``COLUMNS`` or
+    ``COLUMNS_WITH_IGNORED_TIMING``. Yields (line number, row dict with stripped
+    values) and raises if the file has no slide rows. Ignored timing columns
+    stay in the row dict; nothing reads them.
     """
+    accepted = [columns] if columns is not None else [COLUMNS, COLUMNS_WITH_IGNORED_TIMING]
     lines = _iter_lines(data_path, "WSI data file")
     header = None
     for line_number, line in lines:
         if not line.startswith("#"):
             header = line
             break
-    if header is None or header.split("\t") != columns:
+    if header is None or header.split("\t") not in accepted:
         raise ConversionError(f"{data_path}: WSI data has an invalid header or column order")
+    columns = header.split("\t")
     width = len(columns)
     found = False
     for line_number, line in lines:
@@ -257,7 +257,7 @@ def iter_rows(data_path, columns=COLUMNS):
         raise ConversionError(f"{data_path}: WSI data file contains no slide rows")
 
 
-def read_rows(data_path, columns=COLUMNS):
+def read_rows(data_path, columns=None):
     """Read every row of a legacy data file into a list (see iter_rows)."""
     return list(iter_rows(data_path, columns))
 
@@ -287,43 +287,12 @@ def _optional_int(row, field, line):
         _fail(line, f"invalid {field}")
 
 
-def _validate_timing(start_days, status, kind, source, reason, coordinate_system, line):
-    # Mirrors ImportWsiData.validateTiming.
-    if status not in TIMELINE_STATUSES:
-        _fail(line, "invalid TIMELINE_DATE_STATUS")
-    if kind not in TIMELINE_KINDS:
-        _fail(line, "invalid TIMELINE_DATE_KIND")
-    if not source:
-        _fail(line, "TIMELINE_DATE_SOURCE is required")
-    if coordinate_system != TIMELINE_COORDINATE_SYSTEM:
-        _fail(line, "unsupported TIMELINE_COORDINATE_SYSTEM")
-    if status == "AVAILABLE":
-        if start_days is None or kind == "UNDATED" or reason:
-            _fail(line, "AVAILABLE timing is inconsistent")
-        return
-    if start_days is not None:
-        _fail(line, "non-AVAILABLE timing cannot have TIMELINE_START_DAYS")
-    if status == "MISSING_PROCEDURE_DATE" and kind != "UNDATED":
-        _fail(line, "missing procedure date must be UNDATED")
-    if status == "MISSING_REFERENCE_SEQUENCING_DATE" and kind == "UNDATED":
-        _fail(line, "missing reference date cannot be UNDATED")
-
-
 def stain_flags_valid(slide_type, is_hne, is_ihc):
     """Mirror the native wsi_slide_stain_flags_valid CHECK constraint."""
     return (not (is_hne and is_ihc)
             and (slide_type != "H&E" or is_hne)
             and (slide_type != "IHC" or is_ihc)
             and (slide_type not in ("Other", "Unknown") or (not is_hne and not is_ihc)))
-
-
-def derive_timepoint_source(kind, reason, source, status):
-    # Mirrors ImportWsiData.deriveTimepointSource.
-    if kind == "ESTIMATED":
-        return "Verified estimated procedure date relative to first tumor sequencing"
-    if kind == "RECORDED":
-        return "Recorded procedure date relative to first tumor sequencing"
-    return reason or source or status
 
 
 def normalize_row(row, line):
@@ -384,16 +353,6 @@ def normalize_row(row, line):
         })
     # Non-servable rows carry only the image ID, as the native importer stored the rest as null.
     metadata[SERVING_KEY] = serving
-
-    start_days = _optional_int(row, "TIMELINE_START_DAYS", line)
-    _validate_timing(start_days, row["TIMELINE_DATE_STATUS"], row["TIMELINE_DATE_KIND"],
-                     row["TIMELINE_DATE_SOURCE"], row["TIMELINE_DATE_REASON"],
-                     row["TIMELINE_COORDINATE_SYSTEM"], line)
-    if start_days is not None:
-        metadata["timeline_start_days"] = start_days
-    metadata["timepoint_source"] = row["TIMEPOINT_SOURCE"] or derive_timepoint_source(
-        row["TIMELINE_DATE_KIND"], row["TIMELINE_DATE_REASON"],
-        row["TIMELINE_DATE_SOURCE"], row["TIMELINE_DATE_STATUS"])
     return metadata
 
 
@@ -470,8 +429,7 @@ class SlideCounter:
     without a matched slide get no row; patient counts include unmatched slides,
     so every patient with a slide gets a row. Part/block counts follow
     MATCH_LEVEL and zeros are written for entities that have a row. Slides that
-    cannot serve tiles are counted, except in the patient's undated count, which
-    covers viewable slides without a procedure day.
+    cannot serve tiles are counted.
     """
 
     def __init__(self):
@@ -479,11 +437,7 @@ class SlideCounter:
         self.by_patient = {}
 
     def add(self, slide):
-        patient_counts = self.by_patient.setdefault(slide["patient_id"], [0, 0, 0, 0])
-        metadata = slide["metadata"]
-        if metadata["can_serve_tiles"] and "timeline_start_days" not in metadata:
-            patient_counts[3] += 1
-        targets = [patient_counts]
+        targets = [self.by_patient.setdefault(slide["patient_id"], [0, 0, 0])]
         if slide["sample_id"] is not None:
             targets.append(self.by_sample.setdefault((slide["patient_id"], slide["sample_id"]), [0, 0, 0]))
         for counts in targets:

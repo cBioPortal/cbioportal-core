@@ -3953,17 +3953,21 @@ class WsiRowChecks(object):
         'STAIN_NAME', 'STAIN_GROUP', 'IS_HNE', 'IS_IHC', 'MAGNIFICATION',
         'FILE_SIZE_BYTES', 'BARCODE', 'SLIDE_TYPE', 'CAN_SERVE_TILES', 'SOURCE_URL',
         'TILE_METADATA_JSON', 'THUMBNAIL_URL', 'THUMBNAIL_WIDTH',
-        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'TIMELINE_START_DAYS',
-        'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
-        'TIMELINE_DATE_REASON', 'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE',
-        'SLIDE_KEY',
+        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'SLIDE_KEY',
     ]
+    # Slide-timing columns that older files still carry before SLIDE_KEY. They are
+    # accepted but ignored: neither required, validated nor imported.
+    IGNORED_TIMING_HEADERS = [
+        'TIMELINE_START_DAYS', 'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND',
+        'TIMELINE_DATE_SOURCE', 'TIMELINE_DATE_REASON', 'TIMELINE_COORDINATE_SYSTEM',
+        'TIMEPOINT_SOURCE',
+    ]
+    EXPECTED_HEADERS_WITH_IGNORED_TIMING = (
+        EXPECTED_HEADERS[:-1] + IGNORED_TIMING_HEADERS + EXPECTED_HEADERS[-1:])
     SLIDE_TYPES = ('H&E', 'IHC', 'Other', 'Unknown')
     REQUIRED_VALUES = {
         'PATIENT_ID', 'IMAGE_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
-        'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES',
-        'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE',
-        'TIMELINE_COORDINATE_SYSTEM', 'SLIDE_KEY',
+        'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES', 'SLIDE_KEY',
     }
     @staticmethod
     def _is_valid_tile_metadata(metadata):
@@ -4173,45 +4177,6 @@ class WsiRowChecks(object):
                             column('SLIDE_TYPE'),
                             '%s: IS_HNE=%s, IS_IHC=%s' % (slide_type, row['IS_HNE'], row['IS_IHC']))
 
-        timeline_start = row['TIMELINE_START_DAYS']
-        if timeline_start:
-            try:
-                int(timeline_start)
-            except ValueError:
-                self._error('WSI timeline offset is invalid', line_number,
-                            column('TIMELINE_START_DAYS'), timeline_start)
-        timeline_status = row['TIMELINE_DATE_STATUS']
-        timeline_kind = row['TIMELINE_DATE_KIND']
-        timeline_reason = row['TIMELINE_DATE_REASON']
-        if timeline_status not in (
-                'AVAILABLE', 'MISSING_PROCEDURE_DATE',
-                'MISSING_REFERENCE_SEQUENCING_DATE'):
-            self._error('WSI timeline status is invalid', line_number,
-                        column('TIMELINE_DATE_STATUS'), timeline_status)
-        if timeline_kind not in ('RECORDED', 'ESTIMATED', 'UNDATED'):
-            self._error('WSI timeline date kind is invalid', line_number,
-                        column('TIMELINE_DATE_KIND'), timeline_kind)
-        if not row['TIMELINE_DATE_SOURCE']:
-            self._error('WSI timeline date source is required', line_number,
-                        column('TIMELINE_DATE_SOURCE'))
-        if row['TIMELINE_COORDINATE_SYSTEM'] != 'patient_first_tumor_sequencing_day_zero':
-            self._error('WSI timeline coordinate system is unsupported', line_number,
-                        column('TIMELINE_COORDINATE_SYSTEM'),
-                        row['TIMELINE_COORDINATE_SYSTEM'])
-        if timeline_status == 'AVAILABLE' and (
-                not timeline_start or timeline_kind == 'UNDATED' or timeline_reason):
-            self._error('WSI AVAILABLE timing is inconsistent', line_number,
-                        column('TIMELINE_DATE_STATUS'))
-        if timeline_status != 'AVAILABLE' and timeline_start:
-            self._error('WSI non-AVAILABLE timing cannot have an offset', line_number,
-                        column('TIMELINE_START_DAYS'))
-        if timeline_status == 'MISSING_PROCEDURE_DATE' and timeline_kind != 'UNDATED':
-            self._error('WSI missing procedure dates must be UNDATED', line_number,
-                        column('TIMELINE_DATE_KIND'))
-        if timeline_status == 'MISSING_REFERENCE_SEQUENCING_DATE' and timeline_kind == 'UNDATED':
-            self._error('WSI missing reference dates cannot be UNDATED', line_number,
-                        column('TIMELINE_DATE_KIND'))
-
         image_id = row['IMAGE_ID']
         if image_id and image_id in state['images']:
             # image_id is server-side only; never echo it.
@@ -4338,11 +4303,9 @@ class ResourceValidator(WsiRowChecks, Validator):
         'SLIDE_KEY', 'REFERENCE_SAMPLE_ID', 'PART_KEY', 'PART_NUMBER',
         'PART_TYPE', 'PART_DESCRIPTION', 'SUBSPECIALTY', 'BLOCK_KEY',
         'BLOCK_NUMBER', 'BLOCK_LABEL', 'MATCH_LEVEL', 'SPECIMEN_KEY', 'STAIN_NAME',
-        'STAIN_GROUP', 'MAGNIFICATION', 'SLIDE_TYPE', 'TIMELINE_DATE_STATUS',
-        'TIMELINE_DATE_KIND', 'TIMELINE_DATE_SOURCE', 'TIMELINE_DATE_REASON',
-        'TIMELINE_COORDINATE_SYSTEM', 'TIMEPOINT_SOURCE')
+        'STAIN_GROUP', 'MAGNIFICATION', 'SLIDE_TYPE')
     WSI_BOOLEAN_KEYS = ('IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES')
-    WSI_INTEGER_KEYS = ('FILE_SIZE_BYTES', 'TIMELINE_START_DAYS')
+    WSI_INTEGER_KEYS = ('FILE_SIZE_BYTES',)
     # Top-level (public) metadata keys that would expose a real slide identifier,
     # a free-text specimen label or a raw artifact location.
     WSI_FORBIDDEN_PUBLIC_KEYS = ('image_id', 'barcode', 'source_url', 'thumbnail_url',
@@ -5124,7 +5087,7 @@ class WsiValidator(WsiRowChecks, Validator):
             return
 
         header = lines[4].rstrip('\r\n').split('\t')
-        if header != self.EXPECTED_HEADERS:
+        if header not in (self.EXPECTED_HEADERS, self.EXPECTED_HEADERS_WITH_IGNORED_TIMING):
             self._error('Invalid WSI column header or column order', 5,
                         cause=', '.join(header))
             return
@@ -5141,13 +5104,14 @@ class WsiValidator(WsiRowChecks, Validator):
             if values and values[0].startswith('#'):
                 self._error("WSI data row must not start with '#'", line_number)
                 continue
-            if len(values) != len(self.EXPECTED_HEADERS):
+            if len(values) != len(header):
                 self._error('Expected %d WSI columns, found %d', line_number,
-                            cause=(len(self.EXPECTED_HEADERS), len(values)))
+                            cause=(len(header), len(values)))
                 continue
             rows += 1
-            row = dict(zip(self.EXPECTED_HEADERS, (value.strip() for value in values)))
-            self._check_wsi_row(row, line_number, self.EXPECTED_HEADERS.index, state)
+            # ignored timing columns stay in the row; no check reads them
+            row = dict(zip(header, (value.strip() for value in values)))
+            self._check_wsi_row(row, line_number, header.index, state)
 
         if rows == 0:
             self.logger.error('WSI data file contains no slide rows')

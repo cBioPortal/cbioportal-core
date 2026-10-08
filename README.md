@@ -13,14 +13,15 @@ If you are a developer and want to help contribute to the cBioPortal importer co
 Whole-slide images (WSI) are imported as standard resource data: matched slides
 are `WSI_SAMPLE` rows in the sample resource file, unmatched slides are
 `WSI_PATIENT` rows in the patient resource file, and both carry
-`TYPE=WHOLE_SLIDE_IMAGE` with the slide hierarchy, timing and serving metadata
+`TYPE=WHOLE_SLIDE_IMAGE` with the slide hierarchy and serving metadata
 as JSON. `validateData.py` checks those rows against the WSI contract, and
 `metaImport.py` loads them with the other resource files. See
 [`docs/wsi-study-format.md`](docs/wsi-study-format.md).
 
 Legacy `meta_wsi.txt`/`data_wsi.txt` pairs are no longer imported; convert
 them offline with `scripts/importer/convertWsiToResources.py`, which accepts
-only format v3 (39 columns, ending with the opaque `SLIDE_KEY`). Given
+only format v3 (32 columns, ending with the opaque `SLIDE_KEY`; slide-timing
+columns, if present, are ignored for now). Given
 `--study-dir`, it also merges the six `WSI_*` slide-count clinical
 attributes into copies of the study's clinical sample and patient files. Viewer
 links and public metadata identify slides only by `slide_key`; the real image
@@ -29,5 +30,5 @@ responsible for de-identifying free-text values before export. The native WSI
 tables and the `ImportWsiData` Java entry point are deprecated but retained.
 Thumbnail artifacts and slide metadata must still be prepared by an upstream
 artifact-generation/export pipeline; core does not generate thumbnails or write
-the object store. Pathology procedure timing shown on the patient timeline is
+the object store. Pathology procedure events shown on the patient timeline are
 imported separately as standard clinical timeline data.
