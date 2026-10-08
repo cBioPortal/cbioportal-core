@@ -27,6 +27,8 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkDeleter;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
+import org.mskcc.cbio.portal.dao.DaoResourceData;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.springframework.test.context.ContextConfiguration;
@@ -111,6 +113,26 @@ public class TestDaoCancerStudyDelete extends AbstractDaoDeleteTest {
             assertEquals(0L, countRowsWhereEq("patient",          "internal_id", patientId));
             assertEquals(0L, countRowsWhereEq("clinical_patient", "internal_id", patientId));
         }
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeleteCancerStudy_resourceRowsAreGone() throws Exception {
+        // resource_data replaced resource_sample/resource_patient/resource_study, which a 7.2.0
+        // database no longer has at all. Deleting a study has to reach the new table: against an
+        // upgraded database the old statements fail outright with UNKNOWN_TABLE, so a study with
+        // resources could not be deleted, and therefore could not be re-imported either.
+        DaoResourceData.addResourceDatum(
+            studyId, "PATIENT_NOTES", "PATIENT", "TCGA-A1-A0SB", null,
+            "https://example.org/notes.pdf", null, null, null);
+        ClickHouseBulkLoader.flushAll();
+        assertEquals("fixture must have written a resource row",
+            1L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+
+        DaoCancerStudy.deleteCancerStudy(studyId);
+
+        assertEquals("resource_data rows should go with the study",
+            0L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
     }
 
     @Test
