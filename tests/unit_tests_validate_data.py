@@ -2974,6 +2974,19 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
 
+    def test_a_retired_column_is_reported_rather_than_ignored(self):
+        """TYPE is no longer stored; a file still carrying it must hear about it."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        self.logger.setLevel(logging.WARNING)
+
+        record_list = self.validate('data_resource_sample_retired_type.txt',
+                                    validateData.SampleResourceValidator)
+
+        retired = [r for r in record_list if 'no longer read by the portal' in r.getMessage()]
+        self.assertEqual(1, len(retired))
+        self.assertEqual('TYPE', retired[0].cause)
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
     def test_metadata_keys_must_be_declared_when_a_contract_exists(self):
         """A key the contract omits would be imported and never shown, so it is an error."""
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}

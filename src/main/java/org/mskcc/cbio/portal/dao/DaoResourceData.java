@@ -49,7 +49,6 @@ public final class DaoResourceData {
      * @param sampleId       stable sample ID (null for PATIENT/STUDY-level records)
      * @param url            URL of the resource
      * @param displayName    optional display name override (may be null)
-     * @param type           optional type hint, e.g. IMAGE/LINK/PDF (may be null)
      * @param metadata       optional JSON metadata string (may be null)
      */
     public static int addResourceDatum(
@@ -60,13 +59,12 @@ public final class DaoResourceData {
             String sampleId,
             String url,
             String displayName,
-            String type,
             String metadata) throws DaoException {
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             // Column order matches DESCRIBE TABLE resource_data:
             // resource_data_id, resource_id, cancer_study_id, entity_type,
-            // patient_id, sample_id, url, display_name, type, metadata
+            // patient_id, sample_id, url, display_name, metadata
             //
             // Nulls are passed through rather than substituted with "": the loader encodes a
             // null as \N, which ClickHouse stores as a real NULL, and these columns are
@@ -83,7 +81,6 @@ public final class DaoResourceData {
                 sampleId,
                 url,
                 displayName,
-                type,
                 metadata
             );
             return 1;
@@ -98,8 +95,8 @@ public final class DaoResourceData {
                 "INSERT INTO `" + RESOURCE_DATA_TABLE + "` "
                 + "(`resource_id`,`cancer_study_id`,`entity_type`,"
                 + "`patient_id`,`sample_id`,`url`,"
-                + "`display_name`,`type`,`metadata`) "
-                + "VALUES (?,?,?,?,?,?,?,?,?)"
+                + "`display_name`,`metadata`) "
+                + "VALUES (?,?,?,?,?,?,?,?)"
             );
             pstmt.setString(1, resourceId);
             pstmt.setInt(2, cancerStudyId);
@@ -108,8 +105,7 @@ public final class DaoResourceData {
             pstmt.setString(5, sampleId);
             pstmt.setString(6, url);
             pstmt.setString(7, displayName);
-            pstmt.setString(8, type);
-            pstmt.setString(9, metadata);
+            pstmt.setString(8, metadata);
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);

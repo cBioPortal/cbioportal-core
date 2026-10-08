@@ -612,7 +612,6 @@ CREATE TABLE resource_data
     `sample_id`        Nullable(String),
     `url`              String,
     `display_name`     Nullable(String),
-    `type`             Nullable(String),
     `metadata`         Nullable(String)
 )
     ENGINE = MergeTree

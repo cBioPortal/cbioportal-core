@@ -3919,6 +3919,24 @@ class ResourceValidator(Validator):
         # emit one message per row, and the HTML report buffers every record it is given.
         self.observed_metadata_keys = {}
 
+    # Columns the portal used to store and no longer does. Silently ignoring one would leave a
+    # curator believing it still means something; the whole point of validating these files is
+    # that the portal has no other way to tell them.
+    RETIRED_HEADERS = {
+        'TYPE': "put the classification in METADATA instead, where CUSTOM_METADATA can label it, "
+                "type it and decide whether it filters",
+    }
+
+    def checkHeader(self, cols):
+        num_errors = super(ResourceValidator, self).checkHeader(cols)
+        for col_name in cols:
+            if col_name in self.RETIRED_HEADERS:
+                self.logger.warning(
+                    'Column is no longer read by the portal and will be ignored; %s'
+                    % self.RETIRED_HEADERS[col_name],
+                    extra={'line_number': self.line_number, 'cause': col_name})
+        return num_errors
+
     def recordMetadataKeys(self, resource_id, parsed):
         """Remember which metadata keys a row carried, to check against the contract at the end."""
         if not resource_id or not isinstance(parsed, dict):
@@ -4051,7 +4069,7 @@ class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
 
     REQUIRED_HEADERS = ['SAMPLE_ID', 'PATIENT_ID', 'RESOURCE_ID', 'URL']
-    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a SampleResourceValidator with the given parameters."""
@@ -4115,7 +4133,7 @@ class SampleResourceValidator(ResourceValidator):
 class PatientResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['PATIENT_ID', 'RESOURCE_ID', 'URL']
-    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a PatientResourceValidator with the given parameters."""
@@ -4168,7 +4186,7 @@ class PatientResourceValidator(ResourceValidator):
 class StudyResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['RESOURCE_ID', 'URL']
-    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'TYPE', 'METADATA']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a StudyResourceValidator with the given parameters."""

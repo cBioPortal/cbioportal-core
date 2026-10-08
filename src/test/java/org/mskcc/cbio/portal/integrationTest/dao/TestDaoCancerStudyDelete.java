@@ -124,7 +124,7 @@ public class TestDaoCancerStudyDelete extends AbstractDaoDeleteTest {
         // resources could not be deleted, and therefore could not be re-imported either.
         DaoResourceData.addResourceDatum(
             studyId, "PATIENT_NOTES", "PATIENT", "TCGA-A1-A0SB", null,
-            "https://example.org/notes.pdf", null, null, null);
+            "https://example.org/notes.pdf", null, null);
         ClickHouseBulkLoader.flushAll();
         assertEquals("fixture must have written a resource row",
             1L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));

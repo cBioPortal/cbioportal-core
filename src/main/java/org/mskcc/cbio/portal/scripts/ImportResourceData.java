@@ -36,7 +36,6 @@ public class ImportResourceData extends ConsoleRunnable {
     public static final String SAMPLE_TYPE_COLUMN_NAME = "SAMPLE_TYPE";
     // Optional per-row columns (override resource-definition-level values)
     public static final String DISPLAY_NAME_COLUMN_NAME = "DISPLAY_NAME";
-    public static final String TYPE_COLUMN_NAME = "TYPE";
     public static final String METADATA_COLUMN_NAME = "METADATA";
     private int numSampleSpecificResourcesAdded = 0;
     private int numPatientSpecificResourcesAdded = 0;
@@ -51,7 +50,6 @@ public class ImportResourceData extends ConsoleRunnable {
     private ResourceType resourceType;
     private boolean relaxed;
     private Set<String> patientIds = new HashSet<String>();
-    private Map<String, ResourceDefinition> resourceDefinitionMap = new HashMap<>();
     // Resource IDs encountered while reading the file, used to delete stale existing rows for
     // this study/resource-ID combination before the new rows are flushed (see importData()).
     private final Set<String> resourceIdsInFile = new HashSet<>();
@@ -128,9 +126,6 @@ public class ImportResourceData extends ConsoleRunnable {
     private void importData(BufferedReader buff, List<ResourceDefinition> resources, Map<String, Integer> headerIndexMap) throws Exception {
         String line;
         MultiKeyMap resourceMap = new MultiKeyMap();
-        // build lookup map for resource definitions
-        this.resourceDefinitionMap = resources.stream()
-                .collect(Collectors.toMap(ResourceDefinition::getResourceId, r -> r, (a, b) -> a));
         // create resource_id set
         Set<String> patientResourceIdSet = resources
                 .stream()
@@ -387,12 +382,11 @@ public class ImportResourceData extends ConsoleRunnable {
 
     // add datum for patient, sample and study resources (writes only to resource_data)
     private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, String[] fields, Map<String, Integer> headerIndexMap) throws Exception {
-        ResourceDefinition def = resourceDefinitionMap.get(resourceId);
-        // Per-row optional fields override resource-definition-level values when present
+        // Absent optional fields stay null rather than inheriting the resource definition's
+        // values: a copy of the definition on every row says nothing the definition does not
+        // already say, and it is not what the migration writes for rows carried over from the
+        // legacy tables.
         String displayName = getOptionalField(fields, headerIndexMap, DISPLAY_NAME_COLUMN_NAME);
-        if (displayName == null && def != null) displayName = def.getDisplayName();
-        String type = getOptionalField(fields, headerIndexMap, TYPE_COLUMN_NAME);
-        if (type == null) type = (def != null) ? resourceType.toString() : null;
         String metadata = getOptionalField(fields, headerIndexMap, METADATA_COLUMN_NAME);
 
         if (resourceType.equals(ResourceType.PATIENT)) {
@@ -400,7 +394,7 @@ public class ImportResourceData extends ConsoleRunnable {
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "PATIENT",
                 stableId, null,
-                resourceURL, displayName, type, metadata);
+                resourceURL, displayName, metadata);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
             // derive stable patient ID from the sample's internal patient linkage
@@ -414,13 +408,13 @@ public class ImportResourceData extends ConsoleRunnable {
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "SAMPLE",
                 stablePatientId, stableId,
-                resourceURL, displayName, type, metadata);
+                resourceURL, displayName, metadata);
         } else {
             numStudySpecificResourcesAdded++;
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "STUDY",
                 null, null,
-                resourceURL, displayName, type, metadata);
+                resourceURL, displayName, metadata);
         }
     }
 
