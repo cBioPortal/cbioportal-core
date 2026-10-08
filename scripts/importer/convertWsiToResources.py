@@ -3,8 +3,8 @@
 
 The converter is deliberately offline: it never connects to cBioPortal, a
 database, or an artifact store. It reads ``meta_wsi.txt``/``data_wsi.txt``,
-applies the same row parsing and normalization as the retired native importer
-(``ImportWsiData``), and writes:
+applies the row parsing and normalization of the retired native importer, and
+writes:
 
 * ``data_resource_definition.txt`` with the ``WSI_SAMPLE``/``WSI_PATIENT``
   definitions that have rows;
@@ -119,7 +119,7 @@ SEALED_SOURCE_MAX_LENGTH = 4096
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
 SLIDE_TYPES = ("H&E", "IHC", "Other", "Unknown")
 
-# Names and descriptions must stay identical to ImportWsiData.insertSampleSlideCounts.
+# Names and descriptions of the count attributes the retired native importer wrote.
 SAMPLE_COUNT_ATTRIBUTES = [
     ("WSI_SAMPLE_SLIDE_COUNT", "WSI Slides per Sample",
      "Associated pathology slide count for the sample."),
@@ -329,7 +329,7 @@ def stain_flags_valid(slide_type, is_hne, is_ihc):
 
 
 def normalize_row(row, line):
-    """Parse one row like ImportWsiData.normalize and return its metadata object."""
+    """Parse one row and return its metadata object."""
     metadata = {}
     for field in PUBLIC_STRING_FIELDS:
         if row[field]:
@@ -394,7 +394,7 @@ def normalize_row(row, line):
 
 
 class SlideParser:
-    """Normalize rows one at a time, applying the cross-row checks of ImportWsiData.normalize."""
+    """Normalize rows one at a time, applying the cross-row consistency checks."""
 
     def __init__(self):
         self.slide_keys = set()
@@ -453,7 +453,7 @@ def parse_slides(rows):
 
 
 class SlideCounter:
-    """Per-entity counts with the semantics of ImportWsiData.insertSampleSlideCounts.
+    """Per-entity slide counts with the semantics of the retired native importer.
 
     One count per slide (SLIDE_KEY, unique per study as SlideParser enforces).
     Sample counts cover matched slides only, so samples

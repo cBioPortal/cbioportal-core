@@ -329,8 +329,5 @@ importer's sequence, so they stay unique across importer processes.
 Re-importing a resource file replaces the study's rows for the resource IDs in
 that file, and study deletion removes them.
 
-The native WSI tables (`wsi_patient`, `wsi_part`, `wsi_block`, `wsi_slide`,
-`wsi_slide_placement`) and the `ImportWsiData` Java entry
-point are deprecated but retained; nothing in the resource import path writes
-them. Study deletion still removes any rows a study has in them. Retiring the
-tables is a separate change.
+WSI data has no tables of its own: core neither writes nor deletes any
+`wsi_*` table, and the backend schema has none from migration 3.7.0 on.

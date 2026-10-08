@@ -437,7 +437,6 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.PATIENT_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
     MetaFileTypes.STUDY_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
     MetaFileTypes.RESOURCES_DEFINITION: "org.mskcc.cbio.portal.scripts.ImportResourceDefinition",
-    MetaFileTypes.WSI: "org.mskcc.cbio.portal.scripts.ImportWsiData",
 }
 
 IMPORTER_REQUIRES_METADATA = {
@@ -449,8 +448,7 @@ IMPORTER_REQUIRES_METADATA = {
     "org.mskcc.cbio.portal.scripts.ImportTimelineData" : True,
     "org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap" : False,
     "org.mskcc.cbio.portal.scripts.ImportResourceData" : True,
-    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True,
-    "org.mskcc.cbio.portal.scripts.ImportWsiData" : True
+    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True
 }
 
 # ------------------------------------------------------------------------------

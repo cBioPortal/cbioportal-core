@@ -55,8 +55,6 @@ public abstract class IntegrationTestBase {
         Pattern.compile("<cbioportal\\.version>\\s*([^<]+)\\s*</cbioportal\\.version>");
     private static final Pattern DB_VERSION_PATTERN =
         Pattern.compile("<db\\.version>\\s*([^<]+)\\s*</db\\.version>");
-    private static final String EXPECTED_WSI_TABLES =
-        "'wsi_patient', 'wsi_part', 'wsi_block', 'wsi_slide', 'wsi_slide_placement'";
 
     private static ClickHouseContainer container;
 
@@ -225,15 +223,6 @@ public abstract class IntegrationTestBase {
             throw new IllegalStateException(
                 "Canonical ClickHouse schema version mismatch: expected "
                     + expectedVersion + ", found " + actualVersion);
-        }
-
-        String wsiTableCount = executeClickHouseScalar(
-            clickhouse,
-            "SELECT count() FROM system.tables WHERE database = '" + DB_NAME
-                + "' AND name IN (" + EXPECTED_WSI_TABLES + ")");
-        if (!"5".equals(wsiTableCount)) {
-            throw new IllegalStateException(
-                "Canonical ClickHouse schema is missing WSI tables: found " + wsiTableCount);
         }
     }
 
