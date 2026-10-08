@@ -50,6 +50,7 @@ import org.mskcc.cbio.portal.model.ReferenceGenome;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.util.ConsoleUtil;
 import org.mskcc.cbio.portal.util.FileUtil;
+import org.mskcc.cbio.portal.util.FractionGenomeAlteredCalculator;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 
@@ -62,6 +63,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
     private int entriesSkipped;
     private boolean isIncrementalUpdateMode;
     private Set<Integer> processedSampleIds;
+    private FractionGenomeAlteredCalculator fractionGenomeAlteredCalculator;
 
     private void importData(File file, int cancerStudyId) throws IOException, DaoException {
         FileReader reader = new FileReader(file);
@@ -70,6 +72,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             String line = buf.readLine(); // skip header line
             long segId = DaoCopyNumberSegment.getLargestId();
             processedSampleIds = new HashSet<>();
+            fractionGenomeAlteredCalculator = new FractionGenomeAlteredCalculator();
             while ((line=buf.readLine()) != null) {
                 ProgressMonitor.incrementCurValue();
                 ConsoleUtil.showProgress();
@@ -110,6 +113,7 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
                 cns.setSegId(++segId);
                 DaoCopyNumberSegment.addCopyNumberSegment(cns);
                 processedSampleIds.add(s.getInternalId());
+                fractionGenomeAlteredCalculator.addSegment(s.getInternalId(), start, end, segMean);
             }
             if (isIncrementalUpdateMode) {
                 DaoCopyNumberSegment.deleteSegmentDataForSamples(cancerStudyId, processedSampleIds);
@@ -147,7 +151,8 @@ public class ImportCopyNumberSegmentData extends ConsoleRunnable {
             ClickHouseBulkLoader.bulkLoadOn();
             importCopyNumberSegmentFileMetadata(cancerStudy, properties);
             importCopyNumberSegmentFileData(cancerStudy, dataFile);
-            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(), processedSampleIds, isIncrementalUpdateMode);
+            DaoCopyNumberSegment.createFractionGenomeAlteredClinicalData(cancerStudy.getInternalId(),
+                    fractionGenomeAlteredCalculator.getFractionGenomeAltered(), isIncrementalUpdateMode);
             ClickHouseOptimizer.optimizeTables("clinical_sample", "clinical_patient");
             ClickHouseBulkLoader.bulkLoadOff();
         } catch (RuntimeException e) {

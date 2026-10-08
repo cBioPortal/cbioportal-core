@@ -19,7 +19,7 @@
 		     info.db_schema_version IN cbioportal/src/main/resources/db-scripts/clickhouse/init/schema.sql -->
 		<db.version>3.6.0</db.version>
 		<!-- Pin this to the backend commit containing the matching schema before merging. -->
-		<cbioportal.version>11b65c67658700bd1ee82903774bb7520638fd93</cbioportal.version>
+		<cbioportal.version>18e887837f21d64a643cc7a2a12f45cf9910b9f6</cbioportal.version>
 		<maf.version>1.0.0</maf.version>
 
 		<commons_lang3.version>3.13.0</commons_lang3.version>
@@ -37,6 +37,7 @@
 		<spring_starter_test.version>3.5.0</spring_starter_test.version>
 		<junit.version>4.13.2</junit.version>
 		<jakarta_ws_rs.version>3.1.0</jakarta_ws_rs.version>
+		<mockito.version>5.23.0</mockito.version>
 		<easymock.version>4.3</easymock.version>
 		<junitparams.version>1.1.0</junitparams.version>
 		<byte_buddy.version>1.18.3</byte_buddy.version>
@@ -164,6 +165,12 @@
 			<groupId>jakarta.ws.rs</groupId>
 			<artifactId>jakarta.ws.rs-api</artifactId>
 			<version>${jakarta_ws_rs.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

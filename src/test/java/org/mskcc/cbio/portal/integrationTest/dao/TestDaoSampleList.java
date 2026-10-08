@@ -50,6 +50,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * JUnit test for DaoCase List.
@@ -86,9 +87,11 @@ public class TestDaoSampleList extends IntegrationTestBase {
         samples.add("TCGA-2-S1");
         sampleList.setSampleList(samples);
         daoSampleList.addSampleList(sampleList);
+        assertTrue(sampleList.getSampleListId() > 0);
         
         // Only patients with samples are returned. No samples, no returny in the listy.
         SampleList sampleListFromDb = daoSampleList.getSampleListByStableId("stable_0");
+        assertEquals(sampleList.getSampleListId(), sampleListFromDb.getSampleListId());
         assertEquals("Name0", sampleListFromDb.getName());
         assertEquals("Description0", sampleListFromDb.getDescription());
         assertEquals(SampleListCategory.ALL_CASES_WITH_CNA_DATA, sampleListFromDb.getSampleListCategory());
