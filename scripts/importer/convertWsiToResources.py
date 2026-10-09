@@ -59,6 +59,8 @@ from pathlib import Path
 from urllib.parse import quote, urlparse
 
 
+# The WSI row contract below (resource IDs, columns, slide key, sealed source, slide
+# types, stain rule) is also what validateData.py checks WHOLE_SLIDE_IMAGE rows against.
 SAMPLE_RESOURCE_ID = "WSI_SAMPLE"
 PATIENT_RESOURCE_ID = "WSI_PATIENT"
 RESOURCE_TYPE = "WHOLE_SLIDE_IMAGE"
@@ -323,7 +325,7 @@ def sealed_source_valid(value):
 
 
 def stain_flags_valid(slide_type, is_hne, is_ihc):
-    """Mirror the native wsi_slide_stain_flags_valid CHECK constraint."""
+    """Whether IS_HNE/IS_IHC agree with SLIDE_TYPE (at most one is set, and only for its type)."""
     return (not (is_hne and is_ihc)
             and (slide_type != "H&E" or is_hne)
             and (slide_type != "IHC" or is_ihc)

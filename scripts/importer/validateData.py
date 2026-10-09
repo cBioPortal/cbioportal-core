@@ -43,8 +43,7 @@ import json
 import yaml
 import xml.etree.ElementTree as ET
 from pathlib import Path
-import binascii
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from base64 import urlsafe_b64encode
 import math
 from abc import ABCMeta, abstractmethod
 from urllib.parse import urlparse
@@ -52,15 +51,6 @@ from urllib.parse import urlparse
 WSI_TILE_METADATA_SCHEMA_VERSION = 2
 WSI_DECODE_POLICY_VERSION = 'geometry-v2;tile-max=16777216;thumbnail-max=16777216'
 WSI_MAX_DECODE_PIXELS = 16777216
-
-# Opaque per-slide key computed upstream (e.g. a salted hash of the pathology
-# image ID); it is the only slide identifier exposed in public metadata.
-WSI_SLIDE_KEY = re.compile(r'[0-9a-f]{32}')
-# Sealed slide source (contract wsi-serving-v6): unpadded base64url of
-# nonce(12) || ciphertext || tag(16), opened only by the tile server.
-WSI_SEALED_SOURCE = re.compile(r'[A-Za-z0-9_-]+')
-WSI_SEALED_SOURCE_MIN_BYTES = 12 + 1 + 16
-WSI_SEALED_SOURCE_MAX_LENGTH = 4096
 
 # Configure relative imports if running as a script; see PEP 366
 # it might passed as empty string by certain tooling to mark a top level module.
@@ -75,6 +65,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
+# The WSI row contract (columns, slide key, sealed source, stain rule) lives with the converter.
+from . import convertWsiToResources as wsi_contract
 
 
 # ------------------------------------------------------------------------------
@@ -3971,17 +3963,8 @@ class WsiRowChecks(object):
     values ('' for missing).
     """
 
-    EXPECTED_HEADERS = [
-        'PATIENT_ID', 'REFERENCE_SAMPLE_ID', 'SAMPLE_ID',
-        'PART_KEY', 'PART_NUMBER', 'PART_DESIGNATOR', 'PART_TYPE',
-        'PART_DESCRIPTION', 'SUBSPECIALTY', 'PATH_DX_TITLE', 'BLOCK_KEY',
-        'BLOCK_NUMBER', 'BLOCK_LABEL', 'MATCH_LEVEL', 'SPECIMEN_KEY',
-        'STAIN_NAME', 'STAIN_GROUP', 'IS_HNE', 'IS_IHC', 'MAGNIFICATION',
-        'FILE_SIZE_BYTES', 'BARCODE', 'SLIDE_TYPE', 'CAN_SERVE_TILES',
-        'TILE_METADATA_JSON', 'THUMBNAIL_WIDTH',
-        'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'SLIDE_KEY', 'SEALED_SOURCE',
-    ]
-    SLIDE_TYPES = ('H&E', 'IHC', 'Other', 'Unknown')
+    # format-v4 column names; rows are keyed by them
+    EXPECTED_HEADERS = wsi_contract.COLUMNS
     REQUIRED_VALUES = {
         'PATIENT_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
         'SPECIMEN_KEY', 'IS_HNE', 'IS_IHC', 'CAN_SERVE_TILES', 'SLIDE_KEY',
@@ -4068,17 +4051,6 @@ class WsiRowChecks(object):
             return False
         return WsiRowChecks._is_media_type_token(media_type[len('image/'):])
 
-    @staticmethod
-    def _is_sealed_source(value):
-        """Whether a non-empty SEALED_SOURCE has the sealed-source shape."""
-        if len(value) > WSI_SEALED_SOURCE_MAX_LENGTH or not WSI_SEALED_SOURCE.fullmatch(value):
-            return False
-        try:
-            decoded = urlsafe_b64decode(value + '=' * (-len(value) % 4))
-        except (binascii.Error, ValueError):
-            return False
-        return len(decoded) >= WSI_SEALED_SOURCE_MIN_BYTES
-
     def _check_reference_sample(self, row, line_number, column, state, label):
         """Require one reference sample per patient across all WSI rows of the study.
 
@@ -4135,25 +4107,19 @@ class WsiRowChecks(object):
                     self._error('WSI numeric value is invalid', line_number,
                                 column(name), row[name])
 
-        # The native wsi_slide table enforced these as CHECK constraints
-        # (wsi_slide_type_valid and wsi_slide_stain_flags_valid).
         slide_type = row['SLIDE_TYPE']
-        if slide_type not in self.SLIDE_TYPES:
+        if slide_type not in wsi_contract.SLIDE_TYPES:
             self._error('WSI SLIDE_TYPE must be H&E, IHC, Other, or Unknown', line_number,
                         column('SLIDE_TYPE'), slide_type)
         elif row['IS_HNE'] in ('TRUE', 'FALSE') and row['IS_IHC'] in ('TRUE', 'FALSE'):
-            is_hne = row['IS_HNE'] == 'TRUE'
-            is_ihc = row['IS_IHC'] == 'TRUE'
-            if ((is_hne and is_ihc)
-                    or (slide_type == 'H&E' and not is_hne)
-                    or (slide_type == 'IHC' and not is_ihc)
-                    or (slide_type in ('Other', 'Unknown') and (is_hne or is_ihc))):
+            if not wsi_contract.stain_flags_valid(
+                    slide_type, row['IS_HNE'] == 'TRUE', row['IS_IHC'] == 'TRUE'):
                 self._error('WSI IS_HNE/IS_IHC are inconsistent with SLIDE_TYPE', line_number,
                             column('SLIDE_TYPE'),
                             '%s: IS_HNE=%s, IS_IHC=%s' % (slide_type, row['IS_HNE'], row['IS_IHC']))
 
         slide_key = row['SLIDE_KEY']
-        if slide_key and not WSI_SLIDE_KEY.fullmatch(slide_key):
+        if slide_key and not wsi_contract.SLIDE_KEY_PATTERN.fullmatch(slide_key):
             self._error('SLIDE_KEY must be 32 lowercase hex characters', line_number,
                         column('SLIDE_KEY'), label('SLIDE_KEY'))
         elif slide_key and slide_key in state['slide_keys']:
@@ -4181,7 +4147,7 @@ class WsiRowChecks(object):
         state['blocks'][block_key] = block_value
 
         match_level = row['MATCH_LEVEL']
-        if match_level not in ('BLOCK', 'PART', 'UNMATCHED'):
+        if match_level not in wsi_contract.MATCH_LEVELS:
             self._error('WSI MATCH_LEVEL must be BLOCK, PART, or UNMATCHED', line_number,
                         column('MATCH_LEVEL'), match_level)
         if match_level == 'UNMATCHED' and row['SAMPLE_ID']:
@@ -4208,10 +4174,10 @@ class WsiRowChecks(object):
 
         # SEALED_SOURCE is opaque and only the tile server can open it; report the field only.
         sealed_source = row['SEALED_SOURCE']
-        if sealed_source and not self._is_sealed_source(sealed_source):
+        if sealed_source and not wsi_contract.sealed_source_valid(sealed_source):
             self._error('WSI SEALED_SOURCE must be unpadded base64url of at least %d bytes and '
                         'at most %d characters'
-                        % (WSI_SEALED_SOURCE_MIN_BYTES, WSI_SEALED_SOURCE_MAX_LENGTH),
+                        % (wsi_contract.SEALED_SOURCE_MIN_BYTES, wsi_contract.SEALED_SOURCE_MAX_LENGTH),
                         line_number, column('SEALED_SOURCE'), label('SEALED_SOURCE'))
         if sealed_source and row['CAN_SERVE_TILES'] == 'FALSE':
             self._error('WSI SEALED_SOURCE must be empty when CAN_SERVE_TILES is FALSE',
@@ -4265,9 +4231,10 @@ class ResourceValidator(WsiRowChecks, Validator):
     NULL_VALUES = ["[not applicable]", "[not available]", "[pending]", "[discrepancy]", "[completed]", "[null]", "", "na"]
     ALLOW_BLANKS = True
 
-    WSI_RESOURCE_TYPE = 'WHOLE_SLIDE_IMAGE'
+    WSI_RESOURCE_TYPE = wsi_contract.RESOURCE_TYPE
     # resource definition ID required for WSI rows in each resource file type
-    WSI_RESOURCE_IDS = {'SAMPLE': 'WSI_SAMPLE', 'PATIENT': 'WSI_PATIENT'}
+    WSI_RESOURCE_IDS = {'SAMPLE': wsi_contract.SAMPLE_RESOURCE_ID,
+                        'PATIENT': wsi_contract.PATIENT_RESOURCE_ID}
     # metadata keys (the lower-cased format-v4 column names) and their JSON types
     WSI_STRING_KEYS = (
         'SLIDE_KEY', 'REFERENCE_SAMPLE_ID', 'PART_KEY', 'PART_NUMBER',
@@ -4284,7 +4251,7 @@ class ResourceValidator(WsiRowChecks, Validator):
     # a free-text specimen label, a raw artifact location or the sealed source.
     WSI_FORBIDDEN_PUBLIC_KEYS = WSI_UNSEALED_SOURCE_KEYS + (
         'barcode', 'part_designator', 'path_dx_title', 'sealed_source')
-    WSI_SERVING_KEY = 'wsi_serving'
+    WSI_SERVING_KEY = wsi_contract.SERVING_KEY
     WSI_SERVING_STRING_KEYS = ('SEALED_SOURCE', 'THUMBNAIL_CONTENT_TYPE')
     WSI_SERVING_INTEGER_KEYS = ('THUMBNAIL_WIDTH', 'THUMBNAIL_HEIGHT')
 
