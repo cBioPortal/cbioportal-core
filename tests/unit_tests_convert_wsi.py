@@ -265,11 +265,6 @@ class ConvertedOutputTestCase(ConverterTestCase):
              ['WSI-P2', '1', '1', '0'],
              ['WSI+P3', 'NA', 'NA', 'NA']],
             data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[1:])
-        by_sample, by_patient = converter.count_slides(
-            converter.parse_slides(converter.iter_rows(self.write_legacy(rows).parent / 'data_wsi.txt')))
-        self.assertEqual({('WSI-P1', 'WSI-P1-S1'): [1, 0, 1], ('WSI-P2', 'WSI-P2-S1'): [1, 1, 0]},
-                         by_sample)
-        self.assertEqual({'WSI-P1': [2, 0, 1], 'WSI-P2': [1, 1, 0]}, by_patient)
         # the non-viewable slides are still converted to resources
         samples = rows_by_slide(self.out / 'data_resource_sample.txt')
         self.assertIn('slide-3', samples)
@@ -403,7 +398,7 @@ class ConverterInputTestCase(ConverterTestCase):
         rows[0] = rows[0].replace('\tH&E\tH&E\tTRUE\t', '\tH\r&E\tH&E\tTRUE\t', 1)
         self.assertConversionError('tab or line break', meta=self.write_legacy(rows))
         with self.assertRaises(converter.ConversionError):
-            converter.write_tsv(Path(self.tmp.name) / 'x.txt', [['a\tb']])
+            converter.render_tsv('x.txt', [['a\tb']])
 
     def test_existing_count_attributes_conflict(self):
         study = Path(self.tmp.name) / 'study'
@@ -760,7 +755,7 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
 
     def test_tab_in_output_is_not_echoed(self):
         with self.assertRaises(converter.ConversionError) as context:
-            converter.write_tsv(Path(self.tmp.name) / 'x.txt', [['SECRET\t1']])
+            converter.render_tsv('x.txt', [['SECRET\t1']])
         self.assertNotIn('SECRET', str(context.exception))
 
     def test_each_slide_key_counts_once(self):

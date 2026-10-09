@@ -241,15 +241,14 @@ def _iter_lines(path, what):
         raise ConversionError(f"{path}: cannot read {what}: {error}") from error
 
 
-def iter_rows(data_path, columns=None):
+def iter_rows(data_path):
     """Stream the legacy data file: leading '#' rows, the exact header, then slide rows.
 
-    The header must be ``columns`` or, by default, ``COLUMNS`` or
-    ``COLUMNS_WITH_IGNORED_TIMING``. Yields (line number, row dict with stripped
-    values) and raises if the file has no slide rows. Ignored timing columns
-    stay in the row dict; nothing reads them.
+    The header must be ``COLUMNS`` or ``COLUMNS_WITH_IGNORED_TIMING``. Yields
+    (line number, row dict with stripped values) and raises if the file has no
+    slide rows. Ignored timing columns stay in the row dict; nothing reads them.
     """
-    accepted = [columns] if columns is not None else [COLUMNS, COLUMNS_WITH_IGNORED_TIMING]
+    accepted = [COLUMNS, COLUMNS_WITH_IGNORED_TIMING]
     lines = _iter_lines(data_path, "WSI data file")
     header = None
     for line_number, line in lines:
@@ -281,11 +280,6 @@ def iter_rows(data_path, columns=None):
         yield line_number, dict(zip(columns, fields))
     if not found:
         raise ConversionError(f"{data_path}: WSI data file contains no slide rows")
-
-
-def read_rows(data_path, columns=None):
-    """Read every row of a legacy data file into a list (see iter_rows)."""
-    return list(iter_rows(data_path, columns))
 
 
 def _fail(line, message):
@@ -450,12 +444,6 @@ class SlideParser:
         }
 
 
-def parse_slides(rows):
-    """Normalize every row (see SlideParser)."""
-    parser = SlideParser()
-    return [parser.parse(line, row) for line, row in rows]
-
-
 class SlideCounter:
     """Per-entity counts of the slides the viewer can open.
 
@@ -495,14 +483,6 @@ class SlideCounter:
                 counts[2] += 1
 
 
-def count_slides(slides):
-    """Return (by_sample, by_patient) counts for a list of parsed slides (see SlideCounter)."""
-    counter = SlideCounter()
-    for slide in slides:
-        counter.add(slide)
-    return counter.by_sample, counter.by_patient
-
-
 def _check_cell(value, file_name):
     text = "" if value is None else str(value)
     if any(character in text for character in "\t\n\r"):
@@ -515,10 +495,6 @@ def _check_cell(value, file_name):
 def render_tsv(file_name, rows):
     """Render raw tab-separated rows; no quoting, one physical line per record."""
     return "\n".join("\t".join(_check_cell(value, file_name) for value in row) for row in rows) + "\n"
-
-
-def write_tsv(path, rows):
-    path.write_text(render_tsv(path.name, rows), encoding="utf-8")
 
 
 def render_meta(entries):
