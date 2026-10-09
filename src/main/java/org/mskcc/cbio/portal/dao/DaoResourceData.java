@@ -131,19 +131,7 @@ public final class DaoResourceData {
      * @param resourceIds   resource IDs present in the file being (re-)imported; a no-op if empty
      */
     public static void deleteResourceData(int cancerStudyId, Set<String> resourceIds) throws DaoException {
-        if (resourceIds == null || resourceIds.isEmpty()) {
-            return;
-        }
-        Set<Long> idsToDelete = findResourceDataIds(cancerStudyId, resourceIds);
-        if (idsToDelete.isEmpty()) {
-            return;
-        }
-        // Queued, not flushed: the caller runs ClickHouseBulkDeleter.flushAll() (ImportResourceData
-        // does so before writing its inserts). ClickHouseBulkLoader.flushAll() does not run deletions. The ids collected above belong only
-        // to rows that already existed, and ClickHouseAutoIncrement seeds each counter from
-        // max(persisted, current table max), so the rows this import is about to insert get ids
-        // above every one of them. The deletion is therefore correct whenever it runs.
-        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
+        addResourceDataToBulkDelete(cancerStudyId, "resource_id", resourceIds);
     }
 
     /**
@@ -156,7 +144,7 @@ public final class DaoResourceData {
      */
     public static void addSampleResourceDataToBulkDelete(int cancerStudyId, Set<String> sampleStableIds)
             throws DaoException {
-        addEntityResourceDataToBulkDelete(cancerStudyId, "sample_id", sampleStableIds);
+        addResourceDataToBulkDelete(cancerStudyId, "sample_id", sampleStableIds);
     }
 
     /**
@@ -169,22 +157,24 @@ public final class DaoResourceData {
      */
     public static void addPatientResourceDataToBulkDelete(int cancerStudyId, Set<String> patientStableIds)
             throws DaoException {
-        addEntityResourceDataToBulkDelete(cancerStudyId, "patient_id", patientStableIds);
+        addResourceDataToBulkDelete(cancerStudyId, "patient_id", patientStableIds);
     }
 
-    private static void addEntityResourceDataToBulkDelete(int cancerStudyId, String entityColumn,
-            Set<String> stableIds) throws DaoException {
-        if (stableIds == null || stableIds.isEmpty()) {
+    private static void addResourceDataToBulkDelete(int cancerStudyId, String filterColumn,
+            Set<String> values) throws DaoException {
+        if (values == null || values.isEmpty()) {
             return;
         }
-        Set<Long> idsToDelete = findResourceDataIds(cancerStudyId, entityColumn, stableIds);
-        if (!idsToDelete.isEmpty()) {
-            ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
+        Set<Long> idsToDelete = findResourceDataIds(cancerStudyId, filterColumn, values);
+        if (idsToDelete.isEmpty()) {
+            return;
         }
-    }
-
-    private static Set<Long> findResourceDataIds(int cancerStudyId, Set<String> resourceIds) throws DaoException {
-        return findResourceDataIds(cancerStudyId, "resource_id", resourceIds);
+        // Queued here, flushed by the caller. The ids collected above belong only to rows that
+        // already existed, and ClickHouseAutoIncrement seeds each counter from
+        // max(persisted, current table max), so the rows an import is about to insert get ids
+        // above every one of them: the deletion is correct whichever side of the inserts it
+        // lands on.
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
     }
 
     private static Set<Long> findResourceDataIds(int cancerStudyId, String filterColumn, Set<String> values)
@@ -217,3 +207,4 @@ public final class DaoResourceData {
         return ids;
     }
 }
+
