@@ -97,14 +97,13 @@ at most 4096 characters that decode to at least 29 bytes. It is required when
 `can_serve_tiles` is true and must be absent or empty otherwise. Error
 messages never echo it.
 
-For every `WHOLE_SLIDE_IMAGE` row, `validateData.py` applies the same checks
-as the legacy WSI validator described under [Legacy format](#legacy-format-v4):
+For every `WHOLE_SLIDE_IMAGE` row, `validateData.py` applies the row contract
+of [format v4](#legacy-format-v4), shared with the converter:
 required hierarchy keys, typed values, `match_level`
 agreement with the file type (sample rows are matched, patient rows are
 unmatched), `slide_type` being `H&E`, `IHC`, `Other`, or `Unknown` with
 consistent stain flags (never both `is_hne` and `is_ihc`; `H&E` requires
-`is_hne`, `IHC` requires `is_ihc`, `Other`/`Unknown` allow neither), as the
-native `wsi_slide` table constraints required, `slide_key` (32 lowercase hex
+`is_hne`, `IHC` requires `is_ihc`, `Other`/`Unknown` allow neither), `slide_key` (32 lowercase hex
 characters) unique across both files of the study, consistent part and block
 metadata, the sample and reference sample belonging to the row's patient, and
 the `wsi_serving` shape and sealed-source rules. The row's `RESOURCE_ID` must be `WSI_SAMPLE` in sample files and
@@ -158,10 +157,9 @@ python scripts/importer/convertWsiToResources.py \
   converter merges the slide counts into copies of the study's clinical files
   (see [Slide counts](#slide-counts)). It must differ from `--output-dir`.
 
-Rows are parsed like the retired native importer: leading `#` rows are
-skipped, the header must match format v4 exactly, `MATCH_LEVEL` must agree
-with `SAMPLE_ID`, `SLIDE_TYPE` and the stain flags must satisfy the native
-`wsi_slide` constraints above, an `UNMATCHED` reference sample is dropped, and
+Leading `#` rows are skipped, the header must match format v4 exactly,
+`MATCH_LEVEL` must agree with `SAMPLE_ID`, `SLIDE_TYPE` and the stain flags
+must satisfy the rules above, an `UNMATCHED` reference sample is dropped, and
 serving fields are dropped when `CAN_SERVE_TILES=FALSE`. `SLIDE_KEY` is required, must be 32
 lowercase hex characters and unique. `SEALED_SOURCE` must have the
 [sealed-source shape](#sealed-source), is required when `CAN_SERVE_TILES=TRUE`
@@ -224,8 +222,7 @@ With `--study-dir`, the converter fails without writing anything if:
 
 ### Slide counts
 
-The count files carry the attributes the native importer used to write, as
-`NUMBER` attributes with priority 1:
+The count files carry these `NUMBER` attributes with priority 1:
 
 | Attribute | Display name |
 | --- | --- |

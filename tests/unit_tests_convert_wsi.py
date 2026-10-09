@@ -187,7 +187,7 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertEqual({'height': 768, 'width': 1024}, serving['tile_metadata_json']['dimensions'])
         self.assertEqual({'model': 'Scan "Q" \\ 40', 'objective_power': 40, 'calibrated': True},
                          serving['tile_metadata_json']['vendor']['scanner'])
-        # UNMATCHED reference samples are dropped, as the native importer stored null
+        # UNMATCHED reference samples are dropped (stored as no reference sample)
         self.assertNotIn('reference_sample_id', json.loads(samples['slide-5']['METADATA']))
         self.assertEqual(0, json.loads(samples['slide-5']['METADATA'])['file_size_bytes'])
 
@@ -201,7 +201,7 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertNotIn('wsi_serving', second)
         self.assertNotIn('wsi_serving', json.loads(patients['slide-6']['METADATA']))
 
-    def test_count_rows_match_native_semantics(self):
+    def test_count_rows(self):
         self.convert()
         self.assertEqual(
             [['PATIENT_ID', 'SAMPLE_ID', 'WSI_SAMPLE_SLIDE_COUNT', 'WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT',
@@ -344,7 +344,7 @@ class ConverterInputTestCase(ConverterTestCase):
         rows[3] = rows[3].replace('\tUNMATCHED\t', '\tPART\t', 1)
         self.assertConversionError('matched rows require SAMPLE_ID', meta=self.write_legacy(rows))
 
-    def test_slide_type_and_stain_flags_follow_native_constraints(self):
+    def test_slide_type_and_stain_flags(self):
         slide_type = converter.COLUMNS.index('SLIDE_TYPE')
         is_hne = converter.COLUMNS.index('IS_HNE')
         for column, value, message in ((slide_type, 'Frozen', 'SLIDE_TYPE must be one of'),

@@ -3568,7 +3568,6 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
         self.assertEqual([('WHOLE_SLIDE_IMAGE metadata value must be a JSON string', 'part_number')], errors)
 
     def test_slide_type_and_stain_flags(self):
-        # mirrors the native wsi_slide_type_valid / wsi_slide_stain_flags_valid constraints
         errors = self.validate_resource(validateData.SampleResourceValidator,
                                         [self.sample_row(self.metadata(slide_type=None))])
         self.assertIn(('WSI SLIDE_TYPE must be H&E, IHC, Other, or Unknown', ''), errors)

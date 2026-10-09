@@ -3,8 +3,7 @@
 
 The converter is deliberately offline: it never connects to cBioPortal, a
 database, or an artifact store. It reads ``meta_wsi.txt``/``data_wsi.txt``,
-applies the row parsing and normalization of the retired native importer, and
-writes:
+parses and normalizes the slide rows, and writes:
 
 * ``data_resource_definition.txt`` with the ``WSI_SAMPLE``/``WSI_PATIENT``
   definitions that have rows;
@@ -12,8 +11,7 @@ writes:
   ``BLOCK``) and ``data_resource_patient.txt`` for unmatched slides; each row
   links to the standalone viewer by its opaque ``slide_key`` and carries the
   slide metadata as JSON;
-* the six ``WSI_*`` slide-count attributes the native importer used to
-  generate, counting only viewable (``CAN_SERVE_TILES``) slides: with
+* six ``WSI_*`` slide-count attributes, counting only viewable (``CAN_SERVE_TILES``) slides: with
   ``--study-dir``, merged into copies of the study's clinical sample and
   patient files (same file names); without it, as standalone
   ``data_clinical_sample_wsi_counts.txt``/``data_clinical_patient_wsi_counts.txt``
@@ -41,9 +39,8 @@ never values.
 
 Rows are streamed, so large studies convert in bounded memory; output is
 staged next to ``--output-dir`` and only moved there when the conversion
-succeeds. The output is not validated here beyond what the native importer
-checked while parsing; run ``validateData.py`` on the study after adding the
-files.
+succeeds. The output is not validated here beyond the row contract checked
+while parsing; run ``validateData.py`` on the study after adding the files.
 """
 
 import argparse
@@ -122,8 +119,7 @@ SEALED_SOURCE_MAX_LENGTH = 4096
 MATCH_LEVELS = ("BLOCK", "PART", "UNMATCHED")
 SLIDE_TYPES = ("H&E", "IHC", "Other", "Unknown")
 
-# The count attributes (the retired native importer wrote the same IDs). They count only
-# slides the viewer can open.
+# The count attributes. They count only slides the viewer can open.
 SAMPLE_COUNT_ATTRIBUTES = [
     ("WSI_SAMPLE_SLIDE_COUNT", "WSI Viewable Slides per Sample",
      "Pathology slides the slide viewer can open, for the sample."),
@@ -223,8 +219,7 @@ def display_name(row):
 def _iter_lines(path, what):
     """Yield (line number, text) for each line of a UTF-8 file, split on LF only.
 
-    Splitting on LF alone (as the native importer did) keeps a stray CR inside a
-    value in its row, so it is reported instead of silently starting a new row.
+    Splitting on LF alone keeps a stray CR inside a value in its row, so it is reported instead of silently starting a new row.
     """
     try:
         with open(path, "rb") as stream:
@@ -339,8 +334,6 @@ def normalize_row(row, line):
     metadata["is_ihc"] = _boolean(row, "IS_IHC", line)
     can_serve = _boolean(row, "CAN_SERVE_TILES", line)
     metadata["can_serve_tiles"] = can_serve
-    # The native wsi_slide table enforced these as CHECK constraints
-    # (wsi_slide_type_valid and wsi_slide_stain_flags_valid).
     if row["SLIDE_TYPE"] not in SLIDE_TYPES:
         _fail(line, "SLIDE_TYPE must be one of " + ", ".join(SLIDE_TYPES))
     if not stain_flags_valid(row["SLIDE_TYPE"], metadata["is_hne"], metadata["is_ihc"]):
@@ -604,8 +597,7 @@ def merge_clinical_counts(data_path, attributes, key_columns, counts, slide_keys
     ``key_columns`` names the identifier columns that key ``counts`` (a dict from
     identifier tuples to one count per attribute). ``slide_keys`` lists every entity
     with a slide, viewable or not (default: the keys of ``counts``); each must be in
-    the clinical file. Rows of entities without a viewable slide get NA, as the native
-    importer wrote no value for them. Every existing line, value and
+    the clinical file. Rows of entities without a viewable slide get NA (no value). Every existing line, value and
     line ending is kept; comment and blank lines after the header are unchanged.
     """
     name = data_path.name
