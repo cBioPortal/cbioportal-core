@@ -520,7 +520,7 @@ class Validator(object):
             for unique_col_name in self.UNIQUE_COLUMNS:
                 col_index = _get_column_index(header_cols, unique_col_name)
                 if col_index > -1:
-                    self.unique_col_data[_get_column_index(header_cols, unique_col_name)] = []
+                    self.unique_col_data[col_index] = set()
 
             if self.checkHeader(header_cols) > 0:
                 if not self.relaxed_mode:
@@ -560,7 +560,7 @@ class Validator(object):
                                 cell_value, self.cols[unique_col_index])
                             continue
                         # add the value to the set for comparison with other rows
-                        previous_values.append(cell_value)
+                        previous_values.add(cell_value)
                     self.checkLine(fields)
 
             # (tuple of) string(s) of the newlines read (for 'rU' mode files)
