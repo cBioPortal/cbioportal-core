@@ -558,7 +558,7 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     return study_id
 
 def make_study_available(args, study_id):
-    # main() has already put the jar path into args.java_opts
+    # resolve_java_opts() has already put the jar path into args.java_opts
     update_study_status("-Dspring.profiles.active=dbcp " + args.java_opts, study_id)
 
 def usage():
@@ -672,18 +672,8 @@ def locate_jar():
     return str(jars[0])
 
 
-def main(args):
-    global LOGGER
-
-    # get the logger with a handler to print logged error messages to stderr
-    module_logger = logging.getLogger(__name__)
-    error_handler = logging.StreamHandler(sys.stderr)
-    error_handler.setFormatter(cbioportal_common.LogfileStyleFormatter(
-            os.getcwd()))
-    error_handler.setLevel(logging.ERROR)
-    module_logger.addHandler(error_handler)
-    LOGGER = module_logger
-
+def resolve_java_opts(args):
+    """Put the scripts jar on the class path in args.java_opts."""
     # move jar_path to java_opts if it exists
     if args.jar_path:
         args.java_opts = f"-cp {args.jar_path} {args.java_opts}"
@@ -704,6 +694,21 @@ def main(args):
             args.java_opts = f"-cp {jar_path}"
         else:
             args.java_opts = f"-cp {jar_path} {args.java_opts}"
+
+
+def main(args):
+    global LOGGER
+
+    # get the logger with a handler to print logged error messages to stderr
+    module_logger = logging.getLogger(__name__)
+    error_handler = logging.StreamHandler(sys.stderr)
+    error_handler.setFormatter(cbioportal_common.LogfileStyleFormatter(
+            os.getcwd()))
+    error_handler.setLevel(logging.ERROR)
+    module_logger.addHandler(error_handler)
+    LOGGER = module_logger
+
+    resolve_java_opts(args)
 
     # process the options
     jvm_args = "-Dspring.profiles.active=dbcp " + args.java_opts
