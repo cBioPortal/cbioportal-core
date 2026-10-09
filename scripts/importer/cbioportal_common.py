@@ -376,13 +376,6 @@ META_FIELD_MAP = {
         'resource_type': True,
         'data_filename': True
     },
-    MetaFileTypes.WSI: {
-        'cancer_study_identifier': True,
-        'genetic_alteration_type': True,
-        'datatype': True,
-        'data_filename': True,
-        'format_version': True,
-    },
 }
 
 # order is important! This is the order in which they should be loaded:
@@ -890,8 +883,10 @@ def parse_metadata_file(filename,
     else:
         meta_file_type = get_meta_file_type(meta_dictionary, logger, filename)
         meta_dictionary['meta_file_type'] = meta_file_type
-        # if type could not be inferred, no further validations are possible
-        if meta_file_type is None:
+        # if type could not be inferred, no further validations are possible;
+        # a legacy WSI meta file is rejected as a whole by the caller
+        # (LEGACY_WSI_IMPORT_MESSAGE), whatever its other fields say
+        if meta_file_type is None or meta_file_type == MetaFileTypes.WSI:
             return dict(meta_dictionary)
 
     # Check for missing fields for this specific meta file type
@@ -992,20 +987,6 @@ def parse_metadata_file(filename,
                 ' or '.join(valid_segment_reference_genomes),
                 extra={'filename_': filename,
                        'cause': meta_dictionary['reference_genome_id']})
-            meta_dictionary['meta_file_type'] = None
-
-    if meta_file_type == MetaFileTypes.WSI:
-        if meta_dictionary.get('genetic_alteration_type') != 'PATHOLOGY_SLIDES' or \
-                meta_dictionary.get('datatype') != 'WSI':
-            logger.error(
-                'WSI metadata must use genetic_alteration_type PATHOLOGY_SLIDES and datatype WSI',
-                extra={'filename_': filename})
-            meta_dictionary['meta_file_type'] = None
-        elif meta_dictionary.get('format_version') != '4':
-            logger.error(
-                "Unsupported WSI format_version; expected '4'",
-                extra={'filename_': filename,
-                       'cause': meta_dictionary.get('format_version')})
             meta_dictionary['meta_file_type'] = None
 
     if meta_file_type in [MetaFileTypes.MUTATION, MetaFileTypes.MUTATION_UNCALLED]:

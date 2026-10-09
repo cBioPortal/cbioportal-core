@@ -149,7 +149,6 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.PATIENT_RESOURCES:'PatientResourceValidator',
     cbioportal_common.MetaFileTypes.STUDY_RESOURCES:'StudyResourceValidator',
     cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION:'ResourceDefinitionValidator',
-    cbioportal_common.MetaFileTypes.WSI: 'WsiValidator',
 }
 
 
@@ -3965,11 +3964,11 @@ def wsi_resource_state():
 
 
 class WsiRowChecks(object):
-    """Whole-slide-image row contract shared by the legacy WSI file validator and
-    WHOLE_SLIDE_IMAGE rows in standard sample/patient resource files.
+    """Whole-slide-image row contract for WHOLE_SLIDE_IMAGE rows in sample/patient
+    resource files.
 
     Rows are dicts keyed by the format-v4 column names with stripped string
-    values ('' for missing), so both inputs go through the same checks.
+    values ('' for missing).
     """
 
     EXPECTED_HEADERS = [
@@ -3982,17 +3981,6 @@ class WsiRowChecks(object):
         'TILE_METADATA_JSON', 'THUMBNAIL_WIDTH',
         'THUMBNAIL_HEIGHT', 'THUMBNAIL_CONTENT_TYPE', 'SLIDE_KEY', 'SEALED_SOURCE',
     ]
-    # Slide-timing columns that some files still carry before SLIDE_KEY. They are
-    # accepted but ignored: neither required, validated nor imported.
-    IGNORED_TIMING_HEADERS = [
-        'TIMELINE_START_DAYS', 'TIMELINE_DATE_STATUS', 'TIMELINE_DATE_KIND',
-        'TIMELINE_DATE_SOURCE', 'TIMELINE_DATE_REASON', 'TIMELINE_COORDINATE_SYSTEM',
-        'TIMEPOINT_SOURCE',
-    ]
-    EXPECTED_HEADERS_WITH_IGNORED_TIMING = (
-        EXPECTED_HEADERS[:-2] + IGNORED_TIMING_HEADERS + EXPECTED_HEADERS[-2:])
-    # Format-v3 columns that carry the image ID or an object URI embedding it.
-    REMOVED_HEADERS = ('IMAGE_ID', 'SOURCE_URL', 'THUMBNAIL_URL')
     SLIDE_TYPES = ('H&E', 'IHC', 'Other', 'Unknown')
     REQUIRED_VALUES = {
         'PATIENT_ID', 'PART_KEY', 'BLOCK_KEY', 'MATCH_LEVEL',
@@ -5105,67 +5093,6 @@ class MultipleDataFileValidator(FeaturewiseFileValidator, metaclass=ABCMeta):
     def checkId(self):
         return self.checkIdInSamples()
 
-
-class WsiValidator(WsiRowChecks, Validator):
-    """Validate the canonical whole-slide-image study file."""
-
-    def _validate_file(self):
-        try:
-            with open(self.filename, 'r', newline='') as stream:
-                lines = stream.readlines()
-        except OSError:
-            self.logger.error('File could not be opened')
-            return
-        except UnicodeDecodeError:
-            self.logger.error('File contains invalid UTF-8 bytes. Please check values in file')
-            return
-
-        if len(lines) < 5:
-            self.logger.error('WSI file must contain four comment rows and a column header')
-            return
-        if any(not line.startswith('#') for line in lines[:4]):
-            self.logger.error('WSI file must begin with exactly four comment rows')
-            return
-        if lines[4].startswith('#'):
-            self.logger.error('WSI column header is missing')
-            return
-
-        header = lines[4].rstrip('\r\n').split('\t')
-        removed = [name for name in self.REMOVED_HEADERS if name in header]
-        if removed:
-            self._error('WSI file has columns of format v3 or older; format v4 replaces them with '
-                        'SEALED_SOURCE, so re-export data_wsi.txt', 5, cause=', '.join(removed))
-            return
-        if header not in (self.EXPECTED_HEADERS, self.EXPECTED_HEADERS_WITH_IGNORED_TIMING):
-            self._error('Invalid WSI column header or column order', 5,
-                        cause=', '.join(header))
-            return
-        self.cols = header
-        self.numCols = len(header)
-
-        state = new_wsi_row_state()
-        rows = 0
-        for line_number, line in enumerate(lines[5:], start=6):
-            values = line.rstrip('\r\n').split('\t')
-            if not any(value.strip() for value in values):
-                self._error('Blank WSI data row', line_number)
-                continue
-            if values and values[0].startswith('#'):
-                self._error("WSI data row must not start with '#'", line_number)
-                continue
-            if len(values) != len(header):
-                self._error('Expected %d WSI columns, found %d', line_number,
-                            cause=(len(header), len(values)))
-                continue
-            rows += 1
-            # ignored timing columns stay in the row; no check reads them
-            row = dict(zip(header, (value.strip() for value in values)))
-            self._check_wsi_row(row, line_number, header.index, state)
-
-        if rows == 0:
-            self.logger.error('WSI data file contains no slide rows')
-        self.fileCouldBeParsed = True
-        self.logger.info('Validation of WSI file complete')
 
 class GsvaWiseFileValidator(MultipleDataFileValidator, metaclass=ABCMeta):
     """Groups multiple gene set data files from a study to ensure consistency.
