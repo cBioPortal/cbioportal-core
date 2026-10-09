@@ -4269,6 +4269,9 @@ class ResourceValidator(WsiRowChecks, Validator):
             return
         seen = self.observed_metadata_keys.setdefault(resource_id, {})
         for key in parsed:
+            # A WSI row's private wsi_serving object is never a column, so it is not declared.
+            if key == self.WSI_SERVING_KEY and resource_id in self.WSI_RESOURCE_IDS.values():
+                continue
             seen.setdefault(key, self.line_number)
 
     def onComplete(self):
@@ -4511,12 +4514,10 @@ class ResourceValidator(WsiRowChecks, Validator):
                     parsed = json.loads(value)
                     # The value is already parsed here, so collecting its keys costs a dict walk.
                     # They are checked against the contract once per file, in onComplete.
-                    # WHOLE_SLIDE_IMAGE rows are checked against the WSI contract instead.
-                    if not wsi_line:
-                        self.recordMetadataKeys(
-                            data[self.cols.index('RESOURCE_ID')].strip()
-                            if 'RESOURCE_ID' in self.cols else None,
-                            parsed)
+                    self.recordMetadataKeys(
+                        data[self.cols.index('RESOURCE_ID')].strip()
+                        if 'RESOURCE_ID' in self.cols else None,
+                        parsed)
                     if not isinstance(parsed, dict):
                         self.logger.error(
                             'METADATA must be a JSON object (key-value map), not an array or scalar',

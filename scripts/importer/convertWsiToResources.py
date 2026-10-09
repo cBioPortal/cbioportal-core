@@ -98,14 +98,41 @@ PUBLIC_STRING_FIELDS = [
     "STAIN_GROUP", "MAGNIFICATION", "SLIDE_TYPE",
 ]
 SERVING_KEY = "wsi_serving"
-# Public keys that identify a single slide or specimen, so nearly every row has its own value.
-# The definitions declare them non-filterable in their CUSTOM_METADATA contract; otherwise the
-# portal's resource table lists every distinct value as a filter option (over a million for
-# slide_key on a large study). The columns stay visible, searchable and sortable.
-UNFILTERABLE_KEYS = ("slide_key", "part_key", "block_key", "specimen_key",
-                     "reference_sample_id")
+# The CUSTOM_METADATA contract of both WSI resource definitions: every public metadata key the
+# converter writes, so validateData.py's undeclared-key check holds for converted files. The
+# private wsi_serving object is not a column and is never declared. Keys that identify a single
+# slide or specimen (nearly every row has its own value) and free text are not filterable;
+# otherwise the portal's resource table would list every distinct value as a filter option (over
+# a million for slide_key on a large study). Keys, types and labels of the stain, magnification,
+# part, block and match-level columns follow the backend's study slide table.
+CONTRACT_FIELDS = [
+    # (key, type, label, filterable, visibleByDefault)
+    ("stain_name", "string", "Stain", True, True),
+    ("stain_group", "string", "Stain Group", True, True),
+    ("magnification", "string", "Magnification", True, True),
+    ("part_number", "number", "Part", True, True),
+    ("block_number", "number", "Block", True, True),
+    ("match_level", "string", "Matched At", True, False),
+    ("slide_type", "string", "Slide Type", True, True),
+    ("is_hne", None, "H&E", True, False),
+    ("is_ihc", None, "IHC", True, False),
+    ("can_serve_tiles", None, "Viewable", True, False),
+    ("part_type", "string", "Part Type", True, False),
+    ("part_description", "string", "Part Description", False, False),
+    ("subspecialty", "string", "Subspecialty", True, False),
+    ("block_label", "string", "Block Label", False, False),
+    ("file_size_bytes", "number", "File Size (bytes)", False, False),
+    ("slide_key", "string", "Slide Key", False, False),
+    ("part_key", "string", "Part Key", False, False),
+    ("block_key", "string", "Block Key", False, False),
+    ("specimen_key", "string", "Specimen Key", False, False),
+    ("reference_sample_id", "string", "Reference Sample", False, False),
+]
 CUSTOM_METADATA = json.dumps(
-    {"version": 1, "fields": [{"key": key, "filterable": False} for key in UNFILTERABLE_KEYS]},
+    {"version": 1, "fields": [
+        dict({"key": key}, **({"type": kind} if kind else {}),
+             label=label, filterable=filterable, visibleByDefault=visible)
+        for key, kind, label, filterable, visible in CONTRACT_FIELDS]},
     separators=(",", ":"))
 
 # Opaque per-slide key computed upstream from a salted hash of image_id.

@@ -3586,6 +3586,23 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             self.metadata(slide_type='Unknown', is_hne=False))])
         self.assertEqual([], errors)
 
+    def test_contract_check_ignores_private_wsi_serving(self):
+        """wsi_serving is never a column, so a WSI contract does not declare it."""
+        saved = validateData.RESOURCE_CONTRACT_KEYS
+        try:
+            public = set(json.loads(self.metadata())) - {'wsi_serving'}
+            validateData.RESOURCE_CONTRACT_KEYS = {'WSI_SAMPLE': public}
+            self.assertEqual([], self.validate_resource(
+                validateData.SampleResourceValidator, [self.sample_row()]))
+            validateData.RESOURCE_CONTRACT_KEYS = {'WSI_SAMPLE': public - {'slide_type'}}
+            self.assertEqual([("METADATA carries keys that resource 'WSI_SAMPLE' does not declare in "
+                               'CUSTOM_METADATA, so the portal would not show them. Declare them or '
+                               'remove them from the file.', 'slide_type')],
+                             self.validate_resource(validateData.SampleResourceValidator,
+                                                    [self.sample_row()]))
+        finally:
+            validateData.RESOURCE_CONTRACT_KEYS = saved
+
     def test_sample_must_belong_to_patient(self):
         errors = self.validate_resource(validateData.SampleResourceValidator,
                                         [self.sample_row(sample='WSI-P2-S1')])

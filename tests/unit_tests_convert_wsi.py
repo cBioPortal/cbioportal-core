@@ -299,17 +299,19 @@ class ConvertedOutputTestCase(ConverterTestCase):
         definitions = data_rows(self.out / 'data_resource_definition.txt')
         self.assertEqual(['WSI_PATIENT'], [row[0] for row in definitions[1:]])
 
-    def test_definitions_declare_identifier_keys_unfilterable(self):
+    def test_definitions_declare_the_full_public_contract(self):
         self.convert()
         header, *definitions = data_rows(self.out / 'data_resource_definition.txt')
         self.assertEqual('CUSTOM_METADATA', header[-1])
         for row in definitions:
             contract = json.loads(row[-1])
             self.assertEqual(1, contract['version'])
-            self.assertEqual(
-                {'slide_key': False, 'part_key': False, 'block_key': False,
-                 'specimen_key': False, 'reference_sample_id': False},
-                {field['key']: field['filterable'] for field in contract['fields']})
+            fields = {field['key']: field for field in contract['fields']}
+            # every public key the converter writes, and never the private serving object
+            self.assertEqual(PUBLIC_KEYS, set(fields))
+            unfilterable = {key for key, field in fields.items() if not field['filterable']}
+            self.assertTrue({'slide_key', 'part_key', 'block_key', 'specimen_key',
+                             'reference_sample_id'} <= unfilterable, unfilterable)
 
     def test_java_fixture_is_current_converter_output(self):
         self.convert(base_url=BASE_URL)
@@ -784,7 +786,8 @@ class ConvertedFilesValidationTestCase(ConverterTestCase):
         self.logger.addHandler(self.buffer)
         self.saved = {name: getattr(validateData, name) for name in (
             'DEFINED_SAMPLE_IDS', 'PATIENTS_WITH_SAMPLES', 'SAMPLE_TO_PATIENT',
-            'RESOURCE_DEFINITION_DICTIONARY', 'WSI_RESOURCE_STATE', 'DEFINED_SAMPLE_ATTRIBUTES')}
+            'RESOURCE_DEFINITION_DICTIONARY', 'RESOURCE_CONTRACT_KEYS', 'WSI_RESOURCE_STATE',
+            'DEFINED_SAMPLE_ATTRIBUTES')}
         validateData.DEFINED_SAMPLE_IDS = set(SAMPLE_TO_PATIENT)
         validateData.PATIENTS_WITH_SAMPLES = set(SAMPLE_TO_PATIENT.values())
         validateData.SAMPLE_TO_PATIENT = dict(SAMPLE_TO_PATIENT)
@@ -811,10 +814,16 @@ class ConvertedFilesValidationTestCase(ConverterTestCase):
                                                  'data_resource_definition.txt')
         self.assertEqual([], [r.getMessage() for r in problems])
         validateData.RESOURCE_DEFINITION_DICTIONARY = validator.resource_definition_dictionary
+        # the contract applies: no undeclared keys (wsi_serving is private) and no unused ones
+        validateData.RESOURCE_CONTRACT_KEYS = validator.resource_contract_keys
+        self.assertEqual({'WSI_SAMPLE', 'WSI_PATIENT'}, set(validator.resource_contract_keys))
         _, problems = self.run_validator(validateData.SampleResourceValidator, 'data_resource_sample.txt')
         self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems])
         _, problems = self.run_validator(validateData.PatientResourceValidator, 'data_resource_patient.txt')
-        self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems])
+        # the fixture's unmatched slides leave these optional cells blank, which the contract
+        # check reports as a warning, as it would for any resource
+        self.assertEqual([(logging.WARNING, 'file_size_bytes, part_description, subspecialty')],
+                         [(r.levelno, getattr(r, 'cause', None)) for r in problems])
 
     def test_count_files_pass_clinical_validation(self):
         self.convert()
