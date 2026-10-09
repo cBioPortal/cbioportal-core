@@ -4372,9 +4372,7 @@ class ResourceValidator(WsiRowChecks, Validator):
         `resource_level` is 'SAMPLE' or 'PATIENT'. Uniqueness and part/block
         consistency are tracked across all resource files of the study.
         """
-        values = {}
-        for col_index, col_name in enumerate(self.cols):
-            values[col_name] = data[col_index].strip() if col_index < len(data) else ''
+        values = self._line_values(data)
         column_index = {col_name: col_index for col_index, col_name in enumerate(self.cols)}
         resource_id = values.get('RESOURCE_ID', '')
         wsi_resource_ids = set(self.WSI_RESOURCE_IDS.values())
@@ -4435,10 +4433,14 @@ class ResourceValidator(WsiRowChecks, Validator):
         except:
             return False
 
+    def _line_values(self, data):
+        """Map each column name to its stripped value ('' beyond the end of the line)."""
+        return {col_name: data[col_index].strip() if col_index < len(data) else ''
+                for col_index, col_name in enumerate(self.cols)}
+
     def _is_wsi_line(self, data):
         """Whether a line is a WHOLE_SLIDE_IMAGE row (by TYPE or WSI resource ID)."""
-        values = {col_name: data[col_index].strip() if col_index < len(data) else ''
-                  for col_index, col_name in enumerate(self.cols)}
+        values = self._line_values(data)
         return (values.get('TYPE') == self.WSI_RESOURCE_TYPE
                 or values.get('RESOURCE_ID') in self.WSI_RESOURCE_IDS.values())
 
