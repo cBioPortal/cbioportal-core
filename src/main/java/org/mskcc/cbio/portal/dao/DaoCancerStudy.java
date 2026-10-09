@@ -549,7 +549,9 @@ public final class DaoCancerStudy {
 
             deleteByStudyId("DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
-            // resource_data declares its columns in upper case; ClickHouse identifiers are case-sensitive.
+            // One statement for every resource row the study owns, whatever entity it hangs off:
+            // resource_data carries cancer_study_id, where the three tables it replaced had to be
+            // reached through the sample's and patient's internal ids and the study's own id.
             deleteByStudyId("DELETE FROM resource_data WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM cancer_study_tags WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM copy_number_seg WHERE cancer_study_id=?", internalCancerStudyId);

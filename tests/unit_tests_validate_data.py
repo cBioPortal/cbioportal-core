@@ -2988,6 +2988,65 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(set(), {2, 3, 4} & set(by_line))
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
+
+    def test_metadata_keys_must_be_declared_when_a_contract_exists(self):
+        """A key the contract omits would be imported and never shown, so it is an error."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {'PATHOLOGY_SLIDE': {'stain'}}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_sample_undeclared_keys.txt',
+                            validateData.ResourceValidator)
+
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('does not declare in CUSTOM_METADATA', record.getMessage())
+        # One message for the file, naming every undeclared key -- not one per row.
+        self.assertEqual('magnification, slide_id', record.cause)
+        validateData.RESOURCE_CONTRACT_KEYS = {}
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_metadata_keys_are_not_checked_without_a_contract(self):
+        """No contract means the portal still builds columns from the data, so nothing is lost."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {}
+        self.logger.setLevel(logging.ERROR)
+
+        self.assertEqual([], self.validate('data_resource_sample_undeclared_keys.txt',
+                                           validateData.ResourceValidator))
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_an_unreadable_contract_declares_nothing_rather_than_declaring_no_keys(self):
+        """A contract the portal cannot read is reported on its own and leaves the data alone.
+
+        The portal falls back to deriving columns from the data, so the file's keys are not
+        undeclared -- telling a curator to remove them points at the wrong file.
+        """
+        self.assertIsNone(
+            validateData.ResourceDefinitionValidator.declaredKeys({'version': 1, 'field': []}))
+        self.assertIsNone(
+            validateData.ResourceDefinitionValidator.declaredKeys({'fields': {'key': 'stain'}}))
+        self.assertIsNone(validateData.ResourceDefinitionValidator.declaredKeys([]))
+        self.assertEqual(
+            {'stain'},
+            validateData.ResourceDefinitionValidator.declaredKeys(
+                {'version': 1, 'fields': [{'key': 'stain'}]}))
+
+    def test_declared_key_that_no_row_carries_is_a_warning(self):
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {
+            'PATHOLOGY_SLIDE': {'stain', 'magnification', 'slide_id', 'scanner'}}
+        self.logger.setLevel(logging.WARNING)
+        record_list = self.validate('data_resource_sample_undeclared_keys.txt',
+                            validateData.ResourceValidator)
+
+        warnings = [r for r in record_list if r.levelno == logging.WARNING]
+        self.assertEqual(1, len(warnings))
+        self.assertIn('no row carries', warnings[0].getMessage())
+        self.assertEqual('scanner', warnings[0].cause)
+        validateData.RESOURCE_CONTRACT_KEYS = {}
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
     # sample resources tests
     def test_sample_resource_should_have_definition(self):
         # reset RESOURCE_DEFINITION_DICTIONARY

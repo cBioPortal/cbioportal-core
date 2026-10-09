@@ -91,6 +91,10 @@ sample_ids_panel_dict = {}
 
 # resource globals
 RESOURCE_DEFINITION_DICTIONARY = {}
+# resource_id -> set of metadata keys the resource's CUSTOM_METADATA contract declares. A resource
+# with no contract is absent from this map, which is what keeps resources that predate contracts
+# importing unchanged. Populated from the definition file before any resource data file is read.
+RESOURCE_CONTRACT_KEYS = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 # study-wide cross-row state for WHOLE_SLIDE_IMAGE resource rows (see WsiRowChecks);
 # shared by the sample and patient resource files so SLIDE_KEY stays unique per study
@@ -3754,6 +3758,7 @@ class ResourceDefinitionValidator(Validator):
         """Initialize a ResourceDefinitionValidator with the given parameters."""
         super(ResourceDefinitionValidator, self).__init__(*args, **kwargs)
         self.resource_definition_dictionary = {}
+        self.resource_contract_keys = {}
 
     # Keys the portal reads from the contract. Anything else is ignored downstream, so a
     # misspelling would otherwise be silently discarded: the portal treats a structurally
@@ -3761,6 +3766,19 @@ class ResourceDefinitionValidator(Validator):
     CONTRACT_FIELD_KEYS = {'key', 'type', 'label', 'description', 'filterable',
                            'visibleByDefault'}
     CONTRACT_FIELD_TYPES = {'string', 'number'}
+
+    @staticmethod
+    def declaredKeys(contract):
+        """The metadata keys a parsed contract declares, for checking data files against.
+
+        Returns None for a contract the portal cannot read. Such a contract is reported
+        separately and the portal falls back to deriving columns from the data, so the keys
+        a file carries are not undeclared - there is no contract to declare them against.
+        """
+        if not isinstance(contract, dict) or not isinstance(contract.get('fields'), list):
+            return None
+        return {field['key'] for field in contract['fields']
+                if isinstance(field, dict) and field.get('key')}
 
     def checkCustomMetadataContract(self, contract, col_index):
         """Check the shape of a parsed CUSTOM_METADATA contract.
@@ -3908,8 +3926,11 @@ class ResourceDefinitionValidator(Validator):
                 custom_metadata_value = value.strip()
                 if custom_metadata_value and custom_metadata_value.lower() not in self.NULL_VALUES:
                     try:
-                        self.checkCustomMetadataContract(
-                            json.loads(custom_metadata_value), col_index)
+                        contract = json.loads(custom_metadata_value)
+                        self.checkCustomMetadataContract(contract, col_index)
+                        declared = self.declaredKeys(contract)
+                        if declared is not None:
+                            self.resource_contract_keys[resource_id] = declared
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             'Invalid JSON in CUSTOM_METADATA column.',
@@ -4282,6 +4303,50 @@ class ResourceValidator(WsiRowChecks, Validator):
     def __init__(self, *args, **kwargs):
         """Initialize the instance attributes of the data file validator."""
         super(ResourceValidator, self).__init__(*args, **kwargs)
+        # resource_id -> {metadata key: first line it appeared on}. Collected per row but reported
+        # once per file: a file where every row carries the same undeclared key would otherwise
+        # emit one message per row, and the HTML report buffers every record it is given.
+        self.observed_metadata_keys = {}
+
+    def recordMetadataKeys(self, resource_id, parsed):
+        """Remember which metadata keys a row carried, to check against the contract at the end."""
+        if not resource_id or not isinstance(parsed, dict):
+            return
+        seen = self.observed_metadata_keys.setdefault(resource_id, {})
+        for key in parsed:
+            seen.setdefault(key, self.line_number)
+
+    def onComplete(self):
+        self.checkMetadataAgainstContracts()
+        super(ResourceValidator, self).onComplete()
+
+    def checkMetadataAgainstContracts(self):
+        """Compare the metadata keys this file carried against each resource's contract.
+
+        A resource with no contract is skipped: its columns still come from the data, so an
+        undeclared key is not lost. Where a contract exists the portal builds columns from it, so
+        a key the contract omits would be imported and then never shown -- an error, since no
+        later message would tell the curator the data is invisible.
+        """
+        for resource_id, keys in sorted(self.observed_metadata_keys.items()):
+            declared = RESOURCE_CONTRACT_KEYS.get(resource_id)
+            if declared is None:
+                continue
+            undeclared = sorted(set(keys) - declared)
+            if undeclared:
+                self.logger.error(
+                    "METADATA carries keys that resource '%s' does not declare in "
+                    'CUSTOM_METADATA, so the portal would not show them. Declare them or '
+                    'remove them from the file.' % resource_id,
+                    extra={'line_number': min(keys[k] for k in undeclared),
+                           'cause': ', '.join(undeclared)})
+            unused = sorted(declared - set(keys))
+            if unused:
+                self.logger.warning(
+                    "CUSTOM_METADATA for resource '%s' declares keys that no row carries, so "
+                    'those columns would always be empty.' % resource_id,
+                    extra={'line_number': self.line_number,
+                           'cause': ', '.join(unused)})
 
     def _wsi_value(self, value, expected, key, metadata_column):
         """Render a typed metadata value as the format-v4 string, logging type errors."""
@@ -4487,6 +4552,14 @@ class ResourceValidator(WsiRowChecks, Validator):
             if col_name == 'METADATA' and value and value.strip().lower() not in self.NULL_VALUES:
                 try:
                     parsed = json.loads(value)
+                    # The value is already parsed here, so collecting its keys costs a dict walk.
+                    # They are checked against the contract once per file, in onComplete.
+                    # WHOLE_SLIDE_IMAGE rows are checked against the WSI contract instead.
+                    if not wsi_line:
+                        self.recordMetadataKeys(
+                            data[self.cols.index('RESOURCE_ID')].strip()
+                            if 'RESOURCE_ID' in self.cols else None,
+                            parsed)
                     if not isinstance(parsed, dict):
                         self.logger.error(
                             'METADATA must be a JSON object (key-value map), not an array or scalar',
@@ -6093,7 +6166,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global DEFINED_SAMPLE_ATTRIBUTES
     global PATIENTS_WITH_SAMPLES
     global SAMPLE_TO_PATIENT
-    global RESOURCE_DEFINITION_DICTIONARY
+    global RESOURCE_DEFINITION_DICTIONARY, RESOURCE_CONTRACT_KEYS
     global RESOURCE_PATIENTS_WITH_SAMPLES
 
     reset_wsi_resource_state()
@@ -6212,6 +6285,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION]:
             resources_definition_validator.validate()
         RESOURCE_DEFINITION_DICTIONARY = resources_definition_validator.resource_definition_dictionary
+        RESOURCE_CONTRACT_KEYS = resources_definition_validator.resource_contract_keys
 
     # then validate the resource data if exist
     if cbioportal_common.MetaFileTypes.SAMPLE_RESOURCES in validators_by_meta_type:
