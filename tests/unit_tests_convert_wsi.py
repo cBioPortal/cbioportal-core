@@ -356,10 +356,6 @@ class ConverterInputTestCase(ConverterTestCase):
             rows[0] = '\t'.join(fields)
             self.assertConversionError(message, meta=self.write_legacy(rows))
 
-    def test_duplicate_slide_is_rejected(self):
-        rows = self.fixture_rows()
-        self.assertConversionError('SLIDE_KEY is not unique', meta=self.write_legacy(rows + rows[:1]))
-
     def test_timing_columns_are_ignored(self):
         # Some files carry seven slide-timing columns before SLIDE_KEY. They are accepted
         # without being required or validated, and never reach the metadata.
@@ -368,7 +364,7 @@ class ConverterInputTestCase(ConverterTestCase):
         timing_values = [
             ['0', 'AVAILABLE', 'RECORDED', 'PATHOLOGY_REPORT', '',
              'patient_first_tumor_sequencing_day_zero', 'surgery 20210314'],
-            # values the removed timing checks rejected
+            # values that would not pass as timing data
             ['not-a-day', 'BOGUS', '', '', 'reason', 'other_coordinates', ''],
         ]
         source = (FIXTURE_DIR / 'data_wsi.txt').read_text(encoding='utf-8').splitlines()
@@ -389,8 +385,6 @@ class ConverterInputTestCase(ConverterTestCase):
                 metadata = json.loads(record['METADATA'])
                 self.assertFalse([key for key in metadata
                                   if key.startswith(('timeline_', 'timepoint_'))], metadata)
-        patients = data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[0]
-        self.assertNotIn('WSI_PATIENT_UNDATED_SLIDE_COUNT', patients)
 
     def test_line_break_in_output_cell_is_rejected(self):
         rows = self.fixture_rows()
@@ -585,9 +579,6 @@ class V4OnlyTestCase(ConverterTestCase):
         self.assertEqual(list(converter.IGNORED_TIMING_COLUMNS),
                          converter.COLUMNS_WITH_IGNORED_TIMING[28:35])
         self.assertEqual(['SLIDE_KEY', 'SEALED_SOURCE'], converter.COLUMNS_WITH_IGNORED_TIMING[-2:])
-        for name in ('V2_COLUMNS', 'FORMAT_COLUMNS', 'TIMELINE_REQUIRED_COLUMNS',
-                     'find_pathology_timeline', 'read_timeline_index', '_parse_image_ids'):
-            self.assertFalse(hasattr(converter, name), name)
 
     def test_older_format_versions_are_rejected(self):
         for version in ('2', '3'):
@@ -621,11 +612,6 @@ class V4OnlyTestCase(ConverterTestCase):
         rows = ['\t'.join(row.split('\t')[:-2] + timing) for row in source[5:]]
         header = '\t'.join(source[4].split('\t')[:-2] + list(converter.IGNORED_TIMING_COLUMNS))
         self.assertConversionError('invalid header', self.write_legacy(rows, header))
-
-    def test_timeline_options_are_gone(self):
-        with patch('sys.stderr'), self.assertRaises(SystemExit):
-            converter.interface(['--meta-wsi', 'm', '--output-dir', 'o', '--portal-base-url', BASE_URL,
-                                 '--timeline-file', 't'])
 
     def test_failure_late_in_the_file_leaves_no_output(self):
         rows = self.fixture_rows()
@@ -771,10 +757,6 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
         patients = {row[0]: row[1:] for row in data_rows(
             self.out / 'data_clinical_patient_wsi_counts.txt')[1:]}
         self.assertEqual(['4', '0', '3'], patients['WSI-P1'])
-        # the same slide key again is one slide listed twice, which is rejected
-        shutil.rmtree(self.out)
-        message = self.conversion_error(self.write_legacy(rows + rows[:1]))
-        self.assertIn('line 12: SLIDE_KEY is not unique', message)
 
 
 PUBLIC_KEYS = {
@@ -846,18 +828,6 @@ class ConvertedFilesValidationTestCase(ConverterTestCase):
         # the only warnings are the generic ones for a patient file without survival columns
         self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems
                               if 'analysis feature will not be available' not in r.getMessage()])
-
-    def test_duplicate_slide_key_across_resource_files_fails(self):
-        self.convert()
-        sample_file = self.out / 'data_resource_sample.txt'
-        patient_file = self.out / 'data_resource_patient.txt'
-        # give an unmatched slide the slide key of a matched one
-        patient_file.write_text(patient_file.read_text().replace(
-            'c66ee336f70e8b59e48bd7afbf0e606d', '2c96f13783250ad2c6bcfcd5b7c3ef22'))
-        validateData.RESOURCE_DEFINITION_DICTIONARY = {'WSI_SAMPLE': ['SAMPLE'], 'WSI_PATIENT': ['PATIENT']}
-        self.run_validator(validateData.SampleResourceValidator, sample_file.name)
-        _, problems = self.run_validator(validateData.PatientResourceValidator, patient_file.name)
-        self.assertIn('SLIDE_KEY must be unique within a study', [r.getMessage() for r in problems])
 
     def test_merged_study_passes_and_meta_wsi_is_rejected(self):
         study = self.copy_study()

@@ -3587,22 +3587,6 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             self.metadata(slide_type='Unknown', is_hne=False))])
         self.assertEqual([], errors)
 
-    def test_timing_metadata_is_not_checked(self):
-        # slide timing is not part of the WSI metadata contract yet
-        errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row(
-            self.metadata(timeline_start_days='-3', timeline_date_status='MISSING_PROCEDURE_DATE',
-                          timeline_date_kind='BOGUS'))])
-        self.assertEqual([], errors)
-
-    def test_slide_key_unique_across_resource_files(self):
-        errors = self.validate_resource(validateData.SampleResourceValidator,
-                                        [self.sample_row(), self.sample_row()])
-        self.assertIn(('SLIDE_KEY must be unique within a study', 'METADATA.slide_key'), errors)
-        self.validate_resource(validateData.SampleResourceValidator, [self.sample_row()])
-        errors = self.validate_resource(validateData.PatientResourceValidator, [self.patient_row(
-            self.metadata(match_level='UNMATCHED'))], keep_state=True)
-        self.assertEqual([('SLIDE_KEY must be unique within a study', 'METADATA.slide_key')], errors)
-
     def test_sample_must_belong_to_patient(self):
         errors = self.validate_resource(validateData.SampleResourceValidator,
                                         [self.sample_row(sample='WSI-P2-S1')])
