@@ -61,8 +61,7 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
-from .check_oncotree_preprocessing import (
-    OncotreeReference, add_arguments as add_oncotree_arguments, check_oncotree_row)
+from .check_oncotree_preprocessing import OncotreeReference, check_oncotree_row
 from .check_case_list_preprocessing import (missing_generated_case_lists, StagingCaseCollector,
                                       configured_staging_filenames)
 
@@ -5415,7 +5414,6 @@ def load_portal_info(path, logger, offline=False):
 # ------------------------------------------------------------------------------
 def interface(args=None):
     parser = argparse.ArgumentParser(description='cBioPortal study validator')
-    add_oncotree_arguments(parser)
     data_source_group = parser.add_mutually_exclusive_group()
     data_source_group.add_argument('-s', '--study_directory',
                         type=str, help='path to study directory.')
@@ -5453,6 +5451,9 @@ def interface(args=None):
                         action='store_true', default=False,
                         help='Option to enable strict mode for validator when '
                              'validating mutation data')
+    parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
+                        help='OncoTree version used to check ONCOTREE_CODE values '
+                             '(default: oncotree_latest_stable)')
     parser = parser.parse_args(args)
     return parser
 
@@ -5828,10 +5829,8 @@ def main_validate(args):
         portal_instance = load_portal_info(server_url, logger)
 
     portal_instance.oncotree = OncotreeReference(
-        getattr(args, 'oncotree_file', None) or
-        (str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None),
-        getattr(args, 'oncotree_version', 'oncotree_latest_stable'),
-        cache_filename=getattr(args, 'oncotree_cache', None))
+        str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None,
+        args.oncotree_version)
 
     # set portal version
     cbio_version = portal_instance.portal_version

@@ -10,7 +10,6 @@ Checks:
 Blank/NA labels and codes are skipped. Reference failures are reported once;
 clinical data is never changed.
 """
-import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -42,34 +41,23 @@ def parse_oncotree_nodes(raw):
     return nodes
 
 
-def add_arguments(parser):
-    parser.add_argument('--oncotree-cache', help=argparse.SUPPRESS)
-    parser.add_argument('--oncotree-file', help='Saved OncoTree tumorTypes JSON for reproducible/offline validation')
-    parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
-                        help='OncoTree version to fetch when no snapshot is supplied (default: latest stable)')
-
-
 class OncotreeReference:
     """Load the reference when first needed and reuse the result for later rows."""
-    def __init__(self, filename=None, version='oncotree_latest_stable', cache_filename=None):
+    def __init__(self, filename=None, version='oncotree_latest_stable'):
         self.filename = filename
-        self.cache_filename = cache_filename
         self.version = version
         self.nodes = None
         self.error = None
         self.reported_error = False
 
     def read(self):
-        """Read the user's saved file, or reuse the file saved for this batch.
+        """Read the saved portal-info file, or download the requested OncoTree version.
 
-        If neither is available, download the requested OncoTree version.
         Return the JSON together with a description of where it came from.
         """
         if self.filename:
             return Path(self.filename).read_bytes(), str(self.filename)
         source = 'OncoTree version ' + self.version
-        if self.cache_filename and Path(self.cache_filename).exists():
-            return Path(self.cache_filename).read_bytes(), source + ' (batch snapshot)'
         response = requests.get('https://oncotree.mskcc.org/api/tumorTypes',
                                 params={'version': self.version}, timeout=(10, 30))
         response.raise_for_status()
@@ -78,17 +66,14 @@ class OncotreeReference:
     def load(self, logger):
         """Load and check the reference once, then remember the result.
 
-        Save a valid reference for other studies in the batch and log its source
-        and checksum. Remember failures too, so each sample does not try again.
+        Log the reference's source and checksum. Remember failures too, so each
+        sample does not try again.
         """
         if self.nodes is not None or self.error is not None:
             return self.nodes
         try:
             raw, source = self.read()
-            nodes = parse_oncotree_nodes(raw)
-            if self.cache_filename and not self.filename:
-                Path(self.cache_filename).write_bytes(raw)
-            self.nodes = nodes
+            self.nodes = parse_oncotree_nodes(raw)
             logger.info('OncoTree reference: %s; SHA-256 %s', source, hashlib.sha256(raw).hexdigest())
         except (OSError, ValueError, requests.RequestException) as exc:
             self.error = str(exc)
@@ -127,8 +112,9 @@ def check_oncotree_row(columns, values, reference, logger, line_number):
     nodes = reference.load(logger)
     if nodes is None:
         if not reference.reported_error:
-            logger.error('Cannot validate OncoTree preprocessing: %s. Supply a valid '
-                         '--oncotree-file snapshot; this check was not completed.', reference.error,
+            logger.error('Cannot validate OncoTree preprocessing: %s. Check access to OncoTree, or '
+                         'add a valid oncotree.json to the portal info directory; '
+                         'this check was not completed.', reference.error,
                          extra={'line_number': line_number})
             reference.reported_error = True
         return

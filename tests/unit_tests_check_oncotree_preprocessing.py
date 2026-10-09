@@ -54,31 +54,25 @@ class OncotreePreprocessingTests(unittest.TestCase):
              'CANCER_TYPE_DETAILED': 'Lung Adenocarcinoma'}, nodes)))
 
     @patch.object(checks.requests, 'get')
-    def test_saved_reference_takes_precedence_over_batch_cache(self, get):
-        """An explicit file must win over cached data, without downloading."""
+    def test_saved_reference_is_read_without_downloading(self, get):
+        """A portal-info oncotree.json is used as-is, without downloading."""
         with tempfile.TemporaryDirectory() as directory:
-            saved, cache = Path(directory) / 'saved.json', Path(directory) / 'cache.json'
+            saved = Path(directory) / 'oncotree.json'
             raw = json.dumps(TUMOR_TYPES).encode()
             saved.write_bytes(raw)
-            cache.write_text('invalid cache')
-            reference = checks.OncotreeReference(saved, cache_filename=cache)
+            reference = checks.OncotreeReference(saved)
             self.assertIn('LUAD', reference.load(Mock()))
             self.assertEqual(raw, saved.read_bytes())
-            self.assertEqual('invalid cache', cache.read_text())
         get.assert_not_called()
 
     @patch.object(checks.requests, 'get')
-    def test_download_is_reused_for_rows_and_other_studies(self, get):
-        """Download once, then reuse the result and the batch's saved file."""
+    def test_download_is_reused_for_later_rows(self, get):
+        """Download the requested version once, then reuse the result."""
         raw = json.dumps(TUMOR_TYPES).encode()
         get.return_value = Mock(content=raw)
-        with tempfile.TemporaryDirectory() as directory:
-            cache = Path(directory) / 'cache.json'
-            reference = checks.OncotreeReference(version='pinned', cache_filename=cache)
-            nodes = reference.load(Mock())
-            self.assertIs(nodes, reference.load(Mock()))
-            self.assertEqual(nodes, checks.OncotreeReference(cache_filename=cache).load(Mock()))
-            self.assertEqual(raw, cache.read_bytes())
+        reference = checks.OncotreeReference(version='pinned')
+        nodes = reference.load(Mock())
+        self.assertIs(nodes, reference.load(Mock()))
         get.assert_called_once_with('https://oncotree.mskcc.org/api/tumorTypes',
                                     params={'version': 'pinned'}, timeout=(10, 30))
         get.return_value.raise_for_status.assert_called_once()
