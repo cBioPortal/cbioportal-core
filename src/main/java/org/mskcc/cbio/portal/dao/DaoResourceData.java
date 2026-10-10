@@ -91,21 +91,26 @@ public final class DaoResourceData {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
+            // resource_data_id comes from the shared sequence here too. Leaving it out of the
+            // column list makes ClickHouse default it to 0 for every row this path writes, and
+            // deletions select by resource_data_id -- so one row's deletion would take every
+            // other row written this way with it.
             pstmt = con.prepareStatement(
                 "INSERT INTO `" + RESOURCE_DATA_TABLE + "` "
-                + "(`resource_id`,`cancer_study_id`,`entity_type`,"
+                + "(`resource_data_id`,`resource_id`,`cancer_study_id`,`entity_type`,"
                 + "`patient_id`,`sample_id`,`url`,"
                 + "`display_name`,`metadata`) "
-                + "VALUES (?,?,?,?,?,?,?,?)"
+                + "VALUES (?,?,?,?,?,?,?,?,?)"
             );
-            pstmt.setString(1, resourceId);
-            pstmt.setInt(2, cancerStudyId);
-            pstmt.setString(3, entityType);
-            pstmt.setString(4, patientId);
-            pstmt.setString(5, sampleId);
-            pstmt.setString(6, url);
-            pstmt.setString(7, displayName);
-            pstmt.setString(8, metadata);
+            pstmt.setLong(1, ClickHouseAutoIncrement.nextId(RESOURCE_DATA_SEQUENCE));
+            pstmt.setString(2, resourceId);
+            pstmt.setInt(3, cancerStudyId);
+            pstmt.setString(4, entityType);
+            pstmt.setString(5, patientId);
+            pstmt.setString(6, sampleId);
+            pstmt.setString(7, url);
+            pstmt.setString(8, displayName);
+            pstmt.setString(9, metadata);
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
@@ -138,22 +143,84 @@ public final class DaoResourceData {
         ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
     }
 
+    /**
+     * Deletes the {@code resource_data} rows belonging to the given samples of a study.
+     *
+     * <p>The legacy {@code resource_sample} table keyed rows by the sample's <em>internal</em> id,
+     * so deleting a sample could reach its resources directly. {@code resource_data} stores the
+     * <em>stable</em> id instead, and a stable id is unique only within a study, so the lookup has
+     * to be scoped by study before anything is deleted.
+     *
+     * @param cancerStudyId   internal cancer-study ID
+     * @param sampleStableIds stable sample IDs being removed; a no-op if empty
+     */
+    public static void deleteResourceDataForSamples(int cancerStudyId, Set<String> sampleStableIds)
+            throws DaoException {
+        deleteResourceDataForEntities(cancerStudyId, "sample_id", sampleStableIds);
+    }
+
+    /**
+     * Deletes the {@code resource_data} rows belonging to the given patients of a study. Only
+     * patient-level rows carry a patient id with no sample; a sample's rows go with the sample.
+     *
+     * @param cancerStudyId    internal cancer-study ID
+     * @param patientStableIds stable patient IDs being removed; a no-op if empty
+     */
+    public static void deleteResourceDataForPatients(int cancerStudyId, Set<String> patientStableIds)
+            throws DaoException {
+        deleteResourceDataForEntities(cancerStudyId, "patient_id", patientStableIds);
+    }
+
+    private static void deleteResourceDataForEntities(
+            int cancerStudyId, String idColumn, Set<String> stableIds) throws DaoException {
+        if (stableIds == null || stableIds.isEmpty()) {
+            return;
+        }
+        Set<Long> idsToDelete = findResourceDataIdsByEntity(cancerStudyId, idColumn, stableIds);
+        if (idsToDelete.isEmpty()) {
+            return;
+        }
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
+    }
+
+    private static Set<Long> findResourceDataIdsByEntity(
+            int cancerStudyId, String idColumn, Set<String> stableIds) throws DaoException {
+        // A sample's rows are the ones naming that sample; a patient's are the ones naming the
+        // patient and no sample, so removing a patient does not take rows that belong to a sample
+        // being kept.
+        String scope = "sample_id".equals(idColumn) ? "" : " AND `sample_id` IS NULL";
+        return queryResourceDataIds(
+            "WHERE `cancer_study_id` = ? AND `" + idColumn + "` IN (%s)" + scope,
+            cancerStudyId, stableIds);
+    }
+
     private static Set<Long> findResourceDataIds(int cancerStudyId, Set<String> resourceIds) throws DaoException {
+        return queryResourceDataIds(
+            "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s)", cancerStudyId, resourceIds);
+    }
+
+    /**
+     * Collects the {@code resource_data_id}s a deletion should queue. The where clause carries one
+     * {@code %s} for the IN placeholders, and is always scoped by study: the values are stable ids,
+     * which repeat across studies.
+     */
+    private static Set<Long> queryResourceDataIds(
+            String whereTemplate, int cancerStudyId, Set<String> values) throws DaoException {
         Set<Long> ids = new HashSet<>();
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
-            String placeholders = resourceIds.stream().map(id -> "?").collect(Collectors.joining(","));
+            String placeholders = values.stream().map(id -> "?").collect(Collectors.joining(","));
             pstmt = con.prepareStatement(
                 "SELECT `resource_data_id` FROM `" + RESOURCE_DATA_TABLE + "` "
-                + "WHERE `cancer_study_id` = ? AND `resource_id` IN (" + placeholders + ")"
+                + String.format(whereTemplate, placeholders)
             );
             int paramIndex = 1;
             pstmt.setInt(paramIndex++, cancerStudyId);
-            for (String resourceId : resourceIds) {
-                pstmt.setString(paramIndex++, resourceId);
+            for (String value : values) {
+                pstmt.setString(paramIndex++, value);
             }
             rs = pstmt.executeQuery();
             while (rs.next()) {

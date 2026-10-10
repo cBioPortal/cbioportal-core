@@ -24,7 +24,9 @@ import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoResourceData;
 import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.springframework.test.context.ContextConfiguration;
@@ -61,6 +63,23 @@ public class TestDaoPatientDelete extends AbstractDaoDeleteTest {
         patientInternalId = patient.getInternalId();
 
         sampleInternalId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, SAMPLE_STABLE_ID).getInternalId();
+    }
+
+    @Test
+    public void testDeletePatients_resourceRowsAreGone() throws DaoException {
+        // Deleting a patient removes its samples first, so both the patient-level row and the
+        // sample-level row of one of its samples have to go.
+        DaoResourceData.addResourceDatum(studyId, "PATIENT_NOTES", "PATIENT", PATIENT_STABLE_ID,
+                null, "https://example.org/notes.pdf", null, null);
+        DaoResourceData.addResourceDatum(studyId, "PATIENT_NOTES", "SAMPLE", PATIENT_STABLE_ID,
+                SAMPLE_STABLE_ID, "https://example.org/slide.svs", null, null);
+        ClickHouseBulkLoader.flushAll();
+        assertEquals(2L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+
+        DaoPatient.deletePatients(studyId, Set.of(PATIENT_STABLE_ID));
+
+        assertEquals("both the patient's and its sample's resource rows should go",
+                0L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
     }
 
     @Test
