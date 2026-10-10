@@ -154,8 +154,9 @@ python scripts/importer/convertWsiToResources.py \
   optionally with a context path; a trailing slash is ignored. It builds the
   viewer links shown above.
 - `--study-dir` (optional, recommended): the study the output will join. The
-  converter merges the slide counts into copies of the study's clinical files
-  (see [Slide counts](#slide-counts)). It must differ from `--output-dir`.
+  converter fails without writing anything if the study already has a
+  resource definition, sample resource, or patient resource file. It must
+  differ from `--output-dir`.
 
 Leading `#` rows are skipped, the header must match format v4 exactly,
 `MATCH_LEVEL` must agree with `SAMPLE_ID`, `SLIDE_TYPE` and the stain flags
@@ -174,8 +175,8 @@ in a hidden `.<output dir name>.*.partial` directory next to `--output-dir`
 and only moved into it when the whole conversion succeeds, so a failed run
 writes nothing there.
 
-The converter always writes the resource files; each pair is only written
-when it has rows:
+The converter writes only resource files; each pair is only written when it
+has rows:
 
 | Files | Content |
 | --- | --- |
@@ -189,66 +190,6 @@ The `CUSTOM_METADATA` contract declares the per-slide identifier keys
 value for these keys, so without the declaration the portal's resource table
 would list every value as a filter option. The columns stay visible, searchable
 and sortable.
-
-With `--study-dir`, it also writes merged copies of the study's clinical sample
-and patient files, under the study's own meta and data file names (for example
-`meta_clinical_samples.txt`/`data_clinical_samples.txt`). The files are found
-through their meta files (`datatype: SAMPLE_ATTRIBUTES` or
-`PATIENT_ATTRIBUTES`); the meta files are copied unchanged. Copy the output
-directory over the study to use them.
-
-Without `--study-dir`, it writes the counts as standalone pairs instead:
-
-| Files | Content |
-| --- | --- |
-| `meta_clinical_sample_wsi_counts.txt`, `data_clinical_sample_wsi_counts.txt` | sample viewable-slide counts (only when a slide is matched) |
-| `meta_clinical_patient_wsi_counts.txt`, `data_clinical_patient_wsi_counts.txt` | patient viewable-slide counts |
-
-A study may contain only one clinical sample file and one clinical patient
-file, so the standalone pairs are only for studies without clinical files of
-their own, or as input for merging by hand.
-
-With `--study-dir`, the converter fails without writing anything if:
-
-- a clinical file in the study already has any of the six `WSI_*` columns;
-- a sample or patient with slides is missing from the clinical sample or
-  patient file, or a sample belongs to a different patient there;
-- the study has more than one clinical sample or clinical patient meta file;
-- the study has no clinical patient file (every slide's patient must be listed),
-  or no clinical sample file while some slide is matched to a sample;
-- a clinical file to merge lacks the four `#` attribute header rows;
-- the study already has a resource definition, sample resource, or patient
-  resource file.
-
-### Slide counts
-
-The count files carry these `NUMBER` attributes with priority 1:
-
-| Attribute | Display name |
-| --- | --- |
-| `WSI_SAMPLE_SLIDE_COUNT` | WSI Viewable Slides per Sample |
-| `WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Sample, Part-matched |
-| `WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Sample, Block-matched |
-| `WSI_PATIENT_SLIDE_COUNT` | WSI Viewable Slides per Patient |
-| `WSI_PATIENT_PART_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Patient, Part-matched |
-| `WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT` | WSI Viewable Slides per Patient, Block-matched |
-
-Only viewable slides, those with `CAN_SERVE_TILES=TRUE` that the slide viewer
-can open, are counted, and each slide (`SLIDE_KEY`, unique within the study)
-counts once. Sample counts cover matched slides only, so only samples with a
-viewable matched slide get values. Patient counts include unmatched slides, so
-every patient with a viewable slide gets values. A sample or patient whose
-slides are all non-viewable gets no values. Part and block counts follow
-`MATCH_LEVEL`, and zero is written for an entity that has values. In a merged
-clinical file, the rows of samples or patients without a viewable slide get
-`NA`. The standalone count files list every sample or patient with a slide,
-giving `NA` to those without a viewable slide, so the entities their resource
-rows refer to stay defined; `NA` is imported as no value. The merge appends
-the six columns and their four header rows (display name, description,
-`NUMBER`, priority `1`); every existing line, value and line ending is kept,
-including comment and blank lines. Study View uses the patient-level values so
-pagination cannot produce partial totals. Because the counts are ordinary
-clinical data, re-importing corrected files replaces them.
 
 ### Timeline
 

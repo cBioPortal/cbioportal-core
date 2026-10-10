@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Tests for the offline legacy-WSI to resource/clinical file converter.
+"""Tests for the offline legacy-WSI to resource file converter.
 
 The emitted files are run through the real validateData validators, and the
 committed Java integration-test fixture is checked to be current converter
@@ -33,26 +33,10 @@ SAMPLE_TO_PATIENT = {
     'WSI-P2-S1': 'WSI-P2',
     'WSI+P3-S1': 'WSI+P3',
 }
-MERGED_FILES = [
-    'data_clinical_patients.txt',
-    'data_clinical_samples.txt',
-    'data_resource_definition.txt',
-    'data_resource_patient.txt',
-    'data_resource_sample.txt',
-    'meta_clinical_patients.txt',
-    'meta_clinical_samples.txt',
-    'meta_resource_definition.txt',
-    'meta_resource_patient.txt',
-    'meta_resource_sample.txt',
-]
 EXPECTED_FILES = [
-    'data_clinical_patient_wsi_counts.txt',
-    'data_clinical_sample_wsi_counts.txt',
     'data_resource_definition.txt',
     'data_resource_patient.txt',
     'data_resource_sample.txt',
-    'meta_clinical_patient_wsi_counts.txt',
-    'meta_clinical_sample_wsi_counts.txt',
     'meta_resource_definition.txt',
     'meta_resource_patient.txt',
     'meta_resource_sample.txt',
@@ -127,10 +111,6 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertEqual(
             'cancer_study_identifier: wsi_convert_test\nresource_type: SAMPLE\n'
             'data_filename: data_resource_sample.txt\n', meta)
-        meta = (self.out / 'meta_clinical_sample_wsi_counts.txt').read_text()
-        self.assertEqual(
-            'cancer_study_identifier: wsi_convert_test\ngenetic_alteration_type: CLINICAL\n'
-            'datatype: SAMPLE_ATTRIBUTES\ndata_filename: data_clinical_sample_wsi_counts.txt\n', meta)
 
     def test_sample_and_patient_rows(self):
         self.convert()
@@ -201,99 +181,12 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertNotIn('wsi_serving', second)
         self.assertNotIn('wsi_serving', json.loads(patients['slide-6']['METADATA']))
 
-    def test_count_rows(self):
-        self.convert()
-        self.assertEqual(
-            [['PATIENT_ID', 'SAMPLE_ID', 'WSI_SAMPLE_SLIDE_COUNT', 'WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT',
-              'WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', 'WSI-P1-S1', '1', '0', '1'],
-             ['WSI-P1', 'WSI-P1-S2', '1', '0', '1'],
-             ['WSI-P2', 'WSI-P2-S1', '1', '1', '0']],
-            data_rows(self.out / 'data_clinical_sample_wsi_counts.txt'))
-        self.assertEqual(
-            [['PATIENT_ID', 'WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
-              'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', '3', '0', '2'],
-             ['WSI-P2', '1', '1', '0'],
-             ['WSI+P3', 'NA', 'NA', 'NA']],
-            data_rows(self.out / 'data_clinical_patient_wsi_counts.txt'))
-        header = (self.out / 'data_clinical_sample_wsi_counts.txt').read_text().splitlines()[:4]
-        self.assertEqual(
-            ['#Patient Identifier\tSample Identifier\tWSI Viewable Slides per Sample\t'
-             'WSI Viewable Slides per Sample, Part-matched\t'
-             'WSI Viewable Slides per Sample, Block-matched',
-             '#Patient identifier\tSample identifier\t'
-             'Pathology slides the slide viewer can open, for the sample.\t'
-             'Pathology slides the slide viewer can open, for the sample, matched to a specimen part.\t'
-             'Pathology slides the slide viewer can open, for the sample, matched to a specimen block.',
-             '#STRING\tSTRING\tNUMBER\tNUMBER\tNUMBER',
-             '#1\t1\t1\t1\t1'], header)
-        header = (self.out / 'data_clinical_patient_wsi_counts.txt').read_text().splitlines()[:4]
-        self.assertEqual(
-            ['#Patient Identifier\tWSI Viewable Slides per Patient\t'
-             'WSI Viewable Slides per Patient, Part-matched\t'
-             'WSI Viewable Slides per Patient, Block-matched',
-             '#Patient identifier\t'
-             'Pathology slides the slide viewer can open, for the patient.\t'
-             'Pathology slides the slide viewer can open, for the patient, matched to a specimen part.\t'
-             'Pathology slides the slide viewer can open, for the patient, matched to a specimen block.',
-             '#STRING\tNUMBER\tNUMBER\tNUMBER',
-             '#1\t1\t1\t1'], header)
-
-    def test_only_viewable_slides_are_counted(self):
-        can_serve = converter.COLUMNS.index('CAN_SERVE_TILES')
-        sealed = converter.COLUMNS.index('SEALED_SOURCE')
-        only_s2_slide = 'f9bce50b1498c94fa0fa6cce809f64f2'  # the only slide of WSI-P1-S2
-        rows = self.fixture_rows()
-        for index, row in enumerate(rows):
-            fields = row.split('\t')
-            if fields[SLIDE_KEY] == only_s2_slide:
-                fields[can_serve] = 'FALSE'
-                fields[sealed] = ''
-                rows[index] = '\t'.join(fields)
-        self.convert(meta=self.write_legacy(rows))
-        # The fixture's non-viewable slide and WSI-P1-S2's only slide are not counted. WSI-P1-S2 and
-        # WSI+P3, whose only slides are non-viewable, get no count: NA, which the
-        # importer stores as no value, so the row only keeps the entity defined.
-        self.assertEqual(
-            [['WSI-P1', 'WSI-P1-S1', '1', '0', '1'],
-             ['WSI-P1', 'WSI-P1-S2', 'NA', 'NA', 'NA'],
-             ['WSI-P2', 'WSI-P2-S1', '1', '1', '0']],
-            data_rows(self.out / 'data_clinical_sample_wsi_counts.txt')[1:])
-        self.assertEqual(
-            [['WSI-P1', '2', '0', '1'],
-             ['WSI-P2', '1', '1', '0'],
-             ['WSI+P3', 'NA', 'NA', 'NA']],
-            data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[1:])
-        # the non-viewable slides are still converted to resources
-        samples = rows_by_slide(self.out / 'data_resource_sample.txt')
-        self.assertIn('slide-3', samples)
-
-    def test_entities_without_viewable_slides_get_no_counts(self):
-        can_serve = converter.COLUMNS.index('CAN_SERVE_TILES')
-        rows = [row for row in self.fixture_rows() if row.split('\t')[can_serve] == 'FALSE']
-        self.assertEqual(2, len(rows))  # IMG-2 (WSI-P1-S1) and IMG-6 (WSI+P3, unmatched)
-        self.convert(meta=self.write_legacy(rows))
-        self.assertEqual([['WSI-P1', 'WSI-P1-S1', 'NA', 'NA', 'NA']],
-                         data_rows(self.out / 'data_clinical_sample_wsi_counts.txt')[1:])
-        self.assertEqual([['WSI-P1', 'NA', 'NA', 'NA'], ['WSI+P3', 'NA', 'NA', 'NA']],
-                         data_rows(self.out / 'data_clinical_patient_wsi_counts.txt')[1:])
-
-    def test_merge_requires_entities_with_only_non_viewable_slides(self):
-        # WSI+P3 has no counts, but its slide is still a resource, so the
-        # clinical file must still list it; its count columns are NA.
-        study = self.copy_study()
-        self.convert(study_dir=study)
-        patients = {row[0]: row[-3:] for row in data_rows(self.out / 'data_clinical_patients.txt')}
-        self.assertEqual(['NA', 'NA', 'NA'], patients['WSI+P3'])
-
     def test_only_pairs_with_rows_are_written(self):
         match_level = converter.COLUMNS.index('MATCH_LEVEL')
         unmatched = [row for row in self.fixture_rows() if row.split('\t')[match_level] == 'UNMATCHED']
         written = self.convert(meta=self.write_legacy(unmatched))
         self.assertEqual(
-            ['data_clinical_patient_wsi_counts.txt', 'data_resource_definition.txt',
-             'data_resource_patient.txt', 'meta_clinical_patient_wsi_counts.txt',
+            ['data_resource_definition.txt', 'data_resource_patient.txt',
              'meta_resource_definition.txt', 'meta_resource_patient.txt'],
             sorted(path.name for path in written))
         definitions = data_rows(self.out / 'data_resource_definition.txt')
@@ -396,21 +289,6 @@ class ConverterInputTestCase(ConverterTestCase):
         with self.assertRaises(converter.ConversionError):
             converter.render_tsv('x.txt', [['a\tb']])
 
-    def test_existing_count_attributes_conflict(self):
-        study = Path(self.tmp.name) / 'study'
-        study.mkdir()
-        (study / 'data_clinical_samples.txt').write_text(textwrap.dedent('''\
-            #Patient Identifier\tSample Identifier\tSlides
-            #Patient\tSample\tSlides
-            #STRING\tSTRING\tNUMBER
-            #1\t1\t1
-            PATIENT_ID\tSAMPLE_ID\tWSI_SAMPLE_SLIDE_COUNT
-            WSI-P1\tWSI-P1-S1\t2
-            '''))
-        self.assertConversionError('data_clinical_samples.txt already defines WSI_SAMPLE_SLIDE_COUNT',
-                                   study_dir=study)
-        self.assertFalse(self.out.exists(), 'nothing may be written after a conflict')
-
     def test_existing_resource_files_conflict(self):
         study = Path(self.tmp.name) / 'study'
         study.mkdir()
@@ -424,141 +302,6 @@ class ConverterInputTestCase(ConverterTestCase):
         study = self.copy_study()
         self.out = study
         self.assertConversionError('--output-dir must differ from --study-dir', study_dir=study)
-
-
-class ClinicalMergeTestCase(ConverterTestCase):
-
-    """--study-dir merges the counts into copies of the study's clinical files."""
-
-    def assertConversionError(self, text, **kwargs):
-        with self.assertRaises(converter.ConversionError) as context:
-            self.convert(**kwargs)
-        self.assertIn(text, str(context.exception))
-        self.assertFalse(self.out.exists(), 'nothing may be written after a failure')
-
-    def test_writes_merged_clinical_files_under_study_names(self):
-        study = self.copy_study()
-        written = self.convert(study_dir=study)
-        self.assertEqual(MERGED_FILES, sorted(path.name for path in written))
-        for meta in ('meta_clinical_samples.txt', 'meta_clinical_patients.txt'):
-            self.assertEqual((study / meta).read_bytes(), (self.out / meta).read_bytes())
-        # the resource files are the same as without --study-dir
-        resources = Path(self.tmp.name) / 'resources'
-        converter.convert(FIXTURE_DIR / 'meta_wsi.txt', resources, BASE_URL)
-        for name in MERGED_FILES:
-            if 'resource' in name:
-                self.assertEqual((resources / name).read_bytes(), (self.out / name).read_bytes())
-
-    def test_merged_values_and_na(self):
-        study = self.copy_study()
-        self.convert(study_dir=study)
-        self.assertEqual(
-            [['PATIENT_ID', 'SAMPLE_ID', 'CANCER_TYPE', 'TUMOR_PURITY', 'WSI_SAMPLE_SLIDE_COUNT',
-              'WSI_SAMPLE_PART_MATCHED_SLIDE_COUNT', 'WSI_SAMPLE_BLOCK_MATCHED_SLIDE_COUNT'],
-             ['WSI-P1', 'WSI-P1-S1', 'Breast Cancer', '0.45', '1', '0', '1'],
-             ['WSI-P1', 'WSI-P1-S2', 'Breast Cancer', 'NA', '1', '0', '1'],
-             ['WSI-P2', 'WSI-P2-S1', 'Breast Cancer', '0.8', '1', '1', '0'],
-             ['WSI+P3', 'WSI+P3-S1', 'Breast Cancer', '', 'NA', 'NA', 'NA'],
-             ['WSI-P4', 'WSI-P4-S1', 'Breast Cancer', '0.1', 'NA', 'NA', 'NA']],
-            data_rows(self.out / 'data_clinical_samples.txt'))
-        patients = data_rows(self.out / 'data_clinical_patients.txt')
-        self.assertEqual(['WSI_PATIENT_SLIDE_COUNT', 'WSI_PATIENT_PART_MATCHED_SLIDE_COUNT',
-                          'WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT'], patients[0][-3:])
-        self.assertEqual({'WSI-P1': ['3', '0', '2'], 'WSI-P2': ['1', '1', '0'],
-                          'WSI+P3': ['NA', 'NA', 'NA'], 'WSI-P4': ['NA', 'NA', 'NA']},
-                         {row[0]: row[-3:] for row in patients[1:]})
-        header = (self.out / 'data_clinical_samples.txt').read_text().splitlines()[:4]
-        self.assertEqual(
-            ['#Patient Identifier\tSample Identifier\tCancer Type\tTumor Purity\t'
-             'WSI Viewable Slides per Sample\tWSI Viewable Slides per Sample, Part-matched\t'
-             'WSI Viewable Slides per Sample, Block-matched',
-             '#Patient identifier\tSample identifier\tCancer type\tEstimated tumor purity\t'
-             'Pathology slides the slide viewer can open, for the sample.\t'
-             'Pathology slides the slide viewer can open, for the sample, matched to a specimen part.\t'
-             'Pathology slides the slide viewer can open, for the sample, matched to a specimen block.',
-             '#STRING\tSTRING\tSTRING\tNUMBER\tNUMBER\tNUMBER\tNUMBER',
-             '#1\t1\t1\t1\t1\t1\t1'], header)
-
-    def test_existing_lines_are_preserved_byte_for_byte(self):
-        study = self.copy_study()
-        path = study / 'data_clinical_samples.txt'
-        # CRLF on the first rows, a trailing comment, a blank line and no final newline
-        original = (path.read_bytes().replace(b'\n', b'\r\n', 3)
-                    + b'# trailing comment\n\nWSI-P5\tWSI-P5-S1\tBreast Cancer\t0.2')
-        patients = study / 'data_clinical_patients.txt'
-        patients.write_text(patients.read_text() + 'WSI-P5\t0:LIVING\t1\t0:DiseaseFree\t1\tMale\n')
-        path.write_bytes(original)
-        self.convert(study_dir=study)
-        merged = (self.out / 'data_clinical_samples.txt').read_bytes()
-        original_lines = original.split(b'\n')
-        merged_lines = merged.split(b'\n')
-        self.assertEqual(len(original_lines), len(merged_lines))
-        for before, after in zip(original_lines, merged_lines):
-            ending = b'\r' if before.endswith(b'\r') else b''
-            if before.startswith(b'# trailing') or not before.strip():
-                # comment and blank lines stay unchanged
-                self.assertEqual(before, after)
-            else:
-                self.assertTrue(after.startswith(before.rstrip(b'\r') + b'\t'), (before, after))
-                self.assertTrue(after.endswith(ending))
-
-    def test_count_columns_already_present(self):
-        study = self.copy_study()
-        path = study / 'data_clinical_patients.txt'
-        path.write_text(path.read_text().replace('\tSEX\n', '\tWSI_PATIENT_SLIDE_COUNT\n'))
-        self.assertConversionError(
-            'data_clinical_patients.txt already defines WSI_PATIENT_SLIDE_COUNT', study_dir=study)
-
-    def test_wsi_sample_missing_from_clinical_file(self):
-        study = self.copy_study()
-        path = study / 'data_clinical_samples.txt'
-        path.write_text(path.read_text().replace('WSI-P2\tWSI-P2-S1\tBreast Cancer\t0.8\n', ''))
-        self.assertConversionError(
-            'data_clinical_samples.txt: SAMPLE_ID with WSI slides not found in the clinical file: '
-            'WSI-P2-S1', study_dir=study)
-
-    def test_wsi_patient_missing_from_clinical_file(self):
-        study = self.copy_study()
-        path = study / 'data_clinical_patients.txt'
-        lines = [line for line in path.read_text().splitlines(True) if not line.startswith('WSI+P3')]
-        path.write_text(''.join(lines))
-        self.assertConversionError(
-            'PATIENT_ID with WSI slides not found in the clinical file: WSI+P3', study_dir=study)
-
-    def test_sample_patient_mismatch(self):
-        study = self.copy_study()
-        path = study / 'data_clinical_samples.txt'
-        path.write_text(path.read_text().replace('WSI-P1\tWSI-P1-S2', 'WSI-P4\tWSI-P1-S2'))
-        self.assertConversionError('SAMPLE_ID WSI-P1-S2 belongs to WSI-P4 here but to WSI-P1',
-                                   study_dir=study)
-
-    def test_multiple_clinical_meta_files(self):
-        study = self.copy_study()
-        shutil.copy(study / 'meta_clinical_samples.txt', study / 'meta_clinical_samples_2.txt')
-        self.assertConversionError('more than one SAMPLE_ATTRIBUTES clinical meta file',
-                                   study_dir=study)
-
-    def test_missing_clinical_file_fails_only_when_needed(self):
-        study = self.copy_study()
-        (study / 'meta_clinical_patients.txt').unlink()
-        self.assertConversionError('no PATIENT_ATTRIBUTES clinical file', study_dir=study)
-        # a study whose slides are all unmatched needs no sample counts
-        match_level = converter.COLUMNS.index('MATCH_LEVEL')
-        unmatched = [row for row in self.fixture_rows() if row.split('\t')[match_level] == 'UNMATCHED']
-        study = Path(self.tmp.name) / 'study_unmatched'
-        shutil.copytree(STUDY_FIXTURE_DIR, study)
-        (study / 'meta_clinical_samples.txt').unlink()
-        written = self.convert(meta=self.write_legacy(unmatched), study_dir=study)
-        self.assertEqual(
-            ['data_clinical_patients.txt', 'data_resource_definition.txt', 'data_resource_patient.txt',
-             'meta_clinical_patients.txt', 'meta_resource_definition.txt', 'meta_resource_patient.txt'],
-            sorted(path.name for path in written))
-
-    def test_clinical_file_without_attribute_rows(self):
-        study = self.copy_study()
-        path = study / 'data_clinical_samples.txt'
-        path.write_text(''.join(path.read_text().splitlines(True)[4:]))
-        self.assertConversionError("expected the four '#' attribute header rows", study_dir=study)
 
 
 class V4OnlyTestCase(ConverterTestCase):
@@ -746,21 +489,6 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
             converter.render_tsv('x.txt', [['SECRET\t1']])
         self.assertNotIn('SECRET', str(context.exception))
 
-    def test_each_slide_key_counts_once(self):
-        rows = self.fixture_rows()
-        # another viewable, block-matched slide on the first row's sample: a new slide key adds
-        # one to its counts (only viewable slides are counted)
-        extra = rows[0].split('\t')
-        extra[SLIDE_KEY] = 'e' * 32
-        self.convert(meta=self.write_legacy(rows + ['\t'.join(extra)]))
-        samples = {tuple(row[:2]): row[2:] for row in data_rows(
-            self.out / 'data_clinical_sample_wsi_counts.txt')[1:]}
-        self.assertEqual(['2', '0', '2'], samples[('WSI-P1', 'WSI-P1-S1')])
-        patients = {row[0]: row[1:] for row in data_rows(
-            self.out / 'data_clinical_patient_wsi_counts.txt')[1:]}
-        self.assertEqual(['4', '0', '3'], patients['WSI-P1'])
-
-
 PUBLIC_KEYS = {
     'slide_key', 'reference_sample_id', 'part_key', 'part_number', 'part_type',
     'part_description', 'subspecialty', 'block_key', 'block_number', 'block_label', 'match_level',
@@ -825,20 +553,7 @@ class ConvertedFilesValidationTestCase(ConverterTestCase):
         self.assertEqual([(logging.WARNING, 'file_size_bytes, part_description, subspecialty')],
                          [(r.levelno, getattr(r, 'cause', None)) for r in problems])
 
-    def test_count_files_pass_clinical_validation(self):
-        self.convert()
-        validator, problems = self.run_validator(validateData.SampleClinicalValidator,
-                                                 'data_clinical_sample_wsi_counts.txt')
-        self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems])
-        self.assertEqual({'WSI-P1-S1', 'WSI-P1-S2', 'WSI-P2-S1'}, set(validator.sampleIds))
-        _, problems = self.run_validator(validateData.PatientClinicalValidator,
-                                         'data_clinical_patient_wsi_counts.txt')
-        # the patient-level count file is validated against the patients of all samples;
-        # the only warnings are the generic ones for a patient file without survival columns
-        self.assertEqual([], [(r.getMessage(), getattr(r, 'cause', None)) for r in problems
-                              if 'analysis feature will not be available' not in r.getMessage()])
-
-    def test_merged_study_passes_and_meta_wsi_is_rejected(self):
+    def test_converted_study_passes_and_meta_wsi_is_rejected(self):
         study = self.copy_study()
         self.convert(study_dir=study)
         full = Path(self.tmp.name) / 'full'

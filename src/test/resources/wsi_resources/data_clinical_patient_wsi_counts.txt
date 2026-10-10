@@ -1,8 +1,0 @@
-#Patient Identifier	WSI Viewable Slides per Patient	WSI Viewable Slides per Patient, Part-matched	WSI Viewable Slides per Patient, Block-matched
-#Patient identifier	Pathology slides the slide viewer can open, for the patient.	Pathology slides the slide viewer can open, for the patient, matched to a specimen part.	Pathology slides the slide viewer can open, for the patient, matched to a specimen block.
-#STRING	NUMBER	NUMBER	NUMBER
-#1	1	1	1
-PATIENT_ID	WSI_PATIENT_SLIDE_COUNT	WSI_PATIENT_PART_MATCHED_SLIDE_COUNT	WSI_PATIENT_BLOCK_MATCHED_SLIDE_COUNT
-WSI-P1	3	0	2
-WSI-P2	1	1	0
-WSI+P3	NA	NA	NA
