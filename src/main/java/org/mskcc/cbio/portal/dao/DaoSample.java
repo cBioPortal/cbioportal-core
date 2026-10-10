@@ -305,7 +305,7 @@ public class DaoSample {
         ClickHouseBulkDeleter.getBulkDeleter("copy_number_seg", "sample_id").addIds(internalSampleIds);
         ClickHouseBulkDeleter.getBulkDeleter("allele_specific_copy_number", "sample_id").addIds(internalSampleIds);
         ClickHouseBulkDeleter.getBulkDeleter("clinical_sample", "internal_id").addIds(internalSampleIds);
-        ClickHouseBulkDeleter.getBulkDeleter("resource_sample", "internal_id").addIds(internalSampleIds);
+        DaoResourceData.addSampleResourceDataToBulkDelete(internalStudyId, sampleStableIds);
         ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(internalSampleIds);
         ClickHouseBulkDeleter.flushAll();
         clearCache();

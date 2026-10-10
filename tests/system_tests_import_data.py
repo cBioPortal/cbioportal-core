@@ -20,6 +20,25 @@ class DataImporterTests(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
+    @mock.patch('importer.cbioportalImporter.cbioportal_common.parse_metadata_file')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_wsi_import_dispatch(self, run_java, parse_metadata_file):
+        """Legacy WSI files are converted to resource files offline, never imported."""
+        parse_metadata_file.return_value = {
+            'meta_file_type': cbioportalImporter.MetaFileTypes.WSI,
+            'data_filename': 'data_wsi.txt',
+            'cancer_study_identifier': 'study_es_0',
+        }
+
+        for incremental in (False, True):
+            with self.assertRaises(RuntimeError) as context:
+                cbioportalImporter.import_data(
+                    '-Dspring.profiles.active=dbcp -cp test.jar',
+                    '/tmp/meta_wsi.txt', '/tmp/data_wsi.txt', incremental=incremental)
+            self.assertEqual(cbioportalImporter.cbioportal_common.LEGACY_WSI_IMPORT_MESSAGE,
+                             str(context.exception))
+        run_java.assert_not_called()
+
     @mock.patch('importer.cbioportalImporter.locate_jar')
     @mock.patch('importer.cbioportalImporter.run_java')
     def test_full_study_load(self, run_java, locate_jar):

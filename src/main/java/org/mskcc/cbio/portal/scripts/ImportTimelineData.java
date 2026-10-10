@@ -51,6 +51,26 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
  */
 public class ImportTimelineData extends ConsoleRunnable {
 
+	private static final String PATHOLOGY_SLIDES_EVENT = "PATHOLOGY SLIDES";
+	private static final Set<String> FORBIDDEN_PATHOLOGY_ATTRIBUTES = Set.of("IMAGE_ID", "IMAGE_IDS");
+
+	/**
+	 * Pathology slide events reach the browser through the clinical-events API, so they must not
+	 * carry real slide identifiers; slides are addressed by their opaque slide key. Values are
+	 * never echoed.
+	 */
+	static void validatePathologySlidesEvent(String[] headers, String[] fields, String eventType, int line) {
+		if (!PATHOLOGY_SLIDES_EVENT.equals(eventType)) {
+			return;
+		}
+		for (int i = 0; i < fields.length && i < headers.length; i++) {
+			if (FORBIDDEN_PATHOLOGY_ATTRIBUTES.contains(headers[i]) && !fields[i].isEmpty()) {
+				throw new IllegalArgumentException(
+					"Line " + line + ": PATHOLOGY SLIDES events cannot carry " + headers[i]);
+			}
+		}
+	}
+
 	private static void importData(String dataFile, int cancerStudyId, boolean overwriteExisting) throws IOException, DaoException {
 		ClickHouseBulkLoader.bulkLoadOn();
 
@@ -77,16 +97,20 @@ public class ImportTimelineData extends ConsoleRunnable {
 
 			long clinicalEventId = DaoClinicalEvent.getLargestClinicalEventId();
 			Set<Integer> processedPatientIds = new HashSet<>();
+			int lineNumber = 1;
 
 			while ((line = buff.readLine()) != null) {
+				lineNumber++;
 				line = line.trim();
 	
 				String[] fields = line.split("\t");
 				if (fields.length > headers.length) {
 					//TODO - should better throw an exception here...
-					ProgressMonitor.logWarning("more attributes than header: " + line + ". Skipping entry.");
+					// Report the position only: the line may carry identifiers.
+					ProgressMonitor.logWarning("Line " + lineNumber + ": more attributes than header. Skipping entry.");
 					continue;
 				}
+				validatePathologySlidesEvent(headers, fields, fields[indexCategorySpecificField - 1], lineNumber);
 				String patientId = fields[0];
 				Patient patient = DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudyId, patientId);
 				if (patient == null) {

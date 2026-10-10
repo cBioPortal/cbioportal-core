@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * - Rows are checked only when all FK/unique-key columns are non-NULL.
  * - "NULL" in referer/key values means the column value was NULL.
  * <p>
- * The constraint lists are hard-coded for the ClickHouse schema (see clickhouse_cgds.sql).
+ * The constraint lists are hard-coded for the ClickHouse schema (see the canonical init/schema.sql).
  * Update {@link #schemaForeignKeys()} and {@link #schemaUniqueKeys()} when the schema changes.
  */
 public class ClickHouseConstraintChecker {
@@ -179,7 +179,7 @@ public class ClickHouseConstraintChecker {
 
     /**
      * Foreign key list for the ClickHouse schema (lower-case names).
-     * Keep this in sync with clickhouse_cgds.sql.
+     * Keep this in sync with the canonical init/schema.sql.
      */
     private static List<ForeignKey> schemaForeignKeys() {
         List<ForeignKey> fks = new ArrayList<>();
@@ -315,17 +315,20 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         fks.add(new ForeignKey("resource_definition", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
 
-        // resource_sample / resource_patient / resource_study
-        fks.add(new ForeignKey("resource_sample", List.of("internal_id"), "sample", List.of("internal_id")));
-        fks.add(new ForeignKey("resource_patient", List.of("internal_id"), "patient", List.of("internal_id")));
-        fks.add(new ForeignKey("resource_study", List.of("internal_id"), "cancer_study", List.of("cancer_study_id")));
+        // resource_data (patient_id and sample_id hold stable IDs)
+        fks.add(new ForeignKey("resource_data", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("resource_data", List.of("resource_id", "cancer_study_id"),
+                "resource_definition", List.of("resource_id", "cancer_study_id")));
+        fks.add(new ForeignKey("resource_data", List.of("cancer_study_id", "patient_id"),
+                "patient", List.of("cancer_study_id", "stable_id")));
+        fks.add(new ForeignKey("resource_data", List.of("sample_id"), "sample", List.of("stable_id")));
 
         return List.copyOf(fks);
     }
 
     /**
      * Unique key list for the ClickHouse schema (lower-case names).
-     * Keep this in sync with clickhouse_cgds.sql.
+     * Keep this in sync with the canonical init/schema.sql.
      */
     private static List<UniqueKey> schemaUniqueKeys() {
         List<UniqueKey> uniqueKeys = new ArrayList<>();
@@ -462,10 +465,8 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         uniqueKeys.add(new UniqueKey("resource_definition", List.of("resource_id", "cancer_study_id")));
 
-        // resource_sample / resource_patient / resource_study
-        uniqueKeys.add(new UniqueKey("resource_sample", List.of("internal_id", "resource_id", "url")));
-        uniqueKeys.add(new UniqueKey("resource_patient", List.of("internal_id", "resource_id", "url")));
-        uniqueKeys.add(new UniqueKey("resource_study", List.of("internal_id", "resource_id", "url")));
+        // resource_data
+        uniqueKeys.add(new UniqueKey("resource_data", List.of("resource_data_id")));
 
         // allele_specific_copy_number
         uniqueKeys.add(new UniqueKey("allele_specific_copy_number", List.of("mutation_event_id", "genetic_profile_id", "sample_id")));
@@ -493,7 +494,10 @@ public class ClickHouseConstraintChecker {
                 + "LEFT JOIN " + fk.parentTable + " " + parentAlias + "\n"
                 + "  ON " + joinPredicate + "\n"
                 + "WHERE " + childHasAllValues + "\n"
-                + "  AND " + parentMissing;
+                + "  AND " + parentMissing + "\n"
+                // Without join_use_nulls, unmatched non-Nullable parent columns read as
+                // defaults rather than NULL, and no orphan is ever reported.
+                + "SETTINGS join_use_nulls = 1";
     }
 
     /**

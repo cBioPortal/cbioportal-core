@@ -258,7 +258,7 @@ public class DaoPatient {
             ClickHouseBulkDeleter.getBulkDeleter("clinical_event_data", "clinical_event_id").addIds(clinicalEventIds);
             ClickHouseBulkDeleter.getBulkDeleter("clinical_event", "clinical_event_id").addIds(clinicalEventIds);
             ClickHouseBulkDeleter.getBulkDeleter("clinical_patient", "internal_id").addIds(internalPatientIds);
-            ClickHouseBulkDeleter.getBulkDeleter("resource_patient", "internal_id").addIds(internalPatientIds);
+            DaoResourceData.addPatientResourceDataToBulkDelete(internalStudyId, patientStableIds);
             ClickHouseBulkDeleter.getBulkDeleter("patient", "internal_id").addIds(internalPatientIds);
             ClickHouseBulkDeleter.flushAll();
         }

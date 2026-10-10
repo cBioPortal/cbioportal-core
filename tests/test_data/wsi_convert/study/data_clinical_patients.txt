@@ -1,0 +1,9 @@
+#Patient Identifier	Overall Survival Status	Overall Survival (Months)	Disease Free Status	Disease Free (Months)	Sex
+#Patient identifier	Overall survival status	Overall survival in months	Disease free status	Disease free in months	Sex
+#STRING	STRING	NUMBER	STRING	NUMBER	STRING
+#1	1	1	1	1	1
+PATIENT_ID	OS_STATUS	OS_MONTHS	DFS_STATUS	DFS_MONTHS	SEX
+WSI-P1	0:LIVING	12.5	0:DiseaseFree	10	Female
+WSI-P2	1:DECEASED	3	1:Recurred/Progressed	1.5	Female
+WSI+P3	0:LIVING	7	0:DiseaseFree	7	Male
+WSI-P4	0:LIVING	30	0:DiseaseFree	30	Female
