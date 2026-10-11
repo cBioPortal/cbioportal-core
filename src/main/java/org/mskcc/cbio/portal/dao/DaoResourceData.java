@@ -44,7 +44,7 @@ public final class DaoResourceData {
      *
      * @param cancerStudyId  internal cancer-study ID
      * @param resourceId     resource identifier (must match a resource_definition row)
-     * @param entityType     one of "PATIENT", "SAMPLE", or "STUDY"
+     * @param resourceScope  one of "PATIENT", "SAMPLE", or "STUDY"
      * @param patientId      stable patient ID (null for STUDY-level records)
      * @param sampleId       stable sample ID (null for PATIENT/STUDY-level records)
      * @param url            URL of the resource
@@ -54,7 +54,7 @@ public final class DaoResourceData {
     public static int addResourceDatum(
             int cancerStudyId,
             String resourceId,
-            String entityType,
+            String resourceScope,
             String patientId,
             String sampleId,
             String url,
@@ -63,7 +63,7 @@ public final class DaoResourceData {
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             // Column order matches DESCRIBE TABLE resource_data:
-            // resource_data_id, resource_id, cancer_study_id, entity_type,
+            // resource_data_id, resource_id, cancer_study_id, resource_scope,
             // patient_id, sample_id, url, display_name, metadata
             //
             // Nulls are passed through rather than substituted with "": the loader encodes a
@@ -76,7 +76,7 @@ public final class DaoResourceData {
                 Long.toString(ClickHouseAutoIncrement.nextId(RESOURCE_DATA_SEQUENCE)),
                 resourceId,
                 Integer.toString(cancerStudyId),
-                entityType,
+                resourceScope,
                 patientId,
                 sampleId,
                 url,
@@ -97,7 +97,7 @@ public final class DaoResourceData {
             // other row written this way with it.
             pstmt = con.prepareStatement(
                 "INSERT INTO `" + RESOURCE_DATA_TABLE + "` "
-                + "(`resource_data_id`,`resource_id`,`cancer_study_id`,`entity_type`,"
+                + "(`resource_data_id`,`resource_id`,`cancer_study_id`,`resource_scope`,"
                 + "`patient_id`,`sample_id`,`url`,"
                 + "`display_name`,`metadata`) "
                 + "VALUES (?,?,?,?,?,?,?,?,?)"
@@ -105,7 +105,7 @@ public final class DaoResourceData {
             pstmt.setLong(1, ClickHouseAutoIncrement.nextId(RESOURCE_DATA_SEQUENCE));
             pstmt.setString(2, resourceId);
             pstmt.setInt(3, cancerStudyId);
-            pstmt.setString(4, entityType);
+            pstmt.setString(4, resourceScope);
             pstmt.setString(5, patientId);
             pstmt.setString(6, sampleId);
             pstmt.setString(7, url);
