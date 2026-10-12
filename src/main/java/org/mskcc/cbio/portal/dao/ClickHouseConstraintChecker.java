@@ -315,10 +315,19 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         fks.add(new ForeignKey("resource_definition", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
 
-        // resource_sample / resource_patient / resource_study
-        fks.add(new ForeignKey("resource_sample", List.of("internal_id"), "sample", List.of("internal_id")));
-        fks.add(new ForeignKey("resource_patient", List.of("internal_id"), "patient", List.of("internal_id")));
-        fks.add(new ForeignKey("resource_study", List.of("internal_id"), "cancer_study", List.of("cancer_study_id")));
+        // resource_data, which replaced resource_sample / resource_patient / resource_study.
+        // Those tables keyed rows by internal id, so one column reached the parent directly.
+        // resource_data stores stable ids, which are unique only within a study, so a reference
+        // means nothing without the study beside it.
+        fks.add(new ForeignKey("resource_data", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("resource_data", List.of("patient_id", "cancer_study_id"), "patient", List.of("stable_id", "cancer_study_id")));
+        // There is no sample key: sample carries no cancer_study_id, so the pair that would scope
+        // the match cannot be written here, and matching on stable_id alone would accept a
+        // same-named sample in another study. Study-level rows carry no patient_id and are skipped
+        // by the generated SQL, which checks a row only when every key column is non-NULL.
+        // There is no key to resource_definition either: a study carried over by the 3.0.1
+        // migration can hold rows for a resource it never declared, and the portal renders those
+        // by falling back to the resource id rather than treating them as broken.
 
         return List.copyOf(fks);
     }
@@ -462,10 +471,11 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         uniqueKeys.add(new UniqueKey("resource_definition", List.of("resource_id", "cancer_study_id")));
 
-        // resource_sample / resource_patient / resource_study
-        uniqueKeys.add(new UniqueKey("resource_sample", List.of("internal_id", "resource_id", "url")));
-        uniqueKeys.add(new UniqueKey("resource_patient", List.of("internal_id", "resource_id", "url")));
-        uniqueKeys.add(new UniqueKey("resource_study", List.of("internal_id", "resource_id", "url")));
+        // resource_data. Deletions select rows by resource_data_id, so a duplicate id would make
+        // one row's deletion take another row with it. The natural key is not listed: it spans
+        // patient_id and sample_id, which are NULL at the levels that do not use them, and the
+        // generated SQL skips a row unless every key column is non-NULL.
+        uniqueKeys.add(new UniqueKey("resource_data", List.of("resource_data_id")));
 
         // allele_specific_copy_number
         uniqueKeys.add(new UniqueKey("allele_specific_copy_number", List.of("mutation_event_id", "genetic_profile_id", "sample_id")));

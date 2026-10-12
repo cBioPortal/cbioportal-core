@@ -275,20 +275,10 @@ INSERT INTO resource_definition (resource_id, cancer_study_id) VALUES
 ('RES_DEF_DUP', 700010),
 ('RES_DEF_DUP', 700010);
 
--- resource_sample
-INSERT INTO resource_sample (internal_id, resource_id, url) VALUES
-(700040, 'RES_SAMPLE_DUP', 'http://sample'),
-(700040, 'RES_SAMPLE_DUP', 'http://sample');
-
--- resource_patient
-INSERT INTO resource_patient (internal_id, resource_id, url) VALUES
-(700170, 'RES_PAT_DUP', 'http://patient'),
-(700170, 'RES_PAT_DUP', 'http://patient');
-
--- resource_study
-INSERT INTO resource_study (internal_id, resource_id, url) VALUES
-(700010, 'RES_STUDY_DUP', 'http://study'),
-(700010, 'RES_STUDY_DUP', 'http://study');
+-- resource_data: two rows sharing one resource_data_id, which deletions select by.
+INSERT INTO resource_data (resource_data_id, resource_id, cancer_study_id, resource_scope, patient_id, sample_id, url, display_name, metadata) VALUES
+(700500, 'RES_DATA_DUP', 700010, 'STUDY', NULL, NULL, 'http://study', NULL, NULL),
+(700500, 'RES_DATA_DUP', 700010, 'STUDY', NULL, NULL, 'http://study', NULL, NULL);
 
 -- allele_specific_copy_number
 INSERT INTO allele_specific_copy_number (mutation_event_id, genetic_profile_id, sample_id) VALUES
