@@ -48,16 +48,16 @@ import org.mskcc.cbio.portal.model.AscnGeneLevelRecord;
  * ASCN Seg segment calls (see {@link DaoAscnSeg}).
  *
  * Rows are exclusively appended through {@link ClickHouseBulkLoader}. The
- * `ascn_genes` table is ordered by (cancer_study_id, sample_id,
+ * `ascn_gene_level` table is ordered by (cancer_study_id, sample_id,
  * hugo_gene_symbol) for efficient per-sample gene table reads, with a bloom
  * filter index on hugo_gene_symbol to keep cross-sample/cohort gene lookups
  * (e.g. "show gene X across all samples") cheap as well.
  */
-public final class DaoAscnGenes {
+public final class DaoAscnGeneLevel {
 
-    private static final String TABLE = "ascn_genes";
+    private static final String TABLE = "ascn_gene_level";
 
-    private DaoAscnGenes() {}
+    private DaoAscnGeneLevel() {}
 
     public static void addAscnGeneLevelRecord(AscnGeneLevelRecord rec) throws DaoException {
         AscnDaoUtil.requireBulkLoad("insert ASCN gene-level data");
@@ -84,11 +84,11 @@ public final class DaoAscnGenes {
     }
 
     /**
-     * Reserves and returns the next unique id for a new `ascn_genes` row.
+     * Reserves and returns the next unique id for a new `ascn_gene_level` row.
      * Callers should invoke this once per row before {@link #addAscnGeneLevelRecord}.
      */
     public static long getNextId() throws DaoException {
-        return ClickHouseAutoIncrement.nextId("seq_ascn_genes");
+        return ClickHouseAutoIncrement.nextId("seq_ascn_gene_level");
     }
 
     public static List<AscnGeneLevelRecord> getGeneLevelDataForSample(int sampleId, int cancerStudyId) throws DaoException {
@@ -96,7 +96,7 @@ public final class DaoAscnGenes {
     }
 
     public static List<AscnGeneLevelRecord> getGeneLevelDataForSamples(Collection<Integer> sampleIds, int cancerStudyId) throws DaoException {
-        return AscnDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoAscnGenes::mapRow);
+        return AscnDaoUtil.queryForSamples(TABLE, sampleIds, cancerStudyId, DaoAscnGeneLevel::mapRow);
     }
 
     /**
@@ -112,7 +112,7 @@ public final class DaoAscnGenes {
             List<AscnGeneLevelRecord> results = new ArrayList<>();
             Connection con = null;
             try {
-                con = JdbcUtil.getDbConnection(DaoAscnGenes.class);
+                con = JdbcUtil.getDbConnection(DaoAscnGeneLevel.class);
                 try (PreparedStatement pstmt = con.prepareStatement(
                         "SELECT * FROM `" + TABLE + "`" +
                         " WHERE `hugo_gene_symbol`=?" +
@@ -128,16 +128,16 @@ public final class DaoAscnGenes {
                 }
                 return results;
             } finally {
-                JdbcUtil.closeAll(DaoAscnGenes.class, con, null, null);
+                JdbcUtil.closeAll(DaoAscnGeneLevel.class, con, null, null);
             }
         });
     }
 
-    public static boolean ascnGenesDataExistForCancerStudy(int cancerStudyId) throws DaoException {
+    public static boolean ascnGeneLevelDataExistForCancerStudy(int cancerStudyId) throws DaoException {
         return AscnDaoUtil.dataExistsForCancerStudy(TABLE, cancerStudyId);
     }
 
-    public static void deleteAscnGenesDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
+    public static void deleteAscnGeneLevelDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
         AscnDaoUtil.deleteDataForSamples(TABLE, cancerStudyId, sampleIds);
     }
 

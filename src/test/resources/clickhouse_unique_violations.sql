@@ -260,8 +260,8 @@ INSERT INTO ascn_seg (seg_id, cancer_study_id, sample_id) VALUES
 (700221, 700010, 700040),
 (700221, 700011, 700041);
 
--- ascn_genes
-INSERT INTO ascn_genes (gene_id, cancer_study_id, sample_id) VALUES
+-- ascn_gene_level
+INSERT INTO ascn_gene_level (gene_id, cancer_study_id, sample_id) VALUES
 (700222, 700010, 700040),
 (700222, 700011, 700041);
 

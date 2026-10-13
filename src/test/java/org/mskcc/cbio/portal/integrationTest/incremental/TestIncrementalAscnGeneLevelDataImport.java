@@ -8,7 +8,7 @@ import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoAscnGenes;
+import org.mskcc.cbio.portal.dao.DaoAscnGeneLevel;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import org.mskcc.cbio.portal.model.CancerStudy;
@@ -26,7 +26,7 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
-public class TestIncrementalAscnGenesDataImport extends IntegrationTestBase {
+public class TestIncrementalAscnGeneLevelDataImport extends IntegrationTestBase {
 
     public static final String STUDY_ID = "study_tcga_pub";
     private static final String SAMPLE_ID = "TCGA-A1-A0SE-01";
@@ -55,13 +55,13 @@ public class TestIncrementalAscnGenesDataImport extends IntegrationTestBase {
                 2.0,
                 0.5,
                 0.2);
-        existingRecord.setId(DaoAscnGenes.getNextId());
-        DaoAscnGenes.addAscnGeneLevelRecord(existingRecord);
+        existingRecord.setId(DaoAscnGeneLevel.getNextId());
+        DaoAscnGeneLevel.addAscnGeneLevelRecord(existingRecord);
         ClickHouseBulkLoader.flushAll();
 
-        File dataFolder = new File("src/test/resources/incremental/ascn_genes/");
-        File metaFile = new File(dataFolder, "meta_ascn_genes.txt");
-        File dataFile = new File(dataFolder, "data_ascn_genes.txt");
+        File dataFolder = new File("src/test/resources/incremental/ascn_gene_level/");
+        File metaFile = new File(dataFolder, "meta_ascn_gene_level.txt");
+        File dataFile = new File(dataFolder, "data_ascn_gene_level.txt");
 
         ImportAscnGeneLevelData importer = new ImportAscnGeneLevelData(new String[] {
                 "--loadMode", "bulkLoad",
@@ -71,7 +71,7 @@ public class TestIncrementalAscnGenesDataImport extends IntegrationTestBase {
         });
         importer.run();
 
-        List<AscnGeneLevelRecord> records = DaoAscnGenes.getGeneLevelDataForSample(sample.getInternalId(), cancerStudy.getInternalId());
+        List<AscnGeneLevelRecord> records = DaoAscnGeneLevel.getGeneLevelDataForSample(sample.getInternalId(), cancerStudy.getInternalId());
         // the pre-existing AKT1 record should have been replaced by the 2 new records (TP53, BRCA1) from the incremental file
         assertEquals(2, records.size());
         assertTrue(records.stream().noneMatch(r -> "AKT1".equals(r.getHugoGeneSymbol())));
