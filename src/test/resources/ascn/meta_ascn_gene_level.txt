@@ -3,4 +3,4 @@ genetic_alteration_type: ALLELE_SPECIFIC_COPY_NUMBER
 datatype: ASCN_GENE_LEVEL
 reference_genome_id: hg19
 description: Gene-level allele-specific copy number calls derived from segment-level data.
-data_filename: data_ascn_genes.txt
+data_filename: data_ascn_gene_level.txt
