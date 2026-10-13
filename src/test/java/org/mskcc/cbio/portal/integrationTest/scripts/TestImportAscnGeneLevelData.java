@@ -6,7 +6,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoAscnGenes;
+import org.mskcc.cbio.portal.dao.DaoAscnGeneLevel;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import org.mskcc.cbio.portal.model.CancerStudy;
@@ -40,15 +40,15 @@ public class TestImportAscnGeneLevelData extends IntegrationTestBase {
     @Test
     public void testImportAscnGeneLevelData() throws Exception {
         String[] args = {
-                "--data", "src/test/resources/ascn/data_ascn_genes.txt",
-                "--meta", "src/test/resources/ascn/meta_ascn_genes.txt",
+                "--data", "src/test/resources/ascn/data_ascn_gene_level.txt",
+                "--meta", "src/test/resources/ascn/meta_ascn_gene_level.txt",
                 "--loadMode", "bulkLoad"
         };
         ImportAscnGeneLevelData runner = new ImportAscnGeneLevelData(args);
         runner.run();
 
         Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), SAMPLE_ID);
-        List<AscnGeneLevelRecord> records = DaoAscnGenes.getGeneLevelDataForSample(sample.getInternalId(), cancerStudy.getInternalId());
+        List<AscnGeneLevelRecord> records = DaoAscnGeneLevel.getGeneLevelDataForSample(sample.getInternalId(), cancerStudy.getInternalId());
 
         // NOT_A_REAL_GENE should have been skipped since it does not resolve to a known gene
         assertEquals(2, records.size());

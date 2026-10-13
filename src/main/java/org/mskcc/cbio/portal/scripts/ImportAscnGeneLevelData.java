@@ -35,7 +35,7 @@ package org.mskcc.cbio.portal.scripts;
 import java.util.Map;
 import java.util.Set;
 import org.mskcc.cbio.portal.dao.DaoException;
-import org.mskcc.cbio.portal.dao.DaoAscnGenes;
+import org.mskcc.cbio.portal.dao.DaoAscnGeneLevel;
 import org.mskcc.cbio.portal.dao.DaoGeneOptimized;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.CanonicalGene;
@@ -45,7 +45,7 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 /**
  * Imports ASCN gene-level data (derived from, but not directly mapped to,
- * ASCN Seg segment calls) into the {@code ascn_genes} table.
+ * ASCN Seg segment calls) into the {@code ascn_gene_level} table.
  *
  * Expected tab-delimited data file columns (any order):
  * SAMPLE_ID, HUGO_SYMBOL, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
@@ -71,12 +71,12 @@ public class ImportAscnGeneLevelData extends AbstractImportAscnData {
 
     @Override
     protected boolean dataExistsForCancerStudy(int cancerStudyId) throws DaoException {
-        return DaoAscnGenes.ascnGenesDataExistForCancerStudy(cancerStudyId);
+        return DaoAscnGeneLevel.ascnGeneLevelDataExistForCancerStudy(cancerStudyId);
     }
 
     @Override
     protected void deleteDataForSamples(int cancerStudyId, Set<Integer> sampleIds) throws DaoException {
-        DaoAscnGenes.deleteAscnGenesDataForSamples(cancerStudyId, sampleIds);
+        DaoAscnGeneLevel.deleteAscnGeneLevelDataForSamples(cancerStudyId, sampleIds);
     }
 
     @Override
@@ -106,8 +106,8 @@ public class ImportAscnGeneLevelData extends AbstractImportAscnData {
                 common.lcn,
                 common.cellularFraction,
                 common.purity);
-        rec.setId(DaoAscnGenes.getNextId());
-        DaoAscnGenes.addAscnGeneLevelRecord(rec);
+        rec.setId(DaoAscnGeneLevel.getNextId());
+        DaoAscnGeneLevel.addAscnGeneLevelRecord(rec);
         return true;
     }
 
