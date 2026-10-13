@@ -16,7 +16,7 @@ DROP TABLE IF EXISTS copy_number_seg;
 DROP TABLE IF EXISTS copy_number_seg_file;
 DROP TABLE IF EXISTS data_access_tokens;
 DROP TABLE IF EXISTS ascn_seg;
-DROP TABLE IF EXISTS ascn_genes;
+DROP TABLE IF EXISTS ascn_gene_level;
 DROP TABLE IF EXISTS gene;
 DROP TABLE IF EXISTS gene_alias;
 DROP TABLE IF EXISTS gene_panel;
@@ -262,7 +262,7 @@ CREATE TABLE ascn_seg
     ENGINE = MergeTree
 ORDER BY (cancer_study_id, sample_id, chr, start);
 
-CREATE TABLE ascn_genes
+CREATE TABLE ascn_gene_level
 (
     `gene_id` Int64,
     `cancer_study_id` Int64,
@@ -276,7 +276,7 @@ CREATE TABLE ascn_genes
     `lcn` Nullable(Float64),
     `cellular_fraction` Nullable(Float64),
     `purity` Nullable(Float64),
-    INDEX idx_ascn_genes_hugo_symbol hugo_gene_symbol TYPE bloom_filter GRANULARITY 4
+    INDEX idx_ascn_gene_level_hugo_symbol hugo_gene_symbol TYPE bloom_filter GRANULARITY 4
 )
     ENGINE = MergeTree
 ORDER BY (cancer_study_id, sample_id, hugo_gene_symbol);

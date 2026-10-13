@@ -91,7 +91,7 @@ public final class ClickHouseAutoIncrement {
         register("seq_copy_number_seg_file", "copy_number_seg_file", "seg_file_id");
         register("seq_clinical_event", "clinical_event", "clinical_event_id");
         register("seq_ascn_seg", "ascn_seg", "seg_id");
-        register("seq_ascn_genes", "ascn_genes", "gene_id");
+        register("seq_ascn_gene_level", "ascn_gene_level", "gene_id");
         registerShutdownHook();
     }
 
