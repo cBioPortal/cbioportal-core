@@ -6,41 +6,51 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Data Access Object for the unified {@code resource_data} table.
+ * Data Access Object for the unified {@code resource} table.
  *
  * <p>Legacy split tables (resource_sample, resource_patient, resource_study) are no
  * longer written to by the importer.  Existing data in those tables can be migrated
- * to resource_data via the migration.sql script bundled with the backend.</p>
+ * to resource via the migration.sql script bundled with the backend.</p>
  *
- * <p>{@code resource_data} rows are never updated in place: ClickHouse's MergeTree
- * engine makes single-row updates expensive, and the importer has no way to know
- * which existing row (if any) corresponds to a given input line. Instead, a re-import
- * of a resource file for a study first deletes any existing rows for the resource IDs
- * present in that file (see {@link #deleteResourceData(int, Set)}), then re-inserts
- * everything from the file. This mirrors the delete-then-insert pattern used elsewhere
- * in the importer for reloadable data types, and ensures curator corrections to an
- * existing file (e.g. filling in previously-empty metadata) are reflected instead of
- * silently accumulating as duplicate rows.</p>
+ * <p>{@code resource} rows are never updated in place: ClickHouse's MergeTree engine makes
+ * single-row updates expensive, and the importer cannot tell which existing row corresponds to a
+ * given input line. A re-import therefore deletes before it inserts (see
+ * {@link #deleteResourceDataForReimport(int, String, Set, Set)}), which is the delete-then-insert
+ * pattern the importer uses for other reloadable data types. The deletion covers the resources
+ * and the entities the incoming file names, so a corrected file replaces its own rows and leaves
+ * the rest of the study's alone.</p>
  */
 public final class DaoResourceData {
 
-    public static final String RESOURCE_DATA_TABLE = "resource_data";
+    public static final String RESOURCE_TABLE = "resource";
 
     /**
-     * resource_data_id comes from the shared sequence machinery rather than a local counter.
+     * The columns both write paths below bind, in the order they bind them. Declared once so the
+     * bulk and direct-load paths cannot drift apart, and so neither depends on the column order
+     * of a table this repository does not define -- the portal's schema creates resource.
+     */
+    private static final String[] RESOURCE_COLUMNS = {
+        "internal_id", "resource_id", "cancer_study_id", "resource_scope",
+        "patient_id", "sample_id", "url", "display_name", "metadata"
+    };
+
+    /**
+     * internal_id comes from the shared sequence machinery rather than a local counter.
      * ClickHouse has no AUTO_INCREMENT, and seeding from the system clock does not guarantee
      * uniqueness: the clock can be wrong or move backwards, and an import on a second machine
      * knows nothing about ids the first one issued. ClickHouseAutoIncrement seeds from
-     * max(persisted value, current table max) and persists as it goes.
+     * max(persisted value, current table max) once per JVM and writes the counter back on
+     * shutdown, so two importer JVMs loading different studies at the same time can still mint
+     * the same ids.
      */
-    private static final String RESOURCE_DATA_SEQUENCE = "seq_resource_data";
+    private static final String RESOURCE_SEQUENCE = "seq_resource";
 
 
     private DaoResourceData() {
     }
 
     /**
-     * Inserts a row into the unified {@code resource_data} table.
+     * Inserts a row into the unified {@code resource} table.
      *
      * @param cancerStudyId  internal cancer-study ID
      * @param resourceId     resource identifier (must match a resource_definition row)
@@ -62,18 +72,24 @@ public final class DaoResourceData {
             String metadata) throws DaoException {
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
-            // Column order matches DESCRIBE TABLE resource_data:
-            // resource_data_id, resource_id, cancer_study_id, resource_scope,
-            // patient_id, sample_id, url, display_name, metadata
+            // The column names are declared rather than left to the loader, which otherwise
+            // falls back to DESCRIBE TABLE and pairs the values below with whatever order that
+            // returns. resource is created by the portal's schema, in another repository,
+            // so this would bind nine values positionally against a column order this code does
+            // not own: a reordered or newly inserted column lands the url in display_name with
+            // no error, since only the value count is checked.
             //
             // Nulls are passed through rather than substituted with "": the loader encodes a
             // null as \N, which ClickHouse stores as a real NULL, and these columns are
             // Nullable(String). The distinction matters. A patient-level row carries no sample,
-            // and queries select those rows with "SAMPLE_ID IS NULL"; an empty string satisfies
-            // neither that nor "SAMPLE_ID IN (...)", so such rows would be silently dropped from
+            // and queries select those rows with "sample_id IS NULL"; an empty string satisfies
+            // neither that nor "sample_id IN (...)", so such rows would be silently dropped from
             // every cohort-scoped query and miscounted by the distinct-sample count.
-            ClickHouseBulkLoader.getClickHouseBulkLoader(RESOURCE_DATA_TABLE).insertRecord(
-                Long.toString(ClickHouseAutoIncrement.nextId(RESOURCE_DATA_SEQUENCE)),
+            ClickHouseBulkLoader loader =
+                ClickHouseBulkLoader.getClickHouseBulkLoader(RESOURCE_TABLE);
+            loader.setFieldNames(RESOURCE_COLUMNS);
+            loader.insertRecord(
+                Long.toString(ClickHouseAutoIncrement.nextId(RESOURCE_SEQUENCE)),
                 resourceId,
                 Integer.toString(cancerStudyId),
                 resourceScope,
@@ -91,18 +107,12 @@ public final class DaoResourceData {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
-            // resource_data_id comes from the shared sequence here too. Leaving it out of the
+            // internal_id comes from the shared sequence here too. Leaving it out of the
             // column list makes ClickHouse default it to 0 for every row this path writes, and
-            // deletions select by resource_data_id -- so one row's deletion would take every
+            // deletions select by internal_id -- so one row's deletion would take every
             // other row written this way with it.
-            pstmt = con.prepareStatement(
-                "INSERT INTO `" + RESOURCE_DATA_TABLE + "` "
-                + "(`resource_data_id`,`resource_id`,`cancer_study_id`,`resource_scope`,"
-                + "`patient_id`,`sample_id`,`url`,"
-                + "`display_name`,`metadata`) "
-                + "VALUES (?,?,?,?,?,?,?,?,?)"
-            );
-            pstmt.setLong(1, ClickHouseAutoIncrement.nextId(RESOURCE_DATA_SEQUENCE));
+            pstmt = con.prepareStatement(buildInsertStatement());
+            pstmt.setLong(1, ClickHouseAutoIncrement.nextId(RESOURCE_SEQUENCE));
             pstmt.setString(2, resourceId);
             pstmt.setInt(3, cancerStudyId);
             pstmt.setString(4, resourceScope);
@@ -120,7 +130,7 @@ public final class DaoResourceData {
     }
 
     /**
-     * Deletes all existing {@code resource_data} rows for the given study that belong to any
+     * Deletes all existing {@code resource} rows for the given study that belong to any
      * of the given resource IDs. Intended to be called before re-inserting a resource file for
      * that study/resource-ID set, so a re-import replaces stale rows instead of duplicating them.
      *
@@ -140,14 +150,64 @@ public final class DaoResourceData {
         // seeds each counter from max(persisted, current table max), so the rows this import is
         // about to insert get ids above every one of them: the deletion is correct whichever
         // side of the inserts it lands on.
-        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_TABLE, "internal_id").addIds(idsToDelete);
     }
 
     /**
-     * Deletes the {@code resource_data} rows belonging to the given samples of a study.
+     * Deletes the rows a re-import is about to replace: those of the given resources that belong
+     * to the entities the incoming file actually names.
+     *
+     * <p>The entity restriction is what keeps a single-file import from reaching beyond its own
+     * contents. A curator correcting one sample's row sends a file naming that sample; the rows
+     * of every other sample in the study carry the same {@code resource_id} and must survive it.
+     * {@code cbioportalImporter.py import-study-data} loads one file without removing the study
+     * first, so nothing else narrows the deletion.
+     *
+     * @param cancerStudyId   internal cancer-study ID
+     * @param resourceScope   "PATIENT", "SAMPLE" or "STUDY": the level the incoming file loads
+     * @param resourceIds     resource IDs the file carries on rows that passed validation
+     * @param entityStableIds stable patient or sample IDs on those rows; unused for STUDY scope
+     */
+    public static void deleteResourceDataForReimport(
+            int cancerStudyId, String resourceScope, Set<String> resourceIds,
+            Set<String> entityStableIds) throws DaoException {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            return;
+        }
+        Set<Long> idsToDelete;
+        if ("STUDY".equals(resourceScope)) {
+            // Study-level rows hang off nothing else, so the resource ids identify them fully.
+            idsToDelete = queryResourceDataIds(
+                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s)"
+                    + " AND `patient_id` IS NULL AND `sample_id` IS NULL",
+                cancerStudyId, resourceIds);
+        } else if (entityStableIds == null || entityStableIds.isEmpty()) {
+            // No row passed validation, so there is nothing this file is replacing. Deleting on
+            // the resource ids alone would empty the resource and insert nothing in its place.
+            return;
+        } else if ("SAMPLE".equals(resourceScope)) {
+            idsToDelete = queryResourceDataIds(
+                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s) AND `sample_id` IN (%s)",
+                cancerStudyId, resourceIds, entityStableIds);
+        } else {
+            // Patient-level rows are the ones with no sample; a sample's rows belong to the
+            // sample and are replaced by a sample file.
+            idsToDelete = queryResourceDataIds(
+                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s) AND `patient_id` IN (%s)"
+                    + " AND `sample_id` IS NULL",
+                cancerStudyId, resourceIds, entityStableIds);
+        }
+        if (idsToDelete.isEmpty()) {
+            return;
+        }
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_TABLE, "internal_id").addIds(idsToDelete);
+    }
+
+    /**
+     * Deletes the {@code resource} rows belonging to the given samples of a study.
      *
      * <p>The legacy {@code resource_sample} table keyed rows by the sample's <em>internal</em> id,
-     * so deleting a sample could reach its resources directly. {@code resource_data} stores the
+     * so deleting a sample could reach its resources directly. {@code resource} stores the
      * <em>stable</em> id instead, and a stable id is unique only within a study, so the lookup has
      * to be scoped by study before anything is deleted.
      *
@@ -160,7 +220,7 @@ public final class DaoResourceData {
     }
 
     /**
-     * Deletes the {@code resource_data} rows belonging to the given patients of a study. Only
+     * Deletes the {@code resource} rows belonging to the given patients of a study. Only
      * patient-level rows carry a patient id with no sample; a sample's rows go with the sample.
      *
      * @param cancerStudyId    internal cancer-study ID
@@ -180,7 +240,7 @@ public final class DaoResourceData {
         if (idsToDelete.isEmpty()) {
             return;
         }
-        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_DATA_TABLE, "resource_data_id").addIds(idsToDelete);
+        ClickHouseBulkDeleter.getBulkDeleter(RESOURCE_TABLE, "internal_id").addIds(idsToDelete);
     }
 
     private static Set<Long> findResourceDataIdsByEntity(
@@ -194,37 +254,58 @@ public final class DaoResourceData {
             cancerStudyId, stableIds);
     }
 
+    /** {@code INSERT INTO resource (col, ...) VALUES (?, ...)} over RESOURCE_COLUMNS. */
+    private static String buildInsertStatement() {
+        StringBuilder columns = new StringBuilder();
+        StringBuilder placeholders = new StringBuilder();
+        for (String column : RESOURCE_COLUMNS) {
+            if (columns.length() > 0) {
+                columns.append(',');
+                placeholders.append(',');
+            }
+            columns.append('`').append(column).append('`');
+            placeholders.append('?');
+        }
+        return "INSERT INTO `" + RESOURCE_TABLE + "` (" + columns + ") VALUES (" + placeholders + ")";
+    }
+
     private static Set<Long> findResourceDataIds(int cancerStudyId, Set<String> resourceIds) throws DaoException {
         return queryResourceDataIds(
             "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s)", cancerStudyId, resourceIds);
     }
 
     /**
-     * Collects the {@code resource_data_id}s a deletion should queue. The where clause carries one
-     * {@code %s} for the IN placeholders, and is always scoped by study: the values are stable ids,
-     * which repeat across studies.
+     * Collects the {@code internal_id}s a deletion should queue. The where clause carries one
+     * {@code %s} per value set, each expanded to that set's IN placeholders, and is always scoped
+     * by study: the values are stable ids, which repeat across studies.
      */
+    @SafeVarargs
     private static Set<Long> queryResourceDataIds(
-            String whereTemplate, int cancerStudyId, Set<String> values) throws DaoException {
+            String whereTemplate, int cancerStudyId, Set<String>... valueSets) throws DaoException {
         Set<Long> ids = new HashSet<>();
         Connection con = null;
         PreparedStatement pstmt = null;
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceData.class);
-            String placeholders = values.stream().map(id -> "?").collect(Collectors.joining(","));
+            Object[] placeholders = new Object[valueSets.length];
+            for (int i = 0; i < valueSets.length; i++) {
+                placeholders[i] = valueSets[i].stream().map(id -> "?").collect(Collectors.joining(","));
+            }
             pstmt = con.prepareStatement(
-                "SELECT `resource_data_id` FROM `" + RESOURCE_DATA_TABLE + "` "
+                "SELECT `internal_id` FROM `" + RESOURCE_TABLE + "` "
                 + String.format(whereTemplate, placeholders)
             );
             int paramIndex = 1;
             pstmt.setInt(paramIndex++, cancerStudyId);
-            for (String value : values) {
-                pstmt.setString(paramIndex++, value);
+            for (Set<String> values : valueSets) {
+                for (String value : values) {
+                    pstmt.setString(paramIndex++, value);
+                }
             }
             rs = pstmt.executeQuery();
             while (rs.next()) {
-                ids.add(rs.getLong("resource_data_id"));
+                ids.add(rs.getLong("internal_id"));
             }
         } catch (SQLException e) {
             throw new DaoException(e);

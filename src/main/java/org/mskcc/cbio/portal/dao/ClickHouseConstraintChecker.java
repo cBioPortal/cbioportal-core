@@ -135,6 +135,26 @@ public class ClickHouseConstraintChecker {
         private final String parentTable;      // referred_table
         private final List<String> parentCols; // referred_columns (same arity as childCols)
 
+        /**
+         * A key whose parent is a derived relation rather than a base table. Needed where the
+         * columns that identify the parent do not all live on one table -- a sample is identified
+         * by its stable id plus the study it belongs to, and the study reaches it only through
+         * patient. {@code parentSource} is the SQL joined against; {@code parentTable} stays the
+         * name reported for the violation.
+         */
+        private String parentSourceOverride;   // set when the parent is a derived relation
+
+        private ForeignKey(String childTable, List<String> childCols, String parentTable,
+                           List<String> parentCols, String parentSource) {
+            this(childTable, childCols, parentTable, parentCols);
+            this.parentSourceOverride = parentSource;
+        }
+
+        /** The SQL to join: the parent table, or the derived relation standing in for it. */
+        private String parentSource() {
+            return parentSourceOverride != null ? parentSourceOverride : parentTable;
+        }
+
         private ForeignKey(String childTable, List<String> childCols, String parentTable, List<String> parentCols) {
             if (childCols.isEmpty() || parentCols.isEmpty()) {
                 throw new IllegalArgumentException("FK column list cannot be empty: " + childTable + " -> " + parentTable);
@@ -315,19 +335,25 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         fks.add(new ForeignKey("resource_definition", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
 
-        // resource_data, which replaced resource_sample / resource_patient / resource_study.
+        // resource, which replaced resource_sample / resource_patient / resource_study.
         // Those tables keyed rows by internal id, so one column reached the parent directly.
-        // resource_data stores stable ids, which are unique only within a study, so a reference
+        // resource stores stable ids, which are unique only within a study, so a reference
         // means nothing without the study beside it.
-        fks.add(new ForeignKey("resource_data", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
-        fks.add(new ForeignKey("resource_data", List.of("patient_id", "cancer_study_id"), "patient", List.of("stable_id", "cancer_study_id")));
-        // There is no sample key: sample carries no cancer_study_id, so the pair that would scope
-        // the match cannot be written here, and matching on stable_id alone would accept a
-        // same-named sample in another study. Study-level rows carry no patient_id and are skipped
-        // by the generated SQL, which checks a row only when every key column is non-NULL.
-        // There is no key to resource_definition either: a study carried over by the 3.0.1
-        // migration can hold rows for a resource it never declared, and the portal renders those
-        // by falling back to the resource id rather than treating them as broken.
+        fks.add(new ForeignKey("resource", List.of("cancer_study_id"), "cancer_study", List.of("cancer_study_id")));
+        fks.add(new ForeignKey("resource", List.of("patient_id", "cancer_study_id"), "patient", List.of("stable_id", "cancer_study_id")));
+        // The sample key needs the same (stable id, study) pair, but sample carries no
+        // cancer_study_id -- it reaches the study through patient. Joining the two gives a parent
+        // with both columns, so a sample reference is checked against the study it was imported
+        // into rather than against every study that happens to reuse the barcode.
+        fks.add(new ForeignKey("resource", List.of("sample_id", "cancer_study_id"),
+                "sample", List.of("stable_id", "cancer_study_id"),
+                "(SELECT s.`stable_id` AS `stable_id`, p.`cancer_study_id` AS `cancer_study_id`"
+                        + " FROM sample s INNER JOIN patient p ON p.`internal_id` = s.`patient_id`)"));
+        // Rows are checked only when every key column is non-NULL, so patient-level rows (no
+        // sample) and study-level rows (neither) fall out of the keys that do not apply to them.
+        // There is no key to resource_definition: a study carried over by the 3.0.1 migration can
+        // hold rows for a resource it never declared, and the portal renders those by falling back
+        // to the resource id rather than treating them as broken.
 
         return List.copyOf(fks);
     }
@@ -471,11 +497,11 @@ public class ClickHouseConstraintChecker {
         // resource_definition
         uniqueKeys.add(new UniqueKey("resource_definition", List.of("resource_id", "cancer_study_id")));
 
-        // resource_data. Deletions select rows by resource_data_id, so a duplicate id would make
+        // resource. Deletions select rows by internal_id, so a duplicate id would make
         // one row's deletion take another row with it. The natural key is not listed: it spans
         // patient_id and sample_id, which are NULL at the levels that do not use them, and the
         // generated SQL skips a row unless every key column is non-NULL.
-        uniqueKeys.add(new UniqueKey("resource_data", List.of("resource_data_id")));
+        uniqueKeys.add(new UniqueKey("resource", List.of("internal_id")));
 
         // allele_specific_copy_number
         uniqueKeys.add(new UniqueKey("allele_specific_copy_number", List.of("mutation_event_id", "genetic_profile_id", "sample_id")));
@@ -500,7 +526,7 @@ public class ClickHouseConstraintChecker {
                 + "  '" + fk.parentTable + "' AS " + REFERRED_TABLE + ",\n"
                 + "  '" + fk.parentColsCsv() + "' AS " + REFERRED_COLUMNS + "\n"
                 + "FROM " + fk.childTable + " " + childAlias + "\n"
-                + "LEFT JOIN " + fk.parentTable + " " + parentAlias + "\n"
+                + "LEFT JOIN " + fk.parentSource() + " " + parentAlias + "\n"
                 + "  ON " + joinPredicate + "\n"
                 + "WHERE " + childHasAllValues + "\n"
                 + "  AND " + parentMissing;

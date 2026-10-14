@@ -52,7 +52,11 @@ public class ImportResourceData extends ConsoleRunnable {
     private Set<String> patientIds = new HashSet<String>();
     // Resource IDs encountered while reading the file, used to delete stale existing rows for
     // this study/resource-ID combination before the new rows are flushed (see importData()).
-    private final Set<String> resourceIdsInFile = new HashSet<>();
+    // The resources and the entities of the rows this file actually loaded. Filled where a row
+    // is accepted, not where it is read: a row rejected for a missing URL or an unknown sample
+    // loads nothing, so its resource must not be included in what the re-import replaces.
+    private final Set<String> importedResourceIds = new HashSet<>();
+    private final Set<String> importedEntityStableIds = new HashSet<>();
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -105,11 +109,15 @@ public class ImportResourceData extends ConsoleRunnable {
         importData(buff, resources, headerIndexMap);
         buff.close();
 
-        // Delete any existing resource_data rows for the resource IDs seen in this file before
-        // flushing the newly-buffered inserts below, so a re-import (e.g. a curator's corrected
-        // file) replaces stale rows instead of accumulating duplicates. Safe to do here because
-        // ClickHouseBulkLoader only buffers inserts in memory until flushAll() is called next.
-        DaoResourceData.deleteResourceData(cancerStudy.getInternalId(), resourceIdsInFile);
+        // Delete the rows this file replaces before the buffered inserts below are flushed, so a
+        // re-import of a corrected file replaces its rows instead of adding to them. Restricted
+        // to the entities the file names: a whole-study import removes the study first, but
+        // import-study-data loads a single file into a study that is still there.
+        // Safe to compute here because ClickHouseBulkLoader holds the inserts in memory until
+        // flushAll() below, so the lookup sees only the rows that were already in the table.
+        DaoResourceData.deleteResourceDataForReimport(
+            cancerStudy.getInternalId(), getResourceType().name(),
+            importedResourceIds, importedEntityStableIds);
 
         if (ClickHouseBulkLoader.isBulkLoad()) {
             // The deleter has to be flushed here, not left to a later stage: importing a resource
@@ -151,9 +159,6 @@ public class ImportResourceData extends ConsoleRunnable {
             }
 
             String[] fieldValues = getFieldValues(line, headerIndexMap);
-            if (resourceIdIndex >= 0 && !MissingValues.has(fieldValues[resourceIdIndex])) {
-                resourceIdsInFile.add(fieldValues[resourceIdIndex]);
-            }
             addDatum(fieldValues, resources, resourceMap, headerIndexMap, patientResourceIdSet, sampleResourceIdSet, studyResourceIdSet);
         }
     }
@@ -246,17 +251,17 @@ public class ImportResourceData extends ConsoleRunnable {
             // if patient_id column exists and resource type is patient
             if (getResourceType() == ResourceType.PATIENT && internalPatientId != -1) {
                 validateAddDatum(internalPatientId, stablePatientId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.PATIENT, patientResourceIdSet, resourceMap, fields, headerIndexMap);
+                        ResourceType.PATIENT, patientResourceIdSet, resourceMap, fields, headerIndexMap, stablePatientId);
             } 
             // if sample_id column exists and resource type is sample
             else if (getResourceType() == ResourceType.SAMPLE && internalSampleId != -1) {
                 validateAddDatum(internalSampleId, stableSampleId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap, fields, headerIndexMap);
+                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap, fields, headerIndexMap, stablePatientId);
             }
             // if resource type is study
             else if (getResourceType() == ResourceType.STUDY) {
                 validateAddDatum(cancerStudy.getInternalId(), cancerStudy.getCancerStudyStableId(), fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.STUDY, studyResourceIdSet, resourceMap, fields, headerIndexMap);
+                        ResourceType.STUDY, studyResourceIdSet, resourceMap, fields, headerIndexMap, null);
             }
         }
         return true;
@@ -347,7 +352,7 @@ public class ImportResourceData extends ConsoleRunnable {
         return (sampleId != null && !sampleId.isEmpty());
     }
 
-    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap, String[] fields, Map<String, Integer> headerIndexMap) throws Exception {
+    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap, String[] fields, Map<String, Integer> headerIndexMap, String stablePatientId) throws Exception {
         // throw exception if resource definition is not exist in the database
         if (!resourceSet.contains(resourceId)) {
             throw new RuntimeException("Error: " + resourceType.toString().toLowerCase() + " " + stableId
@@ -357,8 +362,12 @@ public class ImportResourceData extends ConsoleRunnable {
         // The resourceMap makes sure a pair of (internalId/resource_id/url) is unique
         // added to the DB if there are no duplicates,
         if (!resourceMap.containsKey(internalId, resourceId, resourceURL)) {
-            addDatum(internalId, stableId, resourceId, resourceURL, resourceType, fields, headerIndexMap);
+            addDatum(internalId, stableId, resourceId, resourceURL, resourceType, fields, headerIndexMap, stablePatientId);
             resourceMap.put(internalId, resourceId, resourceURL, resourceURL);
+            importedResourceIds.add(resourceId);
+            if (resourceType != ResourceType.STUDY) {
+                importedEntityStableIds.add(stableId);
+            }
         }
         // handle duplicates
         // if the "relaxed" flag was given, and the new record e.g. tries to ignore a duplicated resources and log a warning
@@ -380,8 +389,8 @@ public class ImportResourceData extends ConsoleRunnable {
         return (val.isEmpty() || MissingValues.has(val)) ? null : val;
     }
 
-    // add datum for patient, sample and study resources (writes only to resource_data)
-    private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, String[] fields, Map<String, Integer> headerIndexMap) throws Exception {
+    // add datum for patient, sample and study resources (writes only to resource)
+    private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, String[] fields, Map<String, Integer> headerIndexMap, String stablePatientId) throws Exception {
         // Absent optional fields stay null rather than inheriting the resource definition's
         // values: a copy of the definition on every row says nothing the definition does not
         // already say, and it is not what the migration writes for rows carried over from the
@@ -397,14 +406,11 @@ public class ImportResourceData extends ConsoleRunnable {
                 resourceURL, displayName, metadata);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
-            // derive stable patient ID from the sample's internal patient linkage
-            String stablePatientId = null;
-            try {
-                int internalPatientId = DaoSample.getSampleById(internalId).getInternalPatientId();
-                stablePatientId = DaoPatient.getPatientById(internalPatientId).getStableId();
-            } catch (Exception e) {
-                ProgressMonitor.logWarning("Could not resolve patientId for sample " + stableId + ": " + e.getMessage());
-            }
+            // The patient id comes from the row's own PATIENT_ID column, which importData()
+            // requires for sample files and which addDatum has already checked against the
+            // sample's linkage. Re-deriving it from the sample caches instead left the column
+            // NULL whenever a cache missed, and a SAMPLE row with no patient_id is skipped by
+            // the resource -> patient key, so nothing downstream would report it.
             DaoResourceData.addResourceDatum(
                 cancerStudy.getInternalId(), resourceId, "SAMPLE",
                 stablePatientId, stableId,
