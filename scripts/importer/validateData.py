@@ -3714,9 +3714,10 @@ class ResourceDefinitionValidator(Validator):
         self.resource_definition_dictionary = {}
         self.resource_contract_keys = {}
 
-    # Keys the portal reads from the contract. Anything else is ignored downstream, so a
-    # misspelling would otherwise be silently discarded: the portal treats a structurally
-    # unusable contract as "no contract" and says nothing.
+    # The complete set of keys the portal reads from a contract field. The format is closed:
+    # a key is added here when the portal is taught to read it, so any other key is a mistake
+    # and is rejected. ResourceMetadataSchema.parse ignores keys it does not know, which would
+    # otherwise leave a misspelled key with no effect and no message anywhere.
     CONTRACT_FIELD_KEYS = {'key', 'type', 'label', 'description', 'filterable',
                            'visibleByDefault'}
     CONTRACT_FIELD_TYPES = {'string', 'number'}
@@ -3725,9 +3726,11 @@ class ResourceDefinitionValidator(Validator):
     def declaredKeys(contract):
         """The metadata keys a parsed contract declares, for checking data files against.
 
-        Returns None for a contract the portal cannot read. Such a contract is reported
-        separately and the portal falls back to deriving columns from the data, so the keys
-        a file carries are not undeclared - there is no contract to declare them against.
+        Returns None when the contract is not a JSON object or its 'fields' is not a list.
+        checkCustomMetadataContract logs an error for those shapes, and the portal derives the
+        table's columns from the data instead. A data file's keys are therefore not undeclared:
+        there is no usable contract to declare them against, and reporting them would point the
+        curator at the wrong file.
         """
         if not isinstance(contract, dict) or not isinstance(contract.get('fields'), list):
             return None
@@ -3737,14 +3740,14 @@ class ResourceDefinitionValidator(Validator):
     def checkCustomMetadataContract(self, contract, col_index):
         """Check the shape of a parsed CUSTOM_METADATA contract.
 
-        The contract describes the metadata keys a resource's rows carry. The portal parses
-        it leniently and falls back to "no contract" on anything it cannot use, so problems
-        here are invisible at run time - validation is the only place a curator finds out.
+        The contract declares which metadata keys a resource's rows carry and how each column
+        is labelled, typed and filtered. The portal applies what it recognises and ignores the
+        rest: an unusable contract becomes "no contract" and the columns come from the data,
+        with nothing logged and nothing shown in the portal. Validation is the only point at
+        which a curator learns the contract is not being applied.
 
-        Severity follows the blast radius. A contract the portal cannot read at all is an
-        error; a single field declaring something the portal does not recognise is a warning,
-        since the rest of the contract still applies and no data is affected - only how one
-        column presents.
+        Every defect here is an error, so the study does not import until it is fixed. A
+        contract that is accepted but partly ignored is the case this is written to prevent.
         """
         extra = {'line_number': self.line_number, 'column_number': col_index + 1}
 
@@ -3782,26 +3785,24 @@ class ResourceDefinitionValidator(Validator):
 
             field_type = field.get('type')
             if field_type is not None and field_type not in self.CONTRACT_FIELD_TYPES:
-                self.logger.warning(
-                    "CUSTOM_METADATA field 'type' is not one of %s, so the portal will "
-                    'detect the type from the data instead.'
+                self.logger.error(
+                    "CUSTOM_METADATA field 'type' must be one of %s."
                     % ', '.join(sorted(self.CONTRACT_FIELD_TYPES)),
                     extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
                                                           field_type)))
 
             for flag in ('filterable', 'visibleByDefault'):
                 if flag in field and not isinstance(field[flag], bool):
-                    self.logger.warning(
-                        "CUSTOM_METADATA field '%s' is not true or false, so the portal will "
-                        'ignore it and use its default.' % flag,
+                    self.logger.error(
+                        "CUSTOM_METADATA field '%s' must be true or false." % flag,
                         extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
                                                               field[flag])))
 
             unknown = sorted(set(field.keys()) - self.CONTRACT_FIELD_KEYS)
             if unknown:
-                self.logger.warning(
-                    'CUSTOM_METADATA field has keys the portal does not read; they will have '
-                    'no effect.',
+                self.logger.error(
+                    'CUSTOM_METADATA field has keys that are not part of the contract format: '
+                    '%s. Remove them.' % ', '.join(sorted(self.CONTRACT_FIELD_KEYS)),
                     extra=dict(extra, cause='%s: %s' % (field.get('key', 'entry %d' % position),
                                                         ', '.join(unknown))))
 
@@ -3810,6 +3811,7 @@ class ResourceDefinitionValidator(Validator):
         super(ResourceDefinitionValidator, self).checkLine(data)
         resource_id = ''
         resource_type = ''
+        declared_keys = None
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3882,9 +3884,7 @@ class ResourceDefinitionValidator(Validator):
                     try:
                         contract = json.loads(custom_metadata_value)
                         self.checkCustomMetadataContract(contract, col_index)
-                        declared = self.declaredKeys(contract)
-                        if declared is not None:
-                            self.resource_contract_keys[resource_id] = declared
+                        declared_keys = self.declaredKeys(contract)
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             'Invalid JSON in CUSTOM_METADATA column.',
@@ -3897,6 +3897,10 @@ class ResourceDefinitionValidator(Validator):
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
                                    'cause': value})
+        # Filed after the loop, not inside it: REQUIRE_COLUMN_ORDER is False, so resource_id is
+        # only known once every column has been read. Both of these are keyed by it.
+        if declared_keys is not None and resource_id:
+            self.resource_contract_keys[resource_id] = declared_keys
         # add resource_id into dictionary
         self.resource_definition_dictionary.setdefault(resource_id, []).append(resource_type)
 
@@ -3919,24 +3923,6 @@ class ResourceValidator(Validator):
         # emit one message per row, and the HTML report buffers every record it is given.
         self.observed_metadata_keys = {}
 
-    # Columns the portal used to store and no longer does. Silently ignoring one would leave a
-    # curator believing it still means something; the whole point of validating these files is
-    # that the portal has no other way to tell them.
-    RETIRED_HEADERS = {
-        'TYPE': "put the classification in METADATA instead, where CUSTOM_METADATA can label it, "
-                "type it and decide whether it filters",
-    }
-
-    def checkHeader(self, cols):
-        num_errors = super(ResourceValidator, self).checkHeader(cols)
-        for col_name in cols:
-            if col_name in self.RETIRED_HEADERS:
-                self.logger.warning(
-                    'Column is no longer read by the portal and will be ignored; %s'
-                    % self.RETIRED_HEADERS[col_name],
-                    extra={'line_number': self.line_number, 'cause': col_name})
-        return num_errors
-
     def recordMetadataKeys(self, resource_id, parsed):
         """Remember which metadata keys a row carried, to check against the contract at the end."""
         if not resource_id or not isinstance(parsed, dict):
@@ -3952,10 +3938,13 @@ class ResourceValidator(Validator):
     def checkMetadataAgainstContracts(self):
         """Compare the metadata keys this file carried against each resource's contract.
 
-        A resource with no contract is skipped: its columns still come from the data, so an
-        undeclared key is not lost. Where a contract exists the portal builds columns from it, so
-        a key the contract omits would be imported and then never shown -- an error, since no
-        later message would tell the curator the data is invisible.
+        Where a contract exists it is the whole column list, so a key it does not declare would
+        never appear in the portal. That is an error and the study does not import: the data is
+        not filtered out and loaded without it, and nothing downstream would report it either.
+        The curator either declares the key or removes it from the file.
+
+        A resource with no contract is skipped, because its columns come from the data and an
+        undeclared key is not lost.
         """
         for resource_id, keys in sorted(self.observed_metadata_keys.items()):
             declared = RESOURCE_CONTRACT_KEYS.get(resource_id)

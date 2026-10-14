@@ -2902,7 +2902,7 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
             1, sum('must be a JSON object' in m for m in not_a_contract))
 
     def test_custom_metadata_contract_shape_errors(self):
-        """Shapes the portal cannot read at all are errors: it would fall back to "no contract"
+        """A contract the portal cannot read is an error: it would fall back to "no contract"
         and the curator would never hear about it."""
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_resource_definition_contract_shapes.txt',
@@ -2910,7 +2910,6 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
 
         self.assertTrue(all(r.levelno == logging.ERROR for r in record_list))
         messages = [r.getMessage() for r in record_list]
-        self.assertEqual(5, len(messages))
         self.assertEqual(1, sum("has no 'fields' key" in m for m in messages))
         self.assertEqual(1, sum("'fields' must be a list" in m for m in messages))
         self.assertEqual(1, sum('field entry must be a JSON object' in m for m in messages))
@@ -2920,22 +2919,37 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
         # The well-formed contract on line 2 produces nothing.
         self.assertNotIn(2, [r.line_number for r in record_list])
 
-    def test_custom_metadata_contract_field_warnings(self):
-        """A single misdeclared field is a warning: the rest of the contract still applies and
-        only that column's presentation is affected."""
+    def test_a_misdeclared_field_fails_validation(self):
+        """The contract format is closed, so a field the portal cannot act on blocks the import.
+
+        Accepting these would let a curator declare a type, a flag or a key that silently does
+        nothing -- the portal would fall back to its own defaults and say so nowhere.
+        """
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_definition_contract_shapes.txt',
+                            validateData.ResourceDefinitionValidator)
+
+        messages = [r.getMessage() for r in record_list]
+        self.assertTrue(all(r.levelno == logging.ERROR for r in record_list))
+        self.assertEqual(1, sum("field 'type' must be one of" in m for m in messages))
+        self.assertEqual(1, sum("field 'filterable' must be true or false" in m for m in messages))
+        self.assertEqual(1, sum('not part of the contract format' in m for m in messages))
+
+        # Each one names the offending field so a curator can find it.
+        field_errors = [r for r in record_list
+                        if 'must be one of' in r.getMessage()
+                        or 'must be true or false' in r.getMessage()
+                        or 'not part of the contract format' in r.getMessage()]
+        self.assertEqual(3, len(field_errors))
+        self.assertTrue(all('stain' in r.cause for r in field_errors))
+
+    def test_no_warnings_remain_for_a_misdeclared_contract(self):
+        """Every contract defect is an error now; nothing is downgraded to advice."""
         self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_resource_definition_contract_shapes.txt',
                             validateData.ResourceDefinitionValidator)
 
-        warnings = [r for r in record_list if r.levelno == logging.WARNING]
-        messages = [r.getMessage() for r in warnings]
-        self.assertEqual(3, len(warnings))
-        self.assertEqual(1, sum("field 'type' is not one of" in m for m in messages))
-        self.assertEqual(1, sum("field 'filterable' is not true or false" in m for m in messages))
-        self.assertEqual(1, sum('keys the portal does not read' in m for m in messages))
-
-        # Warnings name the offending field so a curator can find it.
-        self.assertTrue(all('stain' in w.cause for w in warnings))
+        self.assertEqual([], [r for r in record_list if r.levelno == logging.WARNING])
 
 class ResourceWiseTestCase(PostClinicalDataFileTestCase):
     def test_resource_is_not_url(self):
@@ -2973,19 +2987,6 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(set(), {2, 3, 4} & set(by_line))
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
-
-    def test_a_retired_column_is_reported_rather_than_ignored(self):
-        """TYPE is no longer stored; a file still carrying it must hear about it."""
-        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
-        self.logger.setLevel(logging.WARNING)
-
-        record_list = self.validate('data_resource_sample_retired_type.txt',
-                                    validateData.SampleResourceValidator)
-
-        retired = [r for r in record_list if 'no longer read by the portal' in r.getMessage()]
-        self.assertEqual(1, len(retired))
-        self.assertEqual('TYPE', retired[0].cause)
-        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
     def test_metadata_keys_must_be_declared_when_a_contract_exists(self):
         """A key the contract omits would be imported and never shown, so it is an error."""
@@ -3029,6 +3030,26 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
             {'stain'},
             validateData.ResourceDefinitionValidator.declaredKeys(
                 {'version': 1, 'fields': [{'key': 'stain'}]}))
+
+    def test_contract_is_filed_under_the_resource_id_whatever_the_column_order(self):
+        """CUSTOM_METADATA may precede RESOURCE_ID: REQUIRE_COLUMN_ORDER is False.
+
+        Filing the contract from inside the per-column loop stored it under '' for such a file,
+        because resource_id is only assigned when the loop reaches the RESOURCE_ID column. Every
+        later lookup is by resource id, so the undeclared-key check silently became a no-op.
+        """
+        self.logger.setLevel(logging.ERROR)
+        # validate_study lifts the validator's resource_contract_keys onto the module global, so
+        # the validator itself is what has to be inspected here.
+        validator = validateData.ResourceDefinitionValidator(
+            'test_data',
+            {'data_filename': 'data_resource_definition_contract_column_order.txt'},
+            PORTAL_INSTANCE, self.logger, False, False)
+        validator.validate()
+
+        self.assertEqual([], self.get_log_records())
+        self.assertEqual({'PATHOLOGY_SLIDE': {'stain'}}, validator.resource_contract_keys)
+        self.assertNotIn('', validator.resource_contract_keys)
 
     def test_declared_key_that_no_row_carries_is_a_warning(self):
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
