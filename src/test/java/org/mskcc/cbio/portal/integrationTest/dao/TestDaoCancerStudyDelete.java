@@ -118,7 +118,7 @@ public class TestDaoCancerStudyDelete extends AbstractDaoDeleteTest {
     @Test
     @SuppressWarnings("deprecation")
     public void testDeleteCancerStudy_resourceRowsAreGone() throws Exception {
-        // resource_data replaced resource_sample/resource_patient/resource_study, which a 7.2.0
+        // resource replaced resource_sample/resource_patient/resource_study, which a 7.2.0
         // database no longer has at all. Deleting a study has to reach the new table: against an
         // upgraded database the old statements fail outright with UNKNOWN_TABLE, so a study with
         // resources could not be deleted, and therefore could not be re-imported either.
@@ -127,12 +127,12 @@ public class TestDaoCancerStudyDelete extends AbstractDaoDeleteTest {
             "https://example.org/notes.pdf", null, null);
         ClickHouseBulkLoader.flushAll();
         assertEquals("fixture must have written a resource row",
-            1L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+            1L, countRowsWhereEq("resource", "cancer_study_id", studyId));
 
         DaoCancerStudy.deleteCancerStudy(studyId);
 
-        assertEquals("resource_data rows should go with the study",
-            0L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+        assertEquals("resource rows should go with the study",
+            0L, countRowsWhereEq("resource", "cancer_study_id", studyId));
     }
 
     @Test

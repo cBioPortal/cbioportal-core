@@ -74,12 +74,12 @@ public class TestDaoPatientDelete extends AbstractDaoDeleteTest {
         DaoResourceData.addResourceDatum(studyId, "PATIENT_NOTES", "SAMPLE", PATIENT_STABLE_ID,
                 SAMPLE_STABLE_ID, "https://example.org/slide.svs", null, null);
         ClickHouseBulkLoader.flushAll();
-        assertEquals(2L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+        assertEquals(2L, countRowsWhereEq("resource", "cancer_study_id", studyId));
 
         DaoPatient.deletePatients(studyId, Set.of(PATIENT_STABLE_ID));
 
         assertEquals("both the patient's and its sample's resource rows should go",
-                0L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+                0L, countRowsWhereEq("resource", "cancer_study_id", studyId));
     }
 
     @Test

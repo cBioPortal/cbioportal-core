@@ -275,8 +275,8 @@ INSERT INTO resource_definition (resource_id, cancer_study_id) VALUES
 ('RES_DEF_DUP', 700010),
 ('RES_DEF_DUP', 700010);
 
--- resource_data: two rows sharing one resource_data_id, which deletions select by.
-INSERT INTO resource_data (resource_data_id, resource_id, cancer_study_id, resource_scope, patient_id, sample_id, url, display_name, metadata) VALUES
+-- resource: two rows sharing one internal_id, which deletions select by.
+INSERT INTO resource (internal_id, resource_id, cancer_study_id, resource_scope, patient_id, sample_id, url, display_name, metadata) VALUES
 (700500, 'RES_DATA_DUP', 700010, 'STUDY', NULL, NULL, 'http://study', NULL, NULL),
 (700500, 'RES_DATA_DUP', 700010, 'STUDY', NULL, NULL, 'http://study', NULL, NULL);
 

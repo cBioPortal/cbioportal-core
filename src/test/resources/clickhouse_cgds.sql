@@ -43,7 +43,7 @@ DROP TABLE IF EXISTS mutation_event;
 DROP TABLE IF EXISTS patient;
 DROP TABLE IF EXISTS reference_genome;
 DROP TABLE IF EXISTS reference_genome_gene;
-DROP TABLE IF EXISTS resource_data;
+DROP TABLE IF EXISTS resource;
 DROP TABLE IF EXISTS resource_definition;
 DROP TABLE IF EXISTS resource_patient;
 DROP TABLE IF EXISTS resource_sample;
@@ -602,9 +602,9 @@ CREATE TABLE resource_definition
     ENGINE = MergeTree
 ORDER BY tuple();
 
-CREATE TABLE resource_data
+CREATE TABLE resource
 (
-    `resource_data_id` Int64,
+    `internal_id` Int64,
     `resource_id`      String,
     `cancer_study_id`  Int32,
     `resource_scope`   String,
@@ -615,7 +615,7 @@ CREATE TABLE resource_data
     `metadata`         Nullable(String)
 )
     ENGINE = MergeTree
-ORDER BY (cancer_study_id, resource_id, patient_id, sample_id, resource_data_id)
+ORDER BY (cancer_study_id, resource_id, patient_id, sample_id, internal_id)
     SETTINGS allow_nullable_key = 1;
 
 CREATE TABLE resource_patient

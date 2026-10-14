@@ -67,7 +67,7 @@ public class TestDaoSampleDelete extends AbstractDaoDeleteTest {
 
     @Test
     public void testDeleteSamples_resourceRowsAreGone() throws DaoException {
-        // resource_data keys rows by stable id where the dropped resource_sample table keyed them
+        // resource keys rows by stable id where the dropped resource_sample table keyed them
         // by internal id, so deleting a sample has to resolve its resources through the stable id,
         // scoped by study. A patient-level row of the same patient must survive: it belongs to the
         // patient, not to this sample.
@@ -76,12 +76,12 @@ public class TestDaoSampleDelete extends AbstractDaoDeleteTest {
         DaoResourceData.addResourceDatum(studyId, "PATIENT_NOTES", "PATIENT", PATIENT_STABLE_ID,
                 null, "https://example.org/notes.pdf", null, null);
         ClickHouseBulkLoader.flushAll();
-        assertEquals(2L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+        assertEquals(2L, countRowsWhereEq("resource", "cancer_study_id", studyId));
 
         DaoSample.deleteSamples(studyId, Set.of(SAMPLE_STABLE_ID));
 
         assertEquals("the sample's resource row should go, the patient's should stay",
-                1L, countRowsWhereEq("resource_data", "cancer_study_id", studyId));
+                1L, countRowsWhereEq("resource", "cancer_study_id", studyId));
     }
 
     @Test
