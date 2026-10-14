@@ -114,8 +114,8 @@ public class ImportSampleList extends ConsoleRunnable {
       sampleList.setDescription(caseList.getDescription());
       sampleList.setSampleList(sampleIDsList);
       daoSampleList.addSampleList(sampleList);
-
-      sampleList = daoSampleList.getSampleListByStableId(caseList.getStableId());
+      // Keep the populated instance. ClickHouse Cloud may not expose an INSERT to a
+      // SELECT on another connection immediately (SharedMergeTree stale snapshot).
 
       ProgressMonitor.setCurrentMessage(" --> stable ID:  " + sampleList.getStableId());
       ProgressMonitor.setCurrentMessage(" --> sample list name:  " + sampleList.getName());

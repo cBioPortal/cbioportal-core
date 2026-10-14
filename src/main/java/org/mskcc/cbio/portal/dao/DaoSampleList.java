@@ -58,6 +58,7 @@ public class DaoSampleList {
             con = JdbcUtil.getDbConnection(DaoSampleList.class);
 
             long listId = ClickHouseAutoIncrement.nextId(SAMPLE_LIST_SEQUENCE);
+            sampleList.setSampleListId((int) listId);
             pstmt = con.prepareStatement("INSERT INTO sample_list (`list_id`, `stable_id`, `cancer_study_id`, `name`, `category`," +
                     "`description`)" + " VALUES (?,?,?,?,?,?)");
             pstmt.setLong(1, listId);
