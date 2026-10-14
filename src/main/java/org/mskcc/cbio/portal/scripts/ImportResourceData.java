@@ -391,10 +391,6 @@ public class ImportResourceData extends ConsoleRunnable {
 
     // add datum for patient, sample and study resources (writes only to resource)
     private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, String[] fields, Map<String, Integer> headerIndexMap, String stablePatientId) throws Exception {
-        // Absent optional fields stay null rather than inheriting the resource definition's
-        // values: a copy of the definition on every row says nothing the definition does not
-        // already say, and it is not what the migration writes for rows carried over from the
-        // legacy tables.
         String displayName = getOptionalField(fields, headerIndexMap, DISPLAY_NAME_COLUMN_NAME);
         String metadata = getOptionalField(fields, headerIndexMap, METADATA_COLUMN_NAME);
 

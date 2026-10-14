@@ -6,19 +6,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Data Access Object for the unified {@code resource} table.
- *
- * <p>Legacy split tables (resource_sample, resource_patient, resource_study) are no
- * longer written to by the importer.  Existing data in those tables can be migrated
- * to resource via the migration.sql script bundled with the backend.</p>
- *
- * <p>{@code resource} rows are never updated in place: ClickHouse's MergeTree engine makes
- * single-row updates expensive, and the importer cannot tell which existing row corresponds to a
- * given input line. A re-import therefore deletes before it inserts (see
- * {@link #deleteResourceDataForReimport(int, String, Set, Set)}), which is the delete-then-insert
- * pattern the importer uses for other reloadable data types. The deletion covers the resources
- * and the entities the incoming file names, so a corrected file replaces its own rows and leaves
- * the rest of the study's alone.</p>
+ * Data Access Object for the unified {@code resource} table, which replaced resource_sample,
+ * resource_patient and resource_study.
  */
 public final class DaoResourceData {
 
@@ -34,15 +23,6 @@ public final class DaoResourceData {
         "patient_id", "sample_id", "url", "display_name", "metadata"
     };
 
-    /**
-     * internal_id comes from the shared sequence machinery rather than a local counter.
-     * ClickHouse has no AUTO_INCREMENT, and seeding from the system clock does not guarantee
-     * uniqueness: the clock can be wrong or move backwards, and an import on a second machine
-     * knows nothing about ids the first one issued. ClickHouseAutoIncrement seeds from
-     * max(persisted value, current table max) once per JVM and writes the counter back on
-     * shutdown, so two importer JVMs loading different studies at the same time can still mint
-     * the same ids.
-     */
     private static final String RESOURCE_SEQUENCE = "seq_resource";
 
 
@@ -155,11 +135,13 @@ public final class DaoResourceData {
 
     /**
      * Deletes the rows a re-import is about to replace: those of the given resources that belong
-     * to the entities the incoming file actually names.
+     * to the entities the incoming file names.
      *
-     * <p>The entity restriction is what keeps a single-file import from reaching beyond its own
-     * contents. A curator correcting one sample's row sends a file naming that sample; the rows
-     * of every other sample in the study carry the same {@code resource_id} and must survive it.
+     * <p>Rows are deleted and reinserted rather than updated. MergeTree makes single-row updates
+     * expensive, and the importer cannot tell which existing row corresponds to an input line.
+     *
+     * <p>The entity restriction keeps a single-file import from reaching beyond its own contents:
+     * rows of other samples carry the same {@code resource_id} and must survive it.
      * {@code cbioportalImporter.py import-study-data} loads one file without removing the study
      * first, so nothing else narrows the deletion.
      *
