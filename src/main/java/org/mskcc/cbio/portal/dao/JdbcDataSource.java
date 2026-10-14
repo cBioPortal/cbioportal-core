@@ -1,5 +1,7 @@
 package org.mskcc.cbio.portal.dao;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.mskcc.cbio.portal.util.DatabaseProperties;
@@ -62,6 +64,8 @@ public class JdbcDataSource extends BasicDataSource {
         this.setPassword(password);
         this.setUrl(connectionURL);
         this.setDriverClassName(driverClassName);
+        connectionTimeoutDefaults(connectionURL).forEach((name, value) ->
+                this.addConnectionProperty(name.toString(), value.toString()));
         applyIdleConnectionKeepalive(connectionURL);
         // Disable this to avoid caching statements
         this.setPoolPreparedStatements(Boolean.valueOf(enablePooling));
@@ -98,6 +102,33 @@ public class JdbcDataSource extends BasicDataSource {
 
     static final String SEND_PROGRESS_SETTING = "send_progress_in_http_headers";
     static final String IDLE_KEEPALIVE_SETTINGS = SEND_PROGRESS_SETTING + "=1,http_headers_progress_interval_ms=60000";
+
+    /**
+     * Allow long import statements without changing explicitly configured JDBC URL options.
+     * Values are milliseconds; pool validation and delete-completion polling have separate limits.
+     * Override either default through spring.datasource.url's standard ClickHouse query parameters.
+     */
+    static Properties connectionTimeoutDefaults(String connectionURL) {
+        Properties defaults = new Properties();
+        if (connectionURL == null || !(connectionURL.startsWith("jdbc:clickhouse:")
+                || connectionURL.startsWith("jdbc:ch:"))) {
+            return defaults;
+        }
+        Set<String> configured = new HashSet<>();
+        int queryStart = connectionURL.indexOf('?');
+        if (queryStart >= 0) {
+            for (String option : connectionURL.substring(queryStart + 1).split("&")) {
+                configured.add(URLDecoder.decode(option.split("=", 2)[0], StandardCharsets.UTF_8));
+            }
+        }
+        if (!configured.contains("socket_timeout")) {
+            defaults.setProperty("socket_timeout", "3600000");
+        }
+        if (!configured.contains("connect_timeout")) {
+            defaults.setProperty("connect_timeout", "60000");
+        }
+        return defaults;
+    }
 
     /** Returns the custom_settings value to add, or null if the URL is not ClickHouse or already sets custom_settings. */
     static String idleConnectionKeepaliveSettings(String connectionURL) {
