@@ -112,7 +112,7 @@ public class JdbcDataSource extends BasicDataSource {
     /**
      * Allow long import statements without changing explicitly configured JDBC URL options.
      * Values are milliseconds; pool validation and delete-completion polling have separate limits.
-     * Override either default through spring.datasource.url's standard ClickHouse query parameters.
+     * Override each default through spring.datasource.url's standard ClickHouse query parameters.
      */
     static Properties connectionTimeoutDefaults(String connectionURL) {
         Properties defaults = new Properties();
@@ -132,6 +132,9 @@ public class JdbcDataSource extends BasicDataSource {
         }
         if (!configured.contains("connect_timeout")) {
             defaults.setProperty("connect_timeout", "60000");
+        }
+        if (!configured.contains("connection_request_timeout")) {
+            defaults.setProperty("connection_request_timeout", "60000");
         }
         return defaults;
     }

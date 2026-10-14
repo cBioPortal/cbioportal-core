@@ -13,14 +13,15 @@ public class JdbcDataSourceKeepaliveTest {
             Properties settings = JdbcDataSource.connectionTimeoutDefaults(prefix + "//host:8443/db?ssl=true");
             assertEquals("3600000", settings.getProperty("socket_timeout"));
             assertEquals("60000", settings.getProperty("connect_timeout"));
-            assertEquals(2, settings.size());
+            assertEquals("60000", settings.getProperty("connection_request_timeout"));
+            assertEquals(3, settings.size());
         }
     }
 
     @Test
     public void explicitTimeoutsArePreservedIndependently() {
         assertTrue(JdbcDataSource.connectionTimeoutDefaults(
-                "jdbc:clickhouse://host/db?socket_timeout=600000&connect_timeout=5000").isEmpty());
+                "jdbc:clickhouse://host/db?socket_timeout=600000&connect_timeout=5000&connection_request_timeout=2000").isEmpty());
         Properties settings = JdbcDataSource.connectionTimeoutDefaults(
                 "jdbc:clickhouse://host/db?socket_timeout=600000");
         assertNull(settings.getProperty("socket_timeout"));
@@ -28,6 +29,12 @@ public class JdbcDataSourceKeepaliveTest {
         settings = JdbcDataSource.connectionTimeoutDefaults("jdbc:clickhouse://host/db?connect_timeout=5000");
         assertEquals("3600000", settings.getProperty("socket_timeout"));
         assertNull(settings.getProperty("connect_timeout"));
+        assertEquals("60000", settings.getProperty("connection_request_timeout"));
+        settings = JdbcDataSource.connectionTimeoutDefaults(
+                "jdbc:clickhouse://host/db?connection_request_timeout=2000");
+        assertNull(settings.getProperty("connection_request_timeout"));
+        assertEquals("3600000", settings.getProperty("socket_timeout"));
+        assertEquals("60000", settings.getProperty("connect_timeout"));
     }
 
     @Test
