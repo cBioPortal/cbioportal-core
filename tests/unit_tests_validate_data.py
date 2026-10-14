@@ -2891,8 +2891,8 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
             ['{"key": "value", "number": 123,}', '{key: "value"}', '["item1", "item2",]'],
             malformed_json)
 
-        # Valid JSON that carries no contract is reported too: the portal would silently ignore
-        # it, so validation is the only place a curator finds out.
+        # Valid JSON that carries no contract is reported too: the portal ignores it without
+        # logging, so validation is the only place a curator finds out.
         not_a_contract = [r.getMessage() for r in record_list
                           if 'Invalid JSON in CUSTOM_METADATA column' not in r.getMessage()]
         self.assertEqual(4, len(not_a_contract))
@@ -2922,8 +2922,8 @@ class ResourceDefinitionWiseTestCase(PostClinicalDataFileTestCase):
     def test_a_misdeclared_field_fails_validation(self):
         """The contract format is closed, so a field the portal cannot act on blocks the import.
 
-        Accepting these would let a curator declare a type, a flag or a key that silently does
-        nothing -- the portal would fall back to its own defaults and say so nowhere.
+        Accepting these would let a curator declare a type, a flag or a key that has no effect:
+        the portal falls back to its own defaults and logs nothing.
         """
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_resource_definition_contract_shapes.txt',
@@ -3034,9 +3034,9 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
     def test_contract_is_filed_under_the_resource_id_whatever_the_column_order(self):
         """CUSTOM_METADATA may precede RESOURCE_ID: REQUIRE_COLUMN_ORDER is False.
 
-        Filing the contract from inside the per-column loop stored it under '' for such a file,
-        because resource_id is only assigned when the loop reaches the RESOURCE_ID column. Every
-        later lookup is by resource id, so the undeclared-key check silently became a no-op.
+        Filing the contract from inside the per-column loop stores it under '', because
+        resource_id is only assigned when the loop reaches the RESOURCE_ID column. Every later
+        lookup is by resource id, so the undeclared-key check never runs.
         """
         self.logger.setLevel(logging.ERROR)
         # validate_study lifts the validator's resource_contract_keys onto the module global, so

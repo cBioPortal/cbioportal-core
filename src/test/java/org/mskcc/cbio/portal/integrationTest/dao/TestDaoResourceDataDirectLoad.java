@@ -50,9 +50,9 @@ import static org.junit.Assert.assertNotNull;
  * the old rows alone. In direct-load mode the same sequence has already committed the new rows, so
  * the lookup -- a plain SELECT on (cancer_study_id, resource_id) -- returns the new rows as well.
  *
- * <p>This pins that difference down, so that a change which simply flushes the deleter in
- * direct-load mode without also moving the delete ahead of the inserts fails here rather than
- * silently emptying the table on a curator's re-import.
+ * <p>This pins that difference down: a change which flushes the deleter in direct-load mode
+ * without moving the delete ahead of the inserts fails here rather than emptying the table on a
+ * curator's re-import.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:/applicationContext-dao.xml"})
@@ -124,7 +124,7 @@ public class TestDaoResourceDataDirectLoad extends AbstractDaoDeleteTest {
     /**
      * A re-import replaces the rows of the entities its file names and leaves every other
      * entity's rows alone. Deleting on (study, resource) alone would take the whole study's rows
-     * for that resource, which is what a single-file import of one corrected row would do.
+     * for that resource.
      */
     @Test
     public void reimportingOnePatientLeavesTheOtherPatientsRowsAlone() throws DaoException {

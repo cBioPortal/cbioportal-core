@@ -77,8 +77,8 @@ sample_ids_panel_dict = {}
 # resource globals
 RESOURCE_DEFINITION_DICTIONARY = {}
 # resource_id -> set of metadata keys the resource's CUSTOM_METADATA contract declares. A resource
-# with no contract is absent from this map, which is what keeps resources that predate contracts
-# importing unchanged. Populated from the definition file before any resource data file is read.
+# with no contract is absent from this map and its data file is not checked against one.
+# Populated from the definition file before any resource data file is read.
 RESOURCE_CONTRACT_KEYS = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 

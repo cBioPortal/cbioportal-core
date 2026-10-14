@@ -59,12 +59,9 @@ public final class DaoResourceData {
             // not own: a reordered or newly inserted column lands the url in display_name with
             // no error, since only the value count is checked.
             //
-            // Nulls are passed through rather than substituted with "": the loader encodes a
-            // null as \N, which ClickHouse stores as a real NULL, and these columns are
-            // Nullable(String). The distinction matters. A patient-level row carries no sample,
-            // and queries select those rows with "sample_id IS NULL"; an empty string satisfies
-            // neither that nor "sample_id IN (...)", so such rows would be silently dropped from
-            // every cohort-scoped query and miscounted by the distinct-sample count.
+            // Pass nulls through: the loader encodes null as \N, which ClickHouse stores as a
+            // real NULL. Patient-level rows have no sample, and queries select them with
+            // sample_id IS NULL, which an empty string does not match.
             ClickHouseBulkLoader loader =
                 ClickHouseBulkLoader.getClickHouseBulkLoader(RESOURCE_TABLE);
             loader.setFieldNames(RESOURCE_COLUMNS);
