@@ -1,0 +1,10 @@
+#Patient Identifier	Sample Identifier	Cancer Type	Tumor Purity
+#Patient identifier	Sample identifier	Cancer type	Estimated tumor purity
+#STRING	STRING	STRING	NUMBER
+#1	1	1	1
+PATIENT_ID	SAMPLE_ID	CANCER_TYPE	TUMOR_PURITY
+WSI-P1	WSI-P1-S1	Breast Cancer	0.45
+WSI-P1	WSI-P1-S2	Breast Cancer	NA
+WSI-P2	WSI-P2-S1	Breast Cancer	0.8
+WSI+P3	WSI+P3-S1	Breast Cancer	
+WSI-P4	WSI-P4-S1	Breast Cancer	0.1

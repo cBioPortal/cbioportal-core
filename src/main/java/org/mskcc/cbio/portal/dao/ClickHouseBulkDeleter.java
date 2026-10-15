@@ -150,13 +150,18 @@ public class ClickHouseBulkDeleter {
             throw new RuntimeException("a ClickHouseBulkDeleter object had been flushed previously, and was attempted to be flushed a second time");
         }
         List<ClickHouseBulkDeleter> effectiveDeleters = deletersWithPendingDeletes(deleters);
+        boolean deletionWasAttempted = false;
         try {
             dropExistingStagingTables(effectiveDeleters, false); // drop any leftover tables from previous crash/failure
             createStagingTables(effectiveDeleters);
             populateStagingTables(effectiveDeleters);
+            // A failed create or population must not enter deletion-confirmation
+            // retries. Once the DELETE phase starts, retain the staging rows
+            // until every target table confirms that its mutation completed.
+            deletionWasAttempted = true;
             totalDeleted = deleteRecordsReferencedInStagingTables(effectiveDeleters);
         } finally {
-            dropExistingStagingTables(effectiveDeleters, true);
+            dropExistingStagingTables(effectiveDeleters, deletionWasAttempted);
             teardownDeleters(effectiveDeleters);
         }
         return totalDeleted;
@@ -397,11 +402,11 @@ public class ClickHouseBulkDeleter {
     }
 
     private void confirmDeletionIsCompleteInData() throws DaoException {
-        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
+        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
             String exceptionMessageString = String.format(
                     "Failed to complete the delete operation on all replicas for table %s after retrying for %d seconds",
                     this.targetTable,
-                    DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
+                    CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
             throw new DaoException(exceptionMessageString);
         }
         // TODO: if condition fails a few times, we might start checking whether any
@@ -430,7 +435,7 @@ public class ClickHouseBulkDeleter {
     private boolean allReplicasReportExpectedStagingTableRecordCount() throws SQLException, DaoException {
         String queryPart1 = "SELECT host, sum(record_count) AS total_rows FROM ((";
         String queryPart2 = "SELECT hostname() AS host, rows AS record_count FROM clusterAllReplicas('default', 'system', 'parts')";
-        String queryPart3 = "WHERE database = current_database() AND table = ";
+        String queryPart3 = "WHERE database = current_database() AND active = 1 AND table = ";
         String queryPart4 = ") union all (";
         // This union insures that at least one part with one record is included in the query result before aggregation. In this way, every host will be present in the results
         String queryPart5 = "SELECT hostname() AS host, 0 AS record_count FROM clusterAllReplicas('default', 'system', 'one')";
@@ -451,7 +456,7 @@ public class ClickHouseBulkDeleter {
     private boolean allReplicasReportSameMetadataForTargetTable() throws SQLException, DaoException {
         String queryPart1 = "SELECT host, sum(record_count) AS total_rows FROM ((";
         String queryPart2 = "SELECT hostname() AS host, rows AS record_count FROM clusterAllReplicas('default', 'system', 'parts')";
-        String queryPart3 = "WHERE database = current_database() AND table = ";
+        String queryPart3 = "WHERE database = current_database() AND active = 1 AND table = ";
         String queryPart4 = ") union all (";
         // This union insures that at least one part with one record is included in the query result before aggregation. In this way, every host will be present in the results
         String queryPart5 = "SELECT hostname() AS host, 0 AS record_count FROM clusterAllReplicas('default', 'system', 'one')";

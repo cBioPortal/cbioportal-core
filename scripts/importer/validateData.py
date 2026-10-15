@@ -61,6 +61,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
+# The WSI row contract lives with the converter.
+from . import convertWsiToResources as wsi_contract
 
 
 # ------------------------------------------------------------------------------
@@ -70,6 +72,7 @@ from . import cbioportal_common
 DEFINED_SAMPLE_IDS = None
 DEFINED_SAMPLE_ATTRIBUTES = None
 PATIENTS_WITH_SAMPLES = None
+SAMPLE_TO_PATIENT = None
 mutation_sample_ids = None
 mutation_file_sample_ids = set()
 sample_ids_panel_dict = {}
@@ -81,6 +84,8 @@ RESOURCE_DEFINITION_DICTIONARY = {}
 # Populated from the definition file before any resource data file is read.
 RESOURCE_CONTRACT_KEYS = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
+# study-wide WSI rules, shared by the sample and patient resource files (reset per study)
+WSI_RESOURCE_STATE = wsi_contract.SlideRegistry()
 
 # globals required for gene set scoring validation
 prior_validated_sample_ids = None
@@ -2826,6 +2831,7 @@ class SampleClinicalValidator(ClinicalValidator):
         self.sample_id_lines = {}
         self.sampleIds = self.sample_id_lines.keys()
         self.patient_ids = set()
+        self.sample_to_patient = {}
 
     def checkLine(self, data):
         """Check the values in a line of data."""
@@ -2876,6 +2882,12 @@ class SampleClinicalValidator(ClinicalValidator):
                     self.sample_id_lines[value] = self.line_number
             elif col_name == 'PATIENT_ID':
                 self.patient_ids.add(value)
+                if 'SAMPLE_ID' in self.cols:
+                    sample_index = self.cols.index('SAMPLE_ID')
+                    if sample_index < len(data):
+                        sample_value = data[sample_index].strip()
+                        if sample_value:
+                            self.sample_to_patient[sample_value] = value
             # TODO: check the values in the other documented columns
 
 
@@ -3500,6 +3512,7 @@ class TimelineValidator(Validator):
 
     def checkLine(self, data):
         super(TimelineValidator, self).checkLine(data)
+        self._check_pathology_slides_deid(data)
         # TODO check the values
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
@@ -3528,6 +3541,25 @@ class TimelineValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value})
+
+    def _check_pathology_slides_deid(self, data):
+        """PATHOLOGY SLIDES events reach the browser through the clinical-events
+        API: reject real slide ids (values never echoed); slides are addressed by
+        their opaque slide key."""
+        if 'EVENT_TYPE' not in self.cols:
+            return
+        event_index = self.cols.index('EVENT_TYPE')
+        if event_index >= len(data) or data[event_index].strip() != 'PATHOLOGY SLIDES':
+            return
+        for col_index, col_name in enumerate(self.cols):
+            value = data[col_index].strip() if col_index < len(data) else ''
+            if col_name in ('IMAGE_ID', 'IMAGE_IDS') and value:
+                self.logger.error(
+                    'PATHOLOGY SLIDES events cannot carry real slide identifiers',
+                    extra={'line_number': self.line_number,
+                           'column_number': col_index + 1,
+                           'cause': col_name})
+
 
 class CancerTypeValidator(Validator):
 
@@ -3904,11 +3936,28 @@ class ResourceDefinitionValidator(Validator):
         # add resource_id into dictionary
         self.resource_definition_dictionary.setdefault(resource_id, []).append(resource_type)
 
+def reset_wsi_resource_state():
+    """Forget the WSI resource rows seen so far (called once per study)."""
+    global WSI_RESOURCE_STATE
+    WSI_RESOURCE_STATE = wsi_contract.SlideRegistry()
+
+
+def wsi_field_label(field):
+    """Name a WSI contract field by its column or METADATA path."""
+    if field in ('PATIENT_ID', 'SAMPLE_ID', 'METADATA'):
+        return field
+    if field in wsi_contract.SERVING_FIELDS:
+        return 'METADATA.%s.%s' % (wsi_contract.SERVING_KEY, field.lower())
+    return 'METADATA.' + field.lower()
+
+
 class ResourceValidator(Validator):
 
     """Abstract Validator class for resource data files.
 
     Subclasses define the columns that must be present in REQUIRED_HEADERS.
+    WSI_SAMPLE and WSI_PATIENT rows are additionally checked against the WSI
+    contract (see checkWsiResource).
     """
 
     REQUIRE_COLUMN_ORDER = False
@@ -3929,6 +3978,9 @@ class ResourceValidator(Validator):
             return
         seen = self.observed_metadata_keys.setdefault(resource_id, {})
         for key in parsed:
+            # A WSI row's private wsi_serving object is never a column, so it is not declared.
+            if key == wsi_contract.SERVING_KEY and resource_id in wsi_contract.WSI_RESOURCE_IDS:
+                continue
             seen.setdefault(key, self.line_number)
 
     def onComplete(self):
@@ -3966,6 +4018,60 @@ class ResourceValidator(Validator):
                     extra={'line_number': self.line_number,
                            'cause': ', '.join(unused)})
 
+    def checkWsiResource(self, data):
+        """Check a WSI_SAMPLE/WSI_PATIENT row against the WSI contract in convertWsiToResources.
+
+        The study-wide rules (unique slide keys, consistent parts, blocks and reference
+        samples) span all resource files of the study. Errors name the column or METADATA
+        path, never the value.
+        """
+        values = self._line_values(data)
+        if values.get('RESOURCE_ID') not in wsi_contract.WSI_RESOURCE_IDS:
+            return
+        column_index = {col_name: col_index for col_index, col_name in enumerate(self.cols)}
+
+        def error(message, field):
+            column = column_index.get(field if field in ('PATIENT_ID', 'SAMPLE_ID') else 'METADATA')
+            extra = {'line_number': self.line_number, 'cause': wsi_field_label(field)}
+            if column is not None:
+                extra['column_number'] = column + 1
+            self.logger.error('WSI: ' + message, extra=extra)
+
+        try:
+            metadata = json.loads(values.get('METADATA', ''))
+        except ValueError:
+            metadata = None
+        if not isinstance(metadata, dict):
+            # a present but malformed value was already reported by checkLine
+            error('resources require a METADATA JSON object', 'METADATA')
+            return
+        patient_id = values.get('PATIENT_ID', '')
+        sample_id = values.get('SAMPLE_ID', '')
+        for field, message in (wsi_contract.slide_problems(metadata, sample_id)
+                               + WSI_RESOURCE_STATE.problems(patient_id, metadata)):
+            error(message, field)
+
+        if DEFINED_SAMPLE_IDS is not None and sample_id and sample_id not in DEFINED_SAMPLE_IDS:
+            error('SAMPLE_ID is not defined in the clinical file', 'SAMPLE_ID')
+        if PATIENTS_WITH_SAMPLES is not None and patient_id not in PATIENTS_WITH_SAMPLES:
+            error('PATIENT_ID is not defined in the clinical file', 'PATIENT_ID')
+        if SAMPLE_TO_PATIENT is not None:
+            for field, value in (('SAMPLE_ID', sample_id),
+                                 ('REFERENCE_SAMPLE_ID', metadata.get('reference_sample_id'))):
+                if value and isinstance(value, str) and SAMPLE_TO_PATIENT.get(value) != patient_id:
+                    error('%s belongs to a different patient' % field, field)
+
+        serving = metadata.get(wsi_contract.SERVING_KEY)
+        if isinstance(serving, dict):
+            known = {field.lower() for field in wsi_contract.SERVING_FIELDS}
+            unknown = sorted(set(serving) - known - set(wsi_contract.UNSEALED_SOURCE_KEYS))
+            if unknown:
+                self.logger.warning(
+                    'WSI metadata wsi_serving has keys the portal does not read',
+                    extra={'line_number': self.line_number,
+                           'column_number': column_index['METADATA'] + 1,
+                           'cause': ', '.join(unknown)})
+
     def url_validator(self, url):
         try:
             result = urlparse(url)
@@ -3973,9 +4079,21 @@ class ResourceValidator(Validator):
         except:
             return False
 
+    def _line_values(self, data):
+        """Map each column name to its stripped value ('' beyond the end of the line)."""
+        return {col_name: data[col_index].strip() if col_index < len(data) else ''
+                for col_index, col_name in enumerate(self.cols)}
+
+    def _is_wsi_line(self, data):
+        """Whether a line is a WSI row (RESOURCE_ID WSI_SAMPLE or WSI_PATIENT)."""
+        return self._line_values(data).get('RESOURCE_ID') in wsi_contract.WSI_RESOURCE_IDS
+
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(ResourceValidator, self).checkLine(data)
+        # WSI URLs and metadata can carry server-side identifiers;
+        # their errors name the column instead of echoing the value.
+        wsi_line = self._is_wsi_line(data)
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4013,7 +4131,7 @@ class ResourceValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'column_name': col_name,
-                               'cause': value})
+                               'cause': col_name if wsi_line else value})
             # make sure that PATIENT_ID is present
             if col_name == 'PATIENT_ID':
                 if value.strip().lower() in self.NULL_VALUES:
@@ -4046,13 +4164,13 @@ class ResourceValidator(Validator):
                             'METADATA must be a JSON object (key-value map), not an array or scalar',
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
-                                   'cause': value[:80]})
+                                   'cause': col_name if wsi_line else value[:80]})
                 except ValueError:
                     self.logger.error(
                         'METADATA value is not valid JSON',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
-                               'cause': value[:80]})
+                               'cause': col_name if wsi_line else value[:80]})
 
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
@@ -4071,6 +4189,7 @@ class SampleResourceValidator(ResourceValidator):
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(SampleResourceValidator, self).checkLine(data)
+        self.checkWsiResource(data)
         resource_id = ''
         sample_id = ''
         resource_url = ''
@@ -4133,6 +4252,7 @@ class PatientResourceValidator(ResourceValidator):
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(PatientResourceValidator, self).checkLine(data)
+        self.checkWsiResource(data)
         resource_id = ''
         patient_id = ''
         resource_url = ''
@@ -4584,6 +4704,7 @@ class MultipleDataFileValidator(FeaturewiseFileValidator, metaclass=ABCMeta):
     def checkId(self):
         return self.checkIdInSamples()
 
+
 class GsvaWiseFileValidator(MultipleDataFileValidator, metaclass=ABCMeta):
     """Groups multiple gene set data files from a study to ensure consistency.
 
@@ -4917,6 +5038,11 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
             filename, logger, study_id, gene_panel_list=portal_instance.gene_panel_list)
         meta_file_type = meta_dictionary['meta_file_type']
         if meta_file_type is None:
+            continue
+        if meta_file_type == cbioportal_common.MetaFileTypes.WSI:
+            # Legacy WSI pairs are converted offline; the importer rejects them.
+            logger.error(cbioportal_common.LEGACY_WSI_IMPORT_MESSAGE,
+                         extra={'filename_': filename})
             continue
 
         # check if geneset version is the same in database
@@ -5577,8 +5703,11 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global DEFINED_SAMPLE_IDS
     global DEFINED_SAMPLE_ATTRIBUTES
     global PATIENTS_WITH_SAMPLES
+    global SAMPLE_TO_PATIENT
     global RESOURCE_DEFINITION_DICTIONARY, RESOURCE_CONTRACT_KEYS
     global RESOURCE_PATIENTS_WITH_SAMPLES
+
+    reset_wsi_resource_state()
 
     if portal_instance.cancer_type_dict is None:
         logger.warning('Skipping validations relating to cancer types '
@@ -5668,6 +5797,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     DEFINED_SAMPLE_IDS = defined_sample_ids
     DEFINED_SAMPLE_ATTRIBUTES = sample_validator.defined_attributes
     PATIENTS_WITH_SAMPLES = sample_validator.patient_ids
+    SAMPLE_TO_PATIENT = sample_validator.sample_to_patient
 
     if len(validators_by_meta_type.get(
                cbioportal_common.MetaFileTypes.PATIENT_ATTRIBUTES,
@@ -5785,6 +5915,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
 
 
 def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks):
+    reset_wsi_resource_state()
     # walk over the meta files in the dir and get properties of the study
     validators_by_meta_type, *_ = process_metadata_files(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
     for meta_file_type, validators in validators_by_meta_type.items():
