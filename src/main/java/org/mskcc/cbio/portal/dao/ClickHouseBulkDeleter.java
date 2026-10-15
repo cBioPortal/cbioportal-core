@@ -397,11 +397,11 @@ public class ClickHouseBulkDeleter {
     }
 
     private void confirmDeletionIsCompleteInData() throws DaoException {
-        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
+        if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
             String exceptionMessageString = String.format(
                     "Failed to complete the delete operation on all replicas for table %s after retrying for %d seconds",
                     this.targetTable,
-                    DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
+                    CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
             throw new DaoException(exceptionMessageString);
         }
         // TODO: if condition fails a few times, we might start checking whether any
@@ -485,11 +485,11 @@ public class ClickHouseBulkDeleter {
                         "SQL Exception encountered during try/retry loop on cycle number %d : %s",
                         cycle, e.getMessage());
                 log.warn(msg);
-                if (exceptionsEncountered > DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT) {
+                if (exceptionsEncountered > RETRY_CYCLE_MAX_EXCEPTION_COUNT) {
                     throw new DaoException(e);
                 }
             } finally {
-                if (returnValue == false && cycle < totalCycleCount - 1 && exceptionsEncountered <= DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT) {
+                if (returnValue == false && cycle < totalCycleCount - 1 && exceptionsEncountered <= RETRY_CYCLE_MAX_EXCEPTION_COUNT) {
                     // sleep if we will be trying another iteration
                     try {
                         Thread.sleep(1000 * RETRY_CYCLE_PERIOD_SECONDS);
@@ -503,6 +503,7 @@ public class ClickHouseBulkDeleter {
         }
         return returnValue;
     }
+
 
     // checks specified outputField in the results of running queryString and looks for expectedResult
     // only the first result (in the result set) is examined
