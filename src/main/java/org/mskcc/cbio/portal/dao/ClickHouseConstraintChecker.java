@@ -351,7 +351,7 @@ public class ClickHouseConstraintChecker {
                         + " FROM sample s INNER JOIN patient p ON p.`internal_id` = s.`patient_id`)"));
         // Rows are checked only when every key column is non-NULL, so patient-level rows (no
         // sample) and study-level rows (neither) fall out of the keys that do not apply to them.
-        // There is no key to resource_definition: a study carried over by the 3.0.1 migration can
+        // There is no key to resource_definition: a study carried over by the 3.1.0 migration can
         // hold rows for a resource it never declared, and the portal renders those by falling back
         // to the resource id rather than treating them as broken.
 
