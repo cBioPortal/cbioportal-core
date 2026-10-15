@@ -33,7 +33,7 @@
 		<commons_text.version>1.9</commons_text.version>
 		<opencsv.version>2.4</opencsv.version>
 		<dom4j.version>1.6.1</dom4j.version>
-		<spring_starter_test.version>3.5.0</spring_starter_test.version>
+		<spring_starter_test.version>4.1.0</spring_starter_test.version>
 		<junit.version>4.13.2</junit.version>
 		<jakarta_ws_rs.version>3.1.0</jakarta_ws_rs.version>
 		<mockito.version>5.23.0</mockito.version>
@@ -90,12 +90,12 @@
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-context</artifactId>
-			<version>6.2.11</version>
+			<version>7.0.8</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-jdbc</artifactId>
-			<version>6.2.0</version>
+			<version>7.0.8</version>
 		</dependency>
 		<dependency>
 			<groupId>org.yaml</groupId>
@@ -110,7 +110,7 @@
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-tx</artifactId>
-			<version>6.2.11</version>
+			<version>7.0.8</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-io</groupId>
