@@ -32,6 +32,7 @@ from . import importOncokbMutation
 from . import importOncokbDiscreteCNA
 from . import libImportOncokb
 from . import rebuild_derived_tables
+from .cbioportal_common import JavaRunException
 
 
 # ----------------------------------------------------------------------------
@@ -55,7 +56,7 @@ class Color(object):
 # Functions
 # ----------------------------------------------------------------------------
 
-def interface():
+def interface(args=None):
     parser = argparse.ArgumentParser(description='cBioPortal meta Importer')
     data_source_group = parser.add_mutually_exclusive_group()
     data_source_group.add_argument('-s', '--study_directory',
@@ -110,7 +111,10 @@ def interface():
                         help='Skip derived table construction after import.')
     derive_tables_group.add_argument('--derived-table-sql', type=str, metavar='PATH',
                         help='Path to SQL file used for derived table construction.')
-    parser = parser.parse_args()
+    parser.add_argument('--make-studies-available', type=str, metavar='STUDY_IDS',
+                        help='Only with derive-tables: after the derived tables are rebuilt '
+                             'successfully, mark these studies AVAILABLE, comma separated.')
+    parser = parser.parse_args(args)
     return parser
 
 
@@ -123,8 +127,7 @@ def _print_need_to_update_derived_tables_warning():
         Color.BOLD +
         'The database has been altered. It is now necessary to reconstitute\n'
         'the derived tables before using the database with the cBioPortal\n'
-        'web application. Run:\n'
-        '    metaImport.py derive-tables\n' +
+        'web application.\n' +
         Color.END,
         file=sys.stderr,
     )
@@ -132,11 +135,69 @@ def _print_need_to_update_derived_tables_warning():
 def _print_need_to_make_study_available_message(study_id):
     print(
         Color.BOLD +
-        'The study stays UNAVAILABLE until the derived tables are rebuilt. Then run:\n'
+        'The study stays UNAVAILABLE until the derived tables are rebuilt and\n'
+        'the study is made available. To do both, run:\n'
+        '    metaImport.py derive-tables --make-studies-available ' + study_id + '\n'
+        'After importing several studies with --no-derive-tables, run this once\n'
+        'at the end, listing all of their study ids, comma separated.\n'
+        'If the derived tables are rebuilt some other way, run afterwards:\n'
         '    cbioportalImporter.py make-studies-available -ids ' + study_id + '\n' +
         Color.END,
         file=sys.stderr,
     )
+
+def _print_studies_may_stay_unavailable_message():
+    print(
+        Color.BOLD +
+        'Studies imported with --no-derive-tables stay UNAVAILABLE until they\n'
+        'are made available. To do so, run:\n'
+        '    cbioportalImporter.py make-studies-available -ids STUDY_ID[,STUDY_ID...]\n'
+        'or pass --make-studies-available STUDY_ID[,STUDY_ID...] to derive-tables.\n' +
+        Color.END,
+        file=sys.stderr,
+    )
+
+def derive_tables(args):
+    """Rebuild the derived tables, then make the requested studies available.
+
+    No study is made available unless the rebuild succeeds. Returns the exit
+    code for the derive-tables command.
+    """
+    study_ids = []
+    if args.make_studies_available is not None:
+        study_ids = [study_id.strip() for study_id in args.make_studies_available.split(',') if study_id.strip()]
+        if not study_ids:
+            print(Color.RED + "No study ids given to --make-studies-available" + Color.END, file=sys.stderr)
+            return 2
+        # check the jar and the database before the rebuild rather than after it
+        cbioportalImporter.resolve_java_opts(args)
+        cbioportalImporter.check_version("-Dspring.profiles.active=dbcp " + args.java_opts)
+
+    if not rebuild_derived_tables.rebuild_derived_tables(args.derived_table_sql):
+        if study_ids:
+            print(Color.RED +
+                  "Derived table construction failed. These studies were not made available: " +
+                  ",".join(study_ids) + Color.END, file=sys.stderr)
+        return 1
+
+    if not study_ids:
+        _print_studies_may_stay_unavailable_message()
+        return 0
+
+    failed_study_ids = []
+    for study_id in study_ids:
+        try:
+            cbioportalImporter.make_study_available(args, study_id)
+        except JavaRunException:
+            failed_study_ids.append(study_id)
+    if failed_study_ids:
+        print(Color.RED +
+              "Could not make these studies available: " + ",".join(failed_study_ids) + "\n"
+              "Once the problem is fixed, run:\n"
+              "    cbioportalImporter.py make-studies-available -ids " + ",".join(failed_study_ids) +
+              Color.END, file=sys.stderr)
+        return 1
+    return 0
 
 if __name__ == '__main__':
     derive_tables_only = len(sys.argv) > 1 and sys.argv[1] == 'derive-tables'
@@ -147,7 +208,10 @@ if __name__ == '__main__':
     args = interface()
 
     if derive_tables_only:
-        sys.exit(0 if rebuild_derived_tables.rebuild_derived_tables(args.derived_table_sql) else 1)
+        sys.exit(derive_tables(args))
+    if args.make_studies_available is not None:
+        print(Color.RED + "--make-studies-available can only be used with derive-tables" + Color.END, file=sys.stderr)
+        sys.exit(2)
     # supply parameters that the validation script expects to have parsed
     args.error_file = False
 

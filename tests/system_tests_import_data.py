@@ -9,6 +9,8 @@ import unittest
 from unittest import mock
 from unittest.mock import call
 from importer import cbioportalImporter
+from importer import metaImport
+from importer.cbioportal_common import JavaRunException
 
 common_part = ('-Dspring.profiles.active=dbcp', '-cp', 'test.jar')
 
@@ -227,6 +229,110 @@ class DataImporterTests(unittest.TestCase):
                 call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
                 call(*common_part, 'org.mskcc.cbio.portal.scripts.RemovePatients', '--study_ids', 'STUDY1,STUDY2', '--patient_ids', 'PATIENT1,PATIENT2'),
             ])
+
+class DeriveTablesTests(unittest.TestCase):
+    '''
+    Tests of the metaImport.py derive-tables command
+    '''
+
+    version_call = call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',)
+
+    def make_available_call(self, study_id):
+        return call(*common_part, 'org.mskcc.cbio.portal.scripts.UpdateCancerStudy', study_id, 'AVAILABLE', '--noprogress')
+
+    @mock.patch('importer.rebuild_derived_tables.rebuild_derived_tables')
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_make_studies_available_after_rebuild(self, run_java, locate_jar, rebuild):
+        '''
+        Tests that the given studies are made available after a successful rebuild
+        '''
+        locate_jar.return_value = "test.jar"
+        rebuild.return_value = True
+
+        args = metaImport.interface(['--make-studies-available', 'STUDY1, STUDY2'])
+        exitcode = metaImport.derive_tables(args)
+
+        self.assertEqual(exitcode, 0)
+        rebuild.assert_called_once_with(None)
+        self.assertEqual(run_java.call_args_list, [
+            self.version_call,
+            self.make_available_call('STUDY1'),
+            self.make_available_call('STUDY2'),
+        ])
+
+    @mock.patch('importer.rebuild_derived_tables.rebuild_derived_tables')
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_failed_rebuild_keeps_studies_unavailable(self, run_java, locate_jar, rebuild):
+        '''
+        Tests that no study is made available when the rebuild fails
+        '''
+        locate_jar.return_value = "test.jar"
+        rebuild.return_value = False
+
+        args = metaImport.interface(['--make-studies-available', 'STUDY1,STUDY2', '--derived-table-sql', 'derived.sql'])
+        exitcode = metaImport.derive_tables(args)
+
+        self.assertEqual(exitcode, 1)
+        rebuild.assert_called_once_with('derived.sql')
+        self.assertEqual(run_java.call_args_list, [self.version_call])
+
+    @mock.patch('importer.rebuild_derived_tables.rebuild_derived_tables')
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_rebuild_without_study_ids(self, run_java, locate_jar, rebuild):
+        '''
+        Tests that study status is left alone when no study ids are given
+        '''
+        rebuild.return_value = True
+
+        args = metaImport.interface([])
+        exitcode = metaImport.derive_tables(args)
+
+        self.assertEqual(exitcode, 0)
+        rebuild.assert_called_once_with(None)
+        run_java.assert_not_called()
+        locate_jar.assert_not_called()
+
+    @mock.patch('importer.rebuild_derived_tables.rebuild_derived_tables')
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_empty_study_ids(self, run_java, locate_jar, rebuild):
+        '''
+        Tests that an empty study id list is rejected before the rebuild
+        '''
+        args = metaImport.interface(['--make-studies-available', ' , '])
+        exitcode = metaImport.derive_tables(args)
+
+        self.assertEqual(exitcode, 2)
+        rebuild.assert_not_called()
+        run_java.assert_not_called()
+
+    @mock.patch('importer.rebuild_derived_tables.rebuild_derived_tables')
+    @mock.patch('importer.cbioportalImporter.locate_jar')
+    @mock.patch('importer.cbioportalImporter.run_java')
+    def test_one_study_fails_to_become_available(self, run_java, locate_jar, rebuild):
+        '''
+        Tests that the remaining studies are still made available when one fails
+        '''
+        locate_jar.return_value = "test.jar"
+        rebuild.return_value = True
+
+        def fail_for_study1(*args):
+            if 'STUDY1' in args:
+                raise JavaRunException(1, 'Aborting due to error while executing step.')
+        run_java.side_effect = fail_for_study1
+
+        args = metaImport.interface(['--make-studies-available', 'STUDY1,STUDY2'])
+        exitcode = metaImport.derive_tables(args)
+
+        self.assertEqual(exitcode, 1)
+        self.assertEqual(run_java.call_args_list, [
+            self.version_call,
+            self.make_available_call('STUDY1'),
+            self.make_available_call('STUDY2'),
+        ])
 
 if __name__ == '__main__':
     unittest.main(buffer=True)
