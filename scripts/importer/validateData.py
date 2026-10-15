@@ -76,6 +76,10 @@ sample_ids_panel_dict = {}
 
 # resource globals
 RESOURCE_DEFINITION_DICTIONARY = {}
+# resource_id -> set of metadata keys the resource's CUSTOM_METADATA contract declares. A resource
+# with no contract is absent from this map and its data file is not checked against one.
+# Populated from the definition file before any resource data file is read.
+RESOURCE_CONTRACT_KEYS = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 
 # globals required for gene set scoring validation
@@ -3708,12 +3712,106 @@ class ResourceDefinitionValidator(Validator):
         """Initialize a ResourceDefinitionValidator with the given parameters."""
         super(ResourceDefinitionValidator, self).__init__(*args, **kwargs)
         self.resource_definition_dictionary = {}
+        self.resource_contract_keys = {}
+
+    # The complete set of keys the portal reads from a contract field. The format is closed:
+    # a key is added here when the portal is taught to read it, so any other key is a mistake
+    # and is rejected. ResourceMetadataSchema.parse ignores keys it does not know, which would
+    # otherwise leave a misspelled key with no effect and no message anywhere.
+    CONTRACT_FIELD_KEYS = {'key', 'type', 'label', 'description', 'filterable',
+                           'visibleByDefault'}
+    CONTRACT_FIELD_TYPES = {'string', 'number'}
+
+    @staticmethod
+    def declaredKeys(contract):
+        """The metadata keys a parsed contract declares, for checking data files against.
+
+        Returns None when the contract is not a JSON object or its 'fields' is not a list.
+        checkCustomMetadataContract logs an error for those shapes, and the portal derives the
+        table's columns from the data instead. A data file's keys are therefore not undeclared:
+        there is no usable contract to declare them against, and reporting them would point the
+        curator at the wrong file.
+        """
+        if not isinstance(contract, dict) or not isinstance(contract.get('fields'), list):
+            return None
+        return {field['key'] for field in contract['fields']
+                if isinstance(field, dict) and field.get('key')}
+
+    def checkCustomMetadataContract(self, contract, col_index):
+        """Check the shape of a parsed CUSTOM_METADATA contract.
+
+        The contract declares which metadata keys a resource's rows carry and how each column
+        is labelled, typed and filtered. The portal applies what it recognises and ignores the
+        rest: an unusable contract becomes "no contract" and the columns come from the data,
+        with nothing logged and nothing shown in the portal. Validation is the only point at
+        which a curator learns the contract is not being applied.
+
+        Every defect here is an error, so the study does not import until it is fixed. A
+        contract that is accepted but partly ignored is the case this is written to prevent.
+        """
+        extra = {'line_number': self.line_number, 'column_number': col_index + 1}
+
+        if not isinstance(contract, dict):
+            self.logger.error(
+                'CUSTOM_METADATA must be a JSON object.',
+                extra=dict(extra, cause=str(contract)[:80]))
+            return
+
+        if 'fields' not in contract:
+            self.logger.error(
+                "CUSTOM_METADATA has no 'fields' key, so the portal will ignore it.",
+                extra=dict(extra, cause=', '.join(sorted(contract.keys())) or '(empty object)'))
+            return
+
+        fields = contract['fields']
+        if not isinstance(fields, list):
+            self.logger.error(
+                "CUSTOM_METADATA 'fields' must be a list.",
+                extra=dict(extra, cause=type(fields).__name__))
+            return
+
+        for position, field in enumerate(fields, start=1):
+            if not isinstance(field, dict):
+                self.logger.error(
+                    'CUSTOM_METADATA field entry must be a JSON object.',
+                    extra=dict(extra, cause='entry %d: %s' % (position, str(field)[:60])))
+                continue
+
+            if not field.get('key'):
+                self.logger.error(
+                    "CUSTOM_METADATA field entry has no 'key', so it cannot be matched to "
+                    'any metadata column.',
+                    extra=dict(extra, cause='entry %d' % position))
+
+            field_type = field.get('type')
+            if field_type is not None and field_type not in self.CONTRACT_FIELD_TYPES:
+                self.logger.error(
+                    "CUSTOM_METADATA field 'type' must be one of %s."
+                    % ', '.join(sorted(self.CONTRACT_FIELD_TYPES)),
+                    extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
+                                                          field_type)))
+
+            for flag in ('filterable', 'visibleByDefault'):
+                if flag in field and not isinstance(field[flag], bool):
+                    self.logger.error(
+                        "CUSTOM_METADATA field '%s' must be true or false." % flag,
+                        extra=dict(extra, cause="%s: '%s'" % (field.get('key', 'entry %d' % position),
+                                                              field[flag])))
+
+            unknown = sorted(set(field.keys()) - self.CONTRACT_FIELD_KEYS)
+            if unknown:
+                self.logger.error(
+                    'CUSTOM_METADATA field has keys that are not part of the contract format: '
+                    '%s. Remove them.' % ', '.join(sorted(self.CONTRACT_FIELD_KEYS)),
+                    extra=dict(extra, cause='%s: %s' % (field.get('key', 'entry %d' % position),
+                                                        ', '.join(unknown))))
 
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(ResourceDefinitionValidator, self).checkLine(data)
         resource_id = ''
         resource_type = ''
+        declared_keys = None
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3784,7 +3882,9 @@ class ResourceDefinitionValidator(Validator):
                 custom_metadata_value = value.strip()
                 if custom_metadata_value and custom_metadata_value.lower() not in self.NULL_VALUES:
                     try:
-                        json.loads(custom_metadata_value)
+                        contract = json.loads(custom_metadata_value)
+                        self.checkCustomMetadataContract(contract, col_index)
+                        declared_keys = self.declaredKeys(contract)
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             'Invalid JSON in CUSTOM_METADATA column.',
@@ -3797,6 +3897,10 @@ class ResourceDefinitionValidator(Validator):
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
                                    'cause': value})
+        # Filed after the loop, not inside it: REQUIRE_COLUMN_ORDER is False, so resource_id is
+        # only known once every column has been read. Both of these are keyed by it.
+        if declared_keys is not None and resource_id:
+            self.resource_contract_keys[resource_id] = declared_keys
         # add resource_id into dictionary
         self.resource_definition_dictionary.setdefault(resource_id, []).append(resource_type)
 
@@ -3814,6 +3918,53 @@ class ResourceValidator(Validator):
     def __init__(self, *args, **kwargs):
         """Initialize the instance attributes of the data file validator."""
         super(ResourceValidator, self).__init__(*args, **kwargs)
+        # resource_id -> {metadata key: first line it appeared on}. Collected per row but reported
+        # once per file: a file where every row carries the same undeclared key would otherwise
+        # emit one message per row, and the HTML report buffers every record it is given.
+        self.observed_metadata_keys = {}
+
+    def recordMetadataKeys(self, resource_id, parsed):
+        """Remember which metadata keys a row carried, to check against the contract at the end."""
+        if not resource_id or not isinstance(parsed, dict):
+            return
+        seen = self.observed_metadata_keys.setdefault(resource_id, {})
+        for key in parsed:
+            seen.setdefault(key, self.line_number)
+
+    def onComplete(self):
+        self.checkMetadataAgainstContracts()
+        super(ResourceValidator, self).onComplete()
+
+    def checkMetadataAgainstContracts(self):
+        """Compare the metadata keys this file carried against each resource's contract.
+
+        Where a contract exists it is the whole column list, so a key it does not declare would
+        never appear in the portal. That is an error and the study does not import: the data is
+        not filtered out and loaded without it, and nothing downstream would report it either.
+        The curator either declares the key or removes it from the file.
+
+        A resource with no contract is skipped, because its columns come from the data and an
+        undeclared key is not lost.
+        """
+        for resource_id, keys in sorted(self.observed_metadata_keys.items()):
+            declared = RESOURCE_CONTRACT_KEYS.get(resource_id)
+            if declared is None:
+                continue
+            undeclared = sorted(set(keys) - declared)
+            if undeclared:
+                self.logger.error(
+                    "METADATA carries keys that resource '%s' does not declare in "
+                    'CUSTOM_METADATA, so the portal would not show them. Declare them or '
+                    'remove them from the file.' % resource_id,
+                    extra={'line_number': min(keys[k] for k in undeclared),
+                           'cause': ', '.join(undeclared)})
+            unused = sorted(declared - set(keys))
+            if unused:
+                self.logger.warning(
+                    "CUSTOM_METADATA for resource '%s' declares keys that no row carries, so "
+                    'those columns would always be empty.' % resource_id,
+                    extra={'line_number': self.line_number,
+                           'cause': ', '.join(unused)})
 
     def url_validator(self, url):
         try:
@@ -3881,10 +4032,33 @@ class ResourceValidator(Validator):
                                'column_number': col_index + 1,
                                'cause': value})
 
+            if col_name == 'METADATA' and value and value.strip().lower() not in self.NULL_VALUES:
+                try:
+                    parsed = json.loads(value)
+                    # The value is already parsed here, so collecting its keys costs a dict walk.
+                    # They are checked against the contract once per file, in onComplete.
+                    self.recordMetadataKeys(
+                        data[self.cols.index('RESOURCE_ID')].strip()
+                        if 'RESOURCE_ID' in self.cols else None,
+                        parsed)
+                    if not isinstance(parsed, dict):
+                        self.logger.error(
+                            'METADATA must be a JSON object (key-value map), not an array or scalar',
+                            extra={'line_number': self.line_number,
+                                   'column_number': col_index + 1,
+                                   'cause': value[:80]})
+                except ValueError:
+                    self.logger.error(
+                        'METADATA value is not valid JSON',
+                        extra={'line_number': self.line_number,
+                               'column_number': col_index + 1,
+                               'cause': value[:80]})
+
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
 
     REQUIRED_HEADERS = ['SAMPLE_ID', 'PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a SampleResourceValidator with the given parameters."""
@@ -3948,6 +4122,7 @@ class SampleResourceValidator(ResourceValidator):
 class PatientResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['PATIENT_ID', 'RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a PatientResourceValidator with the given parameters."""
@@ -4000,6 +4175,7 @@ class PatientResourceValidator(ResourceValidator):
 class StudyResourceValidator(ResourceValidator):
 
     REQUIRED_HEADERS = ['RESOURCE_ID', 'URL']
+    OPTIONAL_HEADERS = ['DISPLAY_NAME', 'METADATA']
 
     def __init__(self, *args, **kwargs):
         """Initialize a StudyResourceValidator with the given parameters."""
@@ -5401,7 +5577,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global DEFINED_SAMPLE_IDS
     global DEFINED_SAMPLE_ATTRIBUTES
     global PATIENTS_WITH_SAMPLES
-    global RESOURCE_DEFINITION_DICTIONARY
+    global RESOURCE_DEFINITION_DICTIONARY, RESOURCE_CONTRACT_KEYS
     global RESOURCE_PATIENTS_WITH_SAMPLES
 
     if portal_instance.cancer_type_dict is None:
@@ -5517,6 +5693,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             cbioportal_common.MetaFileTypes.RESOURCES_DEFINITION]:
             resources_definition_validator.validate()
         RESOURCE_DEFINITION_DICTIONARY = resources_definition_validator.resource_definition_dictionary
+        RESOURCE_CONTRACT_KEYS = resources_definition_validator.resource_contract_keys
 
     # then validate the resource data if exist
     if cbioportal_common.MetaFileTypes.SAMPLE_RESOURCES in validators_by_meta_type:

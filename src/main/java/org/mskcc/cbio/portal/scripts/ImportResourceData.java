@@ -8,6 +8,7 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.apache.commons.collections4.map.MultiKeyMap;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkDeleter;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoPatient;
@@ -33,6 +34,9 @@ public class ImportResourceData extends ConsoleRunnable {
     public static final String RESOURCE_ID_COLUMN_NAME = "RESOURCE_ID";
     public static final String URL_COLUMN_NAME = "URL";
     public static final String SAMPLE_TYPE_COLUMN_NAME = "SAMPLE_TYPE";
+    // Optional per-row columns (override resource-definition-level values)
+    public static final String DISPLAY_NAME_COLUMN_NAME = "DISPLAY_NAME";
+    public static final String METADATA_COLUMN_NAME = "METADATA";
     private int numSampleSpecificResourcesAdded = 0;
     private int numPatientSpecificResourcesAdded = 0;
     private int numStudySpecificResourcesAdded = 0;
@@ -46,6 +50,13 @@ public class ImportResourceData extends ConsoleRunnable {
     private ResourceType resourceType;
     private boolean relaxed;
     private Set<String> patientIds = new HashSet<String>();
+    // Resource IDs encountered while reading the file, used to delete stale existing rows for
+    // this study/resource-ID combination before the new rows are flushed (see importData()).
+    // The resources and the entities of the rows this file actually loaded. Filled where a row
+    // is accepted, not where it is read: a row rejected for a missing URL or an unknown sample
+    // loads nothing, so its resource must not be included in what the re-import replaces.
+    private final Set<String> importedResourceIds = new HashSet<>();
+    private final Set<String> importedEntityStableIds = new HashSet<>();
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -55,10 +66,9 @@ public class ImportResourceData extends ConsoleRunnable {
     }
 
     public void importData() throws Exception {
-        // if bulkLoading is ever turned off,
-        // code has to be added to check whether
-        // a resource data update should be
-        // perform instead of an insert
+        // Resource data is delete-then-insert on re-import (see DaoResourceData javadoc):
+        // ClickHouse bulk-loads inserts, so this must run before the buffered inserts below are
+        // flushed.
         ClickHouseBulkLoader.bulkLoadOn();
 
         if (relaxed) {
@@ -99,7 +109,23 @@ public class ImportResourceData extends ConsoleRunnable {
         importData(buff, resources, headerIndexMap);
         buff.close();
 
+        // Delete the rows this file replaces before the buffered inserts below are flushed, so a
+        // re-import of a corrected file replaces its rows instead of adding to them. Restricted
+        // to the entities the file names: a whole-study import removes the study first, but
+        // import-study-data loads a single file into a study that is still there.
+        // Safe to compute here because ClickHouseBulkLoader holds the inserts in memory until
+        // flushAll() below, so the lookup sees only the rows that were already in the table.
+        DaoResourceData.deleteResourceDataForReimport(
+            cancerStudy.getInternalId(), getResourceType().name(),
+            importedResourceIds, importedEntityStableIds);
+
         if (ClickHouseBulkLoader.isBulkLoad()) {
+            // The deleter has to be flushed here, not left to a later stage: importing a resource
+            // file is the whole job when it is run on its own, so nothing afterwards would execute
+            // the queued deletions and the re-imported rows would be added to the stale ones
+            // rather than replacing them. ClickHouseBulkLoader.flushAll() below flushes inserts
+            // only; it is a different queue.
+            ClickHouseBulkDeleter.flushAll();
             ClickHouseBulkLoader.flushAll();
             ClickHouseBulkLoader.relaxedModeOff();
         }
@@ -124,6 +150,8 @@ public class ImportResourceData extends ConsoleRunnable {
                 .filter(resource -> resource.getResourceType().equals(ResourceType.STUDY))
                 .map(resource -> resource.getResourceId())
                 .collect(Collectors.toSet());
+
+        int resourceIdIndex = findResourceIdColumn(headerIndexMap);
 
         while ((line = buff.readLine()) != null) {
             if (skipLine(line.trim())) {
@@ -223,17 +251,17 @@ public class ImportResourceData extends ConsoleRunnable {
             // if patient_id column exists and resource type is patient
             if (getResourceType() == ResourceType.PATIENT && internalPatientId != -1) {
                 validateAddDatum(internalPatientId, stablePatientId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.PATIENT, patientResourceIdSet, resourceMap);
+                        ResourceType.PATIENT, patientResourceIdSet, resourceMap, fields, headerIndexMap, stablePatientId);
             } 
             // if sample_id column exists and resource type is sample
             else if (getResourceType() == ResourceType.SAMPLE && internalSampleId != -1) {
                 validateAddDatum(internalSampleId, stableSampleId, fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap);
+                        ResourceType.SAMPLE, sampleResourceIdSet, resourceMap, fields, headerIndexMap, stablePatientId);
             }
             // if resource type is study
             else if (getResourceType() == ResourceType.STUDY) {
                 validateAddDatum(cancerStudy.getInternalId(), cancerStudy.getCancerStudyStableId(), fields[resourceIdIndex], fields[urlIndex], 
-                        ResourceType.STUDY, studyResourceIdSet, resourceMap);
+                        ResourceType.STUDY, studyResourceIdSet, resourceMap, fields, headerIndexMap, null);
             }
         }
         return true;
@@ -324,7 +352,7 @@ public class ImportResourceData extends ConsoleRunnable {
         return (sampleId != null && !sampleId.isEmpty());
     }
 
-    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap) throws Exception {
+    private void validateAddDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, Set<String> resourceSet, MultiKeyMap resourceMap, String[] fields, Map<String, Integer> headerIndexMap, String stablePatientId) throws Exception {
         // throw exception if resource definition is not exist in the database
         if (!resourceSet.contains(resourceId)) {
             throw new RuntimeException("Error: " + resourceType.toString().toLowerCase() + " " + stableId
@@ -334,8 +362,12 @@ public class ImportResourceData extends ConsoleRunnable {
         // The resourceMap makes sure a pair of (internalId/resource_id/url) is unique
         // added to the DB if there are no duplicates,
         if (!resourceMap.containsKey(internalId, resourceId, resourceURL)) {
-            addDatum(internalId, resourceId, resourceURL,resourceType);
+            addDatum(internalId, stableId, resourceId, resourceURL, resourceType, fields, headerIndexMap, stablePatientId);
             resourceMap.put(internalId, resourceId, resourceURL, resourceURL);
+            importedResourceIds.add(resourceId);
+            if (resourceType != ResourceType.STUDY) {
+                importedEntityStableIds.add(stableId);
+            }
         }
         // handle duplicates
         // if the "relaxed" flag was given, and the new record e.g. tries to ignore a duplicated resources and log a warning
@@ -350,19 +382,41 @@ public class ImportResourceData extends ConsoleRunnable {
         }
     }
 
-    // add datum for patient, sample and study resources
-    private void addDatum(int internalId, String resourceId, String resourceURL, ResourceType resourceType) throws Exception {
-        // if bulk loading is ever turned off, we need to check if
-        // resource value exists and if so, perfom an update
+    private String getOptionalField(String[] fields, Map<String, Integer> headerIndexMap, String columnName) {
+        Integer idx = headerIndexMap.get(columnName);
+        if (idx == null || idx < 0 || idx >= fields.length) return null;
+        String val = fields[idx].trim();
+        return (val.isEmpty() || MissingValues.has(val)) ? null : val;
+    }
+
+    // add datum for patient, sample and study resources (writes only to resource)
+    private void addDatum(int internalId, String stableId, String resourceId, String resourceURL, ResourceType resourceType, String[] fields, Map<String, Integer> headerIndexMap, String stablePatientId) throws Exception {
+        String displayName = getOptionalField(fields, headerIndexMap, DISPLAY_NAME_COLUMN_NAME);
+        String metadata = getOptionalField(fields, headerIndexMap, METADATA_COLUMN_NAME);
+
         if (resourceType.equals(ResourceType.PATIENT)) {
             numPatientSpecificResourcesAdded++;
-            DaoResourceData.addPatientDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addResourceDatum(
+                cancerStudy.getInternalId(), resourceId, "PATIENT",
+                stableId, null,
+                resourceURL, displayName, metadata);
         } else if (resourceType.equals(ResourceType.SAMPLE)) {
             numSampleSpecificResourcesAdded++;
-            DaoResourceData.addSampleDatum(internalId, resourceId, resourceURL);
+            // The patient id comes from the row's own PATIENT_ID column, which importData()
+            // requires for sample files and which addDatum has already checked against the
+            // sample's linkage. Re-deriving it from the sample caches instead left the column
+            // NULL whenever a cache missed, and a SAMPLE row with no patient_id is skipped by
+            // the resource -> patient key, so nothing downstream would report it.
+            DaoResourceData.addResourceDatum(
+                cancerStudy.getInternalId(), resourceId, "SAMPLE",
+                stablePatientId, stableId,
+                resourceURL, displayName, metadata);
         } else {
             numStudySpecificResourcesAdded++;
-            DaoResourceData.addStudyDatum(internalId, resourceId, resourceURL);
+            DaoResourceData.addResourceDatum(
+                cancerStudy.getInternalId(), resourceId, "STUDY",
+                null, null,
+                resourceURL, displayName, metadata);
         }
     }
 

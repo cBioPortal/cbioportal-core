@@ -117,11 +117,12 @@ INSERT INTO allele_specific_copy_number (mutation_event_id, genetic_profile_id, 
 INSERT INTO resource_definition (resource_id, cancer_study_id) VALUES
 ('res_missing', 900002);
 
-INSERT INTO resource_sample (internal_id, resource_id, url) VALUES
-(900004, 'res_missing', 'http://missing');
-
-INSERT INTO resource_patient (internal_id, resource_id, url) VALUES
-(900003, 'res_missing', 'http://missing');
-
-INSERT INTO resource_study (internal_id, resource_id, url) VALUES
-(900002, 'res_missing', 'http://missing');
+-- Rows are checked only where every key column is non-NULL, so each row below breaks the keys
+-- that apply to its scope:
+--   STUDY  - cancer_study 900002 does not exist; patient_id and sample_id are NULL.
+--   PATIENT - no patient has this stable id in that study.
+--   SAMPLE - no sample has this stable id in that study.
+INSERT INTO resource (internal_id, resource_id, cancer_study_id, resource_scope, patient_id, sample_id, url, display_name, metadata) VALUES
+(900020, 'res_missing', 900002, 'STUDY', NULL, NULL, 'http://missing', NULL, NULL),
+(900021, 'res_missing', 900002, 'PATIENT', 'patient_missing', NULL, 'http://missing', NULL, NULL),
+(900022, 'res_missing', 900002, 'SAMPLE', 'patient_missing', 'sample_missing', 'http://missing', NULL, NULL);
