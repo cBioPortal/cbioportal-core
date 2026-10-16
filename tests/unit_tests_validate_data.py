@@ -3481,7 +3481,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
 
     @staticmethod
     def slide_key(slide):
-        return hashlib.md5(slide.encode()).hexdigest()
+        return hashlib.md5(slide.encode()).hexdigest()[:12]
 
     def metadata(self, **changes):
         """Resource metadata of a servable slide; ``slide`` names it and sets its slide_key."""
@@ -3561,7 +3561,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
     def test_required_hierarchy_keys(self):
         self.assertIn(('WSI: PART_KEY is required', 'METADATA.part_key'), self.sample_errors(part_key=None))
         errors = self.validate_resource(validateData.SampleResourceValidator,
-                                        [self.sample_row('{"slide_key": "%s"}' % ('a' * 32))])
+                                        [self.sample_row('{"slide_key": "%s"}' % ('a' * 12))])
         self.assertIn(('WSI: BLOCK_KEY is required', 'METADATA.block_key'), errors)
         errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row('')])
         self.assertIn(('WSI: resources require a METADATA JSON object', 'METADATA'), errors)
@@ -3719,8 +3719,8 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             self.assertEqual([('WSI: METADATA must not contain %s' % key, 'METADATA.' + key)], errors)
 
     def test_slide_key_format_and_uniqueness_across_files(self):
-        for bad in ('ABCDEF0123456789ABCDEF0123456789', 'abc', 'slide-1'):
-            self.assertEqual([('WSI: SLIDE_KEY must be 32 lowercase hex characters', 'METADATA.slide_key')],
+        for bad in ('ABCDEF012345', 'abcdef0123456789abcdef0123456789', 'abc', 'slide-1'):
+            self.assertEqual([('WSI: SLIDE_KEY must be 12 lowercase hex characters', 'METADATA.slide_key')],
                              self.sample_errors(slide_key=bad))
         self.assertIn(('WSI: SLIDE_KEY is required', 'METADATA.slide_key'), self.sample_errors(slide_key=None))
         self.validate_resource(validateData.SampleResourceValidator, [self.sample_row()])

@@ -50,7 +50,7 @@ and one private key:
   `thumbnail_content_type`.
 
 `slide_key` is the opaque per-slide key of the WSI de-identification contract
-(`wsi-serving-v6`): 32 lowercase hex characters computed upstream from a
+(`wsi-serving-v6`): 12 lowercase hex characters computed upstream from a
 salted hash of the image ID. It is the only slide identifier the browser sees.
 The backend strips `wsi_serving` from generic resource responses and only
 reads it to build the authorized WSI access token, into which it copies
@@ -67,7 +67,7 @@ rules, and the converter applies the same rules to each legacy row (both use
 - `slide_key`, `part_key`, `block_key`, `match_level`, `specimen_key`,
   `is_hne`, `is_ihc` and `can_serve_tiles` are required, and every key has the
   JSON type listed above. Missing keys are absent values.
-- `slide_key` is 32 lowercase hex characters and unique within the study,
+- `slide_key` is 12 lowercase hex characters and unique within the study,
   across both files.
 - `part_key` and `block_key` contain no `?`; slides that share a part or
   block key carry the same part or block values.

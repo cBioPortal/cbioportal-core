@@ -42,12 +42,12 @@ EXPECTED_FILES = [
 ]
 # Fixture slides by their opaque slide key.
 SLIDE_LABELS = {
-    '2c96f13783250ad2c6bcfcd5b7c3ef22': 'slide-1',
-    '90f033ed369247b19bd7a252e7ae86c8': 'slide-2',
-    'f9bce50b1498c94fa0fa6cce809f64f2': 'slide-3',
-    'c66ee336f70e8b59e48bd7afbf0e606d': 'slide-4',
-    'a72487fd68ef59b99fcee054e738f893': 'slide-5',
-    '3474b861eb683902b420f4ee95dfe0fa': 'slide-6',
+    '2c96f1378325': 'slide-1',
+    '90f033ed3692': 'slide-2',
+    'f9bce50b1498': 'slide-3',
+    'c66ee336f70e': 'slide-4',
+    'a72487fd68ef': 'slide-5',
+    '3474b861eb68': 'slide-6',
 }
 # SEALED_SOURCE of slide-1: the contract wsi-serving-v6 test vector.
 SEALED_SOURCE_VECTOR = (
@@ -144,11 +144,11 @@ class ConvertedOutputTestCase(ConverterTestCase):
         patients = rows_by_slide(self.out / 'data_resource_patient.txt')
         self.assertEqual(
             'https://portal.example.org/cbioportal/wsi/patient/WSI-P2'
-            '?studyId=wsi_convert_test&slideKey=a72487fd68ef59b99fcee054e738f893',
+            '?studyId=wsi_convert_test&slideKey=a72487fd68ef',
             samples['slide-5']['URL'])
         self.assertEqual(
             'https://portal.example.org/cbioportal/wsi/patient/WSI%2BP3'
-            '?studyId=wsi_convert_test&slideKey=3474b861eb683902b420f4ee95dfe0fa',
+            '?studyId=wsi_convert_test&slideKey=3474b861eb68',
             patients['slide-6']['URL'])
 
     def test_raw_tsv_metadata_round_trips(self):
@@ -165,7 +165,7 @@ class ConvertedOutputTestCase(ConverterTestCase):
         self.assertEqual(716956681, first['file_size_bytes'])
         self.assertEqual('1', first['part_number'])
         self.assertEqual('Left "upper" lobe \\ wedge', first['part_description'])
-        self.assertEqual('2c96f13783250ad2c6bcfcd5b7c3ef22', first['slide_key'])
+        self.assertEqual('2c96f1378325', first['slide_key'])
         for removed in ('image_id', 'barcode', 'part_designator', 'path_dx_title'):
             self.assertNotIn(removed, first)
         self.assertEqual('WSI-P1-S1', first['reference_sample_id'])
@@ -352,8 +352,8 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
         return self.write_legacy(rows)
 
     def test_slide_key_is_required_and_must_be_lowercase_hex(self):
-        for value in ('', '2C96F13783250AD2C6BCFCD5B7C3EF22', '2c96f13783250ad2', 'g' * 32,
-                      '2c96f13783250ad2c6bcfcd5b7c3ef22a'):
+        for value in ('', '2C96F1378325', '2c96f13783', 'g' * 12, '2c96f13783250ad2c6bcfcd5b7c3ef22',
+                      '2c96f1378325a'):
             self.assertConversionError('SLIDE_KEY', meta=self.with_cell(SLIDE_KEY, value))
 
     def test_slide_key_must_be_unique(self):
@@ -397,7 +397,7 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
             for record in records:
                 row = dict(zip(header, record))
                 metadata = json.loads(row['METADATA'])
-                self.assertRegex(metadata['slide_key'], '^[0-9a-f]{32}$')
+                self.assertRegex(metadata['slide_key'], '^[0-9a-f]{12}$')
                 self.assertTrue(row['URL'].endswith('&slideKey=' + metadata['slide_key']))
                 for field in ('URL', 'DISPLAY_NAME'):
                     for value in ('imageId', 'BC-0001', 'sealed'):

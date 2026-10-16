@@ -106,7 +106,7 @@ CUSTOM_METADATA = json.dumps(
     separators=(",", ":"))
 
 # Opaque per-slide key computed upstream from a salted hash of image_id.
-SLIDE_KEY_PATTERN = re.compile(r"[0-9a-f]{32}")
+SLIDE_KEY_PATTERN = re.compile(r"[0-9a-f]{12}")
 # SEALED_SOURCE is unpadded base64url of nonce(12) || ciphertext || tag(16), so it
 # decodes to at least 29 bytes.
 SEALED_SOURCE_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
@@ -379,7 +379,7 @@ def slide_problems(metadata, sample_id):
             problems.append((field, f"{field} is required"))
     slide_key = values.get("SLIDE_KEY")
     if slide_key and not SLIDE_KEY_PATTERN.fullmatch(slide_key):
-        problems.append(("SLIDE_KEY", "SLIDE_KEY must be 32 lowercase hex characters"))
+        problems.append(("SLIDE_KEY", "SLIDE_KEY must be 12 lowercase hex characters"))
     for field in ("PART_KEY", "BLOCK_KEY"):
         if "?" in values.get(field, ""):
             problems.append((field, f"{field} must not contain ?"))

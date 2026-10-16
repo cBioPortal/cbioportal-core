@@ -54,12 +54,12 @@ public class TestImportResourceData extends IntegrationTestBase {
     private static final String STUDY_ID = "wsi_convert_test";
     private static final String FIXTURE_DIR = "src/test/resources/wsi_resources/";
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String SLIDE_1 = "2c96f13783250ad2c6bcfcd5b7c3ef22";
-    private static final String SLIDE_2 = "90f033ed369247b19bd7a252e7ae86c8";
-    private static final String SLIDE_3 = "f9bce50b1498c94fa0fa6cce809f64f2";
-    private static final String SLIDE_4 = "c66ee336f70e8b59e48bd7afbf0e606d";
-    private static final String SLIDE_5 = "a72487fd68ef59b99fcee054e738f893";
-    private static final String SLIDE_6 = "3474b861eb683902b420f4ee95dfe0fa";
+    private static final String SLIDE_1 = "2c96f1378325";
+    private static final String SLIDE_2 = "90f033ed3692";
+    private static final String SLIDE_3 = "f9bce50b1498";
+    private static final String SLIDE_4 = "c66ee336f70e";
+    private static final String SLIDE_5 = "a72487fd68ef";
+    private static final String SLIDE_6 = "3474b861eb68";
     // contract wsi-serving-v6 test vector, the fixture's sealed source for SLIDE_1
     private static final String SEALED_SOURCE_VECTOR =
         "AAECAwQFBgcICQoLNpOTYnY8HVb-KcPzu1F5HPykr7D0YY_UhVbbyjOFRlxC63fxCt09YO1aYC-phb85wDhN5PPPpC0X46RS"
@@ -89,9 +89,9 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals("WSI-P1", first.patientId());
         assertEquals("WSI-P1-S1", first.sampleId());
         assertEquals("https://portal.example.org/cbioportal/wsi/patient/WSI-P1"
-            + "?studyId=wsi_convert_test&slideKey=2c96f13783250ad2c6bcfcd5b7c3ef22", first.url());
+            + "?studyId=wsi_convert_test&slideKey=2c96f1378325", first.url());
         JsonNode metadata = JSON.readTree(first.metadata());
-        assertEquals("2c96f13783250ad2c6bcfcd5b7c3ef22", metadata.get("slide_key").textValue());
+        assertEquals("2c96f1378325", metadata.get("slide_key").textValue());
         for (String removed : List.of("image_id", "barcode", "part_designator", "path_dx_title",
                 "source_url", "thumbnail_url", "sealed_source")) {
             assertFalse(removed, metadata.has(removed));
@@ -123,7 +123,7 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals("WSI+P3", unmatched.patientId());
         assertNull(unmatched.sampleId());
         assertEquals("https://portal.example.org/cbioportal/wsi/patient/WSI%2BP3"
-            + "?studyId=wsi_convert_test&slideKey=3474b861eb683902b420f4ee95dfe0fa", unmatched.url());
+            + "?studyId=wsi_convert_test&slideKey=3474b861eb68", unmatched.url());
         assertEquals("WSI-P1", rows.get(SLIDE_4).patientId());
         assertNull(rows.get(SLIDE_4).sampleId());
 
