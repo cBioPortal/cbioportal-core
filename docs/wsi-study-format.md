@@ -205,8 +205,8 @@ slide-timing columns, as are other format versions and files with an
 
 ## ClickHouse storage
 
-Resource rows are stored in `resource_data` and definitions in
-`resource_definition`. Resource row IDs (`RESOURCE_DATA_ID`) come from the
+Resource rows are stored in `resource` and definitions in
+`resource_definition`. Resource row IDs (`internal_id`) come from the
 importer's sequence, so they stay unique across importer processes.
 Re-importing a resource file replaces the study's rows for the resource IDs in
 that file, and study deletion removes them. WSI data has no tables of its own.
