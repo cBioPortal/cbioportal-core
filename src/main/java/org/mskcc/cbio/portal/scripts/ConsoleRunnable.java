@@ -137,6 +137,16 @@ public abstract class ConsoleRunnable implements Runnable {
      * Runs the command as a script and exits with an appropriate exit code.
      */
     public void runInConsole() {
+        System.exit(runInProcess());
+    }
+
+    /**
+     * Runs the command with the same console output as {@link #runInConsole()},
+     * but returns the exit code instead of exiting the JVM.
+     *
+     * @return  the exit status code the script would have exited with
+     */
+    public int runInProcess() {
         SysExit status;
         try {
             Date start = new Date();
@@ -159,6 +169,6 @@ public abstract class ConsoleRunnable implements Runnable {
             t.printStackTrace();
             status = SysExit.select(t);
         }
-        System.exit(status.getStatusCode());
+        return status.getStatusCode();
     }
 }

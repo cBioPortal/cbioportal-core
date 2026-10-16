@@ -245,6 +245,15 @@ public final class ClickHouseAutoIncrement {
         }
     }
 
+    /**
+     * Persists the current sequence values, as the shutdown hook would, and
+     * forgets them so the next caller re-reads them from the database.
+     */
+    public static void persistAndResetCounters() {
+        persistAllSequences();
+        resetCounters();
+    }
+
     public static void resetCounters() {
         COUNTERS.clear();
         SEQUENCE_TABLE_READY.set(false);
