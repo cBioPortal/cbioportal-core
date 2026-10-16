@@ -85,6 +85,23 @@ public class ClickHouseBulkLoader {
         return totalInserted;
     }
 
+    /**
+     * Drops all pending records without inserting them and turns bulk load and
+     * relaxed mode off, leaving the loader as a freshly started JVM would.
+     *
+     * @return  the number of records that were discarded
+     */
+    public static int discardAll() {
+        int discarded = 0;
+        for (ClickHouseBulkLoader loader : BULK_LOADERS.values()) {
+            discarded += loader.pendingRecords.size();
+        }
+        BULK_LOADERS.clear();
+        bulkLoad = false;
+        relaxedMode = false;
+        return discarded;
+    }
+
     private int flushPendingRecords() throws DaoException {
         if (pendingRecords.isEmpty()) {
             return 0;
