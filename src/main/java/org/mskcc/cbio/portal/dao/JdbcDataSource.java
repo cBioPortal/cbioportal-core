@@ -100,7 +100,7 @@ public class JdbcDataSource extends BasicDataSource {
         String settings = idleConnectionKeepaliveSettings(connectionURL);
         if (settings != null) {
             this.addConnectionProperty("custom_settings", settings);
-        } else if (connectionURL.startsWith("jdbc:clickhouse:") && !connectionURL.contains(SEND_PROGRESS_SETTING)) {
+        } else if (isClickHouseUrl(connectionURL) && !connectionURL.contains(SEND_PROGRESS_SETTING)) {
             LOG.warn("spring.datasource.url already sets custom_settings; add " + IDLE_KEEPALIVE_SETTINGS +
                     " to it so long-running statements survive network idle timeouts");
         }
@@ -109,6 +109,10 @@ public class JdbcDataSource extends BasicDataSource {
     static final String SEND_PROGRESS_SETTING = "send_progress_in_http_headers";
     static final String IDLE_KEEPALIVE_SETTINGS = SEND_PROGRESS_SETTING + "=1,http_headers_progress_interval_ms=60000";
 
+    private static boolean isClickHouseUrl(String url) {
+        return url != null && (url.startsWith("jdbc:clickhouse:") || url.startsWith("jdbc:ch:"));
+    }
+
     /**
      * Allow long import statements without changing explicitly configured JDBC URL options.
      * Values are milliseconds; pool validation and delete-completion polling have separate limits.
@@ -116,8 +120,7 @@ public class JdbcDataSource extends BasicDataSource {
      */
     static Properties connectionTimeoutDefaults(String connectionURL) {
         Properties defaults = new Properties();
-        if (connectionURL == null || !(connectionURL.startsWith("jdbc:clickhouse:")
-                || connectionURL.startsWith("jdbc:ch:"))) {
+        if (!isClickHouseUrl(connectionURL)) {
             return defaults;
         }
         Set<String> configured = new HashSet<>();
@@ -141,7 +144,7 @@ public class JdbcDataSource extends BasicDataSource {
 
     /** Returns the custom_settings value to add, or null if the URL is not ClickHouse or already sets custom_settings. */
     static String idleConnectionKeepaliveSettings(String connectionURL) {
-        if (connectionURL == null || !connectionURL.startsWith("jdbc:clickhouse:") || connectionURL.contains("custom_settings")) {
+        if (!isClickHouseUrl(connectionURL) || connectionURL.contains("custom_settings")) {
             return null;
         }
         return IDLE_KEEPALIVE_SETTINGS;

@@ -63,6 +63,7 @@ import org.slf4j.LoggerFactory;
 public class ClickHouseBulkDeleter {
 
     private boolean flushed; // once flushed, any particular deleter instance cannot not be flushed again
+    private boolean stagingCreationAttempted = false;
     private boolean deleteIssued = false; // the DELETE was sent (it may be running even if the call failed)
     private final Set<Long> pendingIds = new HashSet<>();
     private final String idColumn;
@@ -71,18 +72,16 @@ public class ClickHouseBulkDeleter {
 
     private static final Logger log = LoggerFactory.getLogger(ClickHouseBulkDeleter.class);
     private static final Map<String, ClickHouseBulkDeleter> BULK_DELETERS = new LinkedHashMap<>();
-    private static Boolean asyncLightweightDeleteSupported = null; // cached result of a read-only capability probe
+    private static Boolean synchronousDeleteSettingSupported = null; // cached result of a read-only capability probe
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
     private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 30 * 60;
-    private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_RETRY_CYCLE_PERIOD_SECONDS = 10;
     private static final Integer DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT = 6;
     private static final Integer CREATE_STAGING_TABLE_MAX_RETRY_SECONDS;
     private static final Integer POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS;
     private static final Integer CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS;
-    private static final Integer CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS;
     private static final Integer RETRY_CYCLE_PERIOD_SECONDS;
     private static final Integer RETRY_CYCLE_MAX_EXCEPTION_COUNT;
 
@@ -96,9 +95,6 @@ public class ClickHouseBulkDeleter {
         CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.confirm_delete_data.max_retry_seconds",
                 DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS);
-        CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = GlobalProperties.parseIntegerProperty(
-                "bulkdeleter.confirm_delete_metadata.max_retry_seconds",
-                DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS);
         RETRY_CYCLE_PERIOD_SECONDS = GlobalProperties.parseIntegerProperty(
                 "bulkdeleter.retry_cycle_period_seconds",
                 DEFAULT_RETRY_CYCLE_PERIOD_SECONDS);
@@ -152,22 +148,23 @@ public class ClickHouseBulkDeleter {
             throw new RuntimeException("a ClickHouseBulkDeleter object had been flushed previously, and was attempted to be flushed a second time");
         }
         List<ClickHouseBulkDeleter> effectiveDeleters = deletersWithPendingDeletes(deleters);
-        boolean deletionSucceeded = false;
+        boolean deletionReturned = false;
         try {
-            dropExistingStagingTables(effectiveDeleters, false); // drop any leftover tables from previous crash/failure
+            dropExistingStagingTables(effectiveDeleters, false); // verify old IDs before reusing staging tables
             createStagingTables(effectiveDeleters);
             populateStagingTables(effectiveDeleters);
             totalDeleted = deleteRecordsReferencedInStagingTables(effectiveDeleters);
-            deletionSucceeded = true;
+            deletionReturned = true;
         } finally {
-            if (deletionSucceeded) {
-                dropExistingStagingTables(effectiveDeleters, true);
-            } else {
-                // An exception is already propagating. Waiting for deletes that failed or never ran
-                // could only time out and replace that exception, so just clean up.
-                dropStagingTablesAfterFailure(effectiveDeleters);
+            try {
+                if (deletionReturned) {
+                    dropExistingStagingTables(effectiveDeleters, true);
+                } else {
+                    dropStagingTablesAfterFailure(effectiveDeleters);
+                }
+            } finally {
+                teardownDeleters(effectiveDeleters);
             }
-            teardownDeleters(effectiveDeleters);
         }
         return totalDeleted;
     }
@@ -255,6 +252,8 @@ public class ClickHouseBulkDeleter {
             // wait until all ids in the stagingTable table have been fully deleted from the target table
             if (deletionHasBeenExecuted) {
                 d.confirmDeletionIsComplete();
+            } else {
+                d.confirmLeftoverDeletionIsComplete();
             }
             d.dropStagingTable(deletionHasBeenExecuted);
         }
@@ -262,15 +261,15 @@ public class ClickHouseBulkDeleter {
 
     private static void dropStagingTablesAfterFailure(List<ClickHouseBulkDeleter> deleters) {
         for (ClickHouseBulkDeleter d : deleters) {
-            if (d.deleteIssued) {
-                // an accepted asynchronous delete still reads its staging table; the next run drops it
+            if (!d.stagingCreationAttempted || d.deleteIssued) {
+                // Preserve old staging tables and ambiguous DELETEs until their IDs are confirmed gone.
                 log.warn("leaving staging table {} in place because its delete may still be running", d.stagingTable);
                 continue;
             }
             try {
                 d.dropStagingTable(true);
             } catch (DaoException e) {
-                log.warn("could not drop staging table {} after a failed delete; it will be dropped on the next run", d.stagingTable, e);
+                log.warn("could not drop staging table {} after a failed delete; the next run must verify its IDs before dropping it", d.stagingTable, e);
             }
         }
     }
@@ -326,6 +325,7 @@ public class ClickHouseBulkDeleter {
                     "CREATE TABLE %s (id Int64) ENGINE = MergeTree() ORDER BY id",
                     this.stagingTable);
             try (PreparedStatement stmt = con.prepareStatement(createTableStatementString)) {
+                stagingCreationAttempted = true;
                 stmt.executeUpdate();
             } finally {
                 JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
@@ -356,15 +356,12 @@ public class ClickHouseBulkDeleter {
 
     private long deleteRecordsReferencedInStagingTable() throws DaoException {
         long records_deleted;
-        // Where the server supports it, return as soon as the delete is accepted; confirmDeletionIsComplete()
-        // then polls with short queries. Waiting inside the DELETE (lightweight_deletes_sync=2, the default)
-        // keeps the connection silent for as long as the delete runs (~6 minutes for genetic_alteration),
-        // longer than network idle timeouts, so the response is lost even though the delete succeeds.
-        // Servers older than 24.4 lack the setting and always wait.
+        // Wait for completion; progress headers keep the waiting HTTP connection active.
+        // Older servers use mutations_sync for lightweight deletes as well.
         String statementString = String.format(
-                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)%s",
+                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s) SETTINGS %s = 2",
                 targetTable, idColumn, stagingTable,
-                isAsyncLightweightDeleteSupported() ? " SETTINGS lightweight_deletes_sync = 0" : "");
+                isSynchronousDeleteSettingSupported() ? "lightweight_deletes_sync" : "mutations_sync");
         try {
             Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
             try (PreparedStatement stmt = con.prepareStatement(statementString)) {
@@ -379,12 +376,12 @@ public class ClickHouseBulkDeleter {
         return records_deleted;
     }
 
-    private static synchronized boolean isAsyncLightweightDeleteSupported() throws DaoException {
-        if (asyncLightweightDeleteSupported == null) {
+    private static synchronized boolean isSynchronousDeleteSettingSupported() throws DaoException {
+        if (synchronousDeleteSettingSupported == null) {
             try {
                 Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
                 try {
-                    asyncLightweightDeleteSupported = supportsAsyncLightweightDelete(con);
+                    synchronousDeleteSettingSupported = supportsSynchronousDeleteSetting(con);
                 } finally {
                     JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
                 }
@@ -392,12 +389,12 @@ public class ClickHouseBulkDeleter {
                 throw new DaoException(e);
             }
         }
-        return asyncLightweightDeleteSupported;
+        return synchronousDeleteSettingSupported;
     }
 
-    static boolean supportsAsyncLightweightDelete(Connection con) throws SQLException {
+    static boolean supportsSynchronousDeleteSetting(Connection con) throws SQLException {
         // Probe the setting without requiring SELECT on system.settings or issuing a DELETE.
-        try (PreparedStatement stmt = con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 0");
+        try (PreparedStatement stmt = con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 2");
                 ResultSet rs = stmt.executeQuery()) {
             return true;
         } catch (SQLException e) {
@@ -453,11 +450,6 @@ public class ClickHouseBulkDeleter {
     }
 
     private void confirmDeletionIsComplete() throws DaoException {
-        this.confirmDeletionIsCompleteInData();
-        this.confirmDeletionIsCompleteInMetadata();
-    }
-
-    private void confirmDeletionIsCompleteInData() throws DaoException {
         if (!this.conditionIsTrueAfterQueryWithRetry(this::deletionIsComplete, CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS)) {
             String exceptionMessageString = String.format(
                     "Failed to complete the delete operation on all replicas for table %s after retrying for %d seconds",
@@ -469,14 +461,22 @@ public class ClickHouseBulkDeleter {
         // mutations are still in progress -- if not, stop waiting and fail early
     }
 
-    private void confirmDeletionIsCompleteInMetadata() throws DaoException {
-        if (!this.conditionIsTrueAfterQueryWithRetry(this::allReplicasReportSameMetadataForTargetTable, CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS)) {
-            String exceptionMessageString = String.format(
-                    "Metadata for table %s could not be confirmed to have propagated across all cluster replica nodes after retrying for %d seconds",
-                    this.targetTable,
-                    CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS);
-            throw new DaoException(exceptionMessageString);
+    private void confirmLeftoverDeletionIsComplete() throws DaoException {
+        String absentQuery = String.format(
+                "SELECT hostname() AS host, countIf(database = current_database() AND name = '%s') AS table_count "
+                + "FROM clusterAllReplicas('default', 'system', 'tables') GROUP BY host", stagingTable);
+        try {
+            if (allReplicasReportExpectedResult(absentQuery, "table_count",
+                    AllReplicaTestType.EXPECTED_VALUE, AllReplicaCriterionType.LONG, 0L)) {
+                return;
+            }
+        } catch (SQLException e) {
+            throw new DaoException(e);
         }
+        // Never replace an earlier attempt's IDs, even if it never submitted its DELETE.
+        // Missing replicas or unfinished deletes must fail closed and retain the table.
+        confirmCreationOfStagingTable();
+        confirmDeletionIsComplete();
     }
 
 // functional predicates for performing tests (these may return SQLException which allows retry, or DaoException for fatal failures)
@@ -503,24 +503,19 @@ public class ClickHouseBulkDeleter {
     }
 
     private boolean deletionIsComplete() throws SQLException, DaoException {
-        String getUndeletedRecordCountsString = String.format(
-                "SELECT count() AS record_count FROM %s WHERE %s IN (SELECT id FROM %s)",
+        // Broadcast the union of saved IDs so a replica cannot pass because its staging
+        // copy is missing IDs. Include zero rows for hosts with no remaining matches.
+        String query = String.format(
+                "SELECT host, sum(record_count) AS record_count FROM ("
+                + "SELECT hostname() AS host, count() AS record_count "
+                + "FROM clusterAllReplicas('default', currentDatabase(), '%s') "
+                + "WHERE %s GLOBAL IN (SELECT id FROM clusterAllReplicas('default', currentDatabase(), '%s')) GROUP BY host "
+                + "UNION ALL SELECT hostname() AS host, toUInt64(0) AS record_count "
+                + "FROM clusterAllReplicas('default', 'system', 'one')) GROUP BY host "
+                + "SETTINGS skip_unavailable_shards = 0",
                 targetTable, idColumn, stagingTable);
-        return queryProducedExpectedResult(getUndeletedRecordCountsString, "record_count", 0L);
-    }
-
-    private boolean allReplicasReportSameMetadataForTargetTable() throws SQLException, DaoException {
-        String queryPart1 = "SELECT host, sum(record_count) AS total_rows FROM ((";
-        String queryPart2 = "SELECT hostname() AS host, rows AS record_count FROM clusterAllReplicas('default', 'system', 'parts')";
-        String queryPart3 = "WHERE database = current_database() AND table = ";
-        String queryPart4 = ") union all (";
-        // This union insures that at least one part with one record is included in the query result before aggregation. In this way, every host will be present in the results
-        String queryPart5 = "SELECT hostname() AS host, 0 AS record_count FROM clusterAllReplicas('default', 'system', 'one')";
-        String queryPart6 = ")) GROUP BY host";
-        String getMetadataString = String.format(
-                "%s%s %s '%s'%s%s%s",
-                queryPart1, queryPart2, queryPart3, targetTable, queryPart4, queryPart5, queryPart6);
-        return allReplicasReportExpectedResult(getMetadataString, "total_rows", AllReplicaTestType.CONSISTENT, AllReplicaCriterionType.LONG, null);
+        return allReplicasReportExpectedResult(query, "record_count",
+                AllReplicaTestType.EXPECTED_VALUE, AllReplicaCriterionType.LONG, 0L);
     }
 
 // reusable logic to perform test/retry loops for database queries with criteria
@@ -563,34 +558,6 @@ public class ClickHouseBulkDeleter {
             }
         }
         return returnValue;
-    }
-
-    // checks specified outputField in the results of running queryString and looks for expectedResult
-    // only the first result (in the result set) is examined
-    private boolean queryProducedExpectedResult(String queryString, String outputField, long expectedResult) throws SQLException {
-        Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
-        try (PreparedStatement pstmt = con.prepareStatement(queryString);
-                ResultSet rs = pstmt.executeQuery()) {
-            if (!rs.next()) {
-                log.warn(String.format(
-                        "evaluation of query produced empty result set : %s",
-                        queryString));
-                return false;
-            }
-            long result = rs.getLong(outputField);
-            if (result != expectedResult) {
-                log.warn(String.format(
-                        "waiting to reach expected result for query '%s' : expected %d saw %d",
-                        queryString,
-                        expectedResult,
-                        result
-                        ));
-                return false;
-            }
-        } finally {
-            JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
-        }
-        return true;
     }
 
     // queryString must be a SQL query which returns results which includes a field "host" with the hostname() of the replica responding. "SELECT hostname() AS host..."
@@ -668,7 +635,7 @@ public class ClickHouseBulkDeleter {
     private Set<String> getReplicaHostnames() throws SQLException {
         Set<String> hostnameSet = new HashSet<>();
         Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
-        String getHostNamesQueryString = "SELECT hostname() AS host FROM clusterAllReplicas('default', 'system', 'one') GROUP BY host";
+        String getHostNamesQueryString = "SELECT hostname() AS host FROM clusterAllReplicas('default', 'system', 'one') GROUP BY host SETTINGS skip_unavailable_shards = 0";
         try (PreparedStatement pstmt = con.prepareStatement(getHostNamesQueryString);
                 ResultSet rs = pstmt.executeQuery()) {
             while (rs.next()) {

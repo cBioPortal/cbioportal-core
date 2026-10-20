@@ -16,28 +16,28 @@ public class ClickHouseBulkDeleterSettingsTest {
         Connection con = mock(Connection.class);
         PreparedStatement stmt = mock(PreparedStatement.class);
         ResultSet rs = mock(ResultSet.class);
-        when(con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 0")).thenReturn(stmt);
+        when(con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 2")).thenReturn(stmt);
         when(stmt.executeQuery()).thenReturn(rs);
 
-        assertTrue(ClickHouseBulkDeleter.supportsAsyncLightweightDelete(con));
+        assertTrue(ClickHouseBulkDeleter.supportsSynchronousDeleteSetting(con));
         verify(rs).close();
         verify(stmt).close();
     }
 
     @Test
-    public void onlyUnknownSettingFallsBackToSynchronousDeletes() throws SQLException {
+    public void onlyUnknownSettingFallsBackToLegacySetting() throws SQLException {
         for (int errorCode : new int[]{115, 497, 452, 0}) {
             Connection con = mock(Connection.class);
             PreparedStatement stmt = mock(PreparedStatement.class);
             SQLException failure = new SQLException("server error", "07000", errorCode);
-            when(con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 0")).thenReturn(stmt);
+            when(con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 2")).thenReturn(stmt);
             when(stmt.executeQuery()).thenThrow(failure);
 
             if (errorCode == 115) {
-                assertFalse(ClickHouseBulkDeleter.supportsAsyncLightweightDelete(con));
+                assertFalse(ClickHouseBulkDeleter.supportsSynchronousDeleteSetting(con));
             } else {
                 SQLException actual = assertThrows(SQLException.class,
-                        () -> ClickHouseBulkDeleter.supportsAsyncLightweightDelete(con));
+                        () -> ClickHouseBulkDeleter.supportsSynchronousDeleteSetting(con));
                 assertSame(failure, actual);
             }
             verify(stmt).close();
