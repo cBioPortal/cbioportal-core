@@ -70,10 +70,12 @@ public final class DaoAscnGeneLevel {
                 rec.getChr(),
                 Long.toString(rec.getStart()),
                 Long.toString(rec.getEnd()),
-                rec.getTcn() == null ? null : Double.toString(rec.getTcn()),
-                rec.getLcn() == null ? null : Double.toString(rec.getLcn()),
+                rec.getTcn() == null ? null : Integer.toString(rec.getTcn()),
+                rec.getLcn() == null ? null : Integer.toString(rec.getLcn()),
                 rec.getCellularFraction() == null ? null : Double.toString(rec.getCellularFraction()),
-                rec.getPurity() == null ? null : Double.toString(rec.getPurity())
+                rec.getPurity() == null ? null : Double.toString(rec.getPurity()),
+                rec.getPloidy() == null ? null : Double.toString(rec.getPloidy()),
+                rec.getDipLogR() == null ? null : Double.toString(rec.getDipLogR())
         );
     }
 
@@ -148,18 +150,25 @@ public final class DaoAscnGeneLevel {
                 rs.getString("hugo_gene_symbol"),
                 rs.getLong("entrez_gene_id"),
                 rs.getString("chr"),
-                rs.getLong("start"),
-                rs.getLong("end"),
-                getNullableDouble(rs, "tcn"),
-                getNullableDouble(rs, "lcn"),
+                rs.getLong("gene_start"),
+                rs.getLong("gene_end"),
+                getNullableInteger(rs, "tcn"),
+                getNullableInteger(rs, "lcn"),
                 getNullableDouble(rs, "cellular_fraction"),
-                getNullableDouble(rs, "purity"));
+                getNullableDouble(rs, "purity"),
+                getNullableDouble(rs, "ploidy"),
+                getNullableDouble(rs, "dip_log_r"));
         rec.setId(rs.getLong("gene_id"));
         return rec;
     }
 
     private static Double getNullableDouble(ResultSet rs, String column) throws SQLException {
         double value = rs.getDouble(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private static Integer getNullableInteger(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
         return rs.wasNull() ? null : value;
     }
 }

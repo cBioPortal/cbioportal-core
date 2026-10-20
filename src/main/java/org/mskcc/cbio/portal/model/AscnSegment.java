@@ -37,12 +37,24 @@ package org.mskcc.cbio.portal.model;
  */
 public class AscnSegment extends AbstractAscnRecord {
 
+    private Double logRatio;
+
     public AscnSegment() {
         super();
     }
 
     public AscnSegment(int cancerStudyId, int sampleId, String chr, long start, long end,
-            Double tcn, Double lcn, Double cellularFraction, Double purity) {
-        super(cancerStudyId, sampleId, chr, start, end, tcn, lcn, cellularFraction, purity);
+            Integer tcn, Integer lcn, Double cellularFraction, Double purity, Double ploidy, Double dipLogR,
+            Double logRatio) {
+        super(cancerStudyId, sampleId, chr, start, end, tcn, lcn, cellularFraction, purity, ploidy, dipLogR);
+        this.logRatio = logRatio;
+    }
+
+    public Double getLogRatio() {
+        return logRatio;
+    }
+
+    public void setLogRatio(Double logRatio) {
+        this.logRatio = logRatio;
     }
 }
