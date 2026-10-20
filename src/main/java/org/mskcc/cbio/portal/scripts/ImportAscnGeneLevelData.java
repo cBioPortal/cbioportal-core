@@ -48,12 +48,17 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
  * ASCN Seg segment calls) into the {@code ascn_gene_level} table.
  *
  * Expected tab-delimited data file columns (any order):
- * SAMPLE_ID, HUGO_SYMBOL, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
+ * SAMPLE_ID, HUGO_SYMBOL, CHROMOSOME, GENE_START, GENE_END, TCN, LCN,
  * CELLULAR_FRACTION, PURITY, PLOIDY, DIP_LOG_R
+ *
+ * Note: unlike ASCN Seg data (which uses LOC_START/LOC_END), this data file
+ * uses GENE_START/GENE_END for the gene's genomic coordinates.
  */
 public class ImportAscnGeneLevelData extends AbstractImportAscnData {
 
     private static final String HUGO_SYMBOL_COLUMN = "HUGO_SYMBOL";
+    private static final String GENE_START_COLUMN = "GENE_START";
+    private static final String GENE_END_COLUMN = "GENE_END";
 
     // Loaded once and reused for every row: DaoGeneOptimized.getInstance() holds
     // the full gene table in memory, so per-row lookups are plain HashMap gets,
@@ -67,6 +72,16 @@ public class ImportAscnGeneLevelData extends AbstractImportAscnData {
     @Override
     protected String dataTypeLabel() {
         return "ASCN gene-level";
+    }
+
+    @Override
+    protected String startPositionColumn() {
+        return GENE_START_COLUMN;
+    }
+
+    @Override
+    protected String endPositionColumn() {
+        return GENE_END_COLUMN;
     }
 
     @Override
