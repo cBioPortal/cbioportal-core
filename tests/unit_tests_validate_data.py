@@ -2971,6 +2971,7 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         treats it as a key-value map. Arrays, scalars and malformed JSON are rejected; an empty
         value or NA is fine, since the column is optional."""
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {'PATHOLOGY_SLIDE': {'stain', 'slide_number'}}
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_resource_sample_metadata.txt',
                             validateData.ResourceValidator)
@@ -2985,6 +2986,7 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
 
         # Lines 2-4: a well-formed object, an empty value and NA all pass.
         self.assertEqual(set(), {2, 3, 4} & set(by_line))
+        validateData.RESOURCE_CONTRACT_KEYS = {}
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
 
@@ -3005,15 +3007,55 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         validateData.RESOURCE_CONTRACT_KEYS = {}
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
-    def test_metadata_keys_are_not_checked_without_a_contract(self):
-        """No contract means the portal still builds columns from the data, so nothing is lost."""
+    def test_metadata_requires_a_contract(self):
+        """The portal reads the definition to decide whether a resource has metadata columns."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_sample_undeclared_keys.txt',
+                            validateData.ResourceValidator)
+
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('has no CUSTOM_METADATA', record.getMessage())
+        self.assertEqual('magnification, slide_id, stain', record.cause)
+        self.assertEqual(2, record.line_number)
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_rows_without_metadata_need_no_contract(self):
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
         validateData.RESOURCE_CONTRACT_KEYS = {}
         self.logger.setLevel(logging.ERROR)
 
-        self.assertEqual([], self.validate('data_resource_sample_undeclared_keys.txt',
+        self.assertEqual([], self.validate('data_resource_sample_valid.txt',
                                            validateData.ResourceValidator))
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_metadata_is_not_checked_against_an_unusable_contract(self):
+        """The definition file already reports the contract; the data file is left alone."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {'PATHOLOGY_SLIDE': None}
+        self.logger.setLevel(logging.ERROR)
+
+        self.assertEqual([], self.validate('data_resource_sample_undeclared_keys.txt',
+                                           validateData.ResourceValidator))
+        validateData.RESOURCE_CONTRACT_KEYS = {}
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_unusable_contract_is_filed_as_none(self):
+        """A resource with CUSTOM_METADATA set is filed even when the value is unusable, so its
+        data file is not also told the contract is missing."""
+        self.logger.setLevel(logging.ERROR)
+        validator = validateData.ResourceDefinitionValidator(
+            'test_data',
+            {'data_filename': 'data_resource_definition_invalid_custom_metadata.txt'},
+            PORTAL_INSTANCE, self.logger, False, False)
+        validator.validate()
+
+        self.assertIsNone(validator.resource_contract_keys['RES_VALID_JSON'])
+        self.assertIsNone(validator.resource_contract_keys['RES_INVALID_JSON'])
+        self.assertNotIn('RES_EMPTY_METADATA', validator.resource_contract_keys)
 
     def test_an_unreadable_contract_declares_nothing_rather_than_declaring_no_keys(self):
         """A contract the portal cannot read is reported on its own and leaves the data alone.

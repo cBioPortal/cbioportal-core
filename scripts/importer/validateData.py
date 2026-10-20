@@ -76,8 +76,9 @@ sample_ids_panel_dict = {}
 
 # resource globals
 RESOURCE_DEFINITION_DICTIONARY = {}
-# resource_id -> set of metadata keys the resource's CUSTOM_METADATA contract declares. A resource
-# with no contract is absent from this map and its data file is not checked against one.
+# resource_id -> set of metadata keys the resource's CUSTOM_METADATA contract declares, or None
+# when CUSTOM_METADATA is set but unusable (already reported against the definition file). A
+# resource with no CUSTOM_METADATA is absent, and its rows may not carry METADATA.
 # Populated from the definition file before any resource data file is read.
 RESOURCE_CONTRACT_KEYS = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
@@ -3812,6 +3813,7 @@ class ResourceDefinitionValidator(Validator):
         resource_id = ''
         resource_type = ''
         declared_keys = None
+        has_custom_metadata = False
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3881,6 +3883,7 @@ class ResourceDefinitionValidator(Validator):
             if col_name == 'CUSTOM_METADATA':
                 custom_metadata_value = value.strip()
                 if custom_metadata_value and custom_metadata_value.lower() not in self.NULL_VALUES:
+                    has_custom_metadata = True
                     try:
                         contract = json.loads(custom_metadata_value)
                         self.checkCustomMetadataContract(contract, col_index)
@@ -3899,7 +3902,7 @@ class ResourceDefinitionValidator(Validator):
                                    'cause': value})
         # Filed after the loop, not inside it: REQUIRE_COLUMN_ORDER is False, so resource_id is
         # only known once every column has been read. Both of these are keyed by it.
-        if declared_keys is not None and resource_id:
+        if has_custom_metadata and resource_id:
             self.resource_contract_keys[resource_id] = declared_keys
         # add resource_id into dictionary
         self.resource_definition_dictionary.setdefault(resource_id, []).append(resource_type)
@@ -3943,11 +3946,22 @@ class ResourceValidator(Validator):
         not filtered out and loaded without it, and nothing downstream would report it either.
         The curator either declares the key or removes it from the file.
 
-        A resource with no contract is skipped, because its columns come from the data and an
-        undeclared key is not lost.
+        A resource with no contract may not carry METADATA, so the portal can tell from the
+        definition alone whether a resource has metadata columns. A resource whose contract is
+        unusable is skipped: that is already an error against the definition file.
         """
         for resource_id, keys in sorted(self.observed_metadata_keys.items()):
-            declared = RESOURCE_CONTRACT_KEYS.get(resource_id)
+            if not keys:
+                continue
+            if resource_id not in RESOURCE_CONTRACT_KEYS:
+                self.logger.error(
+                    "METADATA is set for resource '%s', which has no CUSTOM_METADATA in the "
+                    'resource definition file. Add a contract declaring these keys, or remove '
+                    'METADATA from the file.' % resource_id,
+                    extra={'line_number': min(keys.values()),
+                           'cause': ', '.join(sorted(keys))})
+                continue
+            declared = RESOURCE_CONTRACT_KEYS[resource_id]
             if declared is None:
                 continue
             undeclared = sorted(set(keys) - declared)
