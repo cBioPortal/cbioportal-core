@@ -2,7 +2,7 @@
 
 # load dependencies
 unset this_script_dir
-this_script_dir="$(dirname "$(readlink -f $0)")"
+this_script_dir="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 if ! source "$this_script_dir/parse_property_file_functions.sh" ; then
     echo "Error : unable to load dependency : $this_script_dir/parse_property_file_functions.sh" >&2
     exit 1
@@ -31,6 +31,9 @@ SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 # cancel the whole clone, so bound them tightly and retry.
 QUICK_STATEMENT_MAX_ATTEMPTS=3
 QUICK_STATEMENT_TIMEOUT_SECONDS=120
+# Connection establishment is independent of query duration. Keep the client's 10s default;
+# deployments needing longer can override this without extending query timeouts.
+QUICK_STATEMENT_CONNECT_TIMEOUT_SECONDS=${QUICK_STATEMENT_CONNECT_TIMEOUT_SECONDS:-10}
 QUICK_STATEMENT_RETRY_DELAY_SECONDS=15
 
 function usage() {
@@ -103,17 +106,22 @@ function shutdown_main_and_clean_up() {
     unset clickhouse_is_responsive_filepath
     unset SECONDS_BETWEEN_RESPONSIVENESS_RETRY
     unset QUICK_STATEMENT_MAX_ATTEMPTS
+    unset QUICK_STATEMENT_CONNECT_TIMEOUT_SECONDS
     unset QUICK_STATEMENT_TIMEOUT_SECONDS
     unset QUICK_STATEMENT_RETRY_DELAY_SECONDS
 }
 
+# Only for statements that are safe to run again after a non-zero client exit.
+# The server may still be running the first attempt. Use this for short read-only
+# queries, and statements such as CREATE TABLE IF NOT EXISTS that can be repeated
+# without writing a second copy of the data. Do not use this for INSERTs.
 function execute_quick_sql_statement_with_retry() {
     local statement=$1
     local output_filepath=$2
     local attempt=1
     while true ; do
         if execute_sql_statement_via_clickhouse_client "$statement" "$output_filepath" \
-                --connect_timeout=30 \
+                --connect_timeout="$QUICK_STATEMENT_CONNECT_TIMEOUT_SECONDS" \
                 --send_timeout="$QUICK_STATEMENT_TIMEOUT_SECONDS" \
                 --receive_timeout="$QUICK_STATEMENT_TIMEOUT_SECONDS" ; then
             return 0
@@ -314,4 +322,6 @@ function main() {
     return $exit_status
 }
 
-main "$1" "$2" "$3"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$1" "$2" "$3"
+fi
