@@ -45,10 +45,12 @@ import org.mskcc.cbio.portal.model.Sample;
  * {@code ascn_seg} table.
  *
  * Expected tab-delimited data file columns (any order):
- * SAMPLE_ID, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
- * CELLULAR_FRACTION, PURITY
+ * SAMPLE_ID, CHROMOSOME, START_POSITION, END_POSITION, LOG_RATIO, TCN, LCN,
+ * CELLULAR_FRACTION, PURITY, PLOIDY, DIP_LOG_R
  */
 public class ImportAscnSegData extends AbstractImportAscnData {
+
+    private static final String LOG_RATIO_COLUMN = "LOG_RATIO";
 
     public ImportAscnSegData(String[] args) {
         super(args);
@@ -70,8 +72,14 @@ public class ImportAscnSegData extends AbstractImportAscnData {
     }
 
     @Override
+    protected String[] getAdditionalRequiredColumns() {
+        return new String[] { LOG_RATIO_COLUMN };
+    }
+
+    @Override
     protected boolean storeRow(CommonAscnFields common, String[] parts, Map<String, Integer> colIndex,
             CancerStudy study, Sample sample) throws DaoException {
+        Double logRatio = parseNullableDouble(getValue(parts, colIndex, LOG_RATIO_COLUMN));
         AscnSegment seg = new AscnSegment(
                 study.getInternalId(),
                 sample.getInternalId(),
@@ -81,7 +89,10 @@ public class ImportAscnSegData extends AbstractImportAscnData {
                 common.tcn,
                 common.lcn,
                 common.cellularFraction,
-                common.purity);
+                common.purity,
+                common.ploidy,
+                common.dipLogR,
+                logRatio);
         seg.setId(DaoAscnSeg.getNextId());
         DaoAscnSeg.addAscnSegment(seg);
         return true;

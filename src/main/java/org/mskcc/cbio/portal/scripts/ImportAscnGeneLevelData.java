@@ -49,7 +49,7 @@ import org.mskcc.cbio.portal.util.ProgressMonitor;
  *
  * Expected tab-delimited data file columns (any order):
  * SAMPLE_ID, HUGO_SYMBOL, CHROMOSOME, START_POSITION, END_POSITION, TCN, LCN,
- * CELLULAR_FRACTION, PURITY
+ * CELLULAR_FRACTION, PURITY, PLOIDY, DIP_LOG_R
  */
 public class ImportAscnGeneLevelData extends AbstractImportAscnData {
 
@@ -105,7 +105,9 @@ public class ImportAscnGeneLevelData extends AbstractImportAscnData {
                 common.tcn,
                 common.lcn,
                 common.cellularFraction,
-                common.purity);
+                common.purity,
+                common.ploidy,
+                common.dipLogR);
         rec.setId(DaoAscnGeneLevel.getNextId());
         DaoAscnGeneLevel.addAscnGeneLevelRecord(rec);
         return true;

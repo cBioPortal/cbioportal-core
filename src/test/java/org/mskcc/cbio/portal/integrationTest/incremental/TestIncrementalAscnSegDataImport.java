@@ -49,10 +49,13 @@ public class TestIncrementalAscnSegDataImport extends IntegrationTestBase {
                 "5",
                 1000,
                 2000,
-                5.0,
-                2.0,
+                5,
+                2,
                 0.5,
-                0.2);
+                0.2,
+                2.0,
+                -0.05,
+                0.1);
         existingSegment.setId(DaoAscnSeg.getNextId());
         DaoAscnSeg.addAscnSegment(existingSegment);
         ClickHouseBulkLoader.flushAll();
