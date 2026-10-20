@@ -71,6 +71,16 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
     protected static final String CHROMOSOME_COLUMN = "CHROMOSOME";
     protected static final String START_POSITION_COLUMN = "START_POSITION";
     protected static final String END_POSITION_COLUMN = "END_POSITION";
+    /**
+     * TCN/LCN are stored as {@code Nullable(Int32)} in both {@code ascn_seg} and
+     * {@code ascn_gene_level} (total/lesser copy number are whole-number allele
+     * counts). A data file value that parses as a number but isn't a whole number
+     * (e.g. "2.5") is neither silently accepted (which would hide a questionable
+     * value) nor rejected (which would abort the entire import over one row): it is
+     * rounded to the nearest integer and a warning is logged via
+     * {@link #parseNullableInteger(String, String)} so the discrepancy is visible
+     * without failing the import.
+     */
     protected static final String TCN_COLUMN = "TCN";
     protected static final String LCN_COLUMN = "LCN";
     protected static final String CELLULAR_FRACTION_COLUMN = "CELLULAR_FRACTION";
@@ -236,8 +246,8 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
             return false;
         }
 
-        Integer tcn = parseNullableInteger(getValue(parts, colIndex, TCN_COLUMN));
-        Integer lcn = parseNullableInteger(getValue(parts, colIndex, LCN_COLUMN));
+        Integer tcn = parseNullableInteger(getValue(parts, colIndex, TCN_COLUMN), TCN_COLUMN);
+        Integer lcn = parseNullableInteger(getValue(parts, colIndex, LCN_COLUMN), LCN_COLUMN);
         Double cellularFraction = parseNullableDouble(getValue(parts, colIndex, CELLULAR_FRACTION_COLUMN));
         Double purity = parseNullableDouble(getValue(parts, colIndex, PURITY_COLUMN));
         Double ploidy = parseNullableDouble(getValue(parts, colIndex, PLOIDY_COLUMN));
@@ -267,11 +277,25 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         return Double.parseDouble(value.trim());
     }
 
-    protected static Integer parseNullableInteger(String value) {
+    /**
+     * Parses a nullable integer-constrained column (TCN/LCN). A value that is
+     * numeric but not whole (e.g. "2.5") is rounded to the nearest integer and a
+     * warning is logged, rather than being silently accepted as-is or rejected
+     * outright. A value that isn't numeric at all still fails fast via
+     * {@link NumberFormatException}.
+     */
+    protected static Integer parseNullableInteger(String value, String columnName) {
         if (value == null || value.trim().isEmpty() || "NA".equalsIgnoreCase(value.trim())) {
             return null;
         }
-        return Integer.parseInt(value.trim());
+        String trimmed = value.trim();
+        double parsed = Double.parseDouble(trimmed);
+        int rounded = (int) Math.round(parsed);
+        if (parsed != rounded) {
+            ProgressMonitor.logWarning("Non-integer value '" + trimmed + "' found for column '" + columnName
+                    + "'. Rounding to nearest integer: " + rounded + ".");
+        }
+        return rounded;
     }
 
     /** Common, already-validated fields for a single ASCN data row. */
