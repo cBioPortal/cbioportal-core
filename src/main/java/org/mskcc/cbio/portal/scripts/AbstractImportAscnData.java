@@ -57,7 +57,7 @@ import org.mskcc.cbio.portal.util.StableIdUtil;
  * Shared logic for importing ASCN allele-specific copy number data
  * ({@code ascn_seg} and {@code ascn_gene_level}). Both data types carry the
  * same core columns (sample, genomic coordinates, tcn/lcn/cellular fraction,
- * purity); this class centralizes CLI parsing, coordinate/sample validation,
+ * purity, ploidy); this class centralizes CLI parsing, coordinate/sample validation,
  * numeric parsing, and the bulk-load / incremental-update lifecycle, mirroring
  * {@link ImportCopyNumberSegmentData}.
  *
@@ -75,6 +75,8 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
     protected static final String LCN_COLUMN = "LCN";
     protected static final String CELLULAR_FRACTION_COLUMN = "CELLULAR_FRACTION";
     protected static final String PURITY_COLUMN = "PURITY";
+    protected static final String PLOIDY_COLUMN = "PLOIDY";
+    protected static final String DIPLOGR_COLUMN = "DIP_LOG_R";
 
     protected boolean isIncrementalUpdateMode;
     protected final Set<Integer> processedSampleIds = new HashSet<>();
@@ -197,6 +199,8 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         requireColumn(colIndex, LCN_COLUMN);
         requireColumn(colIndex, CELLULAR_FRACTION_COLUMN);
         requireColumn(colIndex, PURITY_COLUMN);
+        requireColumn(colIndex, PLOIDY_COLUMN);
+        requireColumn(colIndex, DIPLOGR_COLUMN);
         for (String column : getAdditionalRequiredColumns()) {
             requireColumn(colIndex, column);
         }
@@ -232,12 +236,15 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
             return false;
         }
 
-        Double tcn = parseNullableDouble(getValue(parts, colIndex, TCN_COLUMN));
-        Double lcn = parseNullableDouble(getValue(parts, colIndex, LCN_COLUMN));
+        Integer tcn = parseNullableInteger(getValue(parts, colIndex, TCN_COLUMN));
+        Integer lcn = parseNullableInteger(getValue(parts, colIndex, LCN_COLUMN));
         Double cellularFraction = parseNullableDouble(getValue(parts, colIndex, CELLULAR_FRACTION_COLUMN));
         Double purity = parseNullableDouble(getValue(parts, colIndex, PURITY_COLUMN));
+        Double ploidy = parseNullableDouble(getValue(parts, colIndex, PLOIDY_COLUMN));
+        Double dipLogR = parseNullableDouble(getValue(parts, colIndex, DIPLOGR_COLUMN));
 
-        CommonAscnFields common = new CommonAscnFields(chrom, start, end, tcn, lcn, cellularFraction, purity);
+        CommonAscnFields common = new CommonAscnFields(chrom, start, end, tcn, lcn, cellularFraction, purity, ploidy,
+                dipLogR);
         boolean stored = storeRow(common, parts, colIndex, cancerStudy, sample);
         if (stored) {
             processedSampleIds.add(sample.getInternalId());
@@ -253,11 +260,18 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         return parts[index];
     }
 
-    private static Double parseNullableDouble(String value) {
+    protected static Double parseNullableDouble(String value) {
         if (value == null || value.trim().isEmpty() || "NA".equalsIgnoreCase(value.trim())) {
             return null;
         }
         return Double.parseDouble(value.trim());
+    }
+
+    protected static Integer parseNullableInteger(String value) {
+        if (value == null || value.trim().isEmpty() || "NA".equalsIgnoreCase(value.trim())) {
+            return null;
+        }
+        return Integer.parseInt(value.trim());
     }
 
     /** Common, already-validated fields for a single ASCN data row. */
@@ -265,12 +279,15 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         final String chr;
         final long start;
         final long end;
-        final Double tcn;
-        final Double lcn;
+        final Integer tcn;
+        final Integer lcn;
         final Double cellularFraction;
         final Double purity;
+        final Double ploidy;
+        final Double dipLogR;
 
-        CommonAscnFields(String chr, long start, long end, Double tcn, Double lcn, Double cellularFraction, Double purity) {
+        CommonAscnFields(String chr, long start, long end, Integer tcn, Integer lcn, Double cellularFraction,
+                Double purity, Double ploidy, Double dipLogR) {
             this.chr = chr;
             this.start = start;
             this.end = end;
@@ -278,6 +295,8 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
             this.lcn = lcn;
             this.cellularFraction = cellularFraction;
             this.purity = purity;
+            this.ploidy = ploidy;
+            this.dipLogR = dipLogR;
         }
     }
 }

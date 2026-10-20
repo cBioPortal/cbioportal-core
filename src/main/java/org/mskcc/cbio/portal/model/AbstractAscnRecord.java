@@ -47,15 +47,17 @@ public abstract class AbstractAscnRecord {
     private String chr; // 1-22,X/Y,M
     private long start;
     private long end;
-    private Double tcn;
-    private Double lcn;
+    private Integer tcn;
+    private Integer lcn;
     private Double cellularFraction;
     private Double purity;
+    private Double ploidy;
+    private Double dipLogR;
 
     protected AbstractAscnRecord() {}
 
     protected AbstractAscnRecord(int cancerStudyId, int sampleId, String chr, long start, long end,
-            Double tcn, Double lcn, Double cellularFraction, Double purity) {
+            Integer tcn, Integer lcn, Double cellularFraction, Double purity, Double ploidy, Double dipLogR) {
         this.cancerStudyId = cancerStudyId;
         this.sampleId = sampleId;
         this.chr = chr;
@@ -65,6 +67,8 @@ public abstract class AbstractAscnRecord {
         this.lcn = lcn;
         this.cellularFraction = cellularFraction;
         this.purity = purity;
+        this.ploidy = ploidy;
+        this.dipLogR = dipLogR;
     }
 
     public long getId() {
@@ -115,19 +119,19 @@ public abstract class AbstractAscnRecord {
         this.end = end;
     }
 
-    public Double getTcn() {
+    public Integer getTcn() {
         return tcn;
     }
 
-    public void setTcn(Double tcn) {
+    public void setTcn(Integer tcn) {
         this.tcn = tcn;
     }
 
-    public Double getLcn() {
+    public Integer getLcn() {
         return lcn;
     }
 
-    public void setLcn(Double lcn) {
+    public void setLcn(Integer lcn) {
         this.lcn = lcn;
     }
 
@@ -145,5 +149,21 @@ public abstract class AbstractAscnRecord {
 
     public void setPurity(Double purity) {
         this.purity = purity;
+    }
+
+    public Double getPloidy() {
+        return ploidy;
+    }
+
+    public void setPloidy(Double ploidy) {
+        this.ploidy = ploidy;
+    }
+
+    public Double getDipLogR() {
+        return dipLogR;
+    }
+
+    public void setDipLogR(Double dipLogR) {
+        this.dipLogR = dipLogR;
     }
 }

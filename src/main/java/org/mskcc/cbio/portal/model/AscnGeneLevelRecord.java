@@ -47,8 +47,9 @@ public class AscnGeneLevelRecord extends AbstractAscnRecord {
     }
 
     public AscnGeneLevelRecord(int cancerStudyId, int sampleId, String hugoGeneSymbol, long entrezGeneId,
-            String chr, long start, long end, Double tcn, Double lcn, Double cellularFraction, Double purity) {
-        super(cancerStudyId, sampleId, chr, start, end, tcn, lcn, cellularFraction, purity);
+            String chr, long start, long end, Integer tcn, Integer lcn, Double cellularFraction, Double purity,
+            Double ploidy, Double dipLogR) {
+        super(cancerStudyId, sampleId, chr, start, end, tcn, lcn, cellularFraction, purity, ploidy, dipLogR);
         this.hugoGeneSymbol = hugoGeneSymbol;
         this.entrezGeneId = entrezGeneId;
     }

@@ -63,10 +63,13 @@ public final class DaoAscnSeg {
                 seg.getChr(),
                 Long.toString(seg.getStart()),
                 Long.toString(seg.getEnd()),
-                seg.getTcn() == null ? null : Double.toString(seg.getTcn()),
-                seg.getLcn() == null ? null : Double.toString(seg.getLcn()),
+                seg.getLogRatio() == null ? null : Double.toString(seg.getLogRatio()),
+                seg.getTcn() == null ? null : Integer.toString(seg.getTcn()),
+                seg.getLcn() == null ? null : Integer.toString(seg.getLcn()),
                 seg.getCellularFraction() == null ? null : Double.toString(seg.getCellularFraction()),
-                seg.getPurity() == null ? null : Double.toString(seg.getPurity())
+                seg.getPurity() == null ? null : Double.toString(seg.getPurity()),
+                seg.getPloidy() == null ? null : Double.toString(seg.getPloidy()),
+                seg.getDipLogR() == null ? null : Double.toString(seg.getDipLogR())
         );
     }
 
@@ -107,16 +110,24 @@ public final class DaoAscnSeg {
                 rs.getString("chr"),
                 rs.getLong("start"),
                 rs.getLong("end"),
-                getNullableDouble(rs, "tcn"),
-                getNullableDouble(rs, "lcn"),
+                getNullableInteger(rs, "tcn"),
+                getNullableInteger(rs, "lcn"),
                 getNullableDouble(rs, "cellular_fraction"),
-                getNullableDouble(rs, "purity"));
+                getNullableDouble(rs, "purity"),
+                getNullableDouble(rs, "ploidy"),
+                getNullableDouble(rs, "dip_log_r"),
+                getNullableDouble(rs, "log_ratio"));
         seg.setId(rs.getLong("seg_id"));
         return seg;
     }
 
     private static Double getNullableDouble(ResultSet rs, String column) throws SQLException {
         double value = rs.getDouble(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private static Integer getNullableInteger(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
         return rs.wasNull() ? null : value;
     }
 }
