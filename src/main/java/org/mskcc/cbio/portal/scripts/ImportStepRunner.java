@@ -43,8 +43,9 @@ import org.mskcc.cbio.portal.util.VersionUtil;
  * Each step is the class name and arguments that would otherwise be passed to
  * its own {@code java} process. Steps run in order, and the runner stops at the
  * first step that fails and exits with that step's exit status. Between steps
- * the static state that a fresh JVM would start without is reset; the gene
- * cache is kept, since avoiding its reload is the point of running in one JVM.
+ * the static state that a fresh JVM would start without is reset. The DAO
+ * caches are kept, since avoiding their reload is the point of running in one
+ * JVM; they are reloaded only after a step that clears them.
  *
  * Manifest format:
  * <pre>
@@ -88,6 +89,20 @@ public class ImportStepRunner {
         ImportResourceData.class.getName(),
         ImportResourceDefinition.class.getName()
     );
+
+    /**
+     * Steps that clear the DAO caches without reloading them. Every other step
+     * keeps the study, patient, sample, profile and clinical attribute caches
+     * current as it inserts rows, so the caches are only reloaded after these.
+     */
+    static final Set<String> CACHE_CLEARING_CLASSES = Set.of(
+        RemoveSamples.class.getName(),
+        RemovePatients.class.getName()
+    );
+
+    static boolean clearsDaoCaches(String className) {
+        return CACHE_CLEARING_CLASSES.contains(className);
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Step(@JsonProperty("class") String className, List<String> args) {
@@ -162,8 +177,8 @@ public class ImportStepRunner {
             Step step = steps.get(i);
             System.out.println("> " + step.className() + " " + String.join(" ", step.args()));
             System.out.flush();
-            if (i > 0) {
-                // a fresh JVM loads these caches when DaoCancerStudy is first used
+            if (i > 0 && clearsDaoCaches(steps.get(i - 1).className())) {
+                // the previous step emptied the sample and patient caches without reloading them
                 DaoCancerStudy.reCacheAll();
             }
             int status = EX_SOFTWARE;

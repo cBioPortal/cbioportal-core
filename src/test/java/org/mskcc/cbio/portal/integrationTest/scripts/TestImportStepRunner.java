@@ -144,6 +144,25 @@ public class TestImportStepRunner extends IntegrationTestBase {
     }
 
     @Test
+    public void testStepAfterRemoveSamplesSeesReloadedCaches() throws Exception {
+        assertEquals(0, ImportStepRunner.run(new String[] {"--manifest", studyEs0Manifest().getPath()}));
+        CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId("study_es_0");
+        int samplesBefore = DaoSample.getSamplesByCancerStudy(cancerStudy.getInternalId()).size();
+
+        // RemoveSamples empties the sample cache; AddCaseList needs it reloaded to find the remaining samples
+        File manifest = writeManifest(List.of(
+            step("org.mskcc.cbio.portal.scripts.RemoveSamples",
+                "--study_ids", "study_es_0", "--sample_ids", "TCGA-A2-A04P-01"),
+            step("org.mskcc.cbio.portal.scripts.AddCaseList", "study_es_0", "all", "--noprogress")));
+        assertEquals(0, ImportStepRunner.run(new String[] {"--manifest", manifest.getPath()}));
+
+        DaoCancerStudy.reCacheAll();
+        assertEquals(samplesBefore - 1, DaoSample.getSamplesByCancerStudy(cancerStudy.getInternalId()).size());
+        assertEquals(samplesBefore - 1,
+            new DaoSampleList().getSampleListByStableId("study_es_0_all").getSampleList().size());
+    }
+
+    @Test
     public void testUnknownClassIsRejectedBeforeAnyStepRuns() throws Exception {
         List<Map<String, Object>> steps = studyEs0Steps();
         steps.add(step("java.lang.Runtime", "--noprogress"));

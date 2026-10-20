@@ -91,6 +91,18 @@ public class TestImportStepRunnerManifest {
     }
 
     @Test
+    public void testOnlyRemovalStepsReloadDaoCaches() {
+        assertTrue(ImportStepRunner.clearsDaoCaches(RemoveSamples.class.getName()));
+        assertTrue(ImportStepRunner.clearsDaoCaches(RemovePatients.class.getName()));
+        for (String className : ImportStepRunner.STEP_CLASSES) {
+            if (!ImportStepRunner.CACHE_CLEARING_CLASSES.contains(className)) {
+                assertFalse(className, ImportStepRunner.clearsDaoCaches(className));
+            }
+        }
+        assertTrue(ImportStepRunner.STEP_CLASSES.containsAll(ImportStepRunner.CACHE_CLEARING_CLASSES));
+    }
+
+    @Test
     public void testDiscardAllResetsBulkLoader() {
         ClickHouseBulkLoader.bulkLoadOn();
         ClickHouseBulkLoader.relaxedModeOn();
