@@ -45,11 +45,17 @@ import org.mskcc.cbio.portal.model.Sample;
  * {@code ascn_seg} table.
  *
  * Expected tab-delimited data file columns (any order):
- * SAMPLE_ID, CHROMOSOME, START_POSITION, END_POSITION, LOG_RATIO, TCN, LCN,
+ * SAMPLE_ID, CHROMOSOME, LOC_START, LOC_END, LOG_RATIO, TCN, LCN,
  * CELLULAR_FRACTION, PURITY, PLOIDY, DIP_LOG_R
+ *
+ * Note: unlike ASCN gene-level data (and the {@code ascn_seg} table's own
+ * {@code start}/{@code end} columns), the ASCN Seg data file uses LOC_START/
+ * LOC_END for the segment coordinates.
  */
 public class ImportAscnSegData extends AbstractImportAscnData {
 
+    private static final String LOC_START_COLUMN = "LOC_START";
+    private static final String LOC_END_COLUMN = "LOC_END";
     private static final String LOG_RATIO_COLUMN = "LOG_RATIO";
 
     public ImportAscnSegData(String[] args) {
@@ -59,6 +65,16 @@ public class ImportAscnSegData extends AbstractImportAscnData {
     @Override
     protected String dataTypeLabel() {
         return "ASCN Seg";
+    }
+
+    @Override
+    protected String startPositionColumn() {
+        return LOC_START_COLUMN;
+    }
+
+    @Override
+    protected String endPositionColumn() {
+        return LOC_END_COLUMN;
     }
 
     @Override

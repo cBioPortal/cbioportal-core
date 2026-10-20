@@ -69,6 +69,7 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
 
     protected static final String SAMPLE_ID_COLUMN = "SAMPLE_ID";
     protected static final String CHROMOSOME_COLUMN = "CHROMOSOME";
+    /** Default start/end position column names; see {@link #startPositionColumn()}/{@link #endPositionColumn()}. */
     protected static final String START_POSITION_COLUMN = "START_POSITION";
     protected static final String END_POSITION_COLUMN = "END_POSITION";
     /**
@@ -108,6 +109,24 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
     /** @return the additional (data-type-specific) column names required in the data file, e.g. HUGO_SYMBOL. */
     protected String[] getAdditionalRequiredColumns() {
         return new String[0];
+    }
+
+    /**
+     * @return the data file column name for the segment/gene start coordinate.
+     * Defaults to {@link #START_POSITION_COLUMN}; overridden by ASCN Seg, whose
+     * data files use LOC_START instead.
+     */
+    protected String startPositionColumn() {
+        return START_POSITION_COLUMN;
+    }
+
+    /**
+     * @return the data file column name for the segment/gene end coordinate.
+     * Defaults to {@link #END_POSITION_COLUMN}; overridden by ASCN Seg, whose
+     * data files use LOC_END instead.
+     */
+    protected String endPositionColumn() {
+        return END_POSITION_COLUMN;
     }
 
     /**
@@ -203,8 +222,8 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         }
         requireColumn(colIndex, SAMPLE_ID_COLUMN);
         requireColumn(colIndex, CHROMOSOME_COLUMN);
-        requireColumn(colIndex, START_POSITION_COLUMN);
-        requireColumn(colIndex, END_POSITION_COLUMN);
+        requireColumn(colIndex, startPositionColumn());
+        requireColumn(colIndex, endPositionColumn());
         requireColumn(colIndex, TCN_COLUMN);
         requireColumn(colIndex, LCN_COLUMN);
         requireColumn(colIndex, CELLULAR_FRACTION_COLUMN);
@@ -239,8 +258,8 @@ public abstract class AbstractImportAscnData extends ConsoleRunnable {
         String chrom = getValue(parts, colIndex, CHROMOSOME_COLUMN);
         ValidationUtils.validateChromosome(chrom);
 
-        long start = Long.parseLong(getValue(parts, colIndex, START_POSITION_COLUMN).trim());
-        long end = Long.parseLong(getValue(parts, colIndex, END_POSITION_COLUMN).trim());
+        long start = Long.parseLong(getValue(parts, colIndex, startPositionColumn()).trim());
+        long end = Long.parseLong(getValue(parts, colIndex, endPositionColumn()).trim());
         if (start >= end) {
             ProgressMonitor.logWarning("Start position is not lower than end position. Skipping this entry.");
             return false;
