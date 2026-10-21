@@ -390,7 +390,7 @@ public class TestIntegrationTest extends IntegrationTestBase {
      * @throws JsonParseException
      * 
      */
-    private void loadGenes() throws DaoException, JsonParseException, JsonMappingException, IOException {
+    static void loadGenes() throws DaoException, JsonParseException, JsonMappingException, IOException {
         DaoGeneOptimized daoGene = DaoGeneOptimized.getInstance();
 
         // read the respective genes.json and genesaliases.json files from the system
@@ -436,7 +436,7 @@ public class TestIntegrationTest extends IntegrationTestBase {
      * Loads a gene panel used by this test.
      * 
      */
-    private void loadGenePanel() throws Exception {
+    static void loadGenePanel() throws Exception {
         ImportGenePanel gp = new ImportGenePanel(null);
         gp.setFile(new File("tests/test_data/study_es_0/data_gene_panel_testpanel1.txt"));
         gp.importData();
