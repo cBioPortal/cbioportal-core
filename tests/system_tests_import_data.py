@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-'''
-This code is licensed under the GNU Affero General Public License (AGPL),
-version 3, or (at your option) any later version.
-'''
+#
+# SPDX-License-Identifier: Apache-2.0
+#
 
 import unittest
 from unittest import mock

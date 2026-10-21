@@ -15,3 +15,7 @@ Whole-slide images (WSI) are imported as standard resource data
 `meta_wsi.txt`/`data_wsi.txt` pairs are not imported; convert them offline with
 `scripts/importer/convertWsiToResources.py`. See
 [`docs/wsi-study-format.md`](docs/wsi-study-format.md).
+
+## License
+
+cbioportal-core is licensed under the [Apache License 2.0](./LICENSE). Versions released before October 2026 were licensed under AGPL-3.0.
