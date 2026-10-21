@@ -6,12 +6,14 @@ unset sql_data_array
 configured_clickhouse_config_file_path=""
 sql_data_field_value=""
 declare -a sql_data_array
-clickhouse_client_database_exists_filepath="$(pwd)/ccclf_database_exists.txt"
-clickhouse_client_database_table_list_filepath="$(pwd)/ccclf_database_table_list.txt"
+# temp filepaths include the process id : concurrent processes sourcing this file from the
+# same working directory must not collide on (or clean up) each other's temp files
+clickhouse_client_database_exists_filepath="$(pwd)/ccclf_database_exists_$$.txt"
+clickhouse_client_database_table_list_filepath="$(pwd)/ccclf_database_table_list_$$.txt"
 
 function write_clickhouse_config_file() {
     local selected_database=$1
-    configured_clickhouse_config_file_path="$(pwd)/clickhouse_client_config_$(date "+%Y-%m-%d-%H-%M-%S").yaml"
+    configured_clickhouse_config_file_path="$(pwd)/clickhouse_client_config_$$.yaml"
     if ! rm -f "$configured_clickhouse_config_file_path" || ! touch "$configured_clickhouse_config_file_path" ; then
         echo "Error : unable to create clickhouse_client_config file $configured_clickhouse_config_file_path" >&2
         return 1
