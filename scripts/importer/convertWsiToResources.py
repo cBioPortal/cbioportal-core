@@ -186,11 +186,11 @@ def viewer_url(base_url, study_id, patient_id, slide_key):
 
 
 def display_name(row):
-    """Non-identifying slide label, e.g. ``H&E · Specimen 1 / Block 2``; never the image ID."""
+    """Non-identifying slide label, e.g. ``H&E · Part 1 / Block 2``; never the image ID."""
     stain = row["STAIN_NAME"] or row["SLIDE_TYPE"] or "Slide"
     location = []
     if row["PART_NUMBER"]:
-        location.append(f"Specimen {row['PART_NUMBER']}")
+        location.append(f"Part {row['PART_NUMBER']}")
     if row["BLOCK_NUMBER"]:
         location.append(f"Block {row['BLOCK_NUMBER']}")
     return f"{stain} \u00b7 {' / '.join(location)}" if location else stain

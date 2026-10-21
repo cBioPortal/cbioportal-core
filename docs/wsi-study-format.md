@@ -121,7 +121,7 @@ route:
 The base URL is absolute and includes any context path the portal is deployed
 under; each path and query value is percent-encoded. `DISPLAY_NAME` is a
 non-identifying label; the converter writes
-`<stain name> · Specimen <part number> / Block <block number>` (falling back
+`<stain name> · Part <part number> / Block <block number>` (falling back
 to the slide type, and omitting missing parts).
 
 ## Converting legacy files

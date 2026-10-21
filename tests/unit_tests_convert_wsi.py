@@ -417,10 +417,10 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
             for value in ('IMG', 'image_id', 'source_url', 'thumbnail_url', '.svs', '.jpg', 'BC-0001'):
                 self.assertNotIn(value, text)
         samples = rows_by_slide(self.out / 'data_resource_sample.txt')
-        self.assertEqual('H&E \u00b7 Specimen 1 / Block 1', samples['slide-1']['DISPLAY_NAME'])
-        self.assertEqual('PD-L1 (22C3) \u00b7 Specimen 2 / Block 1', samples['slide-3']['DISPLAY_NAME'])
+        self.assertEqual('H&E \u00b7 Part 1 / Block 1', samples['slide-1']['DISPLAY_NAME'])
+        self.assertEqual('PD-L1 (22C3) \u00b7 Part 2 / Block 1', samples['slide-3']['DISPLAY_NAME'])
         patients = rows_by_slide(self.out / 'data_resource_patient.txt')
-        self.assertEqual('H&E \u00b7 Specimen 1', patients['slide-6']['DISPLAY_NAME'])
+        self.assertEqual('H&E \u00b7 Part 1', patients['slide-6']['DISPLAY_NAME'])
 
     def test_display_name_fallbacks(self):
         row = {name: '' for name in converter.COLUMNS}
