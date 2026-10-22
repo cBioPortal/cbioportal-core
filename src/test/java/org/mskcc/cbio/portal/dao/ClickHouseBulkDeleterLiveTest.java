@@ -89,7 +89,7 @@ public class ClickHouseBulkDeleterLiveTest {
                 check.setAccessible(true);
                 ClickHouseBulkDeleter deleter = ClickHouseBulkDeleter.getBulkDeleter("review_replica_target", "id");
                 assertEquals(false, check.invoke(deleter));
-                peerStatement.execute("DELETE FROM review_replica_target WHERE id = 1 SETTINGS lightweight_deletes_sync = 2");
+                peerStatement.execute("DELETE FROM review_replica_target WHERE id = 1");
                 assertEquals(true, check.invoke(deleter));
                 peerStatement.execute("DROP TABLE review_replica_target");
                 assertThrows(java.lang.reflect.InvocationTargetException.class, () -> check.invoke(deleter));

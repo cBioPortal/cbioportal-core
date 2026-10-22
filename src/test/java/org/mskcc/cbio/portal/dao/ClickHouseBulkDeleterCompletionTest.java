@@ -27,15 +27,11 @@ public class ClickHouseBulkDeleterCompletionTest {
     private boolean leftover;
     private boolean failDelete;
     private boolean failRecovery;
-    private boolean legacy;
     private int checksBeforeFirstDrop;
     private int deletionChecks;
 
     @Before
     public void setUp() throws Exception {
-        Field cache = ClickHouseBulkDeleter.class.getDeclaredField("synchronousDeleteSettingSupported");
-        cache.setAccessible(true);
-        cache.set(null, null);
         connection = mock(Connection.class);
         jdbc = mockStatic(JdbcUtil.class);
         jdbc.when(() -> JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class)).thenReturn(connection);
@@ -43,10 +39,6 @@ public class ClickHouseBulkDeleterCompletionTest {
             String sql = call.getArgument(0);
             PreparedStatement statement = mock(PreparedStatement.class);
             when(statement.executeQuery()).thenAnswer(ignored -> {
-                if (sql.startsWith("SELECT 1 SETTINGS")) {
-                    if (legacy) throw new SQLException("unknown setting", "", 115);
-                    return result(new String[]{"a"}, new long[]{1});
-                }
                 if (sql.contains("AS table_count")) {
                     if (failRecovery) throw new SQLException("unavailable replica");
                     return result(new String[]{"a", "b"}, new long[]{leftover ? 1 : 0, leftover ? 1 : 0});
@@ -108,22 +100,13 @@ public class ClickHouseBulkDeleterCompletionTest {
     }
 
     @Test
-    public void confirmsLeftoverBeforeDropAndWaitsForSynchronousDelete() throws Exception {
+    public void confirmsLeftoverBeforeDrop() throws Exception {
         leftover = true;
         ClickHouseBulkDeleter.getBulkDeleter("test_target", "id").addId(2);
         ClickHouseBulkDeleter.flushAll();
         assertEquals(1, checksBeforeFirstDrop);
         assertEquals(2, deletionChecks);
-        assertTrue(updates.stream().anyMatch(sql -> sql.endsWith("SETTINGS lightweight_deletes_sync = 2")));
         assertTrue(updates.get(updates.size() - 1).startsWith("DROP"));
-    }
-
-    @Test
-    public void legacyServerAlsoWaitsForDeletion() throws Exception {
-        legacy = true;
-        ClickHouseBulkDeleter.getBulkDeleter("test_target", "id").addId(2);
-        ClickHouseBulkDeleter.flushAll();
-        assertTrue(updates.stream().anyMatch(sql -> sql.endsWith("SETTINGS mutations_sync = 2")));
     }
 
     @Test

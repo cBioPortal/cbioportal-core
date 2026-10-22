@@ -72,7 +72,6 @@ public class ClickHouseBulkDeleter {
 
     private static final Logger log = LoggerFactory.getLogger(ClickHouseBulkDeleter.class);
     private static final Map<String, ClickHouseBulkDeleter> BULK_DELETERS = new LinkedHashMap<>();
-    private static Boolean synchronousDeleteSettingSupported = null; // cached result of a read-only capability probe
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
@@ -356,12 +355,9 @@ public class ClickHouseBulkDeleter {
 
     private long deleteRecordsReferencedInStagingTable() throws DaoException {
         long records_deleted;
-        // Wait for completion; progress headers keep the waiting HTTP connection active.
-        // Older servers use mutations_sync for lightweight deletes as well.
         String statementString = String.format(
-                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s) SETTINGS %s = 2",
-                targetTable, idColumn, stagingTable,
-                isSynchronousDeleteSettingSupported() ? "lightweight_deletes_sync" : "mutations_sync");
+                "DELETE FROM %s WHERE %s IN (SELECT id FROM %s)",
+                targetTable, idColumn, stagingTable);
         try {
             Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
             try (PreparedStatement stmt = con.prepareStatement(statementString)) {
@@ -374,35 +370,6 @@ public class ClickHouseBulkDeleter {
             throw new DaoException(e);
         }
         return records_deleted;
-    }
-
-    private static synchronized boolean isSynchronousDeleteSettingSupported() throws DaoException {
-        if (synchronousDeleteSettingSupported == null) {
-            try {
-                Connection con = JdbcUtil.getDbConnection(ClickHouseBulkDeleter.class);
-                try {
-                    synchronousDeleteSettingSupported = supportsSynchronousDeleteSetting(con);
-                } finally {
-                    JdbcUtil.closeAll(ClickHouseBulkDeleter.class, con, null, null);
-                }
-            } catch (SQLException e) {
-                throw new DaoException(e);
-            }
-        }
-        return synchronousDeleteSettingSupported;
-    }
-
-    static boolean supportsSynchronousDeleteSetting(Connection con) throws SQLException {
-        // Probe the setting without requiring SELECT on system.settings or issuing a DELETE.
-        try (PreparedStatement stmt = con.prepareStatement("SELECT 1 SETTINGS lightweight_deletes_sync = 2");
-                ResultSet rs = stmt.executeQuery()) {
-            return true;
-        } catch (SQLException e) {
-            if (e.getErrorCode() == 115) { // UNKNOWN_SETTING on servers predating this setting
-                return false;
-            }
-            throw e; // permission and connection failures must not be mistaken for unsupported settings
-        }
     }
 
     private void dropStagingTable(boolean tolerateFailure) throws DaoException {
