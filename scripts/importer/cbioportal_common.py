@@ -83,6 +83,14 @@ class MetaFileTypes(object):
     PATIENT_RESOURCES = 'meta_resource_patient'
     STUDY_RESOURCES = 'meta_resource_study'
     RESOURCES_DEFINITION = 'meta_resource_definition'
+    WSI = 'meta_wsi'
+
+# Legacy WSI files are no longer imported directly; both the importer and the
+# validator reject a study that still contains them with this message.
+LEGACY_WSI_IMPORT_MESSAGE = (
+    'Legacy meta_wsi input is no longer imported. Convert it with '
+    'scripts/importer/convertWsiToResources.py and import the generated '
+    'resource definition and resource data files instead.')
 
 # class to hold information about a failed java process execution
 class JavaRunException(Exception):
@@ -656,6 +664,8 @@ def get_meta_file_type(meta_dictionary, logger, filename):
         ("CLINICAL", "PATIENT_ATTRIBUTES"): MetaFileTypes.PATIENT_ATTRIBUTES,
         ("CLINICAL", "SAMPLE_ATTRIBUTES"): MetaFileTypes.SAMPLE_ATTRIBUTES,
         ("CLINICAL", "TIMELINE"): MetaFileTypes.TIMELINE,
+        # whole-slide images
+        ("PATHOLOGY_SLIDES", "WSI"): MetaFileTypes.WSI,
         # rppa and mass spectrometry
         ("PROTEIN_LEVEL", "LOG2-VALUE"): MetaFileTypes.PROTEIN,
         ("PROTEIN_LEVEL", "Z-SCORE"): MetaFileTypes.PROTEIN,
@@ -873,8 +883,10 @@ def parse_metadata_file(filename,
     else:
         meta_file_type = get_meta_file_type(meta_dictionary, logger, filename)
         meta_dictionary['meta_file_type'] = meta_file_type
-        # if type could not be inferred, no further validations are possible
-        if meta_file_type is None:
+        # if type could not be inferred, no further validations are possible;
+        # a legacy WSI meta file is rejected as a whole by the caller
+        # (LEGACY_WSI_IMPORT_MESSAGE), whatever its other fields say
+        if meta_file_type is None or meta_file_type == MetaFileTypes.WSI:
             return dict(meta_dictionary)
 
     # Check for missing fields for this specific meta file type

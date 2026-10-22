@@ -57,6 +57,8 @@ public class ImportResourceData extends ConsoleRunnable {
     // loads nothing, so its resource must not be included in what the re-import replaces.
     private final Set<String> importedResourceIds = new HashSet<>();
     private final Set<String> importedEntityStableIds = new HashSet<>();
+    // 1-based line number of the row being imported (the header is line 1).
+    private int lineNumber = 1;
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -154,6 +156,7 @@ public class ImportResourceData extends ConsoleRunnable {
         int resourceIdIndex = findResourceIdColumn(headerIndexMap);
 
         while ((line = buff.readLine()) != null) {
+            lineNumber++;
             if (skipLine(line.trim())) {
                 continue;
             }
@@ -182,8 +185,9 @@ public class ImportResourceData extends ConsoleRunnable {
 
         // validate: if number of fields is incorrect, give exception
         if (fieldValues.length != headerIndexMap.size()) {
-            throw new IllegalArgumentException("Number of columns in line is not as expected. Expected: "
-                    + headerIndexMap.size() + " columns, found: " + fieldValues.length + ", for line: " + line);
+            // The line itself is not echoed: resource rows can carry server-side identifiers.
+            throw new IllegalArgumentException("Number of columns in line " + lineNumber + " is not as expected. Expected: "
+                    + headerIndexMap.size() + " columns, found: " + fieldValues.length);
         }
 
         // now iterate over lines and trim each value:

@@ -6,6 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import hashlib
+import json
 import unittest
 from unittest.mock import Mock
 import sys
@@ -17,6 +19,7 @@ from tempfile import TemporaryDirectory
 
 from importer import cbioportal_common
 from importer import validateData
+from importer import convertWsiToResources as wsi_contract
 
 
 # globals for mock data used throughout the module
@@ -497,6 +500,18 @@ class TimelineValuesDataValidationTest(DataFileTestCase):
         for error in record_list:
             self.assertEqual("ERROR", error.levelname)
             self.assertIn("Invalid START_DATE", error.getMessage())
+
+    def test_pathology_slides_events_reject_image_ids(self):
+        """PATHOLOGY SLIDES rows reach the browser: no IMAGE_IDS, and the
+           offending value is never echoed."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_timeline_pathology_slides_deid.txt',
+                                     validateData.TimelineValidator)
+        self.assertEqual(1, len(record_list))
+        self.assertEqual(3, record_list[0].line_number)
+        self.assertIn('slide identifiers', record_list[0].getMessage())
+        self.assertEqual('IMAGE_IDS', record_list[0].cause)
+        self.assertNotIn('3735444', repr(record_list[0].__dict__))
 
         
 # TODO: make tests in this testcase check the number of properly defined types
@@ -3393,6 +3408,373 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
         record_list = self.get_log_records()
         self.assertEqual('Validation complete', record_list[-1].getMessage())
 
+
+# contract wsi-serving-v6 test vector for SEALED_SOURCE
+WSI_SEALED_SOURCE_VECTOR = (
+    'AAECAwQFBgcICQoLNpOTYnY8HVb-KcPzu1F5HPykr7D0YY_UhVbbyjOFRlxC63fxCt09YO1aYC-phb85wDhN5PPPpC0X46RS'
+    'D0K0bRRgSptRb9wDiqMLtftFQ6VpBGfGILaddEV_s-Zsmpp28fG5Z3XTNWnyoBRa9qfr9t209wS7V-LhGl8i')
+# tile metadata of schema version 2
+WSI_TILE_METADATA = {
+    'dimensions': {'width': 100, 'height': 100},
+    'levels': 1,
+    'level_dimensions': [{'width': 100, 'height': 100}],
+    'max_zoom': 0,
+    'tile_size': 256,
+    'safe_min_level': 0,
+    'level_downsamples': [1.0],
+    'tile_metadata_schema_version': 2,
+    'decode_policy_version': 'geometry-v2;tile-max=16777216;thumbnail-max=16777216',
+    'max_decode_pixels': 16777216,
+    'thumbnail_max_decode_pixels': 16777216,
+}
+
+
+class WsiFieldRulesTestCase(unittest.TestCase):
+
+    """Field-level helpers of the WSI row contract."""
+
+    def test_tile_metadata_requires_schema_version_2(self):
+        valid = wsi_contract.tile_metadata_valid
+        self.assertTrue(valid(WSI_TILE_METADATA))
+        self.assertTrue(valid({**WSI_TILE_METADATA, 'producer_specific': {'profile': 'custom'}}))
+        self.assertFalse(valid({}))
+        self.assertFalse(valid({**WSI_TILE_METADATA, 'level_dimensions': []}))
+        without_version = dict(WSI_TILE_METADATA)
+        del without_version['tile_metadata_schema_version']
+        self.assertFalse(valid(without_version))
+        for change in ({'level_downsamples': [float('inf')]}, {'level_downsamples': [float('nan')]},
+                       {'tile_metadata_schema_version': 99}, {'tile_metadata_schema_version': None},
+                       {'safe_min_level': 1}, {'decode_policy_version': 'old'},
+                       {'max_decode_pixels': '16777216'}, {'max_decode_pixels': 16777216.0}):
+            self.assertFalse(valid({**WSI_TILE_METADATA, **change}), change)
+
+    def test_image_content_types(self):
+        valid = wsi_contract.image_content_type_valid
+        for value in ('image/webp', 'image/avif', 'image/svg+xml'):
+            self.assertTrue(valid(value), value)
+        for value in ('text/plain', 'image/foo=bar', 'image/jpeg; charset=utf-8', 'image/jpëg'):
+            self.assertFalse(valid(value), value)
+
+
+class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
+
+    """WSI_SAMPLE/WSI_PATIENT rows in sample/patient resource files follow the WSI contract."""
+
+    SAMPLE_TO_PATIENT = {'WSI-P1-S1': 'WSI-P1', 'WSI-P2-S1': 'WSI-P2'}
+
+    def setUp(self):
+        super(WsiResourceValidatorTestCase, self).setUp()
+        self.saved = {name: getattr(validateData, name) for name in (
+            'RESOURCE_DEFINITION_DICTIONARY', 'SAMPLE_TO_PATIENT', 'WSI_RESOURCE_STATE')}
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {
+            'WSI_SAMPLE': ['SAMPLE'], 'WSI_PATIENT': ['PATIENT'],
+            'PATHOLOGY_SLIDE': ['SAMPLE'], 'SCANS': ['PATIENT']}
+        validateData.DEFINED_SAMPLE_IDS = set(self.SAMPLE_TO_PATIENT)
+        validateData.PATIENTS_WITH_SAMPLES = set(self.SAMPLE_TO_PATIENT.values())
+        validateData.SAMPLE_TO_PATIENT = dict(self.SAMPLE_TO_PATIENT)
+        validateData.reset_wsi_resource_state()
+
+    def tearDown(self):
+        for name, value in self.saved.items():
+            setattr(validateData, name, value)
+        super(WsiResourceValidatorTestCase, self).tearDown()
+
+    @staticmethod
+    def slide_key(slide):
+        return hashlib.md5(slide.encode()).hexdigest()[:12]
+
+    def metadata(self, **changes):
+        """Resource metadata of a servable slide; ``slide`` names it and sets its slide_key."""
+        slide = changes.pop('slide', 'slide-1')
+        value = {
+            'slide_key': self.slide_key(slide), 'part_key': 'PART-A', 'block_key': 'BLOCK-A1',
+            'match_level': 'BLOCK', 'specimen_key': 'SPEC-1', 'is_hne': True, 'is_ihc': False,
+            'slide_type': 'H&E',
+            'can_serve_tiles': True,
+            'wsi_serving': {
+                'sealed_source': WSI_SEALED_SOURCE_VECTOR,
+                'tile_metadata_json': WSI_TILE_METADATA,
+                'thumbnail_width': 16, 'thumbnail_height': 16,
+                'thumbnail_content_type': 'image/jpeg',
+            },
+        }
+        for key, change in changes.items():
+            if change is None:
+                value.pop(key, None)
+            else:
+                value[key] = change
+        return json.dumps(value)
+
+    def serving(self, **changes):
+        """The wsi_serving object of metadata(), changed like metadata()."""
+        serving = json.loads(self.metadata())['wsi_serving']
+        for key, change in changes.items():
+            if change is None:
+                serving.pop(key, None)
+            else:
+                serving[key] = change
+        return serving
+
+    def sample_row(self, metadata=None, patient='WSI-P1', sample='WSI-P1-S1',
+                   resource_id='WSI_SAMPLE'):
+        return [patient, sample, resource_id, 'https://portal.example/wsi/patient/' + patient,
+                'slide', metadata if metadata is not None else self.metadata()]
+
+    def patient_row(self, metadata=None, patient='WSI-P1', resource_id='WSI_PATIENT'):
+        if metadata is None:
+            metadata = self.metadata(slide='slide-9', match_level='UNMATCHED')
+        return [patient, resource_id, 'https://portal.example/wsi/patient/' + patient + '/9',
+                'slide', metadata]
+
+    def validate_resource(self, validator_class, rows, keep_state=False, with_line=False):
+        """Validate one resource file; study-wide WSI state is reset unless keep_state."""
+        if not keep_state:
+            validateData.reset_wsi_resource_state()
+        header = (['PATIENT_ID', 'SAMPLE_ID'] if validator_class is validateData.SampleResourceValidator
+                  else ['PATIENT_ID']) + ['RESOURCE_ID', 'URL', 'DISPLAY_NAME', 'METADATA']
+        content = '\n'.join('\t'.join(row) for row in [header] + rows) + '\n'
+        with temp_inputfolder({'data_resource.txt': content}) as study_dir:
+            validator = validator_class(study_dir, {'data_filename': 'data_resource.txt'},
+                                        PORTAL_INSTANCE, self.logger, False, False)
+            validator.validate()
+        return [(record.getMessage(), getattr(record, 'cause', None))
+                + ((getattr(record, 'line_number', None),) if with_line else ())
+                for record in self.get_log_records() if record.levelno >= logging.ERROR]
+
+    def sample_errors(self, **changes):
+        """Errors of one sample resource row whose metadata() has the given changes."""
+        return self.validate_resource(validateData.SampleResourceValidator,
+                                      [self.sample_row(self.metadata(**changes))])
+
+    def test_valid_sample_and_patient_rows(self):
+        self.assertEqual([], self.validate_resource(
+            validateData.SampleResourceValidator, [self.sample_row()]))
+        self.assertEqual([], self.validate_resource(
+            validateData.PatientResourceValidator, [self.patient_row()]))
+
+    def test_resource_id_must_match_file_type(self):
+        errors = self.validate_resource(validateData.SampleResourceValidator,
+                                        [self.sample_row(resource_id='WSI_PATIENT')])
+        self.assertIn(('RESOURCE_ID for sample resource is not defined correctly in resource '
+                       'definition file', 'WSI_PATIENT'), errors)
+
+    def test_required_hierarchy_keys(self):
+        self.assertIn(('WSI: PART_KEY is required', 'METADATA.part_key'), self.sample_errors(part_key=None))
+        errors = self.validate_resource(validateData.SampleResourceValidator,
+                                        [self.sample_row('{"slide_key": "%s"}' % ('a' * 12))])
+        self.assertIn(('WSI: BLOCK_KEY is required', 'METADATA.block_key'), errors)
+        errors = self.validate_resource(validateData.SampleResourceValidator, [self.sample_row('')])
+        self.assertIn(('WSI: resources require a METADATA JSON object', 'METADATA'), errors)
+
+    def test_typed_values(self):
+        self.assertEqual([('WSI: IS_HNE must be a JSON boolean', 'METADATA.is_hne')],
+                         self.sample_errors(is_hne='TRUE'))
+        self.assertEqual([('WSI: FILE_SIZE_BYTES must be a JSON integer', 'METADATA.file_size_bytes')],
+                         self.sample_errors(file_size_bytes='3'))
+        self.assertEqual([('WSI: PART_NUMBER must be a JSON string', 'METADATA.part_number')],
+                         self.sample_errors(part_number=1))
+
+    def test_slide_type_and_stain_flags(self):
+        self.assertIn(('WSI: SLIDE_TYPE must be one of H&E, IHC, Other, Unknown', 'METADATA.slide_type'),
+                      self.sample_errors(slide_type=None))
+        self.assertIn(('WSI: SLIDE_TYPE must be one of H&E, IHC, Other, Unknown', 'METADATA.slide_type'),
+                      self.sample_errors(slide_type='Frozen'))
+        for changes in ({'is_hne': False}, {'is_ihc': True}, {'slide_type': 'IHC'},
+                        {'slide_type': 'Other'}):
+            self.assertEqual([('WSI: IS_HNE/IS_IHC are inconsistent with SLIDE_TYPE',
+                               'METADATA.slide_type')], self.sample_errors(**changes), changes)
+        self.assertEqual([], self.sample_errors(slide_type='Unknown', is_hne=False))
+
+    def test_contract_check_ignores_private_wsi_serving(self):
+        """wsi_serving is never a column, so a WSI contract does not declare it."""
+        saved = validateData.RESOURCE_CONTRACT_KEYS
+        try:
+            public = set(json.loads(self.metadata())) - {'wsi_serving'}
+            validateData.RESOURCE_CONTRACT_KEYS = {'WSI_SAMPLE': public}
+            self.assertEqual([], self.validate_resource(
+                validateData.SampleResourceValidator, [self.sample_row()]))
+            validateData.RESOURCE_CONTRACT_KEYS = {'WSI_SAMPLE': public - {'slide_type'}}
+            self.assertEqual([("METADATA carries keys that resource 'WSI_SAMPLE' does not declare in "
+                               'CUSTOM_METADATA, so the portal would not show them. Declare them or '
+                               'remove them from the file.', 'slide_type')],
+                             self.validate_resource(validateData.SampleResourceValidator,
+                                                    [self.sample_row()]))
+        finally:
+            validateData.RESOURCE_CONTRACT_KEYS = saved
+
+    def test_sample_must_belong_to_patient(self):
+        errors = self.validate_resource(validateData.SampleResourceValidator,
+                                        [self.sample_row(sample='WSI-P2-S1')])
+        self.assertIn(('WSI: SAMPLE_ID belongs to a different patient', 'SAMPLE_ID'), errors)
+        self.assertIn(('WSI: REFERENCE_SAMPLE_ID belongs to a different patient',
+                       'METADATA.reference_sample_id'),
+                      self.sample_errors(slide='slide-2', reference_sample_id='WSI-P2-S1'))
+
+    REFERENCE_CONFLICT = ('WSI: all slides of a patient must have the same REFERENCE_SAMPLE_ID, '
+                          'or all omit it', 'METADATA.reference_sample_id')
+
+    def validate_sample_then_patient(self, sample_refs, patient_refs):
+        """Validate WSI-P1 slides with the given reference samples (None omits it) in a
+        sample resource file and then a patient resource file of the same study."""
+        sample_rows = [self.sample_row(self.metadata(slide='slide-S%d' % index, reference_sample_id=ref))
+                       for index, ref in enumerate(sample_refs)]
+        patient_rows = [self.patient_row(self.metadata(slide='slide-P%d' % index, match_level='UNMATCHED',
+                                                       reference_sample_id=ref))
+                        for index, ref in enumerate(patient_refs)]
+        for index, row in enumerate(sample_rows + patient_rows):
+            row[-3] += '/%d' % index  # distinct URLs, so rows are not duplicate resources
+        errors = self.validate_resource(validateData.SampleResourceValidator, sample_rows,
+                                        with_line=True)
+        errors += self.validate_resource(validateData.PatientResourceValidator, patient_rows,
+                                         keep_state=True, with_line=True)
+        return errors
+
+    def test_consistent_reference_samples_pass(self):
+        self.assertEqual([], self.validate_sample_then_patient(['WSI-P1-S1'] * 2, ['WSI-P1-S1']))
+        self.assertEqual([], self.validate_sample_then_patient([None, None], [None]))
+
+    def test_conflicting_reference_samples_across_files_fail(self):
+        validateData.SAMPLE_TO_PATIENT['WSI-P1-S2'] = 'WSI-P1'
+        validateData.DEFINED_SAMPLE_IDS.add('WSI-P1-S2')
+        errors = self.validate_sample_then_patient(['WSI-P1-S1'], ['WSI-P1-S1', 'WSI-P1-S2', 'WSI-P1-S2'])
+        # reported once per patient, at the first disagreeing row (line 3 of the patient file)
+        self.assertEqual([self.REFERENCE_CONFLICT + (3,)], errors)
+
+    def test_present_and_absent_reference_sample_fail(self):
+        self.assertEqual([self.REFERENCE_CONFLICT + (3,)],
+                         self.validate_sample_then_patient([None, 'WSI-P1-S1'], []))
+        self.assertEqual([self.REFERENCE_CONFLICT + (2,)],
+                         self.validate_sample_then_patient(['WSI-P1-S1'], [None]))
+
+    def test_reference_samples_are_per_patient(self):
+        errors = self.validate_resource(validateData.SampleResourceValidator, [
+            self.sample_row(self.metadata(reference_sample_id='WSI-P1-S1')),
+            self.sample_row(self.metadata(slide='slide-2', reference_sample_id='WSI-P2-S1'),
+                            patient='WSI-P2', sample='WSI-P2-S1')])
+        self.assertEqual([], errors)
+
+    def test_unmatched_reference_sample_is_rejected_in_metadata(self):
+        errors = self.validate_resource(validateData.PatientResourceValidator, [self.patient_row(
+            self.metadata(slide='slide-9', match_level='UNMATCHED', reference_sample_id='UNMATCHED'))])
+        self.assertIn(('WSI: REFERENCE_SAMPLE_ID must be omitted, not UNMATCHED, when there is none',
+                       'METADATA.reference_sample_id'), errors)
+
+    def test_match_level_matches_file_type(self):
+        errors = self.validate_resource(validateData.PatientResourceValidator, [self.patient_row(
+            self.metadata(match_level='PART'))])
+        self.assertIn(('WSI: matched slides require a SAMPLE_ID', 'SAMPLE_ID'), errors)
+        self.assertIn(('WSI: UNMATCHED slides cannot have a SAMPLE_ID', 'SAMPLE_ID'),
+                      self.sample_errors(slide='slide-3', match_level='UNMATCHED'))
+
+    def test_serving_shape(self):
+        self.assertIn(('WSI: wsi_serving must be a JSON object', 'METADATA.wsi_serving'),
+                      self.sample_errors(wsi_serving=[WSI_SEALED_SOURCE_VECTOR]))
+        self.assertIn(('WSI: TILE_METADATA_JSON must be a JSON object',
+                       'METADATA.wsi_serving.tile_metadata_json'),
+                      self.sample_errors(wsi_serving=self.serving(
+                          tile_metadata_json=json.dumps(WSI_TILE_METADATA))))
+        for key in ('sealed_source', 'thumbnail_content_type', 'thumbnail_width'):
+            self.assertEqual([('WSI: %s is required when CAN_SERVE_TILES is TRUE' % key.upper(),
+                               'METADATA.wsi_serving.' + key)],
+                             self.sample_errors(wsi_serving=self.serving(**{key: None})))
+        self.assertEqual([('WSI: TILE_METADATA_JSON must follow tile metadata schema version 2',
+                           'METADATA.wsi_serving.tile_metadata_json')],
+                         self.sample_errors(wsi_serving=self.serving(tile_metadata_json={})))
+        self.assertEqual([('WSI: THUMBNAIL_WIDTH must be between 1 and 8192',
+                           'METADATA.wsi_serving.thumbnail_width')],
+                         self.sample_errors(wsi_serving=self.serving(thumbnail_width=8193)))
+        self.assertEqual([('WSI: THUMBNAIL_CONTENT_TYPE must be an image media type',
+                           'METADATA.wsi_serving.thumbnail_content_type')],
+                         self.sample_errors(wsi_serving=self.serving(thumbnail_content_type='text/plain')))
+        # non-servable slides have no serving object
+        self.assertEqual([], self.sample_errors(wsi_serving=None, can_serve_tiles=False))
+        self.assertEqual([], self.sample_errors(wsi_serving={}, can_serve_tiles=False))
+        self.assertEqual([('WSI: SEALED_SOURCE must be empty when CAN_SERVE_TILES is FALSE',
+                           'METADATA.wsi_serving.sealed_source')],
+                         self.sample_errors(can_serve_tiles=False))
+
+    def test_sealed_source_shape_in_metadata(self):
+        for value in ('A' * 38, WSI_SEALED_SOURCE_VECTOR + '=', 'not base64url!'):
+            errors = self.sample_errors(wsi_serving=self.serving(sealed_source=value))
+            self.assertEqual([('WSI: SEALED_SOURCE must be unpadded base64url of at least 29 bytes and '
+                               'at most 4096 characters', 'METADATA.wsi_serving.sealed_source')], errors)
+            self.assertNotIn(value, str(errors))
+        self.assertIn(('WSI: SEALED_SOURCE must be a JSON string', 'METADATA.wsi_serving.sealed_source'),
+                      self.sample_errors(wsi_serving=self.serving(sealed_source=29)))
+
+    def test_unsealed_source_keys_are_rejected_in_wsi_serving(self):
+        for key in ('image_id', 'source_url', 'thumbnail_url'):
+            errors = self.sample_errors(wsi_serving=self.serving(**{key: 'S-SECRET-1'}))
+            self.assertEqual([('WSI: wsi_serving must not contain %s; the image ID and object '
+                               'URIs are only carried inside the sealed source' % key,
+                               'METADATA.wsi_serving.' + key)], errors)
+            self.assertNotIn('S-SECRET', str(errors))
+            warnings = [record for record in self.get_log_records() if record.levelno == logging.WARNING]
+            self.assertEqual([], [record.getMessage() for record in warnings])
+
+    def test_forbidden_public_metadata_keys(self):
+        for key in ('image_id', 'barcode', 'source_url', 'thumbnail_url', 'part_designator',
+                    'path_dx_title', 'sealed_source'):
+            errors = self.sample_errors(**{key: 'S-SECRET-1'})
+            self.assertEqual([('WSI: METADATA must not contain %s' % key, 'METADATA.' + key)], errors)
+
+    def test_slide_key_format_and_uniqueness_across_files(self):
+        for bad in ('ABCDEF012345', 'abcdef0123456789abcdef0123456789', 'abc', 'slide-1'):
+            self.assertEqual([('WSI: SLIDE_KEY must be 12 lowercase hex characters', 'METADATA.slide_key')],
+                             self.sample_errors(slide_key=bad))
+        self.assertIn(('WSI: SLIDE_KEY is required', 'METADATA.slide_key'), self.sample_errors(slide_key=None))
+        self.validate_resource(validateData.SampleResourceValidator, [self.sample_row()])
+        errors = self.validate_resource(validateData.PatientResourceValidator, [self.patient_row(
+            self.metadata(slide='slide-9', match_level='UNMATCHED', slide_key=self.slide_key('slide-1')))],
+            keep_state=True)
+        self.assertEqual([('WSI: SLIDE_KEY must be unique within a study', 'METADATA.slide_key')], errors)
+
+    def test_errors_name_fields_not_values(self):
+        errors = self.sample_errors(part_key='S-SECRET?', slide_type='S-SECRET',
+                                    wsi_serving=self.serving(thumbnail_content_type='S-SECRET'))
+        self.assertEqual(3, len(errors), errors)
+        self.assertNotIn('S-SECRET', str(errors))
+
+    def test_public_free_text_is_not_deid_scanned(self):
+        """De-identifying free text is the data provider's responsibility."""
+        self.assertEqual([], self.sample_errors(part_description='Resected 2021-03-14'))
+        row = self.sample_row()
+        row[4] = 'H&E 03/14/2021'
+        errors = self.validate_resource(validateData.SampleResourceValidator, [row])
+        self.assertEqual([], errors)
+
+    def test_wsi_url_and_metadata_errors_are_not_echoed(self):
+        row = self.sample_row()
+        row[3] = 'not-a-url/S-SECRET-1'
+        errors = self.validate_resource(validateData.SampleResourceValidator, [row])
+        self.assertIn(('Value of resource is not an url, url should start with http or https', 'URL'),
+                      errors)
+        self.assertNotIn('S-SECRET', str(errors))
+        errors = self.validate_resource(validateData.SampleResourceValidator,
+                                        [self.sample_row('{"wsi_serving": {"sealed_source": "S-SECRET-1"')])
+        self.assertIn(('METADATA value is not valid JSON', 'METADATA'), errors)
+        self.assertNotIn('S-SECRET', str(errors))
+
+    def test_study_with_legacy_wsi_file_fails(self):
+        """Any meta_wsi, whatever its format_version, gets the convert-it error rather than
+        being skipped as an unrecognized meta file."""
+        wsi_meta = ('cancer_study_identifier: spam\ngenetic_alteration_type: PATHOLOGY_SLIDES\n'
+                    'datatype: WSI\ndata_filename: data_wsi.txt\n')
+        for extra in ('format_version: 4\n', 'format_version: 3\n', ''):
+            with temp_inputfolder({
+                'meta_study.txt': 'cancer_study_identifier: spam\ntype_of_cancer: brca\n'
+                                  'name: Spam\ndescription: Spam\nadd_global_case_list: true\n',
+                'meta_samples.txt': 'cancer_study_identifier: spam\ngenetic_alteration_type: CLINICAL\n'
+                                    'datatype: SAMPLE_ATTRIBUTES\ndata_filename: data_samples.txt\n',
+                'data_samples.txt': '#a\tb\n#a\tb\n#STRING\tSTRING\n#1\t1\n'
+                                    'PATIENT_ID\tSAMPLE_ID\nTEST-PAT1\tTEST-PAT1-S1\n',
+                'meta_wsi.txt': wsi_meta + extra,
+                'data_wsi.txt': 'not read\n',
+            }) as study_dir:
+                self.logger.setLevel(logging.ERROR)
+                validateData.validate_study(study_dir, PORTAL_INSTANCE, self.logger, False, False)
+            self.assertEqual([cbioportal_common.LEGACY_WSI_IMPORT_MESSAGE],
+                             [record.getMessage() for record in self.get_log_records()], extra)
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

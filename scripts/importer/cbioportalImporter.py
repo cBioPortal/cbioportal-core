@@ -165,6 +165,9 @@ def import_data(jvm_args, meta_filename, data_filename, update_generic_assay_ent
     if update_generic_assay_entity != None and update_generic_assay_entity.casefold() == "True".casefold():
         shouldUpdateGenericAssayEntities = True
 
+    if meta_file_type == MetaFileTypes.WSI:
+        raise RuntimeError(cbioportal_common.LEGACY_WSI_IMPORT_MESSAGE)
+
     # invalid file, skip
     if meta_file_type is None:
         print(("Unrecognized meta file type '%s', skipping file"
@@ -392,6 +395,8 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         elif meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
             cna_long_filepair = (
                 (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+        elif meta_file_type == MetaFileTypes.WSI:
+            raise RuntimeError(cbioportal_common.LEGACY_WSI_IMPORT_MESSAGE)
         # Add all other types of data
         else:
             regular_filepairs.append(
