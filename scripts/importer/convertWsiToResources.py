@@ -82,7 +82,7 @@ CONTRACT_FIELDS = [
     ("magnification", "string", "Magnification", True, True),
     ("part_number", "number", "Part", True, True),
     ("block_number", "number", "Block", True, True),
-    ("match_level", "string", "Matched At", True, False),
+    ("match_level", "string", "Match", True, False),
     ("slide_type", "string", "Slide Type", True, True),
     ("is_hne", None, "H&E", True, False),
     ("is_ihc", None, "IHC", True, False),
