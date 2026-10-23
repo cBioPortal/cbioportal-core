@@ -99,6 +99,8 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.SAMPLE_ATTRIBUTES:'SampleClinicalValidator',
     cbioportal_common.MetaFileTypes.PATIENT_ATTRIBUTES:'PatientClinicalValidator',
     cbioportal_common.MetaFileTypes.SEG:'SegValidator',
+    cbioportal_common.MetaFileTypes.ASCN_SEG:'AscnSegValidator',
+    cbioportal_common.MetaFileTypes.ASCN_GENE_LEVEL:'AscnGeneLevelValidator',
     cbioportal_common.MetaFileTypes.PROTEIN:'ProteinLevelValidator',
     cbioportal_common.MetaFileTypes.GISTIC_GENES: 'GisticGenesValidator',
     cbioportal_common.MetaFileTypes.TIMELINE:'TimelineValidator',
@@ -3120,6 +3122,168 @@ class SegValidator(Validator):
         # of each segment comes after the end position of the previous one,
         # meanwhile adding up the number of (non-overlapping) bases covered on
         # that chromosome in that patient.
+
+
+class AscnValidator(Validator):
+
+    """Shared validation logic for ASCN (allele-specific copy number) data files.
+
+    ascn_seg and ascn_gene_level data files share the same core columns
+    (SAMPLE_ID, CHROMOSOME, start/end coordinates, TCN, LCN,
+    CELLULAR_FRACTION, PURITY, PLOIDY, DIP_LOG_R) and the integer constraint
+    on TCN/LCN; subclasses differ only in their extra identifying column
+    (none for segments, HUGO_SYMBOL for gene-level) and the names of their
+    start/end coordinate columns, mirroring
+    AbstractImportAscnData.startPositionColumn()/endPositionColumn() on the
+    Java importer side. Columns may appear in any order, matching the Java
+    importer, which resolves them by header name rather than position.
+    """
+
+    REQUIRE_COLUMN_ORDER = False
+    ALLOW_BLANKS = True
+    NULL_VALUES = ['NA']
+
+    # Name of the start/end coordinate columns; set by subclasses.
+    START_COLUMN = None
+    END_COLUMN = None
+
+    # Columns that may hold a real number or 'NA'; subclasses may extend this.
+    NULLABLE_FLOAT_COLUMNS = ['CELLULAR_FRACTION', 'PURITY', 'PLOIDY', 'DIP_LOG_R']
+
+    def __init__(self, *args, **kwargs):
+        """Initialize validator to look up chromosome lengths."""
+        super(AscnValidator, self).__init__(*args, **kwargs)
+        self.chromosome_lengths = self.load_chromosome_lengths(
+            self.meta_dict['reference_genome_id'],
+            self.logger.logger)
+        # 23 and 24 are accepted aliases for X and Y, matching
+        # ValidationUtils.validateChromosome on the Java importer side.
+        self.chromosome_lengths['23'] = self.chromosome_lengths['X']
+        self.chromosome_lengths['24'] = self.chromosome_lengths['Y']
+
+    def _getValue(self, data, column_name):
+        """Return the stripped value for a column, or None if absent/blank."""
+        if column_name not in self.cols:
+            return None
+        index = self.cols.index(column_name)
+        if index >= len(data):
+            return None
+        value = data[index].strip()
+        return value if value != '' else None
+
+    def _columnNumber(self, column_name):
+        return self.cols.index(column_name) + 1 if column_name in self.cols else None
+
+    def checkLine(self, data):
+        super(AscnValidator, self).checkLine(data)
+
+        sample_id = self._getValue(data, 'SAMPLE_ID')
+        self.checkSampleId(sample_id, column_number=self._columnNumber('SAMPLE_ID'))
+
+        chromosome = self._getValue(data, 'CHROMOSOME')
+        if chromosome is not None:
+            self.parse_chromosome_num(chromosome, self._columnNumber('CHROMOSOME'), self.chromosome_lengths)
+
+        start_value = self._getValue(data, self.START_COLUMN)
+        end_value = self._getValue(data, self.END_COLUMN)
+        start = (self.parse_genomic_coord(start_value, self._columnNumber(self.START_COLUMN))
+                 if start_value is not None else None)
+        end = (self.parse_genomic_coord(end_value, self._columnNumber(self.END_COLUMN))
+               if end_value is not None else None)
+        if start is not None and end is not None and start >= end:
+            self.logger.warning(
+                'Start position is not lower than end position. This record will not be loaded.',
+                extra={'line_number': self.line_number,
+                       'cause': '%s-%s' % (start, end)})
+
+        self._checkIntegerConstrainedColumn(data, 'TCN')
+        self._checkIntegerConstrainedColumn(data, 'LCN')
+
+        for column_name in self.NULLABLE_FLOAT_COLUMNS:
+            value = self._getValue(data, column_name)
+            if value is not None and value not in self.NULL_VALUES and not self.checkFloat(value):
+                self.logger.error(
+                    'Value is neither a real number nor NA',
+                    extra={'line_number': self.line_number,
+                           'column_number': self._columnNumber(column_name),
+                           'cause': value})
+
+    def _checkIntegerConstrainedColumn(self, data, column_name):
+        """TCN/LCN are stored as whole-number allele counts (Nullable(Int32)
+        in the schema). A value that is numeric but not whole (e.g. "2.5") is
+        neither silently accepted nor rejected outright: the Java importer
+        (AbstractImportAscnData.parseNullableInteger) rounds it to the
+        nearest integer and logs a warning, so this validator warns on the
+        same condition rather than erroring.
+        """
+        value = self._getValue(data, column_name)
+        if value is None or value in self.NULL_VALUES:
+            return
+        if not self.checkFloat(value):
+            self.logger.error(
+                'Value is neither a real number nor NA',
+                extra={'line_number': self.line_number,
+                       'column_number': self._columnNumber(column_name),
+                       'cause': value})
+            return
+        numeric_value = float(value)
+        if numeric_value != round(numeric_value):
+            self.logger.warning(
+                '%s is a non-integer value. It will be rounded to the nearest '
+                'integer upon import.' % column_name,
+                extra={'line_number': self.line_number,
+                       'column_number': self._columnNumber(column_name),
+                       'cause': value})
+
+
+class AscnSegValidator(AscnValidator):
+
+    """Validator for ASCN Seg (allele-specific copy number segment) data files."""
+
+    REQUIRED_HEADERS = [
+        'SAMPLE_ID',
+        'CHROMOSOME',
+        'LOC_START',
+        'LOC_END',
+        'LOG_RATIO',
+        'TCN',
+        'LCN',
+        'CELLULAR_FRACTION',
+        'PURITY',
+        'PLOIDY',
+        'DIP_LOG_R',
+    ]
+    START_COLUMN = 'LOC_START'
+    END_COLUMN = 'LOC_END'
+    NULLABLE_FLOAT_COLUMNS = AscnValidator.NULLABLE_FLOAT_COLUMNS + ['LOG_RATIO']
+
+
+class AscnGeneLevelValidator(AscnValidator):
+
+    """Validator for ASCN gene-level data files, derived from (but not
+    directly mapped to) ASCN Seg segment calls."""
+
+    REQUIRED_HEADERS = [
+        'SAMPLE_ID',
+        'HUGO_SYMBOL',
+        'CHROMOSOME',
+        'GENE_START',
+        'GENE_END',
+        'TCN',
+        'LCN',
+        'CELLULAR_FRACTION',
+        'PURITY',
+        'PLOIDY',
+        'DIP_LOG_R',
+    ]
+    START_COLUMN = 'GENE_START'
+    END_COLUMN = 'GENE_END'
+
+    def checkLine(self, data):
+        super(AscnGeneLevelValidator, self).checkLine(data)
+        hugo_symbol = self._getValue(data, 'HUGO_SYMBOL')
+        self.checkGeneIdentification(gene_symbol=hugo_symbol)
+
 
 class StructuralVariantValidator(CustomNamespacesValidator):
 
