@@ -77,21 +77,10 @@ def run_step(jvm_args, step):
 
 def run_steps(jvm_args, steps):
     """
-    Run steps in order, stopping at the first one that fails.
-
-    By default each step runs in its own JVM. If the single JVM environment
-    variable is set, all steps run in one JVM through ImportStepRunner.
-    Either way, a JavaRunException carries the step that failed.
+    Run steps in order in one JVM through ImportStepRunner, stopping at the
+    first one that fails. A JavaRunException carries the step that failed.
     """
     steps = [step for step in steps if step is not None]
-    if not cbioportal_common.single_jvm_enabled():
-        for step in steps:
-            try:
-                run_step(jvm_args, step)
-            except JavaRunException as jre:
-                jre.failed_step = step
-                raise
-        return
     if not steps:
         return
     with tempfile.TemporaryDirectory(prefix='cbioportal-import-') as temp_dir:
@@ -290,9 +279,6 @@ def case_list_steps(case_list_dir):
         if not (case_list.startswith('.') or case_list.endswith('~')):
             steps.append(import_case_list_step(os.path.join(case_list_dir, case_list)))
     return steps
-
-def process_case_lists(jvm_args, case_list_dir):
-    run_steps(jvm_args, case_list_steps(case_list_dir))
 
 def process_command(jvm_args, command, meta_filename, data_filename, study_ids, patient_ids, sample_ids, update_generic_assay_entity = None):
     if command == IMPORT_CANCER_TYPE:
@@ -594,16 +580,6 @@ def log_incremental_data_error(jre):
         LOGGER.error('  entire study, and then reimporting the entire study with all needed updates included.')
         LOGGER.error('  %s' % ('-' * 70))
 
-def import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files):
-    """
-    Load all data types that are available and support incremental upload
-    """
-    try:
-        run_steps(jvm_args, incremental_data_steps(data_directory, update_generic_assay_entity, meta_file_type_to_meta_files))
-    except JavaRunException as jre:
-        log_incremental_data_error(jre)
-        raise
-
 def case_list_update_steps(data_directory, meta_file_type_to_meta_files):
     """
     Return the steps that update case lists if clinical sample provided.
@@ -619,14 +595,6 @@ def case_list_update_steps(data_directory, meta_file_type_to_meta_files):
             LOGGER.info('Updating case lists with sample ids', extra={'filename_': meta_filename})
             steps.append(update_case_lists_step(meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None))
     return steps
-
-def update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files):
-    """
-    Updates case lists if clinical sample provided.
-    The command takes case_list/ folder as optional argument.
-    If folder exists case lists will be updated accordingly.
-    """
-    run_steps(jvm_args, case_list_update_steps(data_directory, meta_file_type_to_meta_files))
 
 def process_data_directory(jvm_args, data_directory, update_generic_assay_entity = None, leading_steps = ()):
     """
@@ -810,22 +778,16 @@ def main(args):
     # process the options
     jvm_args = "-Dspring.profiles.active=dbcp " + args.java_opts
 
-    # check if DB version and application version are in sync. When the
-    # directory import runs in one JVM, the check is its first step instead.
-    leading_steps = []
-    directory = args.data_directory if args.data_directory is not None else args.study_directory
-    if cbioportal_common.single_jvm_enabled() and directory is not None and os.path.exists(directory):
-        leading_steps.append(version_check_step())
-    else:
-        check_version(jvm_args)
-
+    # check if DB version and application version are in sync; a directory
+    # import makes the check the first of the steps it runs in one JVM
     if args.data_directory is not None:
         check_dir(args.data_directory)
-        return process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity, leading_steps)
+        return process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity, [version_check_step()])
     elif args.study_directory is not None:
         check_dir(args.study_directory)
-        return process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity, leading_steps)
+        return process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity, [version_check_step()])
     else:
+        check_version(jvm_args)
         check_args(args.command)
         check_files(args.meta_filename, args.data_filename)
         process_command(
