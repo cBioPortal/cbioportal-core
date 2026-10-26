@@ -1,5 +1,4 @@
 """The preprocessing policy is opt-in; existing validation still runs by default."""
-import json
 import logging
 from pathlib import Path
 import sys
@@ -87,9 +86,13 @@ class StrictModeTests(fixtures.PostClinicalDataFileTestCase):
                 'name: Spam\ndescription: Test\nadd_global_case_list: true\n',
             'meta_samples.txt': 'cancer_study_identifier: spam\ngenetic_alteration_type: CLINICAL\n'
                 'datatype: SAMPLE_ATTRIBUTES\ndata_filename: data_samples.txt\n',
-            'data_samples.txt': '#Patient\tSample\tOncotree\n#Patient\tSample\tOncotree\n'
-                '#STRING\tSTRING\tSTRING\n#1\t1\t1\nPATIENT_ID\tSAMPLE_ID\tONCOTREE_CODE\n'
-                'Patient1\tS1\tRETIRED\nPatient2\tS2\tNA\n',
+            'data_samples.txt': '#Patient\tSample\tOncotree\tDetailed\n'
+                '#Patient\tSample\tOncotree\tDetailed\n'
+                '#STRING\tSTRING\tSTRING\tSTRING\n#1\t1\t1\t1\n'
+                'PATIENT_ID\tSAMPLE_ID\tONCOTREE_CODE\tCANCER_TYPE_DETAILED\n'
+                'Patient1\tS1\tRETIRED\tNA\nPatient2\tS2\tNA\tNA\n'
+                'Patient3\tS3\tBRCA\tInvasive Breast Carcinoma\n'
+                'Patient4\tS4\tbrca\tWrong Detailed Name\n',
             'data_clinical_supp.txt': 'SAMPLE_ID\tEXTRA\nS1\tvalue\n',
             'data_rppa.txt': 'Composite.Element.REF\tS1\nTP53|p53\t1\n',
         }
@@ -105,19 +108,19 @@ class StrictModeTests(fixtures.PostClinicalDataFileTestCase):
         files['case_lists/custom.txt'] = ('cancer_study_identifier: spam\nstable_id: spam_sequenced\n'
             'case_list_name: Sequenced\ncase_list_description: Sequenced samples\n'
             'case_list_category: all_cases_with_mutation_data\ncase_list_ids: S2\n')
-        reference = json.dumps([{'code': 'LUAD', 'mainType': 'Lung',
-                                 'name': 'Lung Adenocarcinoma'}]).encode()
         for strict in (False, True):
-            with self.subTest(strict=strict), fixtures.temp_inputfolder(files) as directory, patch.object(
-                    validateData.OncotreeReference, 'read', return_value=(reference, 'test')) as read:
+            with self.subTest(strict=strict), fixtures.temp_inputfolder(files) as directory:
                 self.portal.strict_mode = strict
                 validateData.validate_study(directory, self.portal, self.logger, False, False)
                 messages = '\n'.join(record.getMessage() for record in self.get_log_records())
                 self.assertEqual(strict, 'Clinical data file has no referencing' in messages)
                 self.assertEqual(strict, 'Missing generated case list' in messages)
+                # Codes come from the portal's cancer types, so lower-case 'brca' is known.
                 self.assertEqual(strict, 'RETIRED' in messages)
+                self.assertEqual(strict, 'Wrong Detailed Name' in messages)
+                self.assertNotIn("ONCOTREE_CODE is 'BRCA'", messages)
+                self.assertNotIn("ONCOTREE_CODE is 'brca'", messages)
                 self.assertEqual(strict, "are missing from the '_sequenced' case list" in messages)
-                self.assertEqual(int(strict), read.call_count)
 
 
 if __name__ == '__main__':
