@@ -61,7 +61,7 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ''):
     importlib.import_module(__package__)
 
 from . import cbioportal_common
-from .check_oncotree_preprocessing import CancerTypeReference, check_oncotree_row
+from .check_oncotree_preprocessing import OncotreeReference, check_oncotree_row
 from .check_case_list_preprocessing import (missing_generated_case_lists, StagingCaseCollector,
                                       configured_staging_filenames)
 
@@ -305,7 +305,7 @@ class PortalInstance(object):
         self.portal_info_dict = portal_info_dict
         self.cancer_type_dict = cancer_type_dict
         self.strict_mode = strict_mode
-        self.cancer_type_reference = CancerTypeReference(cancer_type_dict)
+        self.oncotree = OncotreeReference()
         self.hugo_entrez_map = hugo_entrez_map
         self.alias_entrez_map = alias_entrez_map
         self.gene_set_list = gene_set_list
@@ -2866,7 +2866,7 @@ class SampleClinicalValidator(ClinicalValidator):
         super(SampleClinicalValidator, self).checkLine(data)
         if self.portal.strict_mode:
             check_oncotree_row(
-                self.cols, data, self.portal.cancer_type_reference, self.logger, self.line_number)
+                self.cols, data, self.portal.oncotree, self.logger, self.line_number)
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3588,7 +3588,6 @@ class CancerTypeValidator(Validator):
         self.cols = self.__class__.COLS
         self.numCols = len(self.cols)
         self.defined_cancer_types = []
-        self.defined_cancer_type_names = {}
 
     def checkHeader(self, cols):
         """Check the first uncommented line just like any other data line."""
@@ -3734,8 +3733,6 @@ class CancerTypeValidator(Validator):
             if tracking_handler.max_level < logging.ERROR:
                 # add the cancer type defined on this line to the list
                 self.defined_cancer_types.append(line_cancer_type)
-                self.defined_cancer_type_names[line_cancer_type] = \
-                    data[self.cols.index('name')].strip()
         finally:
             self.logger.logger.removeHandler(tracking_handler)
 
@@ -5407,7 +5404,7 @@ def load_portal_info(path, logger, offline=False):
 
     if all(d is None for d in list(portal_dict.values())):
         raise LookupError('No portal information found at {}'.format(path))
-    return PortalInstance(portal_info_dict=portal_dict['info'],
+    portal = PortalInstance(portal_info_dict=portal_dict['info'],
                           cancer_type_dict=portal_dict['cancer-types'],
                           hugo_entrez_map=portal_dict['genes'],
                           # TODO - create a /genealiases equivalent in the new api
@@ -5416,6 +5413,9 @@ def load_portal_info(path, logger, offline=False):
                           gene_panel_list=portal_dict['gene-panels'],
                           geneset_version = portal_dict['genesets_version'],
                           offline=offline)
+    if offline:
+        portal.oncotree = OncotreeReference(Path(path) / 'oncotree.json')
+    return portal
 
 
 # ------------------------------------------------------------------------------
@@ -5462,6 +5462,9 @@ def interface(args=None):
                         help='Enable additional preprocessing requirements: OncoTree codes/labels, '
                              'CNA identifiers and duplicates, referenced staging files, and case lists. '
                              'Independent of --strict_maf_checks; disabled by default.')
+    parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
+                        help='OncoTree version used with --strict to check ONCOTREE_CODE values '
+                             '(default: oncotree_latest_stable)')
     parser = parser.parse_args(args)
     return parser
 
@@ -5515,7 +5518,6 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
 
     # first parse and validate cancer type files
     studydefined_cancer_types = []
-    studydefined_cancer_type_names = {}
     if cbioportal_common.MetaFileTypes.CANCER_TYPE in validators_by_meta_type:
         cancer_type_validators = validators_by_meta_type[
                 cbioportal_common.MetaFileTypes.CANCER_TYPE]
@@ -5530,13 +5532,6 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             cancer_type_validators[0].validate()
             studydefined_cancer_types = (
                 cancer_type_validators[0].defined_cancer_types)
-            studydefined_cancer_type_names = (
-                cancer_type_validators[0].defined_cancer_type_names)
-
-    # strict OncoTree checks accept the portal's cancer types and the ones
-    # this study adds; rebuild for every study so none leak into the next
-    portal_instance.cancer_type_reference = CancerTypeReference(
-        portal_instance.cancer_type_dict, studydefined_cancer_type_names)
 
     # next check the cancer type of the meta_study file
     if cbioportal_common.MetaFileTypes.STUDY not in validators_by_meta_type:
@@ -5846,6 +5841,10 @@ def main_validate(args):
         portal_instance = load_portal_info(server_url, logger)
 
     portal_instance.strict_mode = getattr(args, 'strict', False)
+    if portal_instance.strict_mode:
+        portal_instance.oncotree = OncotreeReference(
+            str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None,
+            args.oncotree_version)
 
     # set portal version
     cbio_version = portal_instance.portal_version

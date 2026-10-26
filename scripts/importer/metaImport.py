@@ -66,6 +66,9 @@ def interface():
                         help='Enable additional preprocessing requirements: OncoTree codes/labels, '
                              'CNA identifiers and duplicates, referenced staging files, and case lists. '
                              'Independent of --strict_maf_checks; disabled by default.')
+    parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
+                        help='OncoTree version used with --strict to check ONCOTREE_CODE values '
+                             '(default: oncotree_latest_stable)')
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
                                    type=str,
