@@ -23,7 +23,7 @@ IMPORT_STUDY_CLASS = 'org.mskcc.cbio.portal.scripts.ImportCancerStudy'
 IMPORT_CANCER_TYPE_CLASS = 'org.mskcc.cbio.portal.scripts.ImportTypesOfCancers'
 
 single_jvm_on = mock.patch.dict(os.environ, {SINGLE_JVM_ENV_VAR: '1'})
-single_jvm_off = mock.patch.dict(os.environ, {SINGLE_JVM_ENV_VAR: ''})
+single_jvm_off = mock.patch.dict(os.environ, {SINGLE_JVM_ENV_VAR: '0'})
 
 
 class ManifestRecorder:
@@ -109,6 +109,32 @@ class SingleJvmImporterTests(unittest.TestCase):
 
                 self.assertEqual(single_jvm, per_step)
                 self.assertEqual(single_jvm_result, per_step_result)
+
+    def test_single_jvm_is_the_default(self):
+        args = ['--study_directory', 'test_data/study_es_0']
+        _, per_step = self.import_per_step(args)
+        for value in (None, '', '1', 'true'):
+            with self.subTest(value=value):
+                environ = {k: v for k, v in os.environ.items() if k != SINGLE_JVM_ENV_VAR}
+                if value is not None:
+                    environ[SINGLE_JVM_ENV_VAR] = value
+                recorder = ManifestRecorder()
+                with mock.patch.dict(os.environ, environ, clear=True), \
+                        mock.patch('importer.cbioportalImporter.run_java', side_effect=recorder) as run_java:
+                    cbioportalImporter.main(cbioportalImporter.interface(args))
+                self.assertEqual(run_java.call_count, 1)
+                self.assertEqual(recorder.steps(), per_step)
+
+    def test_opt_out_runs_one_jvm_per_step(self):
+        args = ['--study_directory', 'test_data/study_es_0']
+        for value in ('0', 'false', 'no', 'NO'):
+            with self.subTest(value=value):
+                with mock.patch.dict(os.environ, {SINGLE_JVM_ENV_VAR: value}), \
+                        mock.patch('importer.cbioportalImporter.run_java') as run_java:
+                    cbioportalImporter.main(cbioportalImporter.interface(args))
+                classes = [step[0] for step in per_step_calls(run_java)]
+                self.assertNotIn(STEP_RUNNER_CLASS, classes)
+                self.assertGreater(len(classes), 20)
 
     def test_subcommands_still_run_one_jvm_per_step(self):
         args = ['make-studies-available', '--study_ids', 'STUDY1,STUDY2']

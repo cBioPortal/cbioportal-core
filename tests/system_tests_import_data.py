@@ -5,13 +5,17 @@ This code is licensed under the GNU Affero General Public License (AGPL),
 version 3, or (at your option) any later version.
 '''
 
+import os
 import unittest
 from unittest import mock
 from unittest.mock import call
 from importer import cbioportalImporter
+from importer.cbioportal_common import SINGLE_JVM_ENV_VAR
 
 common_part = ('-Dspring.profiles.active=dbcp', '-cp', 'test.jar')
 
+# these tests check the calls of the per-step path, which runs each step in its own JVM
+@mock.patch.dict(os.environ, {SINGLE_JVM_ENV_VAR: '0'})
 class DataImporterTests(unittest.TestCase):
     '''
     Tests of commands produced by scripts
