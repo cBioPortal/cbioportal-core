@@ -42,10 +42,6 @@ UPDATE_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds
 VERSION_UTIL_CLASS = "org.mskcc.cbio.portal.util.VersionUtil"
 IMPORT_STEP_RUNNER_CLASS = "org.mskcc.cbio.portal.scripts.ImportStepRunner"
 
-# Study and data directory imports run their steps in one JVM. Set this to 0 to
-# run each step in its own JVM instead; that temporary opt-out will be removed.
-SINGLE_JVM_ENV_VAR = 'CBIOPORTAL_IMPORTER_SINGLE_JVM'
-
 PORTAL_PROPERTY_DATABASE_USER = 'db.user'
 PORTAL_PROPERTY_DATABASE_PW = 'db.password'
 PORTAL_PROPERTY_DATABASE_HOST = 'db.host'
@@ -1064,9 +1060,6 @@ def parse_metadata_file(filename,
     logger.info('Validation of meta file complete', extra={'filename_': filename})
 
     return meta_dictionary
-
-def single_jvm_enabled():
-    return os.environ.get(SINGLE_JVM_ENV_VAR, '').strip().lower() not in ('0', 'false', 'no')
 
 def write_step_manifest(manifest_filename, steps):
     """Write the steps for ImportStepRunner to run."""
