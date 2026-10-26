@@ -300,10 +300,11 @@ class PortalInstance(object):
     if the checks are to be skipped.
     """
 
-    def __init__(self, portal_info_dict, cancer_type_dict, hugo_entrez_map, alias_entrez_map, gene_set_list, gene_panel_list, geneset_version, offline=False):
+    def __init__(self, portal_info_dict, cancer_type_dict, hugo_entrez_map, alias_entrez_map, gene_set_list, gene_panel_list, geneset_version, offline=False, strict_mode=False):
         """Represent a portal instance with the given dictionaries."""
         self.portal_info_dict = portal_info_dict
         self.cancer_type_dict = cancer_type_dict
+        self.strict_mode = strict_mode
         self.oncotree = OncotreeReference()
         self.hugo_entrez_map = hugo_entrez_map
         self.alias_entrez_map = alias_entrez_map
@@ -446,7 +447,8 @@ class Validator(object):
 
         # Reuse this mandatory scan for generator-compatible case membership.
         collector = (StagingCaseCollector(Path(self.filename).name)
-                     if Path(self.filename).name.lower() in configured_staging_filenames() else None)
+                     if self.portal.strict_mode and
+                     Path(self.filename).name.lower() in configured_staging_filenames() else None)
         self.generated_case_members = None
         # Validate whether the file is correct UTF-8
         try:
@@ -1092,8 +1094,9 @@ class FeaturewiseFileValidator(Validator):
         # skip line with an error if the feature was encountered before
         if feature_id in self._feature_id_lines:
             self.logger.log(
-                self.DUPLICATE_FEATURE_LEVEL,
-                self.DUPLICATE_FEATURE_MESSAGE,
+                self.DUPLICATE_FEATURE_LEVEL if self.portal.strict_mode else logging.WARNING,
+                self.DUPLICATE_FEATURE_MESSAGE if self.portal.strict_mode else
+                FeaturewiseFileValidator.DUPLICATE_FEATURE_MESSAGE,
                 extra={
                     'line_number': self.line_number,
                     'cause': '%s (already defined on line %d)' % (
@@ -1245,6 +1248,8 @@ class CNAValidator(GenewiseFileValidator):
         if gene_symbol is not None:
             if '|' in gene_symbol:
                 gene_symbol, __ = gene_symbol.split('|', maxsplit=1)
+        if not self.portal.strict_mode:
+            return super().checkGeneIdentification(gene_symbol, entrez_id)
         if entrez_id is not None:
             normalized = entrez_id.lstrip('0') or '0'
             if (not re.fullmatch(r'[0-9]+', entrez_id) or len(normalized) > 10
@@ -2859,8 +2864,9 @@ class SampleClinicalValidator(ClinicalValidator):
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(SampleClinicalValidator, self).checkLine(data)
-        check_oncotree_row(
-            self.cols, data, self.portal.oncotree, self.logger, self.line_number)
+        if self.portal.strict_mode:
+            check_oncotree_row(
+                self.cols, data, self.portal.oncotree, self.logger, self.line_number)
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4896,33 +4902,34 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
         else:
             validators_by_type[meta_file_type].append(None)
 
-    # Recognized top-level staging files must not silently disappear from import.
-    # A metadata filename is not proof of coverage: require the right validator
-    # type and its resolved data_filename. Distinct mutation profiles remain valid.
-    types = cbioportal_common.MetaFileTypes
-    required_references = (
-        (r'data_timeline(?:_.*)?\.(?:txt|tsv)', (types.TIMELINE,),
-         'Timeline data file has no referencing timeline meta file. Add a meta file '
-         'with genetic_alteration_type: CLINICAL, datatype: TIMELINE'),
-        (r'data_clinical(?:_.*)?\.(?:txt|tsv)', (types.SAMPLE_ATTRIBUTES, types.PATIENT_ATTRIBUTES),
-         'Clinical data file has no referencing clinical meta file. Merge supplemental '
-         'clinical data into the main sample/patient file when applicable, or add '
-         'the appropriate clinical metadata'),
-        (r'data_mutations(?:_.*)?\.(?:txt|tsv|maf)', (types.MUTATION, types.MUTATION_UNCALLED),
-         'Mutation data file has no referencing mutation meta file. Fuse same-profile '
-         'MAFs when applicable, or declare a distinct mutation profile'),
-    )
-    coverage = [(re.compile(pattern, re.IGNORECASE), {
-        Path(validator.filename).resolve()
-        for meta_type in meta_types for validator in validators_by_type.get(meta_type, [])
-        if validator is not None}, message)
-        for pattern, meta_types, message in required_references]
-    for path in sorted(Path(directory).iterdir()):
-        if path.is_file():
-            for pattern, referenced_paths, message in coverage:
-                if pattern.fullmatch(path.name) and path.resolve() not in referenced_paths:
-                    logger.error('%s, with data_filename: %s.', message, path.name,
-                                 extra={'filename_': str(path)})
+    if portal_instance.strict_mode:
+        # Recognized top-level staging files must not silently disappear from import.
+        # A metadata filename is not proof of coverage: require the right validator
+        # type and its resolved data_filename. Distinct mutation profiles remain valid.
+        types = cbioportal_common.MetaFileTypes
+        required_references = (
+            (r'data_timeline(?:_.*)?\.(?:txt|tsv)', (types.TIMELINE,),
+             'Timeline data file has no referencing timeline meta file. Add a meta file '
+             'with genetic_alteration_type: CLINICAL, datatype: TIMELINE'),
+            (r'data_clinical(?:_.*)?\.(?:txt|tsv)', (types.SAMPLE_ATTRIBUTES, types.PATIENT_ATTRIBUTES),
+             'Clinical data file has no referencing clinical meta file. Merge supplemental '
+             'clinical data into the main sample/patient file when applicable, or add '
+             'the appropriate clinical metadata'),
+            (r'data_mutations(?:_.*)?\.(?:txt|tsv|maf)', (types.MUTATION, types.MUTATION_UNCALLED),
+             'Mutation data file has no referencing mutation meta file. Fuse same-profile '
+             'MAFs when applicable, or declare a distinct mutation profile'),
+        )
+        coverage = [(re.compile(pattern, re.IGNORECASE), {
+            Path(validator.filename).resolve()
+            for meta_type in meta_types for validator in validators_by_type.get(meta_type, [])
+            if validator is not None}, message)
+            for pattern, meta_types, message in required_references]
+        for path in sorted(Path(directory).iterdir()):
+            if path.is_file():
+                for pattern, referenced_paths, message in coverage:
+                    if pattern.fullmatch(path.name) and path.resolve() not in referenced_paths:
+                        logger.error('%s, with data_filename: %s.', message, path.name,
+                                     extra={'filename_': str(path)})
 
     # prepend the cancer study id to any case list suffixes
     defined_case_list_fns = {}
@@ -5451,8 +5458,12 @@ def interface(args=None):
                         action='store_true', default=False,
                         help='Option to enable strict mode for validator when '
                              'validating mutation data')
+    parser.add_argument('--strict', '--strict-mode', action='store_true', default=False,
+                        help='Enable additional preprocessing requirements: OncoTree codes/labels, '
+                             'CNA identifiers and duplicates, referenced staging files, and case lists. '
+                             'Independent of --strict_maf_checks; disabled by default.')
     parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
-                        help='OncoTree version used to check ONCOTREE_CODE values '
+                        help='OncoTree version used with --strict to check ONCOTREE_CODE values '
                              '(default: oncotree_latest_stable)')
     parser = parser.parse_args(args)
     return parser
@@ -5677,37 +5688,38 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
                 continue
             validator.validate()
 
-    # Case lists were read before mutation rows, so compare membership now.
-    if mutation_sample_ids is not None:
-        called_samples = set().union(*(validator.mutation_samples for validator in
-            validators_by_meta_type.get(cbioportal_common.MetaFileTypes.MUTATION, [])))
-        missing_mutation_samples = called_samples - mutation_sample_ids
-        if missing_mutation_samples:
-            logger.error("Sample IDs from mutation data are missing from the '_sequenced' case list.",
-                         extra={'cause': ', '.join(sorted(missing_mutation_samples))})
-    # Avoid reporting twice for lists already required by the core checks above.
-    checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
-    if 'meta_mutations_extended' in validators_by_meta_type:
-        checked_ids.add(study_id + '_sequenced')
-    if 'meta_CNA' in validators_by_meta_type:
-        checked_ids.add(study_id + '_cna')
-    scanned_members = {
-        str(Path(validator.filename).resolve()): validator.generated_case_members
-        for validators in validators_by_meta_type.values() for validator in validators
-        if validator is not None and getattr(validator, 'generated_case_members', None) is not None}
-    try:
-        for stable_id, filename, count in missing_generated_case_lists(
-                study_dir, study_id, checked_ids, scanned_members=scanned_members):
-            if (Path(study_dir) / 'case_lists' / filename).exists():
-                logger.error("Case-list filename '%s' is occupied by an unrelated list. "
-                             "Resolve the stable-ID/category conflict without overwriting curated data.",
-                             filename)
-            logger.error(
-                "Missing generated case list '%s' (%d samples). Run case-list "
-                "preprocessing before import (suggested filename: %s).",
-                stable_id, count, filename)
-    except (OSError, ValueError, IndexError) as exc:
-        logger.error("Cannot check case-list preprocessing: %s", exc)
+    if portal_instance.strict_mode:
+        # Case lists were read before mutation rows, so compare membership now.
+        if mutation_sample_ids is not None:
+            called_samples = set().union(*(validator.mutation_samples for validator in
+                validators_by_meta_type.get(cbioportal_common.MetaFileTypes.MUTATION, [])))
+            missing_mutation_samples = called_samples - mutation_sample_ids
+            if missing_mutation_samples:
+                logger.error("Sample IDs from mutation data are missing from the '_sequenced' case list.",
+                             extra={'cause': ', '.join(sorted(missing_mutation_samples))})
+        # Avoid reporting twice for lists already required by the core checks above.
+        checked_ids = set(defined_case_list_fns) | {study_id + '_all'}
+        if 'meta_mutations_extended' in validators_by_meta_type:
+            checked_ids.add(study_id + '_sequenced')
+        if 'meta_CNA' in validators_by_meta_type:
+            checked_ids.add(study_id + '_cna')
+        scanned_members = {
+            str(Path(validator.filename).resolve()): validator.generated_case_members
+            for validators in validators_by_meta_type.values() for validator in validators
+            if validator is not None and getattr(validator, 'generated_case_members', None) is not None}
+        try:
+            for stable_id, filename, count in missing_generated_case_lists(
+                    study_dir, study_id, checked_ids, scanned_members=scanned_members):
+                if (Path(study_dir) / 'case_lists' / filename).exists():
+                    logger.error("Case-list filename '%s' is occupied by an unrelated list. "
+                                 "Resolve the stable-ID/category conflict without overwriting curated data.",
+                                 filename)
+                logger.error(
+                    "Missing generated case list '%s' (%d samples). Run case-list "
+                    "preprocessing before import (suggested filename: %s).",
+                    stable_id, count, filename)
+        except (OSError, ValueError, IndexError) as exc:
+            logger.error("Cannot check case-list preprocessing: %s", exc)
 
     # additional validation between meta files, after all meta files are processed
     validate_data_relations(validators_by_meta_type, logger)
@@ -5828,9 +5840,11 @@ def main_validate(args):
     else:
         portal_instance = load_portal_info(server_url, logger)
 
-    portal_instance.oncotree = OncotreeReference(
-        str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None,
-        args.oncotree_version)
+    portal_instance.strict_mode = getattr(args, 'strict', False)
+    if portal_instance.strict_mode:
+        portal_instance.oncotree = OncotreeReference(
+            str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None,
+            args.oncotree_version)
 
     # set portal version
     cbio_version = portal_instance.portal_version
