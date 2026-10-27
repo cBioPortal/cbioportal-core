@@ -20,11 +20,12 @@ unset source_database_name
 unset destination_database_name
 declare -A my_properties
 declare -a database_table_list
-database_table_list_filepath="$(pwd)/ccd_database_table_list.txt"
-create_table_result_filepath="$(pwd)/ccd_create_table_result.txt"
-insert_table_data_result_filepath="$(pwd)/ccd_copy_table_data.txt"
-record_count_comparison_filepath="$(pwd)/ccd_table_record_count.txt"
-clickhouse_is_responsive_filepath="$(pwd)/ccd_clickhouse_is_responsive.txt"
+# cis_ts_pid is a timestamp and processid suffix defined by clickhouse_client_command_line_functions.sh
+database_table_list_filepath="$(pwd)/ccd_database_table_list_${cis_ts_pid}.txt"
+create_table_result_filepath="$(pwd)/ccd_create_table_result_${cis_ts_pid}.txt"
+insert_table_data_result_filepath="$(pwd)/ccd_copy_table_data_${cis_ts_pid}.txt"
+record_count_comparison_filepath="$(pwd)/ccd_table_record_count_${cis_ts_pid}.txt"
+clickhouse_is_responsive_filepath="$(pwd)/ccd_clickhouse_is_responsive_${cis_ts_pid}.txt"
 SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
 function usage() {

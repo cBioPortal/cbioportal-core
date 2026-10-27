@@ -24,7 +24,8 @@ database_name=""
 properties_filepath=""
 database_to_create_derived_tables_in=""
 derived_table_sql_filepath=""
-clickhouse_is_responsive_filepath="$(pwd)/cdtcd_cmd_clickhouse_is_responsive.txt"
+# cis_ts_pid is a timestamp and processid suffix defined by clickhouse_client_command_line_functions.sh
+clickhouse_is_responsive_filepath="$(pwd)/cdtcd_cmd_clickhouse_is_responsive_${cis_ts_pid}.txt"
 SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
 function usage() {

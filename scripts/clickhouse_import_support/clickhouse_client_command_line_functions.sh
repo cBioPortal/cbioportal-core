@@ -6,34 +6,32 @@ unset sql_data_array
 configured_clickhouse_config_file_path=""
 sql_data_field_value=""
 declare -a sql_data_array
-# temp filepaths include the process id : concurrent processes sourcing this file from the
-# same working directory must not collide on (or clean up) each other's temp files
-clickhouse_client_database_exists_filepath="$(pwd)/ccclf_database_exists_$$.txt"
-clickhouse_client_database_table_list_filepath="$(pwd)/ccclf_database_table_list_$$.txt"
+# output filepaths include timestamp and process id so that concurrent processes
+# executing in the same working directory do not collide on (or clean up) each other's temp files
+# cis_ts_pid is short for "clickhouse input support timestamp process_id" example : 2026-10-27-05-18-46_29433
+cis_ts_pid="$(date "+%Y-%m-%d-%H-%M-%S")_$$"
+clickhouse_client_database_exists_filepath="$(pwd)/ccclf_database_exists_${cis_ts_pid}.txt"
+clickhouse_client_database_table_list_filepath="$(pwd)/ccclf_database_table_list_${cis_ts_pid}.txt"
 
 function write_clickhouse_config_file() {
     local selected_database=$1
-    configured_clickhouse_config_file_path="$(pwd)/clickhouse_client_config_$$.yaml"
+    configured_clickhouse_config_file_path="$(pwd)/clickhouse_client_config_${cis_ts_pid}.yaml"
     if ! rm -f "$configured_clickhouse_config_file_path" || ! touch "$configured_clickhouse_config_file_path" ; then
         echo "Error : unable to create clickhouse_client_config file $configured_clickhouse_config_file_path" >&2
         return 1
     fi
     chmod 600 "$configured_clickhouse_config_file_path"
     local db_name
-    if [ -z "$selected_database" ] ; then
-        db_name="${my_properties['clickhouse_database_name']}"
-    else
-        if [ "$selected_database" == "blue" ] ; then
-            db_name="${my_properties['clickhouse_blue_database_name']}"
-        else
-            if [ "$selected_database" == "green" ] ; then
-                db_name="${my_properties['clickhouse_green_database_name']}"
-            else
-                echo "Error : selected_database (when specified) must be passed as either 'blue' or 'green'. The argument passed was : '$selected_database'" >&2
-                return 1
-            fi
-        fi
-    fi
+    case "$selected_database" in
+      "") db_name="${my_properties['clickhouse_database_name']}" ;;
+      "blue") db_name="${my_properties['clickhouse_blue_database_name']}" ;;
+      "green") db_name="${my_properties['clickhouse_green_database_name']}" ;;
+      "system") db_name="system" ;; # for cases where the database will be specified in the SQL queries
+      *)
+        echo "Error : selected_database (when specified) must be passed as either 'blue', 'green', or 'system'. The argument passed was : '$selected_database'" >&2
+        return 1
+        ;;
+    esac
     echo "user: ${my_properties['clickhouse_server_username']}" >> "$configured_clickhouse_config_file_path"
     echo "password: ${my_properties['clickhouse_server_password']}" >> "$configured_clickhouse_config_file_path"
     echo "host: ${my_properties['clickhouse_server_host_name']}" >> "$configured_clickhouse_config_file_path"
@@ -58,6 +56,7 @@ function shutdown_clickhouse_client_command_line_functions() {
     unset configured_clickhouse_config_file_path
     unset sql_data_field_value
     unset sql_data_array
+    unset cis_ts_pid
     unset clickhouse_client_database_exists_filepath
     unset clickhouse_client_database_table_list_filepath
 }
