@@ -94,10 +94,6 @@ class JavaRunException(Exception):
         # the JavaStep that failed, when known
         self.failed_step = None
 
-    @property
-    def java_process_status(self):
-        return self.process_return_status
-
 # one Java class to run with its arguments, without the JVM options
 class JavaStep(NamedTuple):
     class_name: str
@@ -1061,10 +1057,12 @@ def parse_metadata_file(filename,
 
     return meta_dictionary
 
+IMPORT_MANIFEST_VERSION = 1
+
 def write_step_manifest(manifest_filename, steps):
     """Write the steps for ImportStepRunner to run."""
     with open(manifest_filename, 'w') as manifest_file:
-        json.dump({'version': 1,
+        json.dump({'version': IMPORT_MANIFEST_VERSION,
                    'steps': [{'class': step.class_name, 'args': list(step.args)} for step in steps]},
                   manifest_file, indent=2)
 
@@ -1079,6 +1077,8 @@ def read_failed_step(result_filename, steps):
         return steps[failed_step]
     return None
 
+# Only run_single_step and run_directory_import in cbioportalImporter.py
+# should call this. A direct call starts a JVM and reloads the DAO caches.
 def run_java(*args):
     java_home = os.environ.get('JAVA_HOME', '')
     if java_home:

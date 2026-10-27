@@ -99,6 +99,16 @@ public final class DaoGeneticProfile {
         list.add(profile);
     }
    
+    static void removeStudyFromCache(int cancerStudyId) {
+        List<GeneticProfile> profiles = byStudy.remove(cancerStudyId);
+        if (profiles != null) {
+            for (GeneticProfile profile : profiles) {
+                byInternalId.remove(profile.getGeneticProfileId(), profile);
+                byStableId.remove(profile.getStableId(), profile);
+            }
+        }
+    }
+
     public static int addGeneticProfile(GeneticProfile profile) throws DaoException {
         //FIXME: this cast may cause problems in the future
         profile.setGeneticProfileId((int) ClickHouseAutoIncrement.nextId(GENETIC_PROFILE_SEQUENCE));

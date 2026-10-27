@@ -98,7 +98,6 @@ public class UpdateCaseListsSampleIds extends ConsoleRunnable {
      * @throws RuntimeException if any DAO operations fail or if a case list with a specified stable ID is not found.
      */
     private void updateCaseListsForTheStudy(Map<String, Set<String>> caseListSampleIdToSampleIds) {
-        DaoCancerStudy.reCacheAll();
         try {
             for (Map.Entry<String, Set<String>> caseListStableIdToSampleIds : caseListSampleIdToSampleIds.entrySet()) {
                 String caseListStableId = caseListStableIdToSampleIds.getKey();

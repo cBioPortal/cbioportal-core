@@ -343,7 +343,6 @@ public final class DaoCancerStudy {
         } finally {
             JdbcUtil.closeAll(DaoCancerStudy.class, con, pstmt, rs);
         }
-        reCacheAll();
     }
 
     public static void addCancerStudyTags(CancerStudyTags cancerStudyTags) throws DaoException {
@@ -563,6 +562,9 @@ public final class DaoCancerStudy {
             deleteByStudyId("DELETE FROM mut_sig WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM cancer_study WHERE cancer_study_id=?", internalCancerStudyId);
 
+            DaoSample.removeStudyFromCache(internalCancerStudyId);
+            DaoPatient.removeStudyFromCache(internalCancerStudyId);
+            DaoGeneticProfile.removeStudyFromCache(internalCancerStudyId);
             removeCancerStudyFromCache(internalCancerStudyId);
         } catch (DaoException e) {
             throw e;
@@ -570,7 +572,6 @@ public final class DaoCancerStudy {
             throw new DaoException(e);
         }
         purgeUnreferencedRecordsAfterDeletionOfStudy();
-        reCacheAll();
         System.out.println("deleted study:\nID: "+internalCancerStudyId);
     }
 

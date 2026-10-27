@@ -33,7 +33,6 @@ import joptsimple.OptionSpec;
 import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkDeleter;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
-import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 import org.mskcc.cbio.portal.util.VersionUtil;
 
@@ -43,9 +42,9 @@ import org.mskcc.cbio.portal.util.VersionUtil;
  * Each step is the class name and arguments that would otherwise be passed to
  * its own {@code java} process. Steps run in order, and the runner stops at the
  * first step that fails and exits with that step's exit status. Between steps
- * the static state that a fresh JVM would start without is reset. The DAO
- * caches are kept, since avoiding their reload is the point of running in one
- * JVM; they are reloaded only after a step that clears them.
+ * step-local bulk buffers and progress state are reset. DAO caches and ID
+ * counters stay current in memory throughout the run, avoiding reads from
+ * replicas that may not yet have applied this process's writes.
  *
  * Manifest format:
  * <pre>
@@ -89,20 +88,6 @@ public class ImportStepRunner {
         ImportResourceData.class.getName(),
         ImportResourceDefinition.class.getName()
     );
-
-    /**
-     * Steps that clear the DAO caches without reloading them. Every other step
-     * keeps the study, patient, sample, profile and clinical attribute caches
-     * current as it inserts rows, so the caches are only reloaded after these.
-     */
-    static final Set<String> CACHE_CLEARING_CLASSES = Set.of(
-        RemoveSamples.class.getName(),
-        RemovePatients.class.getName()
-    );
-
-    static boolean clearsDaoCaches(String className) {
-        return CACHE_CLEARING_CLASSES.contains(className);
-    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Step(@JsonProperty("class") String className, List<String> args) {
@@ -177,10 +162,6 @@ public class ImportStepRunner {
             Step step = steps.get(i);
             System.out.println("> " + step.className() + " " + String.join(" ", step.args()));
             System.out.flush();
-            if (i > 0 && clearsDaoCaches(steps.get(i - 1).className())) {
-                // the previous step emptied the sample and patient caches without reloading them
-                DaoCancerStudy.reCacheAll();
-            }
             int status = EX_SOFTWARE;
             try {
                 status = runStep(step);
@@ -220,8 +201,7 @@ public class ImportStepRunner {
     }
 
     /**
-     * Resets the static state a step can leave behind, so the next step starts
-     * as it would in a fresh JVM.
+     * Clears step-local state and persists ID counters without discarding them.
      */
     static void resetAfterStep(int status) {
         int discardedRecords = ClickHouseBulkLoader.discardAll();
@@ -231,7 +211,7 @@ public class ImportStepRunner {
         }
         ClickHouseBulkDeleter.discardAll();
         // in a separate JVM the shutdown hook persists these on exit
-        ClickHouseAutoIncrement.persistAndResetCounters();
+        ClickHouseAutoIncrement.persistAllSequences();
         ProgressMonitor.reset();
     }
 

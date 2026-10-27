@@ -69,13 +69,16 @@ COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIS
 # ------------------------------------------------------------------------------
 # sub-routines
 
-def run_step(jvm_args, step):
-    """Run one step in its own JVM. A step of None (a skipped file) is ignored."""
+def run_single_step(jvm_args, step):
+    """Run one step in its own JVM. A step of None (a skipped file) is ignored.
+    The new JVM reloads the DAO caches, so call this once. A directory import
+    belongs in run_directory_import.
+    """
     if step is None:
         return
     run_java(*jvm_args.split(' '), step.class_name, *step.args)
 
-def run_steps(jvm_args, steps):
+def run_directory_import(jvm_args, steps):
     """
     Run steps in order in one JVM through ImportStepRunner, stopping at the
     first one that fails. A JavaRunException carries the step that failed.
@@ -103,19 +106,19 @@ def import_cancer_type_step(data_filename):
         "--noprogress"]) # don't report memory usage and % progress
 
 def import_cancer_type(jvm_args, data_filename):
-    run_step(jvm_args, import_cancer_type_step(data_filename))
+    run_single_step(jvm_args, import_cancer_type_step(data_filename))
 
 def import_study_step(meta_filename):
     return JavaStep(IMPORT_STUDY_CLASS, [meta_filename, "--noprogress"])
 
 def import_study(jvm_args, meta_filename):
-    run_step(jvm_args, import_study_step(meta_filename))
+    run_single_step(jvm_args, import_study_step(meta_filename))
 
 def update_study_status_step(study_id, status="AVAILABLE"):
     return JavaStep(UPDATE_STUDY_STATUS_CLASS, [study_id, status, "--noprogress"])
 
 def update_study_status(jvm_args, study_id, status="AVAILABLE"):
-    run_step(jvm_args, update_study_status_step(study_id, status))
+    run_single_step(jvm_args, update_study_status_step(study_id, status))
 
 def remove_study_meta_step(meta_filename):
     meta_dictionary = cbioportal_common.parse_metadata_file(
@@ -127,26 +130,25 @@ def remove_study_meta_step(meta_filename):
     return JavaStep(REMOVE_STUDY_CLASS, [meta_dictionary['cancer_study_identifier'], "--noprogress"])
 
 def remove_study_meta(jvm_args, meta_filename):
-    run_step(jvm_args, remove_study_meta_step(meta_filename))
+    run_single_step(jvm_args, remove_study_meta_step(meta_filename))
 
 def remove_study_id_step(study_id):
     return JavaStep(REMOVE_STUDY_CLASS, [study_id, "--noprogress"])
 
 def remove_study_id(jvm_args, study_id):
-    run_step(jvm_args, remove_study_id_step(study_id))
+    run_single_step(jvm_args, remove_study_id_step(study_id))
 
 def remove_samples(jvm_args, study_ids, sample_ids):
-    args = jvm_args.split(' ')
-    args.append(REMOVE_SAMPLES_CLASS)
+    args = []
     args.append("--study_ids")
     args.append(study_ids)
     args.append("--sample_ids")
     args.append(sample_ids)
     try:
-        run_java(*args)
+        run_single_step(jvm_args, JavaStep(REMOVE_SAMPLES_CLASS, args))
     except JavaRunException as jre:
         LOGGER.error('an error occurred during the java process which removes samples from the database.')
-        LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
         LOGGER.error('  the message sent along with this error was %s' % (jre.message))
         LOGGER.error('  %s' % ('-' * 70))
         LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
@@ -157,13 +159,12 @@ def remove_samples(jvm_args, study_ids, sample_ids):
         raise jre
 
 def remove_patients(jvm_args, study_ids, patient_ids):
-    args = jvm_args.split(' ')
-    args.append(REMOVE_PATIENTS_CLASS)
+    args = []
     args.append("--study_ids")
     args.append(study_ids)
     args.append("--patient_ids")
     args.append(patient_ids)
-    run_java(*args)
+    run_single_step(jvm_args, JavaStep(REMOVE_PATIENTS_CLASS, args))
 
 def update_case_lists_step(meta_filename, case_lists_file_or_dir = None):
     args = ["--meta", meta_filename]
@@ -172,11 +173,8 @@ def update_case_lists_step(meta_filename, case_lists_file_or_dir = None):
         args.append(case_lists_file_or_dir)
     return JavaStep(UPDATE_CASE_LIST_CLASS, args)
 
-def update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir = None):
-    run_step(jvm_args, update_case_lists_step(meta_filename, case_lists_file_or_dir))
-
 def import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity = None, meta_file_dictionary = None, incremental = False):
-    run_step(jvm_args, import_data_step(meta_filename, data_filename, update_generic_assay_entity, meta_file_dictionary, incremental))
+    run_single_step(jvm_args, import_data_step(meta_filename, data_filename, update_generic_assay_entity, meta_file_dictionary, incremental))
 
 def import_data_step(meta_filename, data_filename, update_generic_assay_entity = None, meta_file_dictionary = None, incremental = False):
     """Return the step that imports a data file, or None if the file is skipped."""
@@ -245,13 +243,10 @@ def import_case_list_step(meta_filename):
     return JavaStep(IMPORT_CASE_LIST_CLASS, [meta_filename, "--noprogress"])
 
 def import_case_list(jvm_args, meta_filename):
-    run_step(jvm_args, import_case_list_step(meta_filename))
+    run_single_step(jvm_args, import_case_list_step(meta_filename))
 
 def add_global_case_list_step(study_id):
     return JavaStep(ADD_CASE_LIST_CLASS, [study_id, "all", "--noprogress"])
-
-def add_global_case_list(jvm_args, study_id):
-    run_step(jvm_args, add_global_case_list_step(study_id))
 
 def version_check_step():
     return JavaStep(VERSION_UTIL_CLASS, [])
@@ -267,7 +262,7 @@ def print_version_mismatch_help():
 
 def check_version(jvm_args):
     try:
-        run_step(jvm_args, version_check_step())
+        run_single_step(jvm_args, version_check_step())
     except:
         print_version_mismatch_help()
         raise
@@ -515,13 +510,8 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     leading_steps are run before the import steps.
     """
     steps = list(leading_steps)
-    try:
-        study_id = collect_study_directory_steps(study_directory, update_generic_assay_entity, steps)
-    except Exception:
-        # the steps before the error used to run before it was raised
-        run_steps(jvm_args, steps)
-        raise
-    run_steps(jvm_args, steps)
+    study_id = collect_study_directory_steps(study_directory, update_generic_assay_entity, steps)
+    run_directory_import(jvm_args, steps)
 
     # the study stays UNAVAILABLE until the derived tables are rebuilt
     return study_id
@@ -571,7 +561,7 @@ def incremental_data_steps(data_directory, update_generic_assay_entity, meta_fil
 def log_incremental_data_error(jre):
     if jre.failed_step is not None and jre.failed_step.meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
         LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
-        LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
         LOGGER.error('  the message sent along with this error was %s' % (jre.message))
         LOGGER.error('  %s' % ('-' * 70))
         LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
@@ -604,24 +594,19 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
     """
 
     steps = list(leading_steps)
-    try:
-        meta_file_type_to_meta_files = get_meta_filenames_by_type(data_directory)
+    meta_file_type_to_meta_files = get_meta_filenames_by_type(data_directory)
 
-        not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
-        if not_supported_meta_types:
-            raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
-        # the study is not removed first, so hide it here until the derived tables are rebuilt
-        study_id = next(iter(meta_file_type_to_meta_files.values()))[0][1]['cancer_study_identifier']
-        steps.append(update_study_status_step(study_id, "UNAVAILABLE"))
-        steps.extend(incremental_data_steps(data_directory, update_generic_assay_entity, meta_file_type_to_meta_files))
-        steps.extend(case_list_update_steps(data_directory, meta_file_type_to_meta_files))
-    except Exception:
-        # the steps before the error used to run before it was raised
-        run_steps(jvm_args, steps)
-        raise
+    not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
+    if not_supported_meta_types:
+        raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
+    # the study is not removed first, so hide it here until the derived tables are rebuilt
+    study_id = next(iter(meta_file_type_to_meta_files.values()))[0][1]['cancer_study_identifier']
+    steps.append(update_study_status_step(study_id, "UNAVAILABLE"))
+    steps.extend(incremental_data_steps(data_directory, update_generic_assay_entity, meta_file_type_to_meta_files))
+    steps.extend(case_list_update_steps(data_directory, meta_file_type_to_meta_files))
 
     try:
-        run_steps(jvm_args, steps)
+        run_directory_import(jvm_args, steps)
     except JavaRunException as jre:
         log_incremental_data_error(jre)
         raise

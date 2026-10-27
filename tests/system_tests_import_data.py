@@ -276,7 +276,7 @@ class DataImporterTests(unittest.TestCase):
             with self.assertRaises(JavaRunException) as raised:
                 cbioportalImporter.main(cbioportalImporter.interface(['--study_directory', 'test_data/study_es_0']))
         self.assertEqual(raised.exception.failed_step.class_name, VERSION_UTIL_CLASS)
-        self.assertEqual(raised.exception.java_process_status, 1)
+        self.assertEqual(raised.exception.process_return_status, 1)
         self.assertIn('migrate_db.py', output.getvalue())
 
     @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
@@ -290,7 +290,7 @@ class DataImporterTests(unittest.TestCase):
         self.assertIn('the exit status returned by the java process was 65', '\n'.join(logs.output))
 
     @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
-    def test_steps_before_a_missing_sample_file_still_run(self, locate_jar):
+    def test_missing_sample_file_runs_nothing(self, locate_jar):
         study_directory = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, study_directory)
         for filename in ('meta_study.txt', 'meta_cancer_type.txt', 'data_cancer_type.txt'):
@@ -299,12 +299,20 @@ class DataImporterTests(unittest.TestCase):
         with mock.patch('importer.cbioportalImporter.run_java', recorder):
             with self.assertRaisesRegex(RuntimeError, 'No sample attribute file found'):
                 cbioportalImporter.main(cbioportalImporter.interface(['--study_directory', study_directory]))
-        self.assertEqual(recorder.call_args_list, [
-            call(*common_part, VERSION_UTIL_CLASS),
-            call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportTypesOfCancers', os.path.join(study_directory, 'data_cancer_type.txt'), 'false', '--noprogress'),
-            call(*common_part, 'org.mskcc.cbio.portal.scripts.RemoveCancerStudy', 'study_es_0', '--noprogress'),
-            call(*common_part, 'org.mskcc.cbio.portal.scripts.ImportCancerStudy', os.path.join(study_directory, 'meta_study.txt'), '--noprogress'),
-        ])
+        self.assertEqual(recorder.runs, 0)
+        self.assertEqual(recorder.call_args_list, [])
+
+    @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
+    def test_incremental_preparation_failure_runs_nothing(self, locate_jar):
+        recorder = StepRunnerRecorder()
+        with mock.patch('importer.cbioportalImporter.run_java', recorder), \
+                mock.patch('importer.cbioportalImporter.case_list_update_steps',
+                           side_effect=RuntimeError('Invalid case list')):
+            with self.assertRaisesRegex(RuntimeError, 'Invalid case list'):
+                cbioportalImporter.main(cbioportalImporter.interface(
+                    ['--data_directory', 'test_data/study_es_0_inc/cna_long']))
+        self.assertEqual(recorder.runs, 0)
+        self.assertEqual(recorder.call_args_list, [])
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

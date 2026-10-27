@@ -133,6 +133,51 @@ public class DaoSample {
         samples.put(sample.getStableId(), sample);
     }
 
+    /** Evict deleted rows without rereading samples from a potentially stale replica. */
+    static void removeSamplesFromCache(int cancerStudyId, Collection<Integer> sampleIds) {
+        Set<String> missingStableIds = new HashSet<>();
+        for (int sampleId : sampleIds) {
+            Sample sample = byInternalId.remove(sampleId);
+            if (sample == null) {
+                continue;
+            }
+            Map<String, Sample> patientSamples = byInternalPatientAndStableSampleId.get(sample.getInternalPatientId());
+            if (patientSamples != null) {
+                patientSamples.remove(sample.getStableId(), sample);
+                if (patientSamples.isEmpty()) {
+                    byInternalPatientAndStableSampleId.remove(sample.getInternalPatientId());
+                }
+            }
+            Map<String, Sample> studySamples = byCancerStudyIdAndStableSampleId.get(cancerStudyId);
+            if (studySamples != null) {
+                studySamples.remove(sample.getStableId(), sample);
+                if (studySamples.isEmpty()) {
+                    byCancerStudyIdAndStableSampleId.remove(cancerStudyId);
+                }
+            }
+            if (byStableId.remove(sample.getStableId(), sample)) {
+                missingStableIds.add(sample.getStableId());
+            }
+        }
+        // Stable sample IDs can be shared by studies. Restore survivors in one pass.
+        if (!missingStableIds.isEmpty()) {
+            for (Sample remaining : byInternalId.values()) {
+                if (missingStableIds.remove(remaining.getStableId())) {
+                    byStableId.put(remaining.getStableId(), remaining);
+                }
+                if (missingStableIds.isEmpty()) {
+                    break;
+                }
+            }
+        }
+    }
+
+    static void removeStudyFromCache(int cancerStudyId) {
+        List<Integer> sampleIds = getSamplesByCancerStudy(cancerStudyId).stream()
+            .map(Sample::getInternalId).collect(Collectors.toList());
+        removeSamplesFromCache(cancerStudyId, sampleIds);
+    }
+
     private static final String SAMPLE_SEQUENCE = "seq_sample";
 
     public static int addSample(Sample sample) throws DaoException
@@ -308,7 +353,7 @@ public class DaoSample {
         DaoResourceData.deleteResourceDataForSamples(internalStudyId, sampleStableIds);
         ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(internalSampleIds);
         ClickHouseBulkDeleter.flushAll();
-        clearCache();
+        removeSamplesFromCache(internalStudyId, internalSampleIds);
         DaoCancerStudy.purgeUnreferencedRecordsAfterDeletionOfStudy();
         log.info("Removing {} samples from study with internal id={} done.", sampleStableIds, internalStudyId);
     }
