@@ -15,6 +15,7 @@ import java.util.*;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoGenericAssay;
 import org.mskcc.cbio.portal.dao.DaoGeneticEntity;
 import org.mskcc.cbio.portal.model.shared.EntityType;
@@ -221,7 +222,18 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         }
         
         reader.close();
-        
+
+        // Flush any buffered genetic_entity inserts so that a subsequent SELECT
+        // (e.g. GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap)
+        // in the same JVM sees them. ImportProfileData runs this method
+        // immediately before ImportTabDelimData for GENERIC_ASSAY profiles.
+        // bulkLoadOff() restores the global flag — ImportTabDelimData will
+        // turn it back on for the matrix import.
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.flushAll();
+            ClickHouseBulkLoader.bulkLoadOff();
+        }
+
         ProgressMonitor.setCurrentMessage("Finished loading generic assay.\n");
     }
     

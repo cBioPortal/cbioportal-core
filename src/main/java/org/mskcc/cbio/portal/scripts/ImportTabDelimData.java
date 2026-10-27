@@ -254,11 +254,15 @@ public class ImportTabDelimData {
 
             geneticAlterationImporter.initialize();
 
+            // Bulk-load matrix data via ClickHouseBulkLoader's
+            // INSERT ... FORMAT TSVWithNames path — one round-trip per profile
+            // instead of one JDBC INSERT per gene.
+            ClickHouseBulkLoader.bulkLoadOn();
+
             //cache for data found in  cna_event' table:
             Set<CnaEvent.Event> existingCnaEvents = new HashSet<>();
             if (isDiscretizedCnaProfile) {
                 existingCnaEvents.addAll(DaoCnaEvent.getAllCnaEvents());
-                ClickHouseBulkLoader.bulkLoadOn();
             }
 
             // load entities map from database
@@ -342,6 +346,7 @@ public class ImportTabDelimData {
             DaoSampleProfile.upsertSampleToProfileMapping(orderedSampleList, geneticProfileId, genePanelId);
             if (ClickHouseBulkLoader.isBulkLoad()) {
                 ClickHouseBulkLoader.flushAll();
+                ClickHouseBulkLoader.bulkLoadOff();
             }
             geneticAlterationImporter.complete();
 
