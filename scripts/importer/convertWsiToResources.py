@@ -46,7 +46,7 @@ FORMAT_VERSION = "4"
 
 # Public metadata keys, emitted in lower case. Values the backend reads with
 # JSONExtractString stay strings (e.g. PART_NUMBER, MAGNIFICATION). BARCODE,
-# PART_DESIGNATOR and PATH_DX_TITLE are never written; SEALED_SOURCE is private.
+# PART_DESIGNATOR and PATH_DX_TITLE are never written; SEALED_SOURCE goes only into wsi_serving.
 PUBLIC_STRING_FIELDS = [
     "SLIDE_KEY", "PART_KEY", "PART_NUMBER", "PART_TYPE",
     "PART_DESCRIPTION", "SUBSPECIALTY", "BLOCK_KEY",
@@ -71,7 +71,7 @@ FORBIDDEN_PUBLIC_KEYS = UNSEALED_SOURCE_KEYS + ("barcode", "part_designator", "p
                                                 "sealed_source")
 # The CUSTOM_METADATA contract of both WSI resource definitions: every public metadata key the
 # converter writes, so validateData.py's undeclared-key check holds for converted files. The
-# private wsi_serving object is not a column and is never declared. Keys that identify a single
+# wsi_serving object is not a column and is never declared. Keys that identify a single
 # slide or specimen (nearly every row has its own value) and free text are not filterable;
 # otherwise the portal's resource table would list every distinct value as a filter option (over
 # a million for slide_key on a large study).
@@ -515,7 +515,7 @@ def normalize_row(row, line):
     if problems:
         _fail(line, problems[0][1])
     if not metadata["can_serve_tiles"]:
-        # Non-servable rows have no private serving object.
+        # Non-servable rows have no serving object.
         del metadata[SERVING_KEY]
     return metadata
 

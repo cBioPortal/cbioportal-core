@@ -42,9 +42,9 @@ be returned to the browser:
 - JSON booleans: `is_hne`, `is_ihc`, `can_serve_tiles`;
 - JSON integers: `file_size_bytes`;
 
-and one private key:
+and, only for slides that can serve tiles:
 
-- `wsi_serving`, only for slides that can serve tiles: an object with
+- `wsi_serving`: an object with
   `sealed_source`, `tile_metadata_json` (a JSON object, not a string),
   `thumbnail_width`, `thumbnail_height` (integers) and
   `thumbnail_content_type`.
@@ -52,11 +52,12 @@ and one private key:
 `slide_key` is the opaque per-slide key of the WSI de-identification contract
 (`wsi-serving-v6`): 12 lowercase hex characters computed upstream from a
 salted hash of the image ID. It is the only slide identifier the browser sees.
-The backend strips `wsi_serving` from generic resource responses and only
-reads it to build the authorized WSI access token, into which it copies
-`sealed_source` verbatim. The pathology image ID and the object URIs that
-embed it are not stored anywhere in cBioPortal; they exist only inside the
-sealed source.
+The portal returns slide rows, `wsi_serving` included, through the generic
+resource API, and the slide viewer reads them there. To open a slide, the
+backend checks the user's access to the study and copies `sealed_source`
+verbatim into a signed tile token. The pathology image ID and the object URIs
+that embed it are not stored anywhere in cBioPortal; they exist only inside
+the sealed source, which only the tile server can open.
 
 ### Row contract
 
