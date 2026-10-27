@@ -390,6 +390,18 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
             meta=self.with_cell(SEALED_SOURCE, SEALED_SOURCE_VECTOR, row=1))
         self.assertNotIn(SEALED_SOURCE_VECTOR[:20], message)
 
+    def test_source_identity_is_dropped_from_tile_metadata(self):
+        column = converter.COLUMNS.index('TILE_METADATA_JSON')
+        tile_metadata = json.loads(self.fixture_rows()[0].split('\t')[column])
+        fingerprint = 'f' * 64
+        legacy = dict(tile_metadata, source_fingerprint=fingerprint, identity_version='source-v2')
+        self.convert(meta=self.with_cell(column, json.dumps(legacy)))
+        text = (self.out / 'data_resource_sample.txt').read_text(encoding='utf-8')
+        for value in ('source_fingerprint', 'identity_version', fingerprint, 'source-v2'):
+            self.assertNotIn(value, text)
+        serving = json.loads(rows_by_slide(self.out / 'data_resource_sample.txt')['slide-1']['METADATA'])
+        self.assertEqual(tile_metadata, serving['wsi_serving']['tile_metadata_json'])
+
     def test_url_display_name_and_metadata_shape(self):
         self.convert()
         for name in ('data_resource_sample.txt', 'data_resource_patient.txt'):

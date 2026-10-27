@@ -67,6 +67,10 @@ SERVING_FIELDS = [field for field, _ in SERVING_FIELD_TYPES]
 # Keys that would carry the pathology image ID or an object URI embedding it; those values exist
 # only inside the sealed source.
 UNSEALED_SOURCE_KEYS = ("image_id", "source_url", "thumbnail_url")
+# Upstream source identity: source_fingerprint is an unsalted hash of the source path, which
+# embeds the image ID. The browser reads wsi_serving, so tile metadata must not carry these; the
+# converter drops them from legacy files.
+SOURCE_IDENTITY_TILE_METADATA_KEYS = ("source_fingerprint", "identity_version")
 FORBIDDEN_PUBLIC_KEYS = UNSEALED_SOURCE_KEYS + ("barcode", "part_designator", "path_dx_title",
                                                 "sealed_source")
 # The CUSTOM_METADATA contract of both WSI resource definitions: every public metadata key the
@@ -412,6 +416,12 @@ def _serving_problems(serving, can_serve):
                  f"carried inside the sealed source")
                 for key in UNSEALED_SOURCE_KEYS if key in serving]
     values = _typed_values(serving, SERVING_FIELD_TYPES, problems)
+    tile_metadata = values.get("TILE_METADATA_JSON")
+    if tile_metadata is not None:
+        problems.extend((f"{SERVING_KEY}.tile_metadata_json.{key}",
+                         f"{SERVING_KEY}.tile_metadata_json must not contain {key}; it identifies "
+                         f"the source image")
+                        for key in SOURCE_IDENTITY_TILE_METADATA_KEYS if key in tile_metadata)
     # SEALED_SOURCE is opaque and only the tile server can open it; never echo it.
     sealed_source = values.get("SEALED_SOURCE")
     if sealed_source and not sealed_source_valid(sealed_source):
@@ -425,7 +435,6 @@ def _serving_problems(serving, can_serve):
     for field in SERVING_FIELDS:
         if serving.get(field.lower()) in (None, ""):
             problems.append((field, f"{field} is required when CAN_SERVE_TILES is TRUE"))
-    tile_metadata = values.get("TILE_METADATA_JSON")
     if tile_metadata is not None and not tile_metadata_valid(tile_metadata):
         problems.append(("TILE_METADATA_JSON", "TILE_METADATA_JSON must follow tile metadata "
                          f"schema version {TILE_METADATA_SCHEMA_VERSION}"))
@@ -503,6 +512,8 @@ def normalize_row(row, line):
             pass
         if not isinstance(tile_metadata, dict):
             _fail(line, "TILE_METADATA_JSON must be a JSON object")
+        for key in SOURCE_IDENTITY_TILE_METADATA_KEYS:
+            tile_metadata.pop(key, None)
     serving = {
         "sealed_source": row["SEALED_SOURCE"],
         "tile_metadata_json": tile_metadata,

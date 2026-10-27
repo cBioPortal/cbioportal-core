@@ -3712,6 +3712,20 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             warnings = [record for record in self.get_log_records() if record.levelno == logging.WARNING]
             self.assertEqual([], [record.getMessage() for record in warnings])
 
+    def test_source_identity_is_rejected_in_tile_metadata(self):
+        fingerprint = 'f' * 64
+        for key in ('source_fingerprint', 'identity_version'):
+            tile_metadata = dict(WSI_TILE_METADATA, **{key: fingerprint})
+            errors = self.sample_errors(wsi_serving=self.serving(tile_metadata_json=tile_metadata))
+            self.assertEqual([('WSI: wsi_serving.tile_metadata_json must not contain %s; it '
+                               'identifies the source image' % key,
+                               'METADATA.wsi_serving.tile_metadata_json.' + key)], errors)
+            self.assertNotIn(fingerprint, str(errors))
+            # also when the slide cannot serve tiles
+            errors = self.sample_errors(can_serve_tiles=False, wsi_serving={'tile_metadata_json': tile_metadata})
+            self.assertEqual(['METADATA.wsi_serving.tile_metadata_json.' + key],
+                             [field for _, field in errors])
+
     def test_forbidden_public_metadata_keys(self):
         for key in ('image_id', 'barcode', 'source_url', 'thumbnail_url', 'part_designator',
                     'path_dx_title', 'sealed_source'):

@@ -92,6 +92,10 @@ rules, and the converter applies the same rules to each legacy row (both use
 - The public keys never include `image_id`, `source_url`, `thumbnail_url`,
   `barcode`, `part_designator`, `path_dx_title` or `sealed_source`, and
   `wsi_serving` never includes `image_id`, `source_url` or `thumbnail_url`.
+- `wsi_serving.tile_metadata_json` never includes `source_fingerprint` (an
+  unsalted hash of the source path, which embeds the image ID) or
+  `identity_version`, whether or not the slide can serve tiles. The
+  converter drops both from legacy `TILE_METADATA_JSON`.
 
 WSI errors name the column or `METADATA` path, never the value. Core does not
 scan free text (`DISPLAY_NAME`, part and block descriptions, stain names, tile
