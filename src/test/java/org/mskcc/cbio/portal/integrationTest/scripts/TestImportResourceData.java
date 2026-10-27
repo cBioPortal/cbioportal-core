@@ -102,9 +102,10 @@ public class TestImportResourceData extends IntegrationTestBase {
         assertEquals(716956681L, metadata.get("file_size_bytes").longValue());
         assertEquals("1", metadata.get("part_number").textValue());
         assertEquals("Left \"upper\" lobe \\ wedge", metadata.get("part_description").textValue());
-        JsonNode serving = metadata.get("wsi_serving");
-        assertEquals(List.of("sealed_source", "thumbnail_content_type", "thumbnail_height",
+        JsonNode serving = metadata.get("serving");
+        assertEquals(List.of("key", "sealed_source", "thumbnail_content_type", "thumbnail_height",
             "thumbnail_width", "tile_metadata_json"), fieldNames(serving));
+        assertEquals(metadata.get("slide_key").textValue(), serving.get("key").textValue());
         assertEquals(SEALED_SOURCE_VECTOR, serving.get("sealed_source").textValue());
         assertEquals(256, serving.get("thumbnail_width").intValue());
         assertEquals(1024, serving.at("/tile_metadata_json/dimensions/width").intValue());
@@ -113,7 +114,7 @@ public class TestImportResourceData extends IntegrationTestBase {
 
         JsonNode unservable = JSON.readTree(rows.get(SLIDE_2).metadata());
         assertFalse(unservable.get("can_serve_tiles").booleanValue());
-        assertFalse(unservable.has("wsi_serving"));
+        assertFalse(unservable.has("serving"));
 
         assertEquals("WSI-P2-S1", rows.get(SLIDE_5).sampleId());
 

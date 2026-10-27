@@ -3491,7 +3491,8 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
             'match_level': 'BLOCK', 'specimen_key': 'SPEC-1', 'is_hne': True, 'is_ihc': False,
             'slide_type': 'H&E',
             'can_serve_tiles': True,
-            'wsi_serving': {
+            'serving': {
+                'key': self.slide_key(slide),
                 'sealed_source': WSI_SEALED_SOURCE_VECTOR,
                 'tile_metadata_json': WSI_TILE_METADATA,
                 'thumbnail_width': 16, 'thumbnail_height': 16,
@@ -3503,11 +3504,14 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
                 value.pop(key, None)
             else:
                 value[key] = change
+        if 'serving' not in changes and 'slide_key' in changes:
+            # for a WSI row the slide key is the serving key
+            value['serving']['key'] = value.get('slide_key')
         return json.dumps(value)
 
     def serving(self, **changes):
-        """The wsi_serving object of metadata(), changed like metadata()."""
-        serving = json.loads(self.metadata())['wsi_serving']
+        """The serving object of metadata(), changed like metadata()."""
+        serving = json.loads(self.metadata())['serving']
         for key, change in changes.items():
             if change is None:
                 serving.pop(key, None)
@@ -3585,11 +3589,11 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
                                'METADATA.slide_type')], self.sample_errors(**changes), changes)
         self.assertEqual([], self.sample_errors(slide_type='Unknown', is_hne=False))
 
-    def test_contract_check_ignores_private_wsi_serving(self):
-        """wsi_serving is never a column, so a WSI contract does not declare it."""
+    def test_contract_check_ignores_private_serving(self):
+        """serving is never a column, so a WSI contract does not declare it."""
         saved = validateData.RESOURCE_CONTRACT_KEYS
         try:
-            public = set(json.loads(self.metadata())) - {'wsi_serving'}
+            public = set(json.loads(self.metadata())) - {'serving'}
             validateData.RESOURCE_CONTRACT_KEYS = {'WSI_SAMPLE': public}
             self.assertEqual([], self.validate_resource(
                 validateData.SampleResourceValidator, [self.sample_row()]))
@@ -3667,47 +3671,70 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
                       self.sample_errors(slide='slide-3', match_level='UNMATCHED'))
 
     def test_serving_shape(self):
-        self.assertIn(('WSI: wsi_serving must be a JSON object', 'METADATA.wsi_serving'),
-                      self.sample_errors(wsi_serving=[WSI_SEALED_SOURCE_VECTOR]))
+        self.assertIn(('WSI: serving must be a JSON object', 'METADATA.serving'),
+                      self.sample_errors(serving=[WSI_SEALED_SOURCE_VECTOR]))
         self.assertIn(('WSI: TILE_METADATA_JSON must be a JSON object',
-                       'METADATA.wsi_serving.tile_metadata_json'),
-                      self.sample_errors(wsi_serving=self.serving(
+                       'METADATA.serving.tile_metadata_json'),
+                      self.sample_errors(serving=self.serving(
                           tile_metadata_json=json.dumps(WSI_TILE_METADATA))))
         for key in ('sealed_source', 'thumbnail_content_type', 'thumbnail_width'):
             self.assertEqual([('WSI: %s is required when CAN_SERVE_TILES is TRUE' % key.upper(),
-                               'METADATA.wsi_serving.' + key)],
-                             self.sample_errors(wsi_serving=self.serving(**{key: None})))
+                               'METADATA.serving.' + key)],
+                             self.sample_errors(serving=self.serving(**{key: None})))
         self.assertEqual([('WSI: TILE_METADATA_JSON must follow tile metadata schema version 2',
-                           'METADATA.wsi_serving.tile_metadata_json')],
-                         self.sample_errors(wsi_serving=self.serving(tile_metadata_json={})))
+                           'METADATA.serving.tile_metadata_json')],
+                         self.sample_errors(serving=self.serving(tile_metadata_json={})))
         self.assertEqual([('WSI: THUMBNAIL_WIDTH must be between 1 and 8192',
-                           'METADATA.wsi_serving.thumbnail_width')],
-                         self.sample_errors(wsi_serving=self.serving(thumbnail_width=8193)))
+                           'METADATA.serving.thumbnail_width')],
+                         self.sample_errors(serving=self.serving(thumbnail_width=8193)))
         self.assertEqual([('WSI: THUMBNAIL_CONTENT_TYPE must be an image media type',
-                           'METADATA.wsi_serving.thumbnail_content_type')],
-                         self.sample_errors(wsi_serving=self.serving(thumbnail_content_type='text/plain')))
+                           'METADATA.serving.thumbnail_content_type')],
+                         self.sample_errors(serving=self.serving(thumbnail_content_type='text/plain')))
         # non-servable slides have no serving object
-        self.assertEqual([], self.sample_errors(wsi_serving=None, can_serve_tiles=False))
-        self.assertEqual([], self.sample_errors(wsi_serving={}, can_serve_tiles=False))
+        self.assertEqual([], self.sample_errors(serving=None, can_serve_tiles=False))
+        # a serving object present always names its row
+        self.assertEqual([('WSI: serving.key is required', 'METADATA.serving.key')],
+                         self.sample_errors(serving={}, can_serve_tiles=False))
         self.assertEqual([('WSI: SEALED_SOURCE must be empty when CAN_SERVE_TILES is FALSE',
-                           'METADATA.wsi_serving.sealed_source')],
+                           'METADATA.serving.sealed_source')],
                          self.sample_errors(can_serve_tiles=False))
+
+    def test_serving_key_names_the_slide(self):
+        for serving in (self.serving(key=None), self.serving(key='')):
+            self.assertEqual([('WSI: serving.key is required', 'METADATA.serving.key')],
+                             self.sample_errors(serving=serving))
+        errors = self.sample_errors(serving=self.serving(key=self.slide_key('slide-2')))
+        self.assertEqual([('WSI: serving.key must equal SLIDE_KEY', 'METADATA.serving.key')],
+                         errors)
+        self.assertNotIn(self.slide_key('slide-2'), str(errors))
+        self.assertNotIn(self.slide_key('slide-1'), str(errors))
+        self.assertIn(('WSI: KEY must be a JSON string', 'METADATA.serving.key'),
+                      self.sample_errors(serving=self.serving(key=12)))
+        # also when the slide cannot serve tiles
+        self.assertEqual([('WSI: serving.key must equal SLIDE_KEY', 'METADATA.serving.key')],
+                         self.sample_errors(can_serve_tiles=False, serving={
+                             'key': self.slide_key('slide-2')}))
+        # a servable slide without a serving object reports every serving field once
+        errors = self.sample_errors(serving=None)
+        self.assertEqual(['METADATA.serving.' + field.lower()
+                          for field in validateData.wsi_contract.SERVING_FIELDS],
+                         [field for _, field in errors])
 
     def test_sealed_source_shape_in_metadata(self):
         for value in ('A' * 38, WSI_SEALED_SOURCE_VECTOR + '=', 'not base64url!'):
-            errors = self.sample_errors(wsi_serving=self.serving(sealed_source=value))
+            errors = self.sample_errors(serving=self.serving(sealed_source=value))
             self.assertEqual([('WSI: SEALED_SOURCE must be unpadded base64url of at least 29 bytes and '
-                               'at most 4096 characters', 'METADATA.wsi_serving.sealed_source')], errors)
+                               'at most 4096 characters', 'METADATA.serving.sealed_source')], errors)
             self.assertNotIn(value, str(errors))
-        self.assertIn(('WSI: SEALED_SOURCE must be a JSON string', 'METADATA.wsi_serving.sealed_source'),
-                      self.sample_errors(wsi_serving=self.serving(sealed_source=29)))
+        self.assertIn(('WSI: SEALED_SOURCE must be a JSON string', 'METADATA.serving.sealed_source'),
+                      self.sample_errors(serving=self.serving(sealed_source=29)))
 
-    def test_unsealed_source_keys_are_rejected_in_wsi_serving(self):
+    def test_unsealed_source_keys_are_rejected_in_serving(self):
         for key in ('image_id', 'source_url', 'thumbnail_url'):
-            errors = self.sample_errors(wsi_serving=self.serving(**{key: 'S-SECRET-1'}))
-            self.assertEqual([('WSI: wsi_serving must not contain %s; the image ID and object '
+            errors = self.sample_errors(serving=self.serving(**{key: 'S-SECRET-1'}))
+            self.assertEqual([('WSI: serving must not contain %s; the image ID and object '
                                'URIs are only carried inside the sealed source' % key,
-                               'METADATA.wsi_serving.' + key)], errors)
+                               'METADATA.serving.' + key)], errors)
             self.assertNotIn('S-SECRET', str(errors))
             warnings = [record for record in self.get_log_records() if record.levelno == logging.WARNING]
             self.assertEqual([], [record.getMessage() for record in warnings])
@@ -3716,14 +3743,15 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
         fingerprint = 'f' * 64
         for key in ('source_fingerprint', 'identity_version'):
             tile_metadata = dict(WSI_TILE_METADATA, **{key: fingerprint})
-            errors = self.sample_errors(wsi_serving=self.serving(tile_metadata_json=tile_metadata))
-            self.assertEqual([('WSI: wsi_serving.tile_metadata_json must not contain %s; it '
+            errors = self.sample_errors(serving=self.serving(tile_metadata_json=tile_metadata))
+            self.assertEqual([('WSI: serving.tile_metadata_json must not contain %s; it '
                                'identifies the source image' % key,
-                               'METADATA.wsi_serving.tile_metadata_json.' + key)], errors)
+                               'METADATA.serving.tile_metadata_json.' + key)], errors)
             self.assertNotIn(fingerprint, str(errors))
             # also when the slide cannot serve tiles
-            errors = self.sample_errors(can_serve_tiles=False, wsi_serving={'tile_metadata_json': tile_metadata})
-            self.assertEqual(['METADATA.wsi_serving.tile_metadata_json.' + key],
+            errors = self.sample_errors(can_serve_tiles=False, serving={
+                'key': self.slide_key('slide-1'), 'tile_metadata_json': tile_metadata})
+            self.assertEqual(['METADATA.serving.tile_metadata_json.' + key],
                              [field for _, field in errors])
 
     def test_forbidden_public_metadata_keys(self):
@@ -3745,7 +3773,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
 
     def test_errors_name_fields_not_values(self):
         errors = self.sample_errors(part_key='S-SECRET?', slide_type='S-SECRET',
-                                    wsi_serving=self.serving(thumbnail_content_type='S-SECRET'))
+                                    serving=self.serving(thumbnail_content_type='S-SECRET'))
         self.assertEqual(3, len(errors), errors)
         self.assertNotIn('S-SECRET', str(errors))
 
@@ -3765,7 +3793,7 @@ class WsiResourceValidatorTestCase(PostClinicalDataFileTestCase):
                       errors)
         self.assertNotIn('S-SECRET', str(errors))
         errors = self.validate_resource(validateData.SampleResourceValidator,
-                                        [self.sample_row('{"wsi_serving": {"sealed_source": "S-SECRET-1"')])
+                                        [self.sample_row('{"serving": {"sealed_source": "S-SECRET-1"')])
         self.assertIn(('METADATA value is not valid JSON', 'METADATA'), errors)
         self.assertNotIn('S-SECRET', str(errors))
 

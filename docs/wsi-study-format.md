@@ -44,15 +44,17 @@ be returned to the browser:
 
 and, only for slides that can serve tiles:
 
-- `wsi_serving`: an object with
-  `sealed_source`, `tile_metadata_json` (a JSON object, not a string),
-  `thumbnail_width`, `thumbnail_height` (integers) and
-  `thumbnail_content_type`.
+- `serving`: the serving data the portal copies into a tile capability, an
+  object with `key`, `sealed_source`, `tile_metadata_json` (a JSON object,
+  not a string), `thumbnail_width`, `thumbnail_height` (integers) and
+  `thumbnail_content_type`. `key` names the row for
+  `GET /api/resources/{studyId}/{resourceId}/access?key=`; for a WSI row it is
+  the row's `slide_key`.
 
 `slide_key` is the opaque per-slide key of the WSI de-identification contract
 (`wsi-serving-v6`): 12 lowercase hex characters computed upstream from a
 salted hash of the image ID. It is the only slide identifier the browser sees.
-The portal returns slide rows, `wsi_serving` included, through the generic
+The portal returns slide rows, `serving` included, through the generic
 resource API, and the slide viewer reads them there. To open a slide, the
 backend checks the user's access to the study and copies `sealed_source`
 verbatim into a signed tile token. The pathology image ID and the object URIs
@@ -81,7 +83,8 @@ rules, and the converter applies the same rules to each legacy row (both use
 - All slides of a patient have the same `reference_sample_id`, or all omit it
   (`UNMATCHED` is not a value). The sample and reference sample belong to the
   row's patient in the clinical files.
-- When `can_serve_tiles` is true, all five `wsi_serving` keys are set: a valid
+- When `serving` is present, its `key` is set and equals `slide_key`.
+- When `can_serve_tiles` is true, all six `serving` keys are set: a valid
   sealed source, tile metadata of schema version 2 (positive `dimensions`, one
   positive `level_dimensions` entry and one `level_downsamples` value per
   level, `max_zoom`, `tile_size`, `safe_min_level`,
@@ -91,8 +94,8 @@ rules, and the converter applies the same rules to each legacy row (both use
   absent or empty.
 - The public keys never include `image_id`, `source_url`, `thumbnail_url`,
   `barcode`, `part_designator`, `path_dx_title` or `sealed_source`, and
-  `wsi_serving` never includes `image_id`, `source_url` or `thumbnail_url`.
-- `wsi_serving.tile_metadata_json` never includes `source_fingerprint` (an
+  `serving` never includes `image_id`, `source_url` or `thumbnail_url`.
+- `serving.tile_metadata_json` never includes `source_fingerprint` (an
   unsalted hash of the source path, which embeds the image ID) or
   `identity_version`, whether or not the slide can serve tiles. The
   converter drops both from legacy `TILE_METADATA_JSON`.
@@ -150,7 +153,7 @@ python scripts/importer/convertWsiToResources.py \
 
 The converter fails on the first row that breaks the
 [row contract](#row-contract). It drops `BARCODE`, `PART_DESIGNATOR` and
-`PATH_DX_TITLE`, an `UNMATCHED` reference sample, and the `wsi_serving`
+`PATH_DX_TITLE`, an `UNMATCHED` reference sample, and the `serving`
 object of rows with `CAN_SERVE_TILES=FALSE`; it copies `SEALED_SOURCE`
 verbatim. Rows are streamed, and the output is staged in a hidden
 `.<output dir name>.*.partial` directory next to `--output-dir`, so a failed

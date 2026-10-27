@@ -169,7 +169,7 @@ class ConvertedOutputTestCase(ConverterTestCase):
         for removed in ('image_id', 'barcode', 'part_designator', 'path_dx_title'):
             self.assertNotIn(removed, first)
         self.assertEqual('WSI-P1-S1', first['reference_sample_id'])
-        serving = first['wsi_serving']
+        serving = first['serving']
         self.assertEqual(256, serving['thumbnail_width'])
         self.assertEqual(192, serving['thumbnail_height'])
         self.assertEqual({'height': 768, 'width': 1024}, serving['tile_metadata_json']['dimensions'])
@@ -186,8 +186,8 @@ class ConvertedOutputTestCase(ConverterTestCase):
         # slide-2 has a thumbnail width in the legacy row but CAN_SERVE_TILES=FALSE
         second = json.loads(samples['slide-2']['METADATA'])
         self.assertIs(False, second['can_serve_tiles'])
-        self.assertNotIn('wsi_serving', second)
-        self.assertNotIn('wsi_serving', json.loads(patients['slide-6']['METADATA']))
+        self.assertNotIn('serving', second)
+        self.assertNotIn('serving', json.loads(patients['slide-6']['METADATA']))
 
     def test_only_pairs_with_rows_are_written(self):
         match_level = converter.COLUMNS.index('MATCH_LEVEL')
@@ -400,7 +400,7 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
         for value in ('source_fingerprint', 'identity_version', fingerprint, 'source-v2'):
             self.assertNotIn(value, text)
         serving = json.loads(rows_by_slide(self.out / 'data_resource_sample.txt')['slide-1']['METADATA'])
-        self.assertEqual(tile_metadata, serving['wsi_serving']['tile_metadata_json'])
+        self.assertEqual(tile_metadata, serving['serving']['tile_metadata_json'])
 
     def test_url_display_name_and_metadata_shape(self):
         self.convert()
@@ -414,16 +414,16 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
                 for field in ('URL', 'DISPLAY_NAME'):
                     for value in ('imageId', 'BC-0001', 'sealed'):
                         self.assertNotIn(value, row[field])
-                public = {key for key in metadata if key != 'wsi_serving'}
+                public = {key for key in metadata if key != 'serving'}
                 self.assertFalse(public & {'image_id', 'barcode', 'part_designator', 'path_dx_title',
                                            'source_url', 'thumbnail_url', 'sealed_source'}, public)
                 self.assertLessEqual(public, PUBLIC_KEYS)
                 public_text = json.dumps({key: metadata[key] for key in public})
                 for value in ('BC-0001', 'Adenocarcinoma'):
                     self.assertNotIn(value, public_text)
-                if 'wsi_serving' in metadata:
-                    self.assertNotIn(metadata['wsi_serving']['sealed_source'], public_text)
-                    self.assertNotIn(metadata['wsi_serving']['sealed_source'], row['URL'])
+                if 'serving' in metadata:
+                    self.assertNotIn(metadata['serving']['sealed_source'], public_text)
+                    self.assertNotIn(metadata['serving']['sealed_source'], row['URL'])
             # no image ID, object URI or barcode is written anywhere
             text = (self.out / name).read_text(encoding='utf-8')
             for value in ('IMG', 'image_id', 'source_url', 'thumbnail_url', '.svs', '.jpg', 'BC-0001'):
@@ -440,17 +440,19 @@ class SlideKeyAndDeidTestCase(ConverterTestCase):
         row.update(SLIDE_TYPE='IHC', BLOCK_NUMBER='3')
         self.assertEqual('IHC \u00b7 Block 3', converter.display_name(row))
 
-    def test_wsi_serving_carries_sealed_source(self):
+    def test_serving_carries_key_and_sealed_source(self):
         self.convert()
         samples = rows_by_slide(self.out / 'data_resource_sample.txt')
-        serving = json.loads(samples['slide-1']['METADATA'])['wsi_serving']
+        serving = json.loads(samples['slide-1']['METADATA'])['serving']
         self.assertEqual(
-            {'sealed_source', 'tile_metadata_json', 'thumbnail_width', 'thumbnail_height',
+            {'key', 'sealed_source', 'tile_metadata_json', 'thumbnail_width', 'thumbnail_height',
              'thumbnail_content_type'}, set(serving))
+        # for a WSI row the slide key is the serving key
+        self.assertEqual('2c96f1378325', serving['key'])
         self.assertEqual(SEALED_SOURCE_VECTOR, serving['sealed_source'])
         self.assertEqual('image/jpeg', serving['thumbnail_content_type'])
         # non-servable rows have no serving object
-        self.assertNotIn('wsi_serving', json.loads(samples['slide-2']['METADATA']))
+        self.assertNotIn('serving', json.loads(samples['slide-2']['METADATA']))
 
 PUBLIC_KEYS = {
     'slide_key', 'reference_sample_id', 'part_key', 'part_number', 'part_type',
@@ -505,7 +507,7 @@ class ConvertedFilesValidationTestCase(ConverterTestCase):
                                                  'data_resource_definition.txt')
         self.assertEqual([], [r.getMessage() for r in problems])
         validateData.RESOURCE_DEFINITION_DICTIONARY = validator.resource_definition_dictionary
-        # the contract applies: no undeclared keys (wsi_serving is private) and no unused ones
+        # the contract applies: no undeclared keys (serving is private) and no unused ones
         validateData.RESOURCE_CONTRACT_KEYS = validator.resource_contract_keys
         self.assertEqual({'WSI_SAMPLE', 'WSI_PATIENT'}, set(validator.resource_contract_keys))
         _, problems = self.run_validator(validateData.SampleResourceValidator, 'data_resource_sample.txt')

@@ -46,7 +46,7 @@ FORMAT_VERSION = "4"
 
 # Public metadata keys, emitted in lower case. Values the backend reads with
 # JSONExtractString stay strings (e.g. PART_NUMBER, MAGNIFICATION). BARCODE,
-# PART_DESIGNATOR and PATH_DX_TITLE are never written; SEALED_SOURCE goes only into wsi_serving.
+# PART_DESIGNATOR and PATH_DX_TITLE are never written; SEALED_SOURCE goes only into serving.
 PUBLIC_STRING_FIELDS = [
     "SLIDE_KEY", "PART_KEY", "PART_NUMBER", "PART_TYPE",
     "PART_DESCRIPTION", "SUBSPECIALTY", "BLOCK_KEY",
@@ -59,8 +59,11 @@ PUBLIC_FIELD_TYPES = ([(field, "string") for field in PUBLIC_STRING_FIELDS + ["R
                       + [(field, "boolean") for field in BOOLEAN_FIELDS]
                       + [("FILE_SIZE_BYTES", "integer")])
 REQUIRED_FIELDS = ["SLIDE_KEY", "PART_KEY", "BLOCK_KEY", "MATCH_LEVEL", "SPECIMEN_KEY"] + BOOLEAN_FIELDS
-SERVING_KEY = "wsi_serving"
-SERVING_FIELD_TYPES = [("SEALED_SOURCE", "string"), ("TILE_METADATA_JSON", "object"),
+# The serving data the portal copies into a tile capability. Its "key" names the row for
+# GET /api/resources/{studyId}/{resourceId}/access?key=; for a WSI row it is the slide key.
+SERVING_KEY = "serving"
+SERVING_FIELD_TYPES = [("KEY", "string"), ("SEALED_SOURCE", "string"),
+                       ("TILE_METADATA_JSON", "object"),
                        ("THUMBNAIL_WIDTH", "integer"), ("THUMBNAIL_HEIGHT", "integer"),
                        ("THUMBNAIL_CONTENT_TYPE", "string")]
 SERVING_FIELDS = [field for field, _ in SERVING_FIELD_TYPES]
@@ -68,14 +71,14 @@ SERVING_FIELDS = [field for field, _ in SERVING_FIELD_TYPES]
 # only inside the sealed source.
 UNSEALED_SOURCE_KEYS = ("image_id", "source_url", "thumbnail_url")
 # Upstream source identity: source_fingerprint is an unsalted hash of the source path, which
-# embeds the image ID. The browser reads wsi_serving, so tile metadata must not carry these; the
+# embeds the image ID. The browser reads serving, so tile metadata must not carry these; the
 # converter drops them from legacy files.
 SOURCE_IDENTITY_TILE_METADATA_KEYS = ("source_fingerprint", "identity_version")
 FORBIDDEN_PUBLIC_KEYS = UNSEALED_SOURCE_KEYS + ("barcode", "part_designator", "path_dx_title",
                                                 "sealed_source")
 # The CUSTOM_METADATA contract of both WSI resource definitions: every public metadata key the
 # converter writes, so validateData.py's undeclared-key check holds for converted files. The
-# wsi_serving object is not a column and is never declared. Keys that identify a single
+# serving object is not a column and is never declared. Keys that identify a single
 # slide or specimen (nearly every row has its own value) and free text are not filterable;
 # otherwise the portal's resource table would list every distinct value as a filter option (over
 # a million for slide_key on a large study).
@@ -405,10 +408,11 @@ def slide_problems(metadata, sample_id):
         problems.append(("SLIDE_TYPE", "IS_HNE/IS_IHC are inconsistent with SLIDE_TYPE"))
     if values.get("FILE_SIZE_BYTES", 0) < 0:
         problems.append(("FILE_SIZE_BYTES", "FILE_SIZE_BYTES cannot be negative"))
-    return problems + _serving_problems(metadata.get(SERVING_KEY, {}), values.get("CAN_SERVE_TILES"))
+    return problems + _serving_problems(metadata.get(SERVING_KEY, {}), SERVING_KEY in metadata,
+                                        values.get("CAN_SERVE_TILES"), values.get("SLIDE_KEY"))
 
 
-def _serving_problems(serving, can_serve):
+def _serving_problems(serving, present, can_serve, slide_key):
     if not isinstance(serving, dict):
         return [(SERVING_KEY, f"{SERVING_KEY} must be a JSON object")]
     problems = [(f"{SERVING_KEY}.{key}",
@@ -416,6 +420,12 @@ def _serving_problems(serving, can_serve):
                  f"carried inside the sealed source")
                 for key in UNSEALED_SOURCE_KEYS if key in serving]
     values = _typed_values(serving, SERVING_FIELD_TYPES, problems)
+    # For a WSI row the slide key is the serving key; never echo either value.
+    if present:
+        if serving.get("key") in (None, ""):
+            problems.append(("KEY", f"{SERVING_KEY}.key is required"))
+        elif "KEY" in values and values["KEY"] != slide_key:
+            problems.append(("KEY", f"{SERVING_KEY}.key must equal SLIDE_KEY"))
     tile_metadata = values.get("TILE_METADATA_JSON")
     if tile_metadata is not None:
         problems.extend((f"{SERVING_KEY}.tile_metadata_json.{key}",
@@ -433,6 +443,8 @@ def _serving_problems(serving, can_serve):
             problems.append(("SEALED_SOURCE", "SEALED_SOURCE must be empty when CAN_SERVE_TILES is FALSE"))
         return problems
     for field in SERVING_FIELDS:
+        if field == "KEY" and present:
+            continue  # reported above
         if serving.get(field.lower()) in (None, ""):
             problems.append((field, f"{field} is required when CAN_SERVE_TILES is TRUE"))
     if tile_metadata is not None and not tile_metadata_valid(tile_metadata):
@@ -515,6 +527,7 @@ def normalize_row(row, line):
         for key in SOURCE_IDENTITY_TILE_METADATA_KEYS:
             tile_metadata.pop(key, None)
     serving = {
+        "key": metadata.get("slide_key"),
         "sealed_source": row["SEALED_SOURCE"],
         "tile_metadata_json": tile_metadata,
         "thumbnail_width": _optional_int(row, "THUMBNAIL_WIDTH", line),
@@ -556,7 +569,7 @@ class SlideParser:
 def _check_cell(value, file_name):
     text = "" if value is None else str(value)
     if any(character in text for character in "\t\n\r"):
-        # The value may be server-side only (e.g. inside wsi_serving); never echo it.
+        # The value may be server-side only (e.g. inside serving); never echo it.
         raise ConversionError(
             f"{file_name}: value contains a tab or line break and cannot be written as TSV")
     return text

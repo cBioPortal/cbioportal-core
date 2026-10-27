@@ -3961,7 +3961,7 @@ class ResourceValidator(Validator):
             return
         seen = self.observed_metadata_keys.setdefault(resource_id, {})
         for key in parsed:
-            # A WSI row's private wsi_serving object is never a column, so it is not declared.
+            # A WSI row's private serving object is never a column, so it is not declared.
             if key == wsi_contract.SERVING_KEY and resource_id in wsi_contract.WSI_RESOURCE_IDS:
                 continue
             seen.setdefault(key, self.line_number)
@@ -4050,7 +4050,7 @@ class ResourceValidator(Validator):
             unknown = sorted(set(serving) - known - set(wsi_contract.UNSEALED_SOURCE_KEYS))
             if unknown:
                 self.logger.warning(
-                    'WSI metadata wsi_serving has keys the portal does not read',
+                    'WSI metadata serving has keys the portal does not read',
                     extra={'line_number': self.line_number,
                            'column_number': column_index['METADATA'] + 1,
                            'cause': ', '.join(unknown)})
