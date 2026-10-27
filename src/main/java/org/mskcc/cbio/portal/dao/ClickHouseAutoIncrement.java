@@ -195,7 +195,8 @@ public final class ClickHouseAutoIncrement {
         }
     }
 
-    private static void persistAllSequences() {
+    /** Persist high-water marks while retaining counters for subsequent import steps. */
+    public static void persistAllSequences() {
         if (COUNTERS.isEmpty()) {
             return;
         }
@@ -217,15 +218,6 @@ public final class ClickHouseAutoIncrement {
                     ex);
             }
         }
-    }
-
-    /**
-     * Persists the current sequence values, as the shutdown hook would, and
-     * forgets them so the next caller re-reads them from the database.
-     */
-    public static void persistAndResetCounters() {
-        persistAllSequences();
-        resetCounters();
     }
 
     public static void resetCounters() {

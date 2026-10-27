@@ -17,6 +17,13 @@
 
 package org.mskcc.cbio.portal.scripts;
 
+import java.sql.ResultSet;
+import java.sql.PreparedStatement;
+import java.sql.Connection;
+import javax.sql.DataSource;
+import org.easymock.EasyMock;
+import org.mskcc.cbio.portal.dao.JdbcUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
@@ -91,15 +98,31 @@ public class TestImportStepRunnerManifest {
     }
 
     @Test
-    public void testOnlyRemovalStepsReloadDaoCaches() {
-        assertTrue(ImportStepRunner.clearsDaoCaches(RemoveSamples.class.getName()));
-        assertTrue(ImportStepRunner.clearsDaoCaches(RemovePatients.class.getName()));
-        for (String className : ImportStepRunner.STEP_CLASSES) {
-            if (!ImportStepRunner.CACHE_CLEARING_CLASSES.contains(className)) {
-                assertFalse(className, ImportStepRunner.clearsDaoCaches(className));
-            }
+    public void testStepCleanupKeepsCountersDespiteStaleDatabaseReads() throws Exception {
+        ResultSet empty = EasyMock.createNiceMock(ResultSet.class);
+        EasyMock.expect(empty.next()).andReturn(false).anyTimes();
+        EasyMock.replay(empty);
+        PreparedStatement statement = EasyMock.createNiceMock(PreparedStatement.class);
+        EasyMock.expect(statement.executeQuery()).andReturn(empty).anyTimes();
+        EasyMock.replay(statement);
+        Connection connection = EasyMock.createNiceMock(Connection.class);
+        EasyMock.expect(connection.prepareStatement(EasyMock.anyString()))
+            .andReturn(statement).anyTimes();
+        EasyMock.replay(connection);
+        DataSource source = EasyMock.createNiceMock(DataSource.class);
+        EasyMock.expect(source.getConnection()).andReturn(connection).anyTimes();
+        EasyMock.replay(source);
+        JdbcUtil.setDataSource(source);
+        ClickHouseAutoIncrement.resetCounters();
+        try {
+            assertEquals(1, ClickHouseAutoIncrement.nextId("seq_genetic_profile"));
+            ImportStepRunner.resetAfterStep(0);
+            assertEquals(2, ClickHouseAutoIncrement.nextId("seq_genetic_profile"));
+            ImportStepRunner.resetAfterStep(1);
+            assertEquals(3, ClickHouseAutoIncrement.nextId("seq_genetic_profile"));
+        } finally {
+            ClickHouseAutoIncrement.resetCounters();
         }
-        assertTrue(ImportStepRunner.STEP_CLASSES.containsAll(ImportStepRunner.CACHE_CLEARING_CLASSES));
     }
 
     @Test

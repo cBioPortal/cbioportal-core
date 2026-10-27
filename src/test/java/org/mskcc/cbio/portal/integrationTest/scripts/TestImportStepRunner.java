@@ -17,6 +17,9 @@
 
 package org.mskcc.cbio.portal.integrationTest.scripts;
 
+import org.mskcc.cbio.portal.model.Patient;
+import org.mskcc.cbio.portal.model.Sample;
+import org.mskcc.cbio.portal.dao.DaoPatient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
@@ -144,21 +147,44 @@ public class TestImportStepRunner extends IntegrationTestBase {
     }
 
     @Test
-    public void testStepAfterRemoveSamplesSeesReloadedCaches() throws Exception {
+    public void testStepAfterRemoveSamplesSeesRemainingCachedSamples() throws Exception {
         assertEquals(0, ImportStepRunner.run(new String[] {"--manifest", studyEs0Manifest().getPath()}));
         CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId("study_es_0");
         int samplesBefore = DaoSample.getSamplesByCancerStudy(cancerStudy.getInternalId()).size();
 
-        // RemoveSamples empties the sample cache; AddCaseList needs it reloaded to find the remaining samples
+        // RemoveSamples evicts only deleted rows; AddCaseList must still find the remaining samples
         File manifest = writeManifest(List.of(
             step("org.mskcc.cbio.portal.scripts.RemoveSamples",
                 "--study_ids", "study_es_0", "--sample_ids", "TCGA-A2-A04P-01"),
             step("org.mskcc.cbio.portal.scripts.AddCaseList", "study_es_0", "all", "--noprogress")));
         assertEquals(0, ImportStepRunner.run(new String[] {"--manifest", manifest.getPath()}));
 
-        DaoCancerStudy.reCacheAll();
+        assertNull(DaoSample.getSampleByCancerStudyAndSampleId(
+            cancerStudy.getInternalId(), "TCGA-A2-A04P-01", false));
         assertEquals(samplesBefore - 1, DaoSample.getSamplesByCancerStudy(cancerStudy.getInternalId()).size());
         assertEquals(samplesBefore - 1,
+            new DaoSampleList().getSampleListByStableId("study_es_0_all").getSampleList().size());
+    }
+
+    @Test
+    public void testStepAfterRemovePatientsSeesRemainingCachedRows() throws Exception {
+        assertEquals(0, ImportStepRunner.run(new String[] {"--manifest", studyEs0Manifest().getPath()}));
+        CancerStudy study = DaoCancerStudy.getCancerStudyByStableId("study_es_0");
+        Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(study.getInternalId(), "TCGA-A2-A04P-01");
+        Patient patient = DaoPatient.getPatientById(sample.getInternalPatientId());
+        int patientsBefore = DaoPatient.getPatientsByCancerStudyId(study.getInternalId()).size();
+        int samplesBefore = DaoSample.getSamplesByCancerStudy(study.getInternalId()).size();
+        int removedSamples = DaoSample.getSamplesByPatientId(patient.getInternalId()).size();
+        File manifest = writeManifest(List.of(
+            step("org.mskcc.cbio.portal.scripts.RemovePatients",
+                "--study_ids", "study_es_0", "--patient_ids", patient.getStableId()),
+            step("org.mskcc.cbio.portal.scripts.AddCaseList", "study_es_0", "all", "--noprogress")));
+        assertEquals(0, ImportStepRunner.run(new String[] {"--manifest", manifest.getPath()}));
+        assertNull(DaoPatient.getPatientById(patient.getInternalId()));
+        assertNull(DaoPatient.getPatientByCancerStudyAndPatientId(study.getInternalId(), patient.getStableId()));
+        assertEquals(patientsBefore - 1, DaoPatient.getPatientsByCancerStudyId(study.getInternalId()).size());
+        assertEquals(samplesBefore - removedSamples, DaoSample.getSamplesByCancerStudy(study.getInternalId()).size());
+        assertEquals(samplesBefore - removedSamples,
             new DaoSampleList().getSampleListByStableId("study_es_0_all").getSampleList().size());
     }
 
@@ -176,7 +202,6 @@ public class TestImportStepRunner extends IntegrationTestBase {
     }
 
     private void assertStudyEs0Loaded(int mutationsBefore) throws Exception {
-        DaoCancerStudy.reCacheAll();
         CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId("study_es_0");
         assertNotNull(cancerStudy);
         assertEquals("Test study es_0", cancerStudy.getName());
