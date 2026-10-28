@@ -3005,6 +3005,17 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         validateData.RESOURCE_CONTRACT_KEYS = {}
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
+    def test_the_serving_object_is_not_a_column(self):
+        """`serving` feeds tile-server access for the row, not the table, so a contract omits it."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {'PATHOLOGY_SLIDE': {'stain'}}
+        self.logger.setLevel(logging.WARNING)
+
+        self.assertEqual([], self.validate('data_resource_sample_serving_key.txt',
+                                           validateData.ResourceValidator))
+        validateData.RESOURCE_CONTRACT_KEYS = {}
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
     def test_metadata_keys_are_not_checked_without_a_contract(self):
         """No contract means the portal still builds columns from the data, so nothing is lost."""
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}

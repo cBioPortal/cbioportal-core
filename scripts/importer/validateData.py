@@ -63,6 +63,10 @@ RESOURCE_DEFINITION_DICTIONARY = {}
 # with no contract is absent from this map and its data file is not checked against one.
 # Populated from the definition file before any resource data file is read.
 RESOURCE_CONTRACT_KEYS = {}
+# METADATA keys that are not table columns, so a CUSTOM_METADATA contract does not declare them:
+# `serving` holds what the portal copies into a tile-server capability for the row
+# (GET /api/resources/{studyId}/{resourceId}/access).
+RESERVED_METADATA_KEYS = {'serving'}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 
 # globals required for gene set scoring validation
@@ -3912,6 +3916,8 @@ class ResourceValidator(Validator):
             return
         seen = self.observed_metadata_keys.setdefault(resource_id, {})
         for key in parsed:
+            if key in RESERVED_METADATA_KEYS:
+                continue
             seen.setdefault(key, self.line_number)
 
     def onComplete(self):
