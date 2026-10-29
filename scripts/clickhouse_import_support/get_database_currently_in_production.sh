@@ -22,31 +22,13 @@ portal_database_name=""
 unset database_currently_in_production
 database_currently_in_production=""
 declare -A my_properties
-record_count_filepath="$(pwd)/gdcip_ch_update_status_record_count.txt"
-current_production_database_filepath="$(pwd)/gdcip_ch_current_production_database.txt"
-table_exists_filepath="$(pwd)/gdcip_ch_table_exists.txt"
+# cis_ts_pid is a timestamp and processid suffix defined by clickhouse_client_command_line_functions.sh
+record_count_filepath="$(pwd)/gdcip_ch_update_status_record_count_${cis_ts_pid}.txt"
+current_production_database_filepath="$(pwd)/gdcip_ch_current_production_database_${cis_ts_pid}.txt"
+table_exists_filepath="$(pwd)/gdcip_ch_table_exists_${cis_ts_pid}.txt"
 
 function usage() {
     echo "usage: get_database_currently_in_production.sh properties_filepath" >&2
-}
-
-function write_clickhouse_config_file_for_update_management() {
-    configured_clickhouse_config_file_path="$(pwd)/clickhouse_client_config_$(date "+%Y-%m-%d-%H-%M-%S").yaml"
-    if ! rm -f "$configured_clickhouse_config_file_path" || ! touch "$configured_clickhouse_config_file_path" ; then
-        echo "Error : unable to create clickhouse_client_config file $configured_clickhouse_config_file_path" >&2
-        return 1
-    fi
-    chmod 600 "$configured_clickhouse_config_file_path"
-    echo "user: ${my_properties['clickhouse_server_username']}" >> "$configured_clickhouse_config_file_path"
-    echo "password: ${my_properties['clickhouse_server_password']}" >> "$configured_clickhouse_config_file_path"
-    echo "host: ${my_properties['clickhouse_server_host_name']}" >> "$configured_clickhouse_config_file_path"
-    echo "port: ${my_properties['clickhouse_server_port']}" >> "$configured_clickhouse_config_file_path"
-    echo "database: $update_management_database_name" >> "$configured_clickhouse_config_file_path"
-    if ! [ "$(cat $configured_clickhouse_config_file_path | wc -l)" == "5" ] ; then
-        echo "Error : could not successfully write clickhouse_client config properties to file $configured_clickhouse_config_file_path" >&2
-        return 1
-    fi
-    return 0
 }
 
 function initialize_main() {
@@ -75,7 +57,7 @@ function initialize_main() {
         usage
         return 1
     fi
-    if ! write_clickhouse_config_file_for_update_management ; then
+    if ! initialize_clickhouse_client_command_line_functions "system" ; then
         usage
         return 1
     fi

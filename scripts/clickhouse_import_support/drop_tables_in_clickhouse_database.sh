@@ -20,9 +20,10 @@ unset database_name
 declare -A my_properties
 declare -a database_table_list
 database_name=""
-database_table_list_filepath="$(pwd)/dtcd_database_table_list.txt"
-drop_table_result_filepath="$(pwd)/dtcd_drop_table_result.txt"
-clickhouse_is_responsive_filepath="$(pwd)/cmd_clickhouse_is_responsive.txt"
+# cis_ts_pid is a timestamp and processid suffix defined by clickhouse_client_command_line_functions.sh
+database_table_list_filepath="$(pwd)/dtcd_database_table_list_${cis_ts_pid}.txt"
+drop_table_result_filepath="$(pwd)/dtcd_drop_table_result_${cis_ts_pid}.txt"
+clickhouse_is_responsive_filepath="$(pwd)/cmd_clickhouse_is_responsive_${cis_ts_pid}.txt"
 SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
 function usage() {
