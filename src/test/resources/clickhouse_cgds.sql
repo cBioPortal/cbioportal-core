@@ -15,8 +15,6 @@ DROP TABLE IF EXISTS cna_event;
 DROP TABLE IF EXISTS copy_number_seg;
 DROP TABLE IF EXISTS copy_number_seg_file;
 DROP TABLE IF EXISTS data_access_tokens;
-DROP TABLE IF EXISTS ascn_seg;
-DROP TABLE IF EXISTS ascn_gene_level;
 DROP TABLE IF EXISTS gene;
 DROP TABLE IF EXISTS gene_alias;
 DROP TABLE IF EXISTS gene_panel;
@@ -212,6 +210,10 @@ CREATE TABLE cna_event
     ENGINE = MergeTree
 ORDER BY tuple();
 
+-- tcn/lcn/cellular_fraction/purity/ploidy/dip_log_r are supplemental ASCN
+-- (allele-specific copy number) fields, populated only for segments from an
+-- ALLELE_SPECIFIC_COPY_NUMBER study; null for plain
+-- COPY_NUMBER_ALTERATION SEG data. See ImportCopyNumberSegmentData.
 CREATE TABLE copy_number_seg
 (
     `seg_id` Nullable(Int64),
@@ -221,7 +223,13 @@ CREATE TABLE copy_number_seg
     `start` Nullable(Int64),
     `end` Nullable(Int64),
     `num_probes` Nullable(Int64),
-    `segment_mean` Nullable(Float64)
+    `segment_mean` Nullable(Float64),
+    `tcn` Nullable(Int32),
+    `lcn` Nullable(Int32),
+    `cellular_fraction` Nullable(Float64),
+    `purity` Nullable(Float64),
+    `ploidy` Nullable(Float64),
+    `dip_log_r` Nullable(Float64)
 )
     ENGINE = MergeTree
 ORDER BY tuple();
@@ -246,46 +254,6 @@ CREATE TABLE data_access_tokens
 )
     ENGINE = MergeTree
 ORDER BY tuple();
-
-CREATE TABLE ascn_seg
-(
-    `seg_id` Int64,
-    `cancer_study_id` Int64,
-    `sample_id` Int64,
-    `chr` LowCardinality(String),
-    `start` Int64,
-    `end` Int64,
-    `log_ratio` Nullable(Float64),
-    `tcn` Nullable(Int32),
-    `lcn` Nullable(Int32),
-    `cellular_fraction` Nullable(Float64),
-    `purity` Nullable(Float64),
-    `ploidy` Nullable(Float64),
-    `dip_log_r` Nullable(Float64)
-)
-    ENGINE = MergeTree
-ORDER BY (cancer_study_id, sample_id, chr, start);
-
-CREATE TABLE ascn_gene_level
-(
-    `gene_id` Int64,
-    `cancer_study_id` Int64,
-    `sample_id` Int64,
-    `hugo_gene_symbol` String,
-    `entrez_gene_id` Int64,
-    `chr` LowCardinality(String),
-    `gene_start` Int64,
-    `gene_end` Int64,
-    `tcn` Nullable(Int32),
-    `lcn` Nullable(Int32),
-    `cellular_fraction` Nullable(Float64),
-    `purity` Nullable(Float64),
-    `ploidy` Nullable(Float64),
-    `dip_log_r` Nullable(Float64),
-    INDEX idx_ascn_gene_level_hugo_symbol hugo_gene_symbol TYPE bloom_filter GRANULARITY 4
-)
-    ENGINE = MergeTree
-ORDER BY (cancer_study_id, sample_id, hugo_gene_symbol);
 
 CREATE TABLE gene
 (
