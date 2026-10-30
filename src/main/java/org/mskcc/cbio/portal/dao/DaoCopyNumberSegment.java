@@ -33,7 +33,13 @@ public final class DaoCopyNumberSegment {
                     Long.toString(seg.getStart()),
                     Long.toString(seg.getEnd()),
                     Integer.toString(seg.getNumProbes()),
-                    Double.toString(seg.getSegMean())
+                    Double.toString(seg.getSegMean()),
+                    seg.getTcn() == null ? null : Integer.toString(seg.getTcn()),
+                    seg.getLcn() == null ? null : Integer.toString(seg.getLcn()),
+                    seg.getCellularFraction() == null ? null : Double.toString(seg.getCellularFraction()),
+                    seg.getPurity() == null ? null : Double.toString(seg.getPurity()),
+                    seg.getPloidy() == null ? null : Double.toString(seg.getPloidy()),
+                    seg.getDipLogR() == null ? null : Double.toString(seg.getDipLogR())
             );
             return 1;
         }
@@ -123,6 +129,12 @@ public final class DaoCopyNumberSegment {
                                 rs.getInt("num_probes"),
                                 rs.getDouble("segment_mean"));
                         seg.setSegId(rs.getLong("seg_id"));
+                        seg.setTcn(getNullableInteger(rs, "tcn"));
+                        seg.setLcn(getNullableInteger(rs, "lcn"));
+                        seg.setCellularFraction(getNullableDouble(rs, "cellular_fraction"));
+                        seg.setPurity(getNullableDouble(rs, "purity"));
+                        seg.setPloidy(getNullableDouble(rs, "ploidy"));
+                        seg.setDipLogR(getNullableDouble(rs, "dip_log_r"));
                         segs.add(seg);
                     }
                 }
@@ -255,5 +267,15 @@ public final class DaoCopyNumberSegment {
             }
             return null;
         });
+    }
+
+    private static Double getNullableDouble(ResultSet rs, String column) throws SQLException {
+        double value = rs.getDouble(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private static Integer getNullableInteger(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
     }
 }
