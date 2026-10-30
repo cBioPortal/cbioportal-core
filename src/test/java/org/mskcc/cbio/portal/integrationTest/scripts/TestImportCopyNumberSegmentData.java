@@ -14,16 +14,20 @@ import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
+import org.mskcc.cbio.portal.dao.DaoCopyNumberSegment;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.model.CancerStudy;
+import org.mskcc.cbio.portal.model.CopyNumberSegment;
 import org.mskcc.cbio.portal.model.Patient;
 import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test the import of Segment data into database.
@@ -61,6 +65,46 @@ public class TestImportCopyNumberSegmentData extends IntegrationTestBase {
         //TODO : fix test to actually store data and add some checks 
        
 	}
+
+    /**
+     * Tests that ASCN (allele-specific copy number) enriched segment data lands
+     * in copy_number_seg alongside the coordinates, differentiated from plain
+     * SEG data only by the presence of the optional TCN/LCN/CELLULAR_FRACTION/
+     * PURITY/PLOIDY/DIP_LOG_R columns in the data file.
+     */
+    @Test
+    public void testImportAscnEnrichedSegmentData() throws Exception {
+        String studyId = "study_tcga_pub";
+        String sampleId = "TCGA-A1-A0SE-01";
+        CancerStudy cancerStudy = DaoCancerStudy.getCancerStudyByStableId(studyId);
+
+        String[] args = {
+                "--data", "src/test/resources/ascn/data_ascn_seg.txt",
+                "--meta", "src/test/resources/ascn/meta_ascn_seg.txt",
+                "--loadMode", "bulkLoad"
+        };
+        ImportCopyNumberSegmentData runner = new ImportCopyNumberSegmentData(args);
+        runner.run();
+
+        Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), sampleId);
+        List<CopyNumberSegment> segments = DaoCopyNumberSegment.getSegmentForASample(
+                sample.getInternalId(), cancerStudy.getInternalId());
+        assertEquals(3, segments.size());
+
+        CopyNumberSegment firstSegment = segments.stream()
+                .filter(s -> s.getStart() == 3218610)
+                .findFirst()
+                .orElseThrow();
+        assertEquals("1", firstSegment.getChr());
+        assertEquals(95674710L, firstSegment.getEnd());
+        assertEquals(0.15, firstSegment.getSegMean(), 0.0001);
+        assertEquals(2, (int) firstSegment.getTcn());
+        assertEquals(1, (int) firstSegment.getLcn());
+        assertEquals(0.95, firstSegment.getCellularFraction(), 0.0001);
+        assertEquals(0.4, firstSegment.getPurity(), 0.0001);
+        assertEquals(2.0, firstSegment.getPloidy(), 0.0001);
+        assertEquals(-0.05, firstSegment.getDipLogR(), 0.0001);
+    }
 
     private void addTestPatientAndSampleRecords(File file, CancerStudy cancerStudy) throws FileNotFoundException, IOException, DaoException {
         // extract sample ids from first column

@@ -19,6 +19,15 @@ public class CopyNumberSegment {
     private long end;
     private int numProbes;
     private double segMean;
+    // Supplemental ASCN (allele-specific copy number) fields, populated only
+    // for segments from an ALLELE_SPECIFIC_COPY_NUMBER study;
+    // null for plain COPY_NUMBER_ALTERATION SEG data. See ImportCopyNumberSegmentData.
+    private Integer tcn;
+    private Integer lcn;
+    private Double cellularFraction;
+    private Double purity;
+    private Double ploidy;
+    private Double dipLogR;
 
     public CopyNumberSegment(int cancerStudyId, int sampleId, String chr,
             long start, long end, int numProbes, double segMean) {
@@ -93,5 +102,53 @@ public class CopyNumberSegment {
 
     public void setStart(long start) {
         this.start = start;
+    }
+
+    public Integer getTcn() {
+        return tcn;
+    }
+
+    public void setTcn(Integer tcn) {
+        this.tcn = tcn;
+    }
+
+    public Integer getLcn() {
+        return lcn;
+    }
+
+    public void setLcn(Integer lcn) {
+        this.lcn = lcn;
+    }
+
+    public Double getCellularFraction() {
+        return cellularFraction;
+    }
+
+    public void setCellularFraction(Double cellularFraction) {
+        this.cellularFraction = cellularFraction;
+    }
+
+    public Double getPurity() {
+        return purity;
+    }
+
+    public void setPurity(Double purity) {
+        this.purity = purity;
+    }
+
+    public Double getPloidy() {
+        return ploidy;
+    }
+
+    public void setPloidy(Double ploidy) {
+        this.ploidy = ploidy;
+    }
+
+    public Double getDipLogR() {
+        return dipLogR;
+    }
+
+    public void setDipLogR(Double dipLogR) {
+        this.dipLogR = dipLogR;
     }
 }

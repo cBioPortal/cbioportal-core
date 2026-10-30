@@ -210,6 +210,10 @@ CREATE TABLE cna_event
     ENGINE = MergeTree
 ORDER BY tuple();
 
+-- tcn/lcn/cellular_fraction/purity/ploidy/dip_log_r are supplemental ASCN
+-- (allele-specific copy number) fields, populated only for segments from an
+-- ALLELE_SPECIFIC_COPY_NUMBER study; null for plain
+-- COPY_NUMBER_ALTERATION SEG data. See ImportCopyNumberSegmentData.
 CREATE TABLE copy_number_seg
 (
     `seg_id` Nullable(Int64),
@@ -219,7 +223,13 @@ CREATE TABLE copy_number_seg
     `start` Nullable(Int64),
     `end` Nullable(Int64),
     `num_probes` Nullable(Int64),
-    `segment_mean` Nullable(Float64)
+    `segment_mean` Nullable(Float64),
+    `tcn` Nullable(Int32),
+    `lcn` Nullable(Int32),
+    `cellular_fraction` Nullable(Float64),
+    `purity` Nullable(Float64),
+    `ploidy` Nullable(Float64),
+    `dip_log_r` Nullable(Float64)
 )
     ENGINE = MergeTree
 ORDER BY tuple();

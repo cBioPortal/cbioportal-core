@@ -63,6 +63,7 @@ class MetaFileTypes(object):
     CNA_LOG2 = 'meta_log2CNA'
     CNA_CONTINUOUS = 'meta_contCNA'
     SEG = 'meta_segment'
+    ASCN_SEG = 'meta_ascn_seg'
     EXPRESSION = 'meta_expression'
     MUTATION = 'meta_mutations_extended'
     MUTATION_UNCALLED = 'meta_mutations_uncalled'
@@ -168,6 +169,14 @@ META_FIELD_MAP = {
         'gene_panel': False
     },
     MetaFileTypes.SEG: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'reference_genome_id': True,
+        'data_filename': True,
+        'description': True
+    },
+    MetaFileTypes.ASCN_SEG: {
         'cancer_study_identifier': True,
         'genetic_alteration_type': True,
         'datatype': True,
@@ -390,6 +399,7 @@ INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
     MetaFileTypes.GENE_PANEL_MATRIX,
     MetaFileTypes.STRUCTURAL_VARIANT,
     MetaFileTypes.SEG,
+    MetaFileTypes.ASCN_SEG,
 ]
 
 IMPORTER_CLASSNAME_BY_META_TYPE = {
@@ -402,6 +412,7 @@ IMPORTER_CLASSNAME_BY_META_TYPE = {
     MetaFileTypes.CNA_LOG2: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.CNA_CONTINUOUS: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.SEG: "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData",
+    MetaFileTypes.ASCN_SEG: "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData",
     MetaFileTypes.EXPRESSION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.MUTATION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
     MetaFileTypes.MUTATION_UNCALLED: "org.mskcc.cbio.portal.scripts.ImportProfileData",
@@ -666,6 +677,10 @@ def get_meta_file_type(meta_dictionary, logger, filename):
         ("COPY_NUMBER_ALTERATION", "CONTINUOUS"): MetaFileTypes.CNA_CONTINUOUS,
         ("COPY_NUMBER_ALTERATION", "LOG2-VALUE"): MetaFileTypes.CNA_LOG2,
         ("COPY_NUMBER_ALTERATION", "SEG"): MetaFileTypes.SEG,
+        # ASCN-enriched SEG data uses the same "SEG" datatype as plain SEG; the
+        # genetic_alteration_type (ALLELE_SPECIFIC_COPY_NUMBER vs
+        # COPY_NUMBER_ALTERATION) is what differentiates the two.
+        ("ALLELE_SPECIFIC_COPY_NUMBER", "SEG"): MetaFileTypes.ASCN_SEG,
         # expression
         ("MRNA_EXPRESSION", "CONTINUOUS"): MetaFileTypes.EXPRESSION,
         ("MRNA_EXPRESSION", "Z-SCORE"): MetaFileTypes.EXPRESSION,
@@ -964,7 +979,7 @@ def parse_metadata_file(filename,
                         extra={'filename_': filename,
                         'cause': 'show_profile_in_analysis_tab: %s' % meta_dictionary['show_profile_in_analysis_tab']})
 
-    if meta_file_type in (MetaFileTypes.SEG, MetaFileTypes.GISTIC_GENES):
+    if meta_file_type in (MetaFileTypes.SEG, MetaFileTypes.ASCN_SEG, MetaFileTypes.GISTIC_GENES):
         # Todo: Restore validation for reference genome in segment files
         # Validation can be restored to normal when hg18 data on public portal and data hub has been
         # liftovered to hg19. It was decided in the data hub call of August 14 2018 to remove validation until then.
