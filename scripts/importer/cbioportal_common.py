@@ -979,7 +979,7 @@ def parse_metadata_file(filename,
                         extra={'filename_': filename,
                         'cause': 'show_profile_in_analysis_tab: %s' % meta_dictionary['show_profile_in_analysis_tab']})
 
-    if meta_file_type in (MetaFileTypes.SEG, MetaFileTypes.GISTIC_GENES):
+    if meta_file_type in (MetaFileTypes.SEG, MetaFileTypes.ASCN_SEG, MetaFileTypes.GISTIC_GENES):
         # Todo: Restore validation for reference genome in segment files
         # Validation can be restored to normal when hg18 data on public portal and data hub has been
         # liftovered to hg19. It was decided in the data hub call of August 14 2018 to remove validation until then.
