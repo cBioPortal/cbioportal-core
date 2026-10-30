@@ -1,0 +1,2 @@
+ID	chrom	loc.start	loc.end	num.mark	seg.mean	TCN	LCN	CELLULAR_FRACTION	PURITY	PLOIDY	DIP_LOG_R
+TCGA-A1-A0SE-01	99	3218610	95674710	100	notanumber	2	1	0.95	0.4	2.0	-0.05

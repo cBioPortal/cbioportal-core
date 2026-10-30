@@ -181,23 +181,20 @@ class ColumnOrderTestCase(DataFileTestCase):
     """Test if column order requirements are appropriately validated."""
 
     def test_column_order_validation_SegValidator(self):
-        """seg validator needs its columns in a specific order.
+        """SegValidator does NOT need its columns in a specific order.
 
-        Here we serve a file with wrong order and expect validator to log this:
+        Columns are resolved by header name (to allow the optional ASCN
+        columns to appear in any order after the core ones), so a file with
+        reordered core columns is still valid.
         """
         # set level according to this test case:
-        self.logger.setLevel(logging.ERROR)
+        self.logger.setLevel(logging.WARNING)
         record_list = self.validate('data_seg_wrong_order.txt',
                                     validateData.SegValidator,
                                     extra_meta_fields={'reference_genome_id':
                                                            'hg19'})
-        # we expect 2 errors about columns in wrong order,
-        # and one about the file not being parseable:
-        self.assertEqual(3, len(record_list))
-        # check if both messages come from checkOrderedRequiredColumns:
-        for error in record_list[:2]:
-            self.assertEqual("ERROR", error.levelname)
-            self.assertEqual("_checkOrderedRequiredColumns", error.funcName)
+        # we expect no errors or warnings
+        self.assertEqual(0, len(record_list))
 
     def test_column_order_validation_ClinicalValidator(self):
         """Sample attributes do NOT need their columns in a specific order.
@@ -2066,7 +2063,7 @@ class SegFileValidationTestCase(PostClinicalDataFileTestCase):
     @classmethod
     def tearDownClass(cls):
         """Restore the environment to before setUpClass() was called."""
-        validateData.SegValidator.load_chromosome_lengths = cls.orig_chromlength_method
+        validateData.SegValidator.load_chromosome_lengths = staticmethod(cls.orig_chromlength_method)
         super(SegFileValidationTestCase, cls).tearDownClass()
 
     def test_valid_seg(self):
@@ -2162,110 +2159,56 @@ class SegFileValidationTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(record.line_number, 35)
         self.assertIn('blank', record.getMessage().lower())
 
-
-class AscnFileValidationTestCase(PostClinicalDataFileTestCase):
-
-    """Tests for the various validations of ASCN Seg and ASCN gene-level data files."""
-
-    @classmethod
-    def setUpClass(cls):
-        """Override a static method to skip a UCSC HTTP query in each test."""
-        super(AscnFileValidationTestCase, cls).setUpClass()
-        @staticmethod
-        def load_chromosome_lengths(genome_build, _):
-            if genome_build == 'hg19':
-                return {'1': 249250621, '10': 135534747, '11': 135006516,
-                        '12': 133851895, '13': 115169878, '14': 107349540,
-                        '15': 102531392, '16': 90354753, '17': 81195210,
-                        '18': 78077248, '19': 59128983, '2': 243199373,
-                        '20': 63025520, '21': 48129895, '22': 51304566,
-                        '3': 198022430, '4': 191154276, '5': 180915260,
-                        '6': 171115067, '7': 159138663, '8': 146364022,
-                        '9': 141213431, 'X': 155270560, 'Y': 59373566}
-            else:
-                raise ValueError(
-                    "load_chromosome_lengths() called with genome build '{}'".format(
-                        genome_build))
-        cls.orig_chromlength_method = validateData.AscnValidator.load_chromosome_lengths
-        validateData.AscnValidator.load_chromosome_lengths = load_chromosome_lengths
-
-    @classmethod
-    def tearDownClass(cls):
-        """Restore the environment to before setUpClass() was called."""
-        validateData.AscnValidator.load_chromosome_lengths = cls.orig_chromlength_method
-        super(AscnFileValidationTestCase, cls).tearDownClass()
-
-    def test_valid_ascn_seg(self):
-        """Validate an ASCN Seg file without file format errors or warnings."""
+    def test_valid_seg_with_ascn_columns(self):
+        """Validate a .seg file enriched with the optional ASCN columns."""
         self.logger.setLevel(logging.WARNING)
-        record_list = self.validate('data_ascn_seg_valid.txt',
-                                    validateData.AscnSegValidator,
+        record_list = self.validate('data_seg_ascn_valid.txt',
+                                    validateData.SegValidator,
                                     extra_meta_fields={'reference_genome_id':
                                                            'hg19'})
         self.assertEqual(0, len(record_list))
 
-    def test_ascn_seg_nonsense_values(self):
-        """Validate an ASCN Seg file with an unsupported chromosome and a non-numeric LOG_RATIO."""
+    def test_seg_ascn_nonsense_values(self):
+        """Validate a SEG+ASCN file with an unsupported chromosome and a non-numeric seg.mean."""
         self.logger.setLevel(logging.ERROR)
-        record_list = self.validate('data_ascn_seg_nonsense_values.txt',
-                                    validateData.AscnSegValidator,
+        record_list = self.validate('data_seg_ascn_nonsense_values.txt',
+                                    validateData.SegValidator,
                                     extra_meta_fields={'reference_genome_id':
                                                            'hg19'})
         self.assertEqual(2, len(record_list))
         for record in record_list:
             self.assertEqual(logging.ERROR, record.levelno)
-        # unknown chromosome (parse_chromosome_num does not attach a column_number)
-        self.assertIn('chromosome', record_list[0].getMessage().lower())
-        # non-numeric LOG_RATIO
-        self.assertEqual(5, record_list[1].column_number)
+        # unknown chromosome
+        self.assertEqual(2, record_list[0].column_number)
+        # non-numeric seg.mean
+        self.assertEqual(6, record_list[1].column_number)
 
-    def test_ascn_seg_noninteger_tcn_lcn(self):
+    def test_seg_ascn_noninteger_tcn_lcn(self):
         """A numeric but non-integer TCN/LCN value should warn, not error or pass silently."""
         self.logger.setLevel(logging.WARNING)
-        record_list = self.validate('data_ascn_seg_noninteger_tcn_lcn.txt',
-                                    validateData.AscnSegValidator,
+        record_list = self.validate('data_seg_ascn_noninteger_tcn_lcn.txt',
+                                    validateData.SegValidator,
                                     extra_meta_fields={'reference_genome_id':
                                                            'hg19'})
         self.assertEqual(2, len(record_list))
         for record in record_list:
             self.assertEqual(logging.WARNING, record.levelno)
         # non-integer TCN
-        self.assertEqual(6, record_list[0].column_number)
+        self.assertEqual(7, record_list[0].column_number)
         # non-integer LCN
-        self.assertEqual(7, record_list[1].column_number)
+        self.assertEqual(8, record_list[1].column_number)
 
-    def test_ascn_seg_end_before_start(self):
-        """Validate an ASCN Seg file where the start position is not lower than the end."""
-        self.logger.setLevel(logging.WARNING)
-        record_list = self.validate('data_ascn_seg_end_before_start.txt',
-                                    validateData.AscnSegValidator,
+    def test_seg_ascn_end_before_start(self):
+        """Validate a SEG+ASCN file where the start position is not lower than the end."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_seg_ascn_end_before_start.txt',
+                                    validateData.SegValidator,
                                     extra_meta_fields={'reference_genome_id':
                                                            'hg19'})
         self.assertEqual(1, len(record_list))
         record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('start position', record.getMessage().lower())
-
-    def test_valid_ascn_gene_level(self):
-        """Validate an ASCN gene-level file without file format errors or warnings."""
-        self.logger.setLevel(logging.WARNING)
-        record_list = self.validate('data_ascn_gene_level_valid.txt',
-                                    validateData.AscnGeneLevelValidator,
-                                    extra_meta_fields={'reference_genome_id':
-                                                           'hg19'})
-        self.assertEqual(0, len(record_list))
-
-    def test_ascn_gene_level_unknown_gene(self):
-        """An unrecognized HUGO symbol should warn rather than error or pass silently."""
-        self.logger.setLevel(logging.WARNING)
-        record_list = self.validate('data_ascn_gene_level_unknown_gene.txt',
-                                    validateData.AscnGeneLevelValidator,
-                                    extra_meta_fields={'reference_genome_id':
-                                                           'hg19'})
-        self.assertEqual(1, len(record_list))
-        record = record_list.pop()
-        self.assertEqual(logging.WARNING, record.levelno)
-        self.assertIn('not known', record.getMessage().lower())
 
 
 class GisticGenesValidationTestCase(PostClinicalDataFileTestCase):
