@@ -2034,6 +2034,48 @@ class StructuralVariantValidationTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(1, len(record_list))
         self.assertIn("duplicate entry in structural variant data", record_list[0].getMessage().lower())
 
+
+class AscnSegMetaDispatchTestCase(LogBufferTestCase):
+
+    """Pin the meta-file dispatch contract for ASCN-enriched SEG data:
+    MetaFileTypes.ASCN_SEG is reached only via genetic_alteration_type ==
+    ALLELE_SPECIFIC_COPY_NUMBER together with datatype == SEG. Any other
+    datatype for that genetic_alteration_type is rejected outright, not
+    silently treated as plain SEG (see cbioportal_common.get_meta_file_type).
+    """
+
+    def test_allele_specific_copy_number_and_seg_resolves_to_ascn_seg(self):
+        meta_file_type = cbioportal_common.get_meta_file_type(
+            {'genetic_alteration_type': 'ALLELE_SPECIFIC_COPY_NUMBER',
+             'datatype': 'SEG'},
+            self.logger,
+            'meta_ascn_seg.txt')
+        self.assertEqual(cbioportal_common.MetaFileTypes.ASCN_SEG, meta_file_type)
+        self.assertEqual(0, len(self.get_log_records()))
+
+    def test_copy_number_alteration_and_seg_resolves_to_plain_seg(self):
+        meta_file_type = cbioportal_common.get_meta_file_type(
+            {'genetic_alteration_type': 'COPY_NUMBER_ALTERATION',
+             'datatype': 'SEG'},
+            self.logger,
+            'meta_segment.txt')
+        self.assertEqual(cbioportal_common.MetaFileTypes.SEG, meta_file_type)
+        self.assertEqual(0, len(self.get_log_records()))
+
+    def test_allele_specific_copy_number_with_other_datatype_is_rejected(self):
+        """ALLELE_SPECIFIC_COPY_NUMBER is only valid paired with datatype SEG."""
+        self.logger.setLevel(logging.ERROR)
+        meta_file_type = cbioportal_common.get_meta_file_type(
+            {'genetic_alteration_type': 'ALLELE_SPECIFIC_COPY_NUMBER',
+             'datatype': 'DISCRETE'},
+            self.logger,
+            'meta_ascn_seg.txt')
+        self.assertIsNone(meta_file_type)
+        record_list = self.get_log_records()
+        self.assertEqual(1, len(record_list))
+        self.assertEqual(logging.ERROR, record_list[0].levelno)
+
+
 class SegFileValidationTestCase(PostClinicalDataFileTestCase):
 
     """Tests for the various validations of data in segment CNA data files."""
@@ -2209,6 +2251,13 @@ class SegFileValidationTestCase(PostClinicalDataFileTestCase):
         record = record_list.pop()
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('start position', record.getMessage().lower())
+
+    def test_ascn_optional_column_set(self):
+        """Pin the exact set of optional ASCN-enrichment columns SegValidator recognizes."""
+        self.assertEqual(
+            {'TCN', 'LCN', 'CELLULAR_FRACTION', 'PURITY', 'PLOIDY', 'DIP_LOG_R'},
+            set(validateData.SegValidator.INTEGER_CONSTRAINED_COLUMNS) |
+            set(validateData.SegValidator.NULLABLE_FLOAT_COLUMNS))
 
 
 class GisticGenesValidationTestCase(PostClinicalDataFileTestCase):
