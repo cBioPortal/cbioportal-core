@@ -1,6 +1,7 @@
 package org.mskcc.cbio.portal.dao;
 
 import java.sql.*;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -157,22 +158,22 @@ public final class DaoResourceData {
         if ("STUDY".equals(resourceScope)) {
             // Study-level rows hang off nothing else, so the resource ids identify them fully.
             idsToDelete = queryResourceDataIds(
-                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s)"
+                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%1$s)"
                     + " AND `patient_id` IS NULL AND `sample_id` IS NULL",
-                cancerStudyId, resourceIds);
+                cancerStudyId, resourceIds, null);
         } else if (entityStableIds == null || entityStableIds.isEmpty()) {
             // No row passed validation, so there is nothing this file is replacing. Deleting on
             // the resource ids alone would empty the resource and insert nothing in its place.
             return;
         } else if ("SAMPLE".equals(resourceScope)) {
             idsToDelete = queryResourceDataIds(
-                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s) AND `sample_id` IN (%s)",
+                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%1$s) AND `sample_id` IN (%2$s)",
                 cancerStudyId, resourceIds, entityStableIds);
         } else {
             // Patient-level rows are the ones with no sample; a sample's rows belong to the
             // sample and are replaced by a sample file.
             idsToDelete = queryResourceDataIds(
-                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s) AND `patient_id` IN (%s)"
+                "WHERE `cancer_study_id` = ? AND `resource_id` IN (%1$s) AND `patient_id` IN (%2$s)"
                     + " AND `sample_id` IS NULL",
                 cancerStudyId, resourceIds, entityStableIds);
         }
@@ -229,8 +230,8 @@ public final class DaoResourceData {
         // being kept.
         String scope = "sample_id".equals(idColumn) ? "" : " AND `sample_id` IS NULL";
         return queryResourceDataIds(
-            "WHERE `cancer_study_id` = ? AND `" + idColumn + "` IN (%s)" + scope,
-            cancerStudyId, stableIds);
+            "WHERE `cancer_study_id` = ? AND `" + idColumn + "` IN (%2$s)" + scope,
+            cancerStudyId, Collections.emptySet(), stableIds);
     }
 
     /** {@code INSERT INTO resource (col, ...) VALUES (?, ...)} over RESOURCE_COLUMNS. */
@@ -250,48 +251,49 @@ public final class DaoResourceData {
 
     private static Set<Long> findResourceDataIds(int cancerStudyId, Set<String> resourceIds) throws DaoException {
         return queryResourceDataIds(
-            "WHERE `cancer_study_id` = ? AND `resource_id` IN (%s)", cancerStudyId, resourceIds);
+            "WHERE `cancer_study_id` = ? AND `resource_id` IN (%1$s)", cancerStudyId, resourceIds, null);
     }
 
     /**
-     * Collects the {@code internal_id}s a deletion should queue. The where clause carries one
-     * {@code %s} per value set, each expanded to that set's IN placeholders, and is always scoped
-     * by study: the values are stable ids, which repeat across studies.
+     * Collects the {@code internal_id}s a deletion should queue. The where clause is always scoped
+     * by study, since stable ids repeat across studies. {@code %1$s} expands to IN placeholders
+     * for the resource ids, which are bounded by the study's resource definitions. {@code %2$s}
+     * expands to a subquery over a staging table of entity ids: a file can name every sample in a
+     * study, and the driver inlines bound values, so an IN list of them exceeds max_query_size.
+     *
+     * @param entityStableIds staged when non-null; pass null when the template has no {@code %2$s}
      */
-    @SafeVarargs
     private static Set<Long> queryResourceDataIds(
-            String whereTemplate, int cancerStudyId, Set<String>... valueSets) throws DaoException {
-        Set<Long> ids = new HashSet<>();
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoResourceData.class);
-            Object[] placeholders = new Object[valueSets.length];
-            for (int i = 0; i < valueSets.length; i++) {
-                placeholders[i] = valueSets[i].stream().map(id -> "?").collect(Collectors.joining(","));
-            }
-            pstmt = con.prepareStatement(
-                "SELECT `internal_id` FROM `" + RESOURCE_TABLE + "` "
-                + String.format(whereTemplate, placeholders)
-            );
-            int paramIndex = 1;
-            pstmt.setInt(paramIndex++, cancerStudyId);
-            for (Set<String> values : valueSets) {
-                for (String value : values) {
-                    pstmt.setString(paramIndex++, value);
+            String whereTemplate, int cancerStudyId, Set<String> resourceIds,
+            Set<String> entityStableIds) throws DaoException {
+        return ClickHouseBulkUploader.uploadStrings(entityStableIds, stagingTable -> {
+            Set<Long> ids = new HashSet<>();
+            Connection con = null;
+            PreparedStatement pstmt = null;
+            ResultSet rs = null;
+            try {
+                con = JdbcUtil.getDbConnection(DaoResourceData.class);
+                String resourcePlaceholders =
+                    resourceIds.stream().map(id -> "?").collect(Collectors.joining(","));
+                String entitySubquery = stagingTable == null ? null : "SELECT id FROM " + stagingTable;
+                pstmt = con.prepareStatement(
+                    "SELECT `internal_id` FROM `" + RESOURCE_TABLE + "` "
+                    + String.format(whereTemplate, resourcePlaceholders, entitySubquery)
+                );
+                int paramIndex = 1;
+                pstmt.setInt(paramIndex++, cancerStudyId);
+                for (String resourceId : resourceIds) {
+                    pstmt.setString(paramIndex++, resourceId);
                 }
+                rs = pstmt.executeQuery();
+                while (rs.next()) {
+                    ids.add(rs.getLong("internal_id"));
+                }
+            } finally {
+                JdbcUtil.closeAll(DaoResourceData.class, con, pstmt, rs);
             }
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                ids.add(rs.getLong("internal_id"));
-            }
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoResourceData.class, con, pstmt, rs);
-        }
-        return ids;
+            return ids;
+        });
     }
 }
 
