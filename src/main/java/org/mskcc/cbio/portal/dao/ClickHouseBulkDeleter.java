@@ -47,7 +47,7 @@ public class ClickHouseBulkDeleter {
 
     private static final Integer DEFAULT_CREATE_STAGING_TABLE_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_POPULATE_STAGING_TABLE_MAX_RETRY_SECONDS = 3 * 60;
-    private static final Integer CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 15 * 60;
+    private static final Integer DEFAULT_CONFIRM_DELETE_DATA_MAX_RETRY_SECONDS = 15 * 60;
     private static final Integer DEFAULT_CONFIRM_DELETE_METADATA_MAX_RETRY_SECONDS = 2 * 60;
     private static final Integer DEFAULT_RETRY_CYCLE_PERIOD_SECONDS = 10;
     private static final Integer DEFAULT_RETRY_CYCLE_MAX_EXCEPTION_COUNT = 6;
