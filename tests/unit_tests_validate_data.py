@@ -3006,7 +3006,7 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
     def test_the_serving_object_is_not_a_column(self):
-        """`serving` feeds tile-server access for the row, not the table, so a contract omits it."""
+        """`serving` is sent to the tile server, not shown in the table, so a contract omits it."""
         validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
         validateData.RESOURCE_CONTRACT_KEYS = {'PATHOLOGY_SLIDE': {'stain'}}
         self.logger.setLevel(logging.WARNING)

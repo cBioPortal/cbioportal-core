@@ -64,8 +64,8 @@ RESOURCE_DEFINITION_DICTIONARY = {}
 # Populated from the definition file before any resource data file is read.
 RESOURCE_CONTRACT_KEYS = {}
 # METADATA keys that are not table columns, so a CUSTOM_METADATA contract does not declare them:
-# `serving` holds what the portal copies into a tile-server capability for the row
-# (GET /api/resources/{studyId}/{resourceId}/access).
+# `serving` holds what the frontend sends to the tile server for the row (its serving key and
+# sealed source), not a field to display.
 RESERVED_METADATA_KEYS = {'serving'}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
 
