@@ -24,6 +24,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -117,6 +118,30 @@ public class TestDaoResourceDataBulkLoad extends AbstractDaoDeleteTest {
         assertNull("metadata", row.metadata);
     }
 
+    /**
+     * A sample file for a large study names tens of thousands of samples. The lookup of the rows
+     * it replaces must not put them all in the query text, which ClickHouse caps at
+     * max_query_size (256 KiB by default).
+     */
+    @Test
+    public void reimportOfManySamplesReplacesTheirRows() throws DaoException {
+        DaoResourceData.addResourceDatum(
+            studyId, RESOURCE_ID, "SAMPLE", PATIENT_STABLE_ID, SAMPLE_STABLE_ID, URL, null, null);
+        ClickHouseBulkLoader.flushAll();
+        assertEquals(1, countProbeRows());
+
+        Set<String> sampleIds = new HashSet<>();
+        sampleIds.add(SAMPLE_STABLE_ID);
+        for (int i = 0; i < 20_000; i++) {
+            sampleIds.add(String.format("LARGE-STUDY-SAMPLE-%06d", i));
+        }
+        DaoResourceData.deleteResourceDataForReimport(
+            studyId, "SAMPLE", Set.of(RESOURCE_ID), sampleIds);
+        ClickHouseBulkDeleter.flushAll();
+
+        assertEquals(0, countProbeRows());
+    }
+
     private static final class Row {
         int cancerStudyId;
         String resourceScope;
@@ -125,6 +150,24 @@ public class TestDaoResourceDataBulkLoad extends AbstractDaoDeleteTest {
         String url;
         String displayName;
         String metadata;
+    }
+
+    private int countProbeRows() throws DaoException {
+        Connection con = null;
+        try {
+            con = JdbcUtil.getDbConnection(ClickHouseBulkLoader.class);
+            PreparedStatement ps = con.prepareStatement(
+                "SELECT count() FROM resource WHERE cancer_study_id = ? AND resource_id = ?");
+            ps.setInt(1, studyId);
+            ps.setString(2, RESOURCE_ID);
+            ResultSet rs = ps.executeQuery();
+            rs.next();
+            return rs.getInt(1);
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(ClickHouseBulkLoader.class, con, null, null);
+        }
     }
 
     private Row readProbeRow() throws DaoException {
