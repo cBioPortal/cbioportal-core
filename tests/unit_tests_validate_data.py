@@ -3268,6 +3268,20 @@ class GenericAssayContinuousTestCase(PostClinicalDataFileTestCase):
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn(record.cause, 'NON_NUMERIC')
 
+    def test_generic_assay_entity_ids_differing_only_in_case(self):
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_generic_assay_entity_id_case_duplicate.txt',
+                            validateData.GenericAssayContinuousValidator,
+                            extra_meta_fields={
+                                'generic_entity_meta_properties': 'name,description,url'})
+
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual(4, record.line_number)
+        self.assertEqual('Mean_1', record.cause)
+        self.assertIn('differs only in case from `mean_1` on line 2', record.getMessage())
+
 class GenericAssayCategoricalTestCase(PostClinicalDataFileTestCase):
     def test_generic_assay_with_valid_categorical_data(self):
         self.logger.setLevel(logging.ERROR)
