@@ -3242,12 +3242,56 @@ class EmbeddingDefinitionValidatorTestCase(PostClinicalDataFileTestCase):
                                     validateData.EmbeddingDefinitionValidator)
         self.assertEqual(0, len(record_list))
 
+    def test_invalid_entity_type(self):
+        """Test that an ENTITY_TYPE other than PATIENT/SAMPLE is rejected."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_embedding_definition_invalid_entity_type.txt',
+                                    validateData.EmbeddingDefinitionValidator)
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual('tumor', record.cause)
+        self.assertIn('Invalid entity_type', record.getMessage())
+
 class EmbeddingValidatorTestCase(PostClinicalDataFileTestCase):
     def test_valid_embedding_file(self):
         self.logger.setLevel(logging.ERROR)
         record_list = self.validate('data_embedding.txt',
                                     validateData.EmbeddingDataValidator)
         self.assertEqual(0, len(record_list))
+
+    def test_invalid_coordinates(self):
+        """Test that a non-numeric X coordinate is rejected."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_embedding_invalid_coordinates.txt',
+                                    validateData.EmbeddingDataValidator)
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual('not_a_number', record.cause)
+        self.assertIn('X coordinate is not a number', record.getMessage())
+
+    def test_duplicate_entry(self):
+        """Test that a repeated (EMBEDDING_ID, SAMPLE_ID) pair is flagged."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_embedding_duplicate_pair.txt',
+                                    validateData.EmbeddingDataValidator)
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual(3, record.line_number)
+        self.assertIn('Duplicate entry', record.getMessage())
+
+    def test_unknown_sample_id(self):
+        """Test that a SAMPLE_ID absent from the sample file is rejected."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_embedding_unknown_sample.txt',
+                                    validateData.EmbeddingDataValidator)
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual('NOT-A-REAL-SAMPLE-01', record.cause)
+        self.assertIn('Sample ID not defined in clinical file', record.getMessage())
 
 
 

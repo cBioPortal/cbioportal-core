@@ -1,0 +1,3 @@
+EMBEDDING_ID	PATIENT_ID	SAMPLE_ID	X	Y	CUSTOM_ATTRIBUTES
+patient_record_embedding	TEST-PAT5	TCGA-A1-A0SB-01	0.5	1.9	{"data_split":"train"}
+patient_record_embedding	TEST-PAT5	TCGA-A1-A0SB-01	0.6	2.0	{"data_split":"test"}

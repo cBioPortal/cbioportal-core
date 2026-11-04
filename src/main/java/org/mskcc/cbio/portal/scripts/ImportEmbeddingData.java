@@ -37,8 +37,9 @@ public class ImportEmbeddingData extends ConsoleRunnable{
     public static final String X__COLUMN_NAME = "X";
     public static final String Y_COLUMN_NAME = "Y";
     private static Properties properties;
-    Map<String, Integer> seenDefinitionIds = new HashMap<>();
+    private final Map<String, Integer> seenDefinitionIds = new HashMap<>();
     public static final String TABLE = "embedding_data";
+    private boolean overwriteExisting;
 
     /**
      * Instantiates a ConsoleRunnable to run with the given command line args.
@@ -107,6 +108,9 @@ public class ImportEmbeddingData extends ConsoleRunnable{
                         throw new IllegalArgumentException(
                                 "Embedding definition not found: " + embeddingId
                         );
+                    }
+                    if (overwriteExisting) {
+                        DaoEmbeddingData.deleteByCancerStudyAndDefinition(cancerStudyId, embeddingDefinitionId);
                     }
                     seenDefinitionIds.put(embeddingId, embeddingDefinitionId);
                 }
@@ -215,7 +219,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
                     "meta (description) file" ).withOptionalArg().describedAs( "meta_file.txt" ).ofType( String.class );
             OptionSpec<String> study = parser.accepts("study",
                     "cancer study id").withOptionalArg().describedAs("study").ofType(String.class);
-            // might not need this parsed into the arguement because it always does bulk insert
+            // this importer only supports bulk load; loadMode is validated below.
             parser.accepts( "loadMode", "direct (per record) or bulk load of data" )
                     .withOptionalArg().describedAs( "[directLoad|bulkLoad (default)]" ).ofType( String.class );
             parser.accepts("noprogress", "this option can be given to avoid the messages regarding memory usage and % complete");
@@ -231,6 +235,12 @@ public class ImportEmbeddingData extends ConsoleRunnable{
                         e.getMessage());
             }
 
+            if (options.has("loadMode") && !"bulkLoad".equalsIgnoreCase((String) options.valueOf("loadMode"))) {
+                throw new UnsupportedOperationException("This loader supports bulkLoad load mode only, but "
+                        + options.valueOf("loadMode")
+                        + " has been supplied.");
+            }
+
             File embeddingData_f = null;
             if( options.has( data ) ){
                 embeddingData_f = new File( options.valueOf( data ) );
@@ -239,6 +249,7 @@ public class ImportEmbeddingData extends ConsoleRunnable{
                         progName, description, parser,
                         "'data' argument required.");
             }
+            this.overwriteExisting = options.has(overWriteExistingFlag);
             boolean relaxed = false;
             String cancerStudyStableId = null;
             if( options.has ( study ) )

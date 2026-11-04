@@ -294,6 +294,8 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     sample_attr_filepair = None
     sample_resource_filepair = None
     resource_definition_filepair = None
+    embedding_definition_filepair = None
+    embedding_filepairs = []
     regular_filepairs = []
     gene_panel_matrix_filepair = None
     zscore_filepairs = []
@@ -388,6 +390,18 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
         elif meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
             cna_long_filepair = (
                 (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
+        # Check for embedding definitions
+        elif meta_file_type == MetaFileTypes.EMBEDDING_DEFINITION:
+            if embedding_definition_filepair is not None:
+                raise RuntimeError(
+                    'Multiple embedding definition files found: {} and {}'.format(
+                        embedding_definition_filepair[0], meta_filename))   # pylint: disable=unsubscriptable-object
+            embedding_definition_filepair = (
+                meta_filename, os.path.join(study_directory, meta_dictionary['data_filename']))
+        # Check for embedding data (requires embedding definitions to already exist)
+        elif meta_file_type == MetaFileTypes.EMBEDDING:
+            embedding_filepairs.append(
+                (meta_filename, os.path.join(study_directory, meta_dictionary['data_filename'])))
         # Add all other types of data
         else:
             regular_filepairs.append(
@@ -420,6 +434,15 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
     # Next, we need to import sample definitions for resource data
     if sample_resource_filepair is not None:
         meta_filename, data_filename = sample_resource_filepair
+        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+
+    # Next, we need to import embedding definitions before embedding data
+    if embedding_definition_filepair is not None:
+        meta_filename, data_filename = embedding_definition_filepair
+        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+
+    # Next, import embedding data (requires embedding definitions to already exist)
+    for meta_filename, data_filename in embedding_filepairs:
         import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
 
     # Next, import everything else except gene panel, structural variant data, GSVA and

@@ -1,0 +1,2 @@
+EMBEDDING_ID	PATIENT_ID	SAMPLE_ID	X	Y	CUSTOM_ATTRIBUTES
+mosaic_sample	TEST-PAT1		not_a_number	3.4	{"data_split":"train"}

@@ -10,6 +10,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 
@@ -58,5 +59,14 @@ public class TestDaoEmbeddingDefinition extends IntegrationTestBase {
         assertEquals(1,DaoEmbeddingDefinition.getDefinitionId(emb.getEmbeddingId()));
     }
 
+    @Test
+    public void checkDefinitionExists_returnsFalseForUnknownId() throws DaoException {
+        assertFalse(DaoEmbeddingDefinition.checkDefinitionExists("no_such_embedding"));
+    }
+
+    @Test
+    public void getDefinitionId_returnsNegativeOneForUnknownId() throws DaoException {
+        assertEquals(-1, DaoEmbeddingDefinition.getDefinitionId("no_such_embedding"));
+    }
 
 }

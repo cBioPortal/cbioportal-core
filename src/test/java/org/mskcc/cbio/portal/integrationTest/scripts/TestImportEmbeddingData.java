@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/applicationContext-dao.xml" })
@@ -34,9 +35,6 @@ public class TestImportEmbeddingData extends IntegrationTestBase {
     @Before
     public void setUp() throws DaoException
     {
-//        DaoCancerStudy.reCacheAll();
-//        ProgressMonitor.resetWarnings();
-
         // new dummy study to simulate importing clinical data in empty study:
         cancerStudy = new CancerStudy("testnew","testnew","testnew","brca",true);
         cancerStudy.setReferenceGenome("hg19");
@@ -70,7 +68,113 @@ public class TestImportEmbeddingData extends IntegrationTestBase {
         assertTrue(DaoEmbeddingDefinition.checkDefinitionExists("umap_1"));
         assertTrue(DaoEmbeddingDefinition.checkDefinitionExists("pca_1"));
         // Check the actual embedding data exists
-        List<EmbeddingData> data = DaoEmbeddingData.getEmbeddingDataByCancerStudy(2);
+        List<EmbeddingData> data = DaoEmbeddingData.getEmbeddingDataByCancerStudy(cancerStudy.getInternalId());
         assertEquals(8, data.size());
+
+        // Value-level assertions: confirm patientId/sampleId land in the correct fields,
+        // not swapped. data_embedding.txt's pca_1 rows have genuinely distinguishable
+        // patient vs. sample values (e.g. "TCGA-B6-A0WX" vs "TCGA-B6-A0WX-01"), so this
+        // would fail loudly if the two ever got transposed again.
+        EmbeddingData pcaRow = data.stream()
+                .filter(d -> "TCGA-B6-A0WX-01".equals(d.getSampleId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected a row with sampleId TCGA-B6-A0WX-01"));
+        assertEquals("TCGA-B6-A0WX", pcaRow.getPatientId());
+        assertEquals("TCGA-B6-A0WX-01", pcaRow.getSampleId());
+        assertEquals(0.5, pcaRow.getX(), 0.001);
+        assertEquals(1.9, pcaRow.getY(), 0.001);
+
+        // umap_1 rows are patient-level: sampleId must come back empty, never null and
+        // never accidentally holding the patient value.
+        EmbeddingData umapRow = data.stream()
+                .filter(d -> "TCGA-A2-A04P".equals(d.getPatientId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected a row with patientId TCGA-A2-A04P"));
+        assertEquals("", umapRow.getSampleId());
+    }
+
+    @Test
+    public void importData_overwriteExisting_doesNotDuplicateRows() throws Exception {
+        ProgressMonitor.setConsoleMode(false);
+        String[] args = {
+                "--data","src/test/resources/data_embedding.txt",
+                "--meta","src/test/resources/meta_embedding.txt",
+                "--loadMode", "bulkLoad"
+        };
+        new ImportEmbeddingData(args).run();
+        assertEquals(8, DaoEmbeddingData.getEmbeddingDataByCancerStudy(cancerStudy.getInternalId()).size());
+
+        // Re-running with --overwrite-existing must replace the previously loaded
+        // rows for this definition, not pile duplicates on top of them.
+        String[] overwriteArgs = {
+                "--data","src/test/resources/data_embedding.txt",
+                "--meta","src/test/resources/meta_embedding.txt",
+                "--loadMode", "bulkLoad",
+                "--overwrite-existing"
+        };
+        new ImportEmbeddingData(overwriteArgs).run();
+
+        assertEquals(8, DaoEmbeddingData.getEmbeddingDataByCancerStudy(cancerStudy.getInternalId()).size());
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void importData_unsupportedLoadMode_throws() throws Exception {
+        ProgressMonitor.setConsoleMode(false);
+        String[] args = {
+                "--data","src/test/resources/data_embedding.txt",
+                "--meta","src/test/resources/meta_embedding.txt",
+                "--loadMode", "directLoad"
+        };
+
+        // This importer only ever bulk-loads; a directLoad request must be rejected
+        // instead of silently falling back to bulk load.
+        new ImportEmbeddingData(args).run();
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void importData_missingRequiredColumn_throws() throws Exception {
+        ProgressMonitor.setConsoleMode(false);
+        String[] args = {
+                "--data", "src/test/resources/data_embedding_missing_column.txt",
+                "--meta", "src/test/resources/meta_embedding.txt",
+                "--loadMode", "bulkLoad"
+        };
+
+        // File has no X column at all — must fail fast with a clear error rather than
+        // silently importing incomplete points.
+        new ImportEmbeddingData(args).run();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void importData_malformedRow_throws() throws Exception {
+        ProgressMonitor.setConsoleMode(false);
+        String[] args = {
+                "--data", "src/test/resources/data_embedding_malformed_row.txt",
+                "--meta", "src/test/resources/meta_embedding.txt",
+                "--loadMode", "bulkLoad"
+        };
+
+        // Data row has fewer fields than the header — must be rejected instead of
+        // silently misaligning columns.
+        new ImportEmbeddingData(args).run();
+    }
+
+    @Test
+    public void importData_unknownEmbeddingDefinition_throwsIllegalArgumentException() throws Exception {
+        ProgressMonitor.setConsoleMode(false);
+        String[] args = {
+                "--data", "src/test/resources/data_embedding_unknown_definition.txt",
+                "--meta", "src/test/resources/meta_embedding.txt",
+                "--loadMode", "bulkLoad"
+        };
+
+        try {
+            new ImportEmbeddingData(args).run();
+            fail("Expected an IllegalArgumentException for an EMBEDDING_ID with no matching definition");
+        } catch (IllegalArgumentException e) {
+            // run() rethrows RuntimeExceptions (including this one) unwrapped, so the
+            // message itself must identify what actually went wrong, not a generic failure.
+            assertTrue(e.getMessage().contains("Embedding definition not found"));
+        }
     }
 }

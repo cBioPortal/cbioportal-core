@@ -1,0 +1,2 @@
+EMBEDDING_ID	PATIENT_ID	SAMPLE_ID	X	Y	CUSTOM_ATTRIBUTES
+ghost_embedding	TCGA-A2-A04P		1.2	3.4	{"data_split":"train"}

@@ -28,6 +28,22 @@ public final class DaoEmbeddingData {
         }
     }
 
+    public static void deleteByCancerStudyAndDefinition(int cancerStudyId, int embeddingDefinitionId) throws DaoException {
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        try {
+            con = JdbcUtil.getDbConnection(DaoEmbeddingData.class);
+            pstmt = con.prepareStatement("DELETE FROM " + TABLE + " WHERE study_id = ? AND embedding_definition_id = ?");
+            pstmt.setInt(1, cancerStudyId);
+            pstmt.setInt(2, embeddingDefinitionId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoEmbeddingData.class, con, pstmt, null);
+        }
+    }
+
     public static List<EmbeddingData> getEmbeddingDataByCancerStudy(int cancerStudyId) throws DaoException {
         Connection con = null;
         PreparedStatement pstmt = null;

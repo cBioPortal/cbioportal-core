@@ -1,0 +1,2 @@
+EMBEDDING_ID	PATIENT_ID	SAMPLE_ID	X	Y	CUSTOM_ATTRIBUTES
+patient_record_embedding	TEST-PAT5	NOT-A-REAL-SAMPLE-01	0.5	1.9	{"data_split":"train"}
