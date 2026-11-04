@@ -79,6 +79,11 @@ def interface():
                                        action='store_true',
                                        help='Skip tests requiring information '
                                             'from the cBioPortal installation')
+    parser.add_argument('--api_token', type=str,
+                        default=os.environ.get('CBIOPORTAL_API_TOKEN'),
+                        help='Data access token for a cBioPortal server with '
+                             'authentication enabled (default: the '
+                             'CBIOPORTAL_API_TOKEN environment variable)')
     parser.add_argument('-jvo', '--java_opts', type=str, default=os.environ.get('JAVA_OPTS'),
                         help='Path to specify JAVA_OPTS for the importer. \
                         (default: gets the JAVA_OPTS from the environment)')
