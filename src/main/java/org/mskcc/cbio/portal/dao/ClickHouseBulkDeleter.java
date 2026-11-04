@@ -478,6 +478,7 @@ public class ClickHouseBulkDeleter {
         return returnValue;
     }
 
+
     // checks specified outputField in the results of running queryString and looks for expectedResult
     // only the first result (in the result set) is examined
     private boolean queryProducedExpectedResult(String queryString, String outputField, long expectedResult) throws SQLException {
