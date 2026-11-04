@@ -99,6 +99,7 @@ VALIDATOR_IDS = {
     cbioportal_common.MetaFileTypes.SAMPLE_ATTRIBUTES:'SampleClinicalValidator',
     cbioportal_common.MetaFileTypes.PATIENT_ATTRIBUTES:'PatientClinicalValidator',
     cbioportal_common.MetaFileTypes.SEG:'SegValidator',
+    cbioportal_common.MetaFileTypes.ASCN_SEG:'SegValidator',
     cbioportal_common.MetaFileTypes.PROTEIN:'ProteinLevelValidator',
     cbioportal_common.MetaFileTypes.GISTIC_GENES: 'GisticGenesValidator',
     cbioportal_common.MetaFileTypes.TIMELINE:'TimelineValidator',
@@ -3005,7 +3006,23 @@ class PatientClinicalValidator(ClinicalValidator):
 
 
 class SegValidator(Validator):
-    """Validator for .seg files."""
+
+    """Validator for .seg files, optionally enriched with ASCN
+    (allele-specific copy number) fields for segmentation data.
+
+    The 6 core columns (ID, chrom, loc.start, loc.end, num.mark, seg.mean)
+    are always required. TCN, LCN, CELLULAR_FRACTION, PURITY, PLOIDY and
+    DIP_LOG_R are optional supplemental ASCN columns, present only for
+    ALLELE_SPECIFIC_COPY_NUMBER studies; plain COPY_NUMBER_ALTERATION SEG
+    files simply omit them.
+
+    Columns are resolved by header name rather than position
+    (REQUIRE_COLUMN_ORDER = False), both so the optional ASCN columns may
+    appear anywhere after the core ones, and so this validator and the Java
+    importer (ImportCopyNumberSegmentData, which also resolves columns by
+    header rather than position) agree on what a given column name means
+    regardless of where it sits in the file.
+    """
 
     REQUIRED_HEADERS = [
         'ID',
@@ -3014,7 +3031,13 @@ class SegValidator(Validator):
         'loc.end',
         'num.mark',
         'seg.mean']
-    REQUIRE_COLUMN_ORDER = True
+    REQUIRE_COLUMN_ORDER = False
+    ALLOW_BLANKS = True
+    NULL_VALUES = ['NA']
+
+    # Optional ASCN (allele-specific copy number) enrichment columns.
+    INTEGER_CONSTRAINED_COLUMNS = ['TCN', 'LCN']
+    NULLABLE_FLOAT_COLUMNS = ['CELLULAR_FRACTION', 'PURITY', 'PLOIDY', 'DIP_LOG_R']
 
     def __init__(self, *args, **kwargs):
         """Initialize validator to track coverage of the genome."""
@@ -3026,76 +3049,110 @@ class SegValidator(Validator):
         self.chromosome_lengths['23'] = self.chromosome_lengths['X']
         self.chromosome_lengths['24'] = self.chromosome_lengths['Y']
 
+    def _getValue(self, data, column_name):
+        """Return the stripped value for a column, or None if absent/blank."""
+        if column_name not in self.cols:
+            return None
+        index = self.cols.index(column_name)
+        if index >= len(data):
+            return None
+        value = data[index].strip()
+        return value if value != '' else None
+
+    def _columnNumber(self, column_name):
+        return self.cols.index(column_name) + 1 if column_name in self.cols else None
+
+    def _checkRequiredValue(self, data, column_name):
+        """Return the value for a required column, logging a blank-cell error
+        if it is absent (mirroring the base Validator's ALLOW_BLANKS=False
+        behavior, which this class otherwise opts out of so the optional ASCN
+        columns can be blank/NA).
+        """
+        value = self._getValue(data, column_name)
+        if value is None:
+            self.logger.error(
+                'Blank cell found in column',
+                extra={'line_number': self.line_number,
+                       'column_number': self._columnNumber(column_name),
+                       'cause': "'' (in column '%s')" % column_name})
+        return value
+
     def checkLine(self, data):
         super(SegValidator, self).checkLine(data)
 
         parsed_coords = {}
-        for col_index, col_name in enumerate(self.cols):
-            value = data[col_index].strip()
-            if col_name == 'ID':
-                self.checkSampleId(value, column_number=col_index + 1)
-            elif col_name == 'chrom':
-                if value in self.chromosome_lengths:
-                    parsed_coords[col_name] = value
-                else:
-                    self.logger.error(
-                        ('Unknown chromosome, must be one of (%s)' %
-                         '|'.join(list(self.chromosome_lengths.keys()))),
-                        extra={'line_number': self.line_number,
-                               'column_number': col_index + 1,
-                               'cause': value})
-            elif col_name in ('loc.start', 'loc.end'):
-                try:
-                    # convert possible scientific notation to python scientific notation
-                    if "e+" in value:
-                        value = float(value.replace("e+", "e"))
-                        if not value.is_integer():
-                            # raise value error 'Genomic position is not an integer'
-                            raise ValueError()
-                    parsed_coords[col_name] = int(value)
-                except ValueError:
-                    self.logger.error(
-                        'Genomic position is not an integer',
-                        extra={'line_number': self.line_number,
-                               'column_number': col_index + 1,
-                               'cause': value})
-                    # skip further validation specific to this column
-                    continue
-                # 0 is the first base, and loc.end is not part of the segment
-                # 'chrom' has already been read, as column order is fixed
-                if parsed_coords[col_name] < 0 or (
-                        'chrom' in parsed_coords and
-                        parsed_coords[col_name] > self.chromosome_lengths[
-                                                      parsed_coords['chrom']]):
-                    self.logger.error(
-                        'Genomic position beyond end of chromosome '
-                        '(chr%s:0-%s)',
-                        parsed_coords['chrom'],
-                        self.chromosome_lengths[parsed_coords['chrom']],
-                        extra={'line_number': self.line_number,
-                               'column_number': col_index + 1,
-                               'cause': value})
-                    # not a valid coordinate usable in further validations
-                    del parsed_coords[col_name]
-            elif col_name == 'num.mark':
-                if not self.checkInt(value):
-                    # also check if the value is an int in scientific notation (1e+05)
-                    if not ("e+" in value and self.checkFloat(value)):
-                        self.logger.error(
-                            'Number of probes is not an integer',
-                            extra={'line_number': self.line_number,
-                                   'column_number': col_index + 1,
-                                   'cause': value})
-            elif col_name == 'seg.mean':
-                if not self.checkFloat(value):
-                    self.logger.error(
-                        'Mean segment copy number is not a number',
-                        extra={'line_number': self.line_number,
-                               'column_number': col_index + 1,
-                               'cause': value})
+
+        id_value = self._checkRequiredValue(data, 'ID')
+        if id_value is not None:
+            self.checkSampleId(id_value, column_number=self._columnNumber('ID'))
+
+        chrom_value = self._checkRequiredValue(data, 'chrom')
+        if chrom_value is not None:
+            if chrom_value in self.chromosome_lengths:
+                parsed_coords['chrom'] = chrom_value
             else:
-                raise RuntimeError('Could not validate column type: ' +
-                                   col_name)
+                self.logger.error(
+                    ('Unknown chromosome, must be one of (%s)' %
+                     '|'.join(list(self.chromosome_lengths.keys()))),
+                    extra={'line_number': self.line_number,
+                           'column_number': self._columnNumber('chrom'),
+                           'cause': chrom_value})
+
+        for column_name in ('loc.start', 'loc.end'):
+            value = self._checkRequiredValue(data, column_name)
+            if value is None:
+                continue
+            try:
+                # convert possible scientific notation to python scientific notation
+                if "e+" in value:
+                    value = float(value.replace("e+", "e"))
+                    if not value.is_integer():
+                        # raise value error 'Genomic position is not an integer'
+                        raise ValueError()
+                parsed_coords[column_name] = int(value)
+            except ValueError:
+                self.logger.error(
+                    'Genomic position is not an integer',
+                    extra={'line_number': self.line_number,
+                           'column_number': self._columnNumber(column_name),
+                           'cause': value})
+                # skip further validation specific to this column
+                continue
+            # 0 is the first base, and loc.end is not part of the segment
+            if parsed_coords[column_name] < 0 or (
+                    'chrom' in parsed_coords and
+                    parsed_coords[column_name] > self.chromosome_lengths[
+                                                      parsed_coords['chrom']]):
+                self.logger.error(
+                    'Genomic position beyond end of chromosome '
+                    '(chr%s:0-%s)',
+                    parsed_coords['chrom'],
+                    self.chromosome_lengths[parsed_coords['chrom']],
+                    extra={'line_number': self.line_number,
+                           'column_number': self._columnNumber(column_name),
+                           'cause': value})
+                # not a valid coordinate usable in further validations
+                del parsed_coords[column_name]
+
+        num_mark_value = self._checkRequiredValue(data, 'num.mark')
+        if num_mark_value is not None:
+            if not self.checkInt(num_mark_value):
+                # also check if the value is an int in scientific notation (1e+05)
+                if not ("e+" in num_mark_value and self.checkFloat(num_mark_value)):
+                    self.logger.error(
+                        'Number of probes is not an integer',
+                        extra={'line_number': self.line_number,
+                               'column_number': self._columnNumber('num.mark'),
+                               'cause': num_mark_value})
+
+        seg_mean_value = self._checkRequiredValue(data, 'seg.mean')
+        if seg_mean_value is not None:
+            if not self.checkFloat(seg_mean_value):
+                self.logger.error(
+                    'Mean segment copy number is not a number',
+                    extra={'line_number': self.line_number,
+                           'column_number': self._columnNumber('seg.mean'),
+                           'cause': seg_mean_value})
 
         if 'loc.start' in parsed_coords and 'loc.end' in parsed_coords:
             # the convention for genomic coordinates (at least at UCSC) is that
@@ -3114,12 +3171,52 @@ class SegValidator(Validator):
                            'cause': '{}-{}'.format(parsed_coords['loc.start'],
                                                    parsed_coords['loc.end'])})
 
+        for column_name in self.INTEGER_CONSTRAINED_COLUMNS:
+            self._checkIntegerConstrainedColumn(data, column_name)
+
+        for column_name in self.NULLABLE_FLOAT_COLUMNS:
+            value = self._getValue(data, column_name)
+            if value is not None and value not in self.NULL_VALUES and not self.checkFloat(value):
+                self.logger.error(
+                    'Value is neither a real number nor NA',
+                    extra={'line_number': self.line_number,
+                           'column_number': self._columnNumber(column_name),
+                           'cause': value})
+
         # TODO check for overlap and low genome coverage
         # this could be implemented by sorting the segments for a patient
         # by (chromosome and) start position and checking if the start position
         # of each segment comes after the end position of the previous one,
         # meanwhile adding up the number of (non-overlapping) bases covered on
         # that chromosome in that patient.
+
+    def _checkIntegerConstrainedColumn(self, data, column_name):
+        """TCN/LCN are stored as whole-number allele counts (Nullable(Int32)
+        in the schema). A value that is numeric but not whole (e.g. "2.5") is
+        neither silently accepted nor rejected outright: the Java importer
+        (ImportCopyNumberSegmentData.parseNullableInteger) rounds it to the
+        nearest integer and logs a warning, so this validator warns on the
+        same condition rather than erroring.
+        """
+        value = self._getValue(data, column_name)
+        if value is None or value in self.NULL_VALUES:
+            return
+        if not self.checkFloat(value):
+            self.logger.error(
+                'Value is neither a real number nor NA',
+                extra={'line_number': self.line_number,
+                       'column_number': self._columnNumber(column_name),
+                       'cause': value})
+            return
+        numeric_value = float(value)
+        if numeric_value != round(numeric_value):
+            self.logger.warning(
+                '%s is a non-integer value. It will be rounded to the nearest '
+                'integer upon import.' % column_name,
+                extra={'line_number': self.line_number,
+                       'column_number': self._columnNumber(column_name),
+                       'cause': value})
+
 
 class StructuralVariantValidator(CustomNamespacesValidator):
 
