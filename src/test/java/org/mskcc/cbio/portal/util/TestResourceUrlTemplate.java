@@ -11,6 +11,8 @@ import java.util.List;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNotEquals;
 
 public class TestResourceUrlTemplate {
@@ -55,5 +57,20 @@ public class TestResourceUrlTemplate {
         assertNotEquals(
             ResourceUrlTemplate.rowValues(SLIDE_TEMPLATE, "P-1", "S-1", "{\"slide_key\": \"abc\"}"),
             ResourceUrlTemplate.rowValues(SLIDE_TEMPLATE, "P-1", "S-1", "{\"slide_key\": \"def\"}"));
+    }
+
+    @Test
+    public void onlyBaseUrlAndHttpStartsAreAllowed() {
+        assertTrue(ResourceUrlTemplate.hasAllowedStart(SLIDE_TEMPLATE));
+        assertTrue(ResourceUrlTemplate.hasAllowedStart("https://example.org/${PATIENT_ID}"));
+        assertTrue(ResourceUrlTemplate.hasAllowedStart("http://example.org/${PATIENT_ID}"));
+        // The scheme is compared case-insensitively, the placeholder name is not.
+        assertTrue(ResourceUrlTemplate.hasAllowedStart("HTTPS://example.org/"));
+        assertFalse(ResourceUrlTemplate.hasAllowedStart("${BASE_URL}/x"));
+        assertFalse(ResourceUrlTemplate.hasAllowedStart("javascript:alert(1)"));
+        assertFalse(ResourceUrlTemplate.hasAllowedStart("ftp://example.org/x"));
+        assertFalse(ResourceUrlTemplate.hasAllowedStart("/relative/${PATIENT_ID}"));
+        assertFalse(ResourceUrlTemplate.hasAllowedStart(" https://leading.space/"));
+        assertFalse(ResourceUrlTemplate.hasAllowedStart(null));
     }
 }

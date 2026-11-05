@@ -16,6 +16,7 @@ import org.mskcc.cbio.portal.model.shared.ResourceType;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MissingValues;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.ResourceUrlTemplate;
 
 public class ImportResourceDefinition extends ConsoleRunnable {
 
@@ -131,6 +132,10 @@ public class ImportResourceDefinition extends ConsoleRunnable {
             // get urlTemplate (optional): the portal expands it for rows with no URL of their own
             if (urlTemplateIndex != MISSING_COLUMN_INDEX && isValueNotMissing(fieldValues[urlTemplateIndex])) {
                 urlTemplate = fieldValues[urlTemplateIndex];
+                if (!ResourceUrlTemplate.hasAllowedStart(urlTemplate)) {
+                    throw new RuntimeException("URL_TEMPLATE of resource " + resourceId
+                        + " must start with ${base_url}, http:// or https://: " + urlTemplate);
+                }
             }
 
             // add resource definitions into database

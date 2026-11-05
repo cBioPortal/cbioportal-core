@@ -33,6 +33,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests the optional URL_TEMPLATE column of the resource definition file and the resource data
@@ -107,6 +108,32 @@ public class TestImportResourceUrlTemplate extends IntegrationTestBase {
         importData("resource_sample_url_template_duplicate.txt", "SAMPLE");
     }
 
+    /**
+     * In relaxed mode the duplicate is skipped rather than failing the import, with a warning
+     * naming it: both rows are stored with an empty url, so the "different values" warning could
+     * not tell them apart.
+     */
+    @Test
+    public void relaxedModeSkipsATemplatedDuplicateWithAWarning() throws Exception {
+        importDefinitions("resource_definition_url_template.txt");
+        ImportResourceData importer = importData("resource_sample_url_template_duplicate.txt", "SAMPLE", true);
+
+        assertEquals(1, importer.getNumSampleSpecificResourcesAdded());
+        assertEquals(List.of("TCGA-A1-A0SD-01|"), readRows("WSI_SLIDE", "sample_id"));
+        List<String> warnings = ProgressMonitor.getWarnings();
+        assertTrue(warnings.toString(), warnings.stream().anyMatch(w ->
+            w.contains("Duplicated sample resource WSI_SLIDE for TCGA-A1-A0SD-01")
+                && w.contains("URL_TEMPLATE the same values")));
+    }
+
+    /** A template that could expand to a URL of another scheme is rejected, as the validator does. */
+    @Test
+    public void aTemplateWithoutAnAllowedStartIsRejected() throws Exception {
+        exception.expect(RuntimeException.class);
+        exception.expectMessage("URL_TEMPLATE of resource WSI_SLIDE must start with ${base_url}, http:// or https://");
+        importDefinitions("resource_definition_url_template_bad_scheme.txt");
+    }
+
     @Test
     public void patientRowsWithoutUrlAreImportedWhenTheResourceHasATemplate() throws Exception {
         importDefinitions("resource_definition_url_template.txt");
@@ -133,8 +160,12 @@ public class TestImportResourceUrlTemplate extends IntegrationTestBase {
     }
 
     private ImportResourceData importData(String file, String resourceType) throws Exception {
+        return importData(file, resourceType, false);
+    }
+
+    private ImportResourceData importData(String file, String resourceType, boolean relaxed) throws Exception {
         ImportResourceData importer = new ImportResourceData(null);
-        importer.setFile(cancerStudy, new File("src/test/resources/" + file), resourceType, false);
+        importer.setFile(cancerStudy, new File("src/test/resources/" + file), resourceType, relaxed);
         importer.importData();
         return importer;
     }

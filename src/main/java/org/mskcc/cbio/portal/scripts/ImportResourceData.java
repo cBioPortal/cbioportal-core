@@ -399,6 +399,15 @@ public class ImportResourceData extends ConsoleRunnable {
         else if (!relaxed) {
             throw new RuntimeException("Error: Duplicated " + resourceType.toString().toLowerCase() + " resource in file");
         }
+        // A row relying on the template is stored with an empty url, so the comparison below
+        // cannot tell it from the row it duplicates. Say which row is dropped and why instead.
+        else if (resourceURL.isEmpty()) {
+            ProgressMonitor.logWarning("Duplicated " + resourceType.toString().toLowerCase() + " resource "
+                    + resourceId + " for " + (resourceType == ResourceType.STUDY ? "the study" : stableId)
+                    + ": this row has no URL and gives the resource's URL_TEMPLATE the same values as an"
+                    + " earlier row (" + urlKey + "), so it would resolve to the same URL. The row is skipped,"
+                    + " with any DISPLAY_NAME and METADATA it carries.");
+        }
         // log a warning
         else if (!resourceMap.get(internalId, resourceId, urlKey).equals(resourceURL)) {
             ProgressMonitor.logWarning("Error: Duplicated "  + resourceType.toString().toLowerCase() + " " + stableId
