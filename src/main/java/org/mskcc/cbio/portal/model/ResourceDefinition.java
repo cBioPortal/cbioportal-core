@@ -12,9 +12,16 @@ public class ResourceDefinition {
     private Integer priority;
     private Integer cancerStudyId;
     private String customMetadata;
+    private String urlTemplate;
 
     public ResourceDefinition(String resourceId, String displayName,
             String description, ResourceType resourceType, boolean openByDefault, Integer priority, Integer cancerStudyId, String customMetadata) {
+        this(resourceId, displayName, description, resourceType, openByDefault, priority, cancerStudyId, customMetadata, null);
+    }
+
+    public ResourceDefinition(String resourceId, String displayName,
+            String description, ResourceType resourceType, boolean openByDefault, Integer priority, Integer cancerStudyId, String customMetadata,
+            String urlTemplate) {
         this.resourceId = resourceId;
         this.displayName = displayName;
         this.description = description;
@@ -23,6 +30,7 @@ public class ResourceDefinition {
         this.priority = priority;
         this.cancerStudyId = cancerStudyId;
         this.customMetadata = customMetadata;
+        this.urlTemplate = urlTemplate;
     }
 
     public String getResourceId() {
@@ -85,5 +93,17 @@ public class ResourceDefinition {
 
     public void setCustomMetadata(String customMetadata) {
         this.customMetadata = customMetadata;
+    }
+
+    /**
+     * The URL the portal builds for this resource's rows that carry no URL of their own, or null.
+     * See {@link org.mskcc.cbio.portal.util.ResourceUrlTemplate} for the placeholder syntax.
+     */
+    public String getUrlTemplate() {
+        return urlTemplate;
+    }
+
+    public void setUrlTemplate(String urlTemplate) {
+        this.urlTemplate = urlTemplate;
     }
 }

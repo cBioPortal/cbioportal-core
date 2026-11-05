@@ -3185,6 +3185,126 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         record = record_list.pop()
         self.assertEqual(logging.ERROR, record.levelno)
         self.assertIn('Duplicated resources found', record.getMessage())
+
+class ResourceUrlTemplateTestCase(PostClinicalDataFileTestCase):
+    """URL_TEMPLATE in the definition file, and data rows that leave URL empty to use it."""
+
+    SLIDE_TEMPLATE = ('${base_url}/wsi/patient/${PATIENT_ID}?studyId=${STUDY_ID}'
+                      '&slideKey=${metadata.slide_key}')
+
+    def setUp(self):
+        super(ResourceUrlTemplateTestCase, self).setUp()
+        self.orig_definitions = validateData.RESOURCE_DEFINITION_DICTIONARY
+        self.orig_contract_keys = validateData.RESOURCE_CONTRACT_KEYS
+        self.orig_url_templates = validateData.RESOURCE_URL_TEMPLATES
+
+    def tearDown(self):
+        validateData.RESOURCE_DEFINITION_DICTIONARY = self.orig_definitions
+        validateData.RESOURCE_CONTRACT_KEYS = self.orig_contract_keys
+        validateData.RESOURCE_URL_TEMPLATES = self.orig_url_templates
+        super(ResourceUrlTemplateTestCase, self).tearDown()
+
+    def validate_definitions(self):
+        validator = validateData.ResourceDefinitionValidator(
+            'test_data',
+            {'data_filename': 'data_resource_definition_url_template.txt'},
+            PORTAL_INSTANCE, self.logger, False, False)
+        validator.validate()
+        return validator, self.get_log_records()
+
+    def test_url_template_errors(self):
+        self.logger.setLevel(logging.ERROR)
+        _, record_list = self.validate_definitions()
+
+        self.assertTrue(all(r.levelno == logging.ERROR for r in record_list))
+        by_line = {r.line_number: r for r in record_list}
+        self.assertEqual({4, 5, 7}, set(by_line))
+        self.assertIn('placeholder is not one of', by_line[4].getMessage())
+        self.assertEqual('${CASE_ID}', by_line[4].cause)
+        self.assertIn('must start with ${base_url}, http:// or https://', by_line[5].getMessage())
+        self.assertIn("'${' without a closing '}'", by_line[7].getMessage())
+
+    def test_url_template_warnings(self):
+        self.logger.setLevel(logging.WARNING)
+        _, record_list = self.validate_definitions()
+
+        warnings = {r.line_number: r for r in record_list if r.levelno == logging.WARNING}
+        self.assertEqual({6, 8}, set(warnings))
+        # A key the resource's contract does not declare; without a contract (line 3) any key
+        # may be read.
+        self.assertIn('CUSTOM_METADATA does not declare', warnings[6].getMessage())
+        self.assertEqual('${metadata.slide_key}', warnings[6].cause)
+        # A patient-level row has no sample id to fill in.
+        self.assertIn('rows of a PATIENT resource do not have', warnings[8].getMessage())
+        self.assertEqual('${SAMPLE_ID}', warnings[8].cause)
+
+    def test_url_templates_are_collected_by_resource_id(self):
+        validator, _ = self.validate_definitions()
+
+        self.assertEqual(self.SLIDE_TEMPLATE, validator.resource_url_templates['WSI_SLIDE'])
+        self.assertEqual('https://example.org/slides/${SAMPLE_ID}/${metadata.file}',
+                         validator.resource_url_templates['SLIDE_FILE'])
+        self.assertNotIn('NO_TEMPLATE', validator.resource_url_templates)
+        self.assertIn('NO_TEMPLATE', validator.resource_definition_dictionary)
+
+    def test_parse_url_template(self):
+        self.assertEqual(
+            (['base_url', 'PATIENT_ID', 'STUDY_ID', 'metadata.slide_key'], False),
+            validateData.parse_url_template(self.SLIDE_TEMPLATE))
+        self.assertEqual(([], False), validateData.parse_url_template('https://example.org/x'))
+        self.assertTrue(validateData.parse_url_template('${base_url}/${PATIENT_ID')[1])
+        self.assertTrue(validateData.parse_url_template('${base_url}/${a${PATIENT_ID}')[1])
+
+    def test_sample_rows_with_empty_url(self):
+        """An empty URL is accepted only for a resource with a template. Rows relying on the
+        template are duplicates when they give it the same values, so the same sample may have
+        several slides told apart by the metadata the template reads."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {
+            'WSI_SLIDE': ['SAMPLE'], 'PATHOLOGY_SLIDE': ['SAMPLE']}
+        validateData.RESOURCE_CONTRACT_KEYS = {'WSI_SLIDE': {'slide_key', 'stain'}}
+        validateData.RESOURCE_URL_TEMPLATES = {'WSI_SLIDE': self.SLIDE_TEMPLATE}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_sample_url_template.txt',
+                                    validateData.SampleResourceValidator)
+
+        by_line = {r.line_number: r for r in record_list}
+        self.assertEqual({4, 7, 8}, set(by_line))
+        # Line 3 differs from line 2 in slide_key; line 5 is another sample. Line 4 differs from
+        # line 2 only in stain, which the template does not read.
+        self.assertIn('Duplicated resources found', by_line[4].getMessage())
+        self.assertEqual(2, by_line[4].duplicated_line_number)
+        # PATHOLOGY_SLIDE has no template.
+        self.assertIn('not an url', by_line[7].getMessage())
+        self.assertIn('URL may be empty only for a resource whose definition has a URL_TEMPLATE',
+                      by_line[7].getMessage())
+        # The template reads slide_key, which line 8 does not carry.
+        self.assertIn("URL_TEMPLATE reads METADATA keys this row does not carry",
+                      by_line[8].getMessage())
+        self.assertEqual('slide_key', by_line[8].cause)
+
+    def test_empty_url_without_template_is_an_error(self):
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATIENT_PAGE': ['PATIENT']}
+        validateData.RESOURCE_URL_TEMPLATES = {}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_patient_url_template.txt',
+                                    validateData.PatientResourceValidator)
+
+        not_url = [r for r in record_list if 'not an url' in r.getMessage()]
+        self.assertEqual([2, 3, 4], [r.line_number for r in not_url])
+
+    def test_patient_rows_with_empty_url_are_duplicates_per_patient(self):
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATIENT_PAGE': ['PATIENT']}
+        validateData.RESOURCE_URL_TEMPLATES = {
+            'PATIENT_PAGE': '${base_url}/patient?studyId=${STUDY_ID}&caseId=${PATIENT_ID}'}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_patient_url_template.txt',
+                                    validateData.PatientResourceValidator)
+
+        self.assertEqual(1, len(record_list))
+        self.assertIn('Duplicated resources found', record_list[0].getMessage())
+        self.assertEqual(4, record_list[0].line_number)
+        self.assertEqual(2, record_list[0].duplicated_line_number)
+
 # -------------------------- end resource definition wise test ----------------------------
 
 # --------------------------- generic assay test ------------------------------

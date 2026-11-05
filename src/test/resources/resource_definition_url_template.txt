@@ -1,0 +1,5 @@
+RESOURCE_ID	DISPLAY_NAME	RESOURCE_TYPE	DESCRIPTION	OPEN_BY_DEFAULT	PRIORITY	CUSTOM_METADATA	URL_TEMPLATE
+WSI_SLIDE	Slides	SAMPLE	Whole-slide images	true	1	{"version": 1, "fields": [{"key": "slide_key"}, {"key": "stain"}]}	${base_url}/wsi/patient/${PATIENT_ID}?studyId=${STUDY_ID}&slideKey=${metadata.slide_key}
+PATHOLOGY_REPORT	Pathology report	SAMPLE	Reports with their own URLs	false	2		
+PATIENT_PAGE	Patient page	PATIENT	Patient view	false	3		${base_url}/patient?studyId=${STUDY_ID}&caseId=${PATIENT_ID}
+STUDY_PAGE	Study page	STUDY	Study summary	false	4		${base_url}/study/summary?id=${STUDY_ID}

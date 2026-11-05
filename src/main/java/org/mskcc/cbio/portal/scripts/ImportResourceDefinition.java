@@ -16,6 +16,7 @@ import org.mskcc.cbio.portal.model.shared.ResourceType;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MissingValues;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.ResourceUrlTemplate;
 
 public class ImportResourceDefinition extends ConsoleRunnable {
 
@@ -27,6 +28,7 @@ public class ImportResourceDefinition extends ConsoleRunnable {
     public static final String OPEN_BY_DEFAULT_COLUMN_NAME = "OPEN_BY_DEFAULT";
     public static final String PRIORITY_COLUMN_NAME = "PRIORITY";
     public static final String CUSTOM_METADATA_COLUMN_NAME = "CUSTOM_METADATA";
+    public static final String URL_TEMPLATE_COLUMN_NAME = "URL_TEMPLATE";
     public static final int MISSING_COLUMN_INDEX = -1;
     private int numResourceDefinitionsAdded = 0;
 
@@ -68,6 +70,7 @@ public class ImportResourceDefinition extends ConsoleRunnable {
         int openByDefaultIndex = findAndValidateOpenByDefaultColumn(headerIndexMap);
         int priorityIndex = findAndValidatePriorityColumn(headerIndexMap);
         int customMetadataIndex = findAndValidateOptionalColumnIndexInHeaders(CUSTOM_METADATA_COLUMN_NAME, headerIndexMap);
+        int urlTemplateIndex = findAndValidateOptionalColumnIndexInHeaders(URL_TEMPLATE_COLUMN_NAME, headerIndexMap);
 
         while ((line = buff.readLine()) != null) {
             if (skipLine(line.trim())) {
@@ -84,6 +87,7 @@ public class ImportResourceDefinition extends ConsoleRunnable {
             Boolean openByDefault = false;
             int priority = 1;
             String customMetadata = null;
+            String urlTemplate = null;
             // get resource definitions from columns
             // get resourceId
             if (isValueNotMissing(fieldValues[resourceIdIndex].toUpperCase())) {
@@ -125,11 +129,19 @@ public class ImportResourceDefinition extends ConsoleRunnable {
             if (customMetadataIndex != MISSING_COLUMN_INDEX && isValueNotMissing(fieldValues[customMetadataIndex])) {
                 customMetadata = fieldValues[customMetadataIndex];
             }
+            // get urlTemplate (optional): the portal expands it for rows with no URL of their own
+            if (urlTemplateIndex != MISSING_COLUMN_INDEX && isValueNotMissing(fieldValues[urlTemplateIndex])) {
+                urlTemplate = fieldValues[urlTemplateIndex];
+                if (!ResourceUrlTemplate.hasAllowedStart(urlTemplate)) {
+                    throw new RuntimeException("URL_TEMPLATE of resource " + resourceId
+                        + " must start with ${base_url}, http:// or https://: " + urlTemplate);
+                }
+            }
 
             // add resource definitions into database
             ResourceDefinition resource = new ResourceDefinition(resourceId, displayName,
                     description, resourceType, openByDefault,
-                    priority, cancerStudy.getInternalId(), customMetadata);
+                    priority, cancerStudy.getInternalId(), customMetadata, urlTemplate);
 
             ResourceDefinition resourceInDb = DaoResourceDefinition.getDatum(resource.getResourceId(),
                     cancerStudy.getInternalId());

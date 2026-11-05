@@ -1,0 +1,9 @@
+RESOURCE_ID	DISPLAY_NAME	RESOURCE_TYPE	CUSTOM_METADATA	URL_TEMPLATE
+WSI_SLIDE	Slides	SAMPLE	{"version": 1, "fields": [{"key": "slide_key", "type": "string"}, {"key": "stain", "type": "string"}]}	${base_url}/wsi/patient/${PATIENT_ID}?studyId=${STUDY_ID}&slideKey=${metadata.slide_key}
+SLIDE_FILE	Slide file	SAMPLE		https://example.org/slides/${SAMPLE_ID}/${metadata.file}
+BAD_PLACEHOLDER	Bad placeholder	SAMPLE		${base_url}/case/${CASE_ID}
+NO_BASE_URL	No base URL	SAMPLE		/wsi/patient/${PATIENT_ID}
+UNDECLARED_KEY	Undeclared key	SAMPLE	{"version": 1, "fields": [{"key": "stain"}]}	${base_url}/wsi?slideKey=${metadata.slide_key}
+UNBALANCED	Unbalanced	SAMPLE		${base_url}/patient/${PATIENT_ID/view
+PATIENT_PAGE	Patient page	PATIENT		${base_url}/patient?studyId=${STUDY_ID}&sampleId=${SAMPLE_ID}
+NO_TEMPLATE	No template	SAMPLE		

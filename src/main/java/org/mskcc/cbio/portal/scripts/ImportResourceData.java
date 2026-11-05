@@ -23,6 +23,7 @@ import org.mskcc.cbio.portal.model.shared.ResourceType;
 import org.mskcc.cbio.portal.util.FileUtil;
 import org.mskcc.cbio.portal.util.MissingValues;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
+import org.mskcc.cbio.portal.util.ResourceUrlTemplate;
 import org.mskcc.cbio.portal.util.StableIdUtil;
 
 public class ImportResourceData extends ConsoleRunnable {
@@ -57,6 +58,9 @@ public class ImportResourceData extends ConsoleRunnable {
     // loads nothing, so its resource must not be included in what the re-import replaces.
     private final Set<String> importedResourceIds = new HashSet<>();
     private final Set<String> importedEntityStableIds = new HashSet<>();
+    // resource_id -> URL_TEMPLATE, for the study's resources that have one. A row of one of
+    // these resources may leave URL empty: the portal builds its URL from the template.
+    private final Map<String, String> urlTemplates = new HashMap<>();
 
     public void setFile(CancerStudy cancerStudy, File resourceDataFile, String resourceType, boolean relaxed) {
         this.cancerStudy = cancerStudy;
@@ -78,6 +82,11 @@ public class ImportResourceData extends ConsoleRunnable {
         FileReader reader = new FileReader(resourceDataFile);
         BufferedReader buff = new BufferedReader(reader);
         List<ResourceDefinition> resources = DaoResourceDefinition.getDatumByStudy(cancerStudy.getInternalId());
+        for (ResourceDefinition resource : resources) {
+            if (resource.getUrlTemplate() != null) {
+                urlTemplates.put(resource.getResourceId(), resource.getUrlTemplate());
+            }
+        }
         String currentLine = buff.readLine();
         String[] headerNames = currentLine.split("\t");
         Map<String, Integer> headerIndexMap = makeHeaderIndexMap(headerNames);
@@ -244,10 +253,18 @@ public class ImportResourceData extends ConsoleRunnable {
             }
         }
 
-        // if the resource id or url matches one of the missing values, skip this resource:
-        if ((resourceIdIndex != -1 && MissingValues.has(fields[resourceIdIndex])) || (urlIndex != -1 && MissingValues.has(fields[urlIndex]))) {
+        // if the resource id matches one of the missing values, or the url does and the resource
+        // has no URL template to build it from, skip this resource:
+        boolean urlMissing = urlIndex != -1 && MissingValues.has(fields[urlIndex]);
+        if ((resourceIdIndex != -1 && MissingValues.has(fields[resourceIdIndex]))
+                || (urlMissing && !urlTemplates.containsKey(fields[resourceIdIndex]))) {
             numEmptyResourcesSkipped++;
         } else {
+            // A row that relies on the template is stored with an empty url, which the portal
+            // replaces with the expanded template when it serves the row.
+            if (urlMissing) {
+                fields[urlIndex] = "";
+            }
             // if patient_id column exists and resource type is patient
             if (getResourceType() == ResourceType.PATIENT && internalPatientId != -1) {
                 validateAddDatum(internalPatientId, stablePatientId, fields[resourceIdIndex], fields[urlIndex], 
@@ -359,11 +376,19 @@ public class ImportResourceData extends ConsoleRunnable {
             + " with resource " + resourceId
             + " does not have matching resources information in database, please make sure to include resource definition in the resource definition file");
         }
-        // The resourceMap makes sure a pair of (internalId/resource_id/url) is unique
-        // added to the DB if there are no duplicates,
-        if (!resourceMap.containsKey(internalId, resourceId, resourceURL)) {
+        // The resourceMap makes sure a row (internalId/resource_id/url) is unique and is only
+        // added to the DB if there are no duplicates. A row with no url of its own is identified
+        // by the values it gives the URL template instead: two such rows that agree on them
+        // resolve to the same URL.
+        Object urlKey = resourceURL;
+        if (resourceURL.isEmpty()) {
+            urlKey = ResourceUrlTemplate.rowValues(urlTemplates.get(resourceId),
+                stablePatientId, resourceType == ResourceType.SAMPLE ? stableId : null,
+                getOptionalField(fields, headerIndexMap, METADATA_COLUMN_NAME));
+        }
+        if (!resourceMap.containsKey(internalId, resourceId, urlKey)) {
             addDatum(internalId, stableId, resourceId, resourceURL, resourceType, fields, headerIndexMap, stablePatientId);
-            resourceMap.put(internalId, resourceId, resourceURL, resourceURL);
+            resourceMap.put(internalId, resourceId, urlKey, resourceURL);
             importedResourceIds.add(resourceId);
             if (resourceType != ResourceType.STUDY) {
                 importedEntityStableIds.add(stableId);
@@ -374,8 +399,17 @@ public class ImportResourceData extends ConsoleRunnable {
         else if (!relaxed) {
             throw new RuntimeException("Error: Duplicated " + resourceType.toString().toLowerCase() + " resource in file");
         }
+        // A row relying on the template is stored with an empty url, so the comparison below
+        // cannot tell it from the row it duplicates. Say which row is dropped and why instead.
+        else if (resourceURL.isEmpty()) {
+            ProgressMonitor.logWarning("Duplicated " + resourceType.toString().toLowerCase() + " resource "
+                    + resourceId + " for " + (resourceType == ResourceType.STUDY ? "the study" : stableId)
+                    + ": this row has no URL and gives the resource's URL_TEMPLATE the same values as an"
+                    + " earlier row (" + urlKey + "), so it would resolve to the same URL. The row is skipped,"
+                    + " with any DISPLAY_NAME and METADATA it carries.");
+        }
         // log a warning
-        else if (!resourceMap.get(internalId, resourceId, resourceURL).equals(resourceURL)) {
+        else if (!resourceMap.get(internalId, resourceId, urlKey).equals(resourceURL)) {
             ProgressMonitor.logWarning("Error: Duplicated "  + resourceType.toString().toLowerCase() + " " + stableId
                     + " with different values for "  + resourceType.toString().toLowerCase() + " resource " + resourceId
                     + "\n\tValues: " + resourceId + " " + resourceURL);
