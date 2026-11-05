@@ -1,0 +1,5 @@
+PATIENT_ID	SAMPLE_ID	RESOURCE_ID	URL	METADATA
+TCGA-A1-A0SD	TCGA-A1-A0SD-01	WSI_SLIDE		{"slide_key": "aaaaaaaaaaaa", "stain": "H&E"}
+TCGA-A1-A0SD	TCGA-A1-A0SD-01	WSI_SLIDE		{"slide_key": "bbbbbbbbbbbb", "stain": "H&E"}
+TCGA-A1-A0SE	TCGA-A1-A0SE-01	WSI_SLIDE	https://example.org/slides/own.svs	{"slide_key": "cccccccccccc", "stain": "IHC"}
+TCGA-A1-A0SE	TCGA-A1-A0SE-01	PATHOLOGY_REPORT		

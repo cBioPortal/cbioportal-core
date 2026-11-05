@@ -17,9 +17,12 @@ public class DaoResourceDefinition {
         ResultSet rs = null;
         try {
             con = JdbcUtil.getDbConnection(DaoResourceDefinition.class);
+            // url_template is written only when the definition has one, so a definition file
+            // without templates still imports into a database whose schema predates the column.
+            boolean hasUrlTemplate = resource.getUrlTemplate() != null;
             pstmt = con.prepareStatement("INSERT INTO resource_definition(" + "`resource_id`," + "`display_name`,"
-                    + "`description`," + "`resource_type`," + "`open_by_default`," + "`priority`," + "`cancer_study_id`," + "`custom_metadata`)"
-                    + " VALUES(?,?,?,?,?,?,?,?)");
+                    + "`description`," + "`resource_type`," + "`open_by_default`," + "`priority`," + "`cancer_study_id`," + "`custom_metadata`"
+                    + (hasUrlTemplate ? ",`url_template`)" + " VALUES(?,?,?,?,?,?,?,?,?)" : ")" + " VALUES(?,?,?,?,?,?,?,?)"));
             pstmt.setString(1, resource.getResourceId());
             pstmt.setString(2, resource.getDisplayName());
             pstmt.setString(3, resource.getDescription());
@@ -28,6 +31,9 @@ public class DaoResourceDefinition {
             pstmt.setInt(6, resource.getPriority());
             pstmt.setInt(7, resource.getCancerStudyId());
             pstmt.setString(8, resource.getCustomMetadata());
+            if (hasUrlTemplate) {
+                pstmt.setString(9, resource.getUrlTemplate());
+            }
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException(e);
@@ -39,7 +45,22 @@ public class DaoResourceDefinition {
     private static ResourceDefinition unpack(ResultSet rs) throws SQLException {
         return new ResourceDefinition(rs.getString("resource_id"), rs.getString("display_name"), rs.getString("description"),
                 ResourceType.valueOf(rs.getString("resource_type")), rs.getBoolean("open_by_default"), rs.getInt("priority"),
-                rs.getInt("cancer_study_id"), rs.getString("custom_metadata"));
+                rs.getInt("cancer_study_id"), rs.getString("custom_metadata"),
+                hasColumn(rs, "url_template") ? rs.getString("url_template") : null);
+    }
+
+    /**
+     * Whether a {@code SELECT *} result carries the given column. url_template is read only when
+     * it does, so the importer keeps working against a schema that predates the column.
+     */
+    private static boolean hasColumn(ResultSet rs, String column) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        for (int i = 1; i <= metaData.getColumnCount(); i++) {
+            if (column.equalsIgnoreCase(metaData.getColumnName(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static ResourceDefinition getDatum(String resourceId, Integer cancerStudyId) throws DaoException {
