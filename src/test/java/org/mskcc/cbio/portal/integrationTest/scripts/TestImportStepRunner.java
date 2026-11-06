@@ -22,6 +22,8 @@ import org.mskcc.cbio.portal.model.Sample;
 import org.mskcc.cbio.portal.dao.DaoPatient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,9 +44,11 @@ import org.mskcc.cbio.portal.dao.DaoMutation;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.DaoSampleList;
 import org.mskcc.cbio.portal.dao.DaoStructuralVariant;
+import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticProfile;
+import org.mskcc.cbio.portal.model.SampleList;
 import org.mskcc.cbio.portal.scripts.ImportGenesetData;
 import org.mskcc.cbio.portal.scripts.ImportStepRunner;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
@@ -153,6 +157,7 @@ public class TestImportStepRunner extends IntegrationTestBase {
         int samplesBefore = DaoSample.getSamplesByCancerStudy(cancerStudy.getInternalId()).size();
 
         // RemoveSamples evicts only deleted rows; AddCaseList must still find the remaining samples
+        deleteAllCaseList();
         File manifest = writeManifest(List.of(
             step("org.mskcc.cbio.portal.scripts.RemoveSamples",
                 "--study_ids", "study_es_0", "--sample_ids", "TCGA-A2-A04P-01"),
@@ -175,6 +180,7 @@ public class TestImportStepRunner extends IntegrationTestBase {
         int patientsBefore = DaoPatient.getPatientsByCancerStudyId(study.getInternalId()).size();
         int samplesBefore = DaoSample.getSamplesByCancerStudy(study.getInternalId()).size();
         int removedSamples = DaoSample.getSamplesByPatientId(patient.getInternalId()).size();
+        deleteAllCaseList();
         File manifest = writeManifest(List.of(
             step("org.mskcc.cbio.portal.scripts.RemovePatients",
                 "--study_ids", "study_es_0", "--patient_ids", patient.getStableId()),
@@ -199,6 +205,22 @@ public class TestImportStepRunner extends IntegrationTestBase {
 
         assertEquals(64, status);
         assertNull(DaoCancerStudy.getCancerStudyByStableId("study_es_0"));
+    }
+
+    /**
+     * Deletes study_es_0_all so AddCaseList, which refuses to keep an existing
+     * list, builds it again from the samples it can see.
+     */
+    private static void deleteAllCaseList() throws Exception {
+        SampleList allCases = new DaoSampleList().getSampleListByStableId("study_es_0_all");
+        try (Connection con = JdbcUtil.getDbConnection(TestImportStepRunner.class);
+             PreparedStatement listList = con.prepareStatement("DELETE FROM sample_list_list WHERE list_id = ?");
+             PreparedStatement list = con.prepareStatement("DELETE FROM sample_list WHERE list_id = ?")) {
+            listList.setInt(1, allCases.getSampleListId());
+            listList.executeUpdate();
+            list.setInt(1, allCases.getSampleListId());
+            list.executeUpdate();
+        }
     }
 
     private void assertStudyEs0Loaded(int mutationsBefore) throws Exception {
