@@ -1,0 +1,47 @@
+# When cbioportal-core's main branch is pushed, notify cmo-pipelines so its
+# workflows can rebuild the importer / core images.
+#
+# cmo-pipelines subscribes to repository_dispatch events of type
+# cbioportal-core-push in:
+#   - .github/workflows/build-importer-image.yml (builds docker/Dockerfile)
+#   - .github/workflows/build-core-image.yml      (rebuilds docker/core.Dockerfile)
+#
+# NOTE: GITHUB_TOKEN is scoped to THIS repo and cannot dispatch events to
+# another repository, so this uses a PAT stored as a repository secret
+# (CMO_PIPELINES_DISPATCH_TOKEN) with access to the cmo-pipelines repo.
+name: Notify cmo-pipelines
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      core_branch:
+        description: 'cbioportal-core branch to build (default: current branch)'
+        required: false
+        type: string
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch cbioportal-core-push to cmo-pipelines
+        env:
+          GH_TOKEN: ${{ secrets.CMO_PIPELINES_DISPATCH_TOKEN }}
+        run: |
+          branch="${{ inputs.core_branch || github.ref_name }}"
+          # For push events, use the exact SHA; for workflow_dispatch on a
+          # named branch, resolve its HEAD so cmo-pipelines gets a pinned ref.
+          if [ -n "${{ inputs.core_branch }}" ]; then
+            ref=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "${branch}" | cut -f1)
+          else
+            ref="${GITHUB_SHA}"
+          fi
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/knowledgesystems/cmo-pipelines/dispatches \
+            -f event_type=cbioportal-core-push \
+            -f "client_payload[ref]=${ref}" \
+            -f "client_payload[branch]=${branch}" \
+            -f "client_payload[core_branch]=${branch}"
