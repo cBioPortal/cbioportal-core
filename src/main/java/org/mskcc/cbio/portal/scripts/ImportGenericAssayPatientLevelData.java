@@ -109,10 +109,15 @@ public class ImportGenericAssayPatientLevelData {
      * @throws DaoException Database Error.
      */
     public void importData() throws Exception {
-        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples"), this::importDataInternal);
+        importData(null);
     }
 
-    void importDataInternal() throws Exception {
+    /** Use the entity IDs produced by the metadata import without rereading newly inserted rows. */
+    public void importData(Map<String, Integer> genericAssayEntities) throws Exception {
+        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples"), () -> importDataInternal(genericAssayEntities));
+    }
+
+    private void importDataInternal(Map<String, Integer> genericAssayEntities) throws Exception {
         int numLines = FileUtil.getNumLines(dataFile);
 
         geneticProfile = DaoGeneticProfile.getGeneticProfileById(geneticProfileId);
@@ -166,8 +171,10 @@ public class ImportGenericAssayPatientLevelData {
             
             DaoGeneticProfileSamples.addGeneticProfileSamples(geneticProfileId, orderedSampleList);
     
-            // load entities map from database
-            Map<String, Integer> genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
+            // Prefer IDs retained from the metadata import; standalone callers load existing entities.
+            Map<String, Integer> genericAssayStableIdToEntityIdMap = genericAssayEntities != null
+                    ? genericAssayEntities
+                    : GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             
             String line = buf.readLine();
             while (line != null) {

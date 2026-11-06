@@ -153,7 +153,7 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
     * @param additionalProperties
     * @throws Exception
     */
-    public static void importData(File dataFile, GeneticAlterationType geneticAlterationType, String additionalProperties, boolean updateInfo) throws Exception {
+    public static Map<String, Integer> importData(File dataFile, GeneticAlterationType geneticAlterationType, String additionalProperties, boolean updateInfo) throws Exception {
         ProgressMonitor.setCurrentMessage("Reading data from: " + dataFile.getCanonicalPath());
         
         // read generic assay data file
@@ -222,6 +222,7 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
                 newEntities.add(stableId);
                 GeneticEntity newGeneticEntity = new GeneticEntity(geneticAlterationType.name(), stableId);
                 GeneticEntity createdGeneticEntity = DaoGeneticEntity.addNewGeneticEntity(newGeneticEntity);
+                genericAssayStableIdToEntityIdMap.put(stableId, createdGeneticEntity.getId());
                 propertiesMap.forEach((k, v) -> {
                     updateProperties.add(new GenericEntityProperty(k, v, createdGeneticEntity.getId()));
                 });
@@ -249,6 +250,7 @@ public class ImportGenericAssayEntity extends ConsoleRunnable {
         reader.close();
         
         ProgressMonitor.setCurrentMessage("Finished loading generic assay.\n");
+        return genericAssayStableIdToEntityIdMap;
     }
     
     // returns index for ENTITY_STABLE_ID column

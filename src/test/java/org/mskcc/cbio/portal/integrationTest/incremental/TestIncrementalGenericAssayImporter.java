@@ -22,6 +22,10 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mskcc.cbio.portal.scripts.GenericAssayMetaUtils;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoGenePanel;
@@ -84,12 +88,20 @@ public class TestIncrementalGenericAssayImporter extends IntegrationTestBase {
         /**
          * Test
          */
-        new ImportProfileData(new String[] {
-                "--loadMode", "bulkLoad",
-                "--meta", metaFile.getAbsolutePath(),
-                "--data", dataFile.getAbsolutePath(),
-                "--overwrite-existing",
-        }).run();
+        try (MockedStatic<GenericAssayMetaUtils> reads =
+                mockStatic(GenericAssayMetaUtils.class)) {
+            reads.when(GenericAssayMetaUtils::buildGenericAssayStableIdToEntityIdMap)
+                .thenCallRealMethod()
+                .thenThrow(new AssertionError("Must retain inserted entity IDs instead of rereading a stale replica"));
+            new ImportProfileData(new String[] {
+                    "--loadMode", "bulkLoad",
+                    "--meta", metaFile.getAbsolutePath(),
+                    "--data", dataFile.getAbsolutePath(),
+                    "--overwrite-existing",
+            }).run();
+            reads.verify(GenericAssayMetaUtils::buildGenericAssayStableIdToEntityIdMap,
+                times(1));
+        }
 
         /**
          * After test assertions

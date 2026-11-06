@@ -140,23 +140,6 @@ public final class DaoClinicalEvent {
         return clinicalEvent;
     }
     
-    public static long getLargestClinicalEventId() throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoClinicalEvent.class);
-            pstmt = con.prepareStatement
-                    ("SELECT max(`clinical_event_id`) FROM `clinical_event`");
-            rs = pstmt.executeQuery();
-            return rs.next() ? rs.getLong(1) : 0;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoClinicalEvent.class, con, pstmt, rs);
-        }
-    }
-    
     /**
      * 
      * @param cancerStudyId

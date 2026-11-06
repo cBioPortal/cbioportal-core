@@ -35,6 +35,7 @@ package org.mskcc.cbio.portal.scripts;
 import java.io.*;
 import java.util.*;
 import joptsimple.OptionSet;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoClinicalEvent;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -75,7 +76,6 @@ public class ImportTimelineData extends ConsoleRunnable {
 					+ "PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE");
 			}
 
-			long clinicalEventId = DaoClinicalEvent.getLargestClinicalEventId();
 			Set<Integer> processedPatientIds = new HashSet<>();
 
 			while ((line = buff.readLine()) != null) {
@@ -97,7 +97,7 @@ public class ImportTimelineData extends ConsoleRunnable {
 					DaoClinicalEvent.deleteByPatientId(patient.getInternalId());
 				}
 				ClinicalEvent event = new ClinicalEvent();
-				event.setClinicalEventId(++clinicalEventId);
+				event.setClinicalEventId(ClickHouseAutoIncrement.nextId("seq_clinical_event"));
 				event.setPatientId(patient.getInternalId());
 				event.setStartDate(Long.valueOf(fields[1]));
 				if (indexCategorySpecificField != 3 && !fields[2].isEmpty()) {

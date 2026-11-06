@@ -172,12 +172,17 @@ public class ImportTabDelimData {
      *
      */
     public void importData() throws Exception {
-        this.numLines = FileUtil.getNumLines(dataFile);
-        ProgressMonitor.setMaxValue(numLines);
-        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples", "sample_profile"), this::importDataInternal);
+        importData(null);
     }
 
-    void importDataInternal() throws Exception {
+    /** Use the entity IDs produced by the metadata import without rereading newly inserted rows. */
+    public void importData(Map<String, Integer> genericAssayEntities) throws Exception {
+        this.numLines = FileUtil.getNumLines(dataFile);
+        ProgressMonitor.setMaxValue(numLines);
+        BackupUtil.conditionalBackup(isIncrementalUpdateMode, List.of("genetic_alteration", "genetic_profile_samples", "sample_profile"), () -> importDataInternal(genericAssayEntities));
+    }
+
+    private void importDataInternal(Map<String, Integer> genericAssayEntities) throws Exception {
         try (FileReader reader = new FileReader(dataFile);
             BufferedReader buf = new BufferedReader(reader)) {
 
@@ -287,10 +292,12 @@ public class ImportTabDelimData {
                 ClickHouseBulkLoader.bulkLoadOn();
             }
 
-            // load entities map from database
+            // Prefer IDs retained from the metadata import; standalone callers load existing entities.
             Map<String, Integer> genericAssayStableIdToEntityIdMap = Collections.emptyMap();
             if (isGenericAssayProfile) {
-                genericAssayStableIdToEntityIdMap = GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
+                genericAssayStableIdToEntityIdMap = genericAssayEntities != null
+                    ? genericAssayEntities
+                    : GenericAssayMetaUtils.buildGenericAssayStableIdToEntityIdMap();
             }
 
 
