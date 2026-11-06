@@ -1,5 +1,8 @@
 package org.mskcc.cbio.portal.dao;
 
+import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -10,6 +13,11 @@ import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mskcc.cbio.portal.model.ClinicalEvent;
+import org.mskcc.cbio.portal.scripts.ImportTimelineData;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.ArgumentMatchers.any;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.mskcc.cbio.portal.model.Patient;
@@ -75,6 +83,43 @@ public class TestImportStateRetention {
         assertEquals(3, ClickHouseAutoIncrement.nextId("seq_genetic_profile"));
         assertEquals(2, queries.size());
         assertTrue(queries.stream().allMatch(sql -> sql.startsWith("INSERT INTO cbioportal_sequence_state")));
+    }
+
+    @Test
+    public void fileImportSequencesKeepIdsAcrossFilesDespiteStaleMaxReads() throws Exception {
+        for (String sequence : List.of("seq_clinical_event", "seq_mutation_event",
+                "seq_structural_variant", "seq_copy_number_seg")) {
+            assertEquals(1, ClickHouseAutoIncrement.nextId(sequence));
+            ClickHouseAutoIncrement.persistAllSequences();
+            queries.clear();
+            assertEquals(2, ClickHouseAutoIncrement.nextId(sequence));
+            assertEquals(3, ClickHouseAutoIncrement.nextId(sequence));
+            assertTrue("A later file must not reread a stale maximum: " + sequence, queries.isEmpty());
+        }
+    }
+
+    @Test
+    public void twoTimelineFilesDoNotReuseIdsWhenReadsCannotSeeFirstFile() throws Exception {
+        patient(1, 10);
+        Path file = Files.createTempFile("timeline", ".tsv");
+        List<Long> insertedIds = new ArrayList<>();
+        Method importFile = ImportTimelineData.class
+            .getDeclaredMethod("importData", String.class, int.class, boolean.class);
+        importFile.setAccessible(true);
+        try (MockedStatic<DaoClinicalEvent> events = mockStatic(DaoClinicalEvent.class)) {
+            Files.writeString(file, "PATIENT_ID\tSTART_DATE\tEVENT_TYPE\npatient\t1\tSTATUS\n");
+            events.when(() -> DaoClinicalEvent.addClinicalEvent(any()))
+                .thenAnswer(call -> {
+                    insertedIds.add(((ClinicalEvent) call.getArgument(0)).getClinicalEventId());
+                    return null;
+                });
+            importFile.invoke(null, file.toString(), 1, false);
+            ClickHouseAutoIncrement.persistAllSequences();
+            importFile.invoke(null, file.toString(), 1, false);
+            assertEquals(List.of(1L, 2L), insertedIds);
+        } finally {
+            Files.deleteIfExists(file);
+        }
     }
 
     @Test
