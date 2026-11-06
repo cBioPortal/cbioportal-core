@@ -12,6 +12,7 @@ import java.util.regex.*;
 import org.apache.commons.lang3.StringUtils;
 import org.mskcc.cbio.maf.MafRecord;
 import org.mskcc.cbio.maf.MafUtil;
+import org.mskcc.cbio.portal.dao.ClickHouseAutoIncrement;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoAlleleSpecificCopyNumber;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
@@ -119,7 +120,6 @@ public class ImportExtendedMutationData {
         Set<MutationEvent> newEvents = new HashSet<MutationEvent>();
 
         Map<ExtendedMutation,ExtendedMutation> mutations = new HashMap<ExtendedMutation,ExtendedMutation>();
-        long mutationEventId = DaoMutation.getLargestMutationEventId();
 
         List<AlleleSpecificCopyNumber> ascnRecords = new ArrayList<AlleleSpecificCopyNumber>();
 
@@ -409,7 +409,7 @@ public class ImportExtendedMutationData {
                         if (event!=null) {
                             mutation.setEvent(event);
                         } else {
-                            mutation.setMutationEventId(++mutationEventId);
+                            mutation.setMutationEventId(ClickHouseAutoIncrement.nextId("seq_mutation_event"));
                             existingEvents.put(mutation.getEvent(), mutation.getEvent());
                             newEvents.add(mutation.getEvent());
                         }

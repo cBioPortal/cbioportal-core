@@ -11,6 +11,7 @@ import importlib
 import argparse
 import logging
 import re
+import tempfile
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -41,6 +42,9 @@ from .cbioportal_common import REMOVE_PATIENTS_CLASS
 from .cbioportal_common import IMPORT_CASE_LIST_CLASS
 from .cbioportal_common import ADD_CASE_LIST_CLASS
 from .cbioportal_common import VERSION_UTIL_CLASS
+from .cbioportal_common import IMPORT_STEP_RUNNER_CLASS
+from .cbioportal_common import JavaRunException
+from .cbioportal_common import JavaStep
 from .cbioportal_common import run_java
 from .cbioportal_common import UPDATE_CASE_LIST_CLASS
 from .cbioportal_common import INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
@@ -65,61 +69,86 @@ COMMANDS = [IMPORT_CANCER_TYPE, IMPORT_STUDY, IMPORT_STUDY_DATA, IMPORT_CASE_LIS
 # ------------------------------------------------------------------------------
 # sub-routines
 
+def run_single_step(jvm_args, step):
+    """Run one step in its own JVM. A step of None (a skipped file) is ignored.
+    The new JVM reloads the DAO caches, so call this once. A directory import
+    belongs in run_directory_import.
+    """
+    if step is None:
+        return
+    run_java(*jvm_args.split(' '), step.class_name, *step.args)
+
+def run_directory_import(jvm_args, steps):
+    """
+    Run steps in order in one JVM through ImportStepRunner, stopping at the
+    first one that fails. A JavaRunException carries the step that failed.
+    """
+    steps = [step for step in steps if step is not None]
+    if not steps:
+        return
+    with tempfile.TemporaryDirectory(prefix='cbioportal-import-') as temp_dir:
+        manifest_filename = os.path.join(temp_dir, 'steps.json')
+        result_filename = os.path.join(temp_dir, 'result.json')
+        cbioportal_common.write_step_manifest(manifest_filename, steps)
+        try:
+            run_java(*jvm_args.split(' '), IMPORT_STEP_RUNNER_CLASS,
+                     '--manifest', manifest_filename, '--result', result_filename)
+        except JavaRunException as jre:
+            jre.failed_step = cbioportal_common.read_failed_step(result_filename, steps)
+            if jre.failed_step is not None and jre.failed_step.class_name == VERSION_UTIL_CLASS:
+                print_version_mismatch_help()
+            raise
+
+def import_cancer_type_step(data_filename):
+    return JavaStep(IMPORT_CANCER_TYPE_CLASS, [
+        data_filename,
+        "false", # don't clobber existing table
+        "--noprogress"]) # don't report memory usage and % progress
+
 def import_cancer_type(jvm_args, data_filename):
-    args = jvm_args.split(' ')
-    args.append(IMPORT_CANCER_TYPE_CLASS)
-    args.append(data_filename)
-    args.append("false") # don't clobber existing table
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+    run_single_step(jvm_args, import_cancer_type_step(data_filename))
+
+def import_study_step(meta_filename):
+    return JavaStep(IMPORT_STUDY_CLASS, [meta_filename, "--noprogress"])
 
 def import_study(jvm_args, meta_filename):
-    args = jvm_args.split(' ')
-    args.append(IMPORT_STUDY_CLASS)
-    args.append(meta_filename)
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+    run_single_step(jvm_args, import_study_step(meta_filename))
+
+def update_study_status_step(study_id, status="AVAILABLE"):
+    return JavaStep(UPDATE_STUDY_STATUS_CLASS, [study_id, status, "--noprogress"])
 
 def update_study_status(jvm_args, study_id, status="AVAILABLE"):
-    args = jvm_args.split(' ')
-    args.append(UPDATE_STUDY_STATUS_CLASS)
-    args.append(study_id)
-    args.append(status)
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+    run_single_step(jvm_args, update_study_status_step(study_id, status))
 
-def remove_study_meta(jvm_args, meta_filename):
-    args = jvm_args.split(' ')
-    args.append(REMOVE_STUDY_CLASS)
+def remove_study_meta_step(meta_filename):
     meta_dictionary = cbioportal_common.parse_metadata_file(
         meta_filename, logger=LOGGER)
     if meta_dictionary['meta_file_type'] != MetaFileTypes.STUDY:
         # invalid file, skip
         print('Not a study meta file: ' + meta_filename, file=ERROR_FILE)
-        return
-    args.append(meta_dictionary['cancer_study_identifier'])
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+        return None
+    return JavaStep(REMOVE_STUDY_CLASS, [meta_dictionary['cancer_study_identifier'], "--noprogress"])
+
+def remove_study_meta(jvm_args, meta_filename):
+    run_single_step(jvm_args, remove_study_meta_step(meta_filename))
+
+def remove_study_id_step(study_id):
+    return JavaStep(REMOVE_STUDY_CLASS, [study_id, "--noprogress"])
 
 def remove_study_id(jvm_args, study_id):
-    args = jvm_args.split(' ')
-    args.append(REMOVE_STUDY_CLASS)
-    args.append(study_id)
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+    run_single_step(jvm_args, remove_study_id_step(study_id))
 
 def remove_samples(jvm_args, study_ids, sample_ids):
-    args = jvm_args.split(' ')
-    args.append(REMOVE_SAMPLES_CLASS)
+    args = []
     args.append("--study_ids")
     args.append(study_ids)
     args.append("--sample_ids")
     args.append(sample_ids)
     try:
-        run_java(*args)
+        run_single_step(jvm_args, JavaStep(REMOVE_SAMPLES_CLASS, args))
     except JavaRunException as jre:
         LOGGER.error('an error occurred during the java process which removes samples from the database.')
-        LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
         LOGGER.error('  the message sent along with this error was %s' % (jre.message))
         LOGGER.error('  %s' % ('-' * 70))
         LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
@@ -130,26 +159,26 @@ def remove_samples(jvm_args, study_ids, sample_ids):
         raise jre
 
 def remove_patients(jvm_args, study_ids, patient_ids):
-    args = jvm_args.split(' ')
-    args.append(REMOVE_PATIENTS_CLASS)
+    args = []
     args.append("--study_ids")
     args.append(study_ids)
     args.append("--patient_ids")
     args.append(patient_ids)
-    run_java(*args)
+    run_single_step(jvm_args, JavaStep(REMOVE_PATIENTS_CLASS, args))
 
-def update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir = None):
-    args = jvm_args.split(' ')
-    args.append(UPDATE_CASE_LIST_CLASS)
-    args.append("--meta")
-    args.append(meta_filename)
+def update_case_lists_step(meta_filename, case_lists_file_or_dir = None):
+    args = ["--meta", meta_filename]
     if case_lists_file_or_dir:
         args.append("--case-lists")
         args.append(case_lists_file_or_dir)
-    run_java(*args)
+    return JavaStep(UPDATE_CASE_LIST_CLASS, args)
 
 def import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity = None, meta_file_dictionary = None, incremental = False):
-    args = jvm_args.split(' ')
+    run_single_step(jvm_args, import_data_step(meta_filename, data_filename, update_generic_assay_entity, meta_file_dictionary, incremental))
+
+def import_data_step(meta_filename, data_filename, update_generic_assay_entity = None, meta_file_dictionary = None, incremental = False):
+    """Return the step that imports a data file, or None if the file is skipped."""
+    args = []
 
     # In case the meta file is already parsed in a previous function, it is not
     # necessary to parse it again
@@ -169,16 +198,15 @@ def import_data(jvm_args, meta_filename, data_filename, update_generic_assay_ent
     if meta_file_type is None:
         print(("Unrecognized meta file type '%s', skipping file"
                               % (meta_file_type)), file=ERROR_FILE)
-        return
+        return None
 
     if not data_filename.endswith(meta_file_dictionary['data_filename']):
         print(("'data_filename' in meta file contradicts "
                               "data filename in command, skipping file"), file=ERROR_FILE)
-        return
+        return None
 
     importer = IMPORTER_CLASSNAME_BY_META_TYPE[meta_file_type]
 
-    args.append(importer)
     if incremental:
         if meta_file_type not in INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES:
             raise NotImplementedError("This type does not support incremental upload: {}".format(meta_file_type))
@@ -209,43 +237,43 @@ def import_data(jvm_args, meta_filename, data_filename, update_generic_assay_ent
         args.append(data_filename)
 
     args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+    return JavaStep(importer, args, meta_file_type)
+
+def import_case_list_step(meta_filename):
+    return JavaStep(IMPORT_CASE_LIST_CLASS, [meta_filename, "--noprogress"])
 
 def import_case_list(jvm_args, meta_filename):
-    args = jvm_args.split(' ')
-    args.append(IMPORT_CASE_LIST_CLASS)
-    args.append(meta_filename)
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+    run_single_step(jvm_args, import_case_list_step(meta_filename))
 
-def add_global_case_list(jvm_args, study_id):
-    args = jvm_args.split(' ')
-    args.append(ADD_CASE_LIST_CLASS)
-    args.append(study_id)
-    args.append("all")
-    args.append("--noprogress") # don't report memory usage and % progress
-    run_java(*args)
+def add_global_case_list_step(study_id):
+    return JavaStep(ADD_CASE_LIST_CLASS, [study_id, "all", "--noprogress"])
+
+def version_check_step():
+    return JavaStep(VERSION_UTIL_CLASS, [])
+
+def print_version_mismatch_help():
+    print(
+        'Error, probably due to this version of the portal '
+        'being out of sync with the database. '
+        'Run the database migration script located at '
+        'CBIOPORTAL_SRC/core/src/main/scripts/migrate_db.py '
+        'before continuing.',
+        file=OUTPUT_FILE)
 
 def check_version(jvm_args):
-    args = jvm_args.split(' ')
-    args.append(VERSION_UTIL_CLASS)
     try:
-        run_java(*args)
+        run_single_step(jvm_args, version_check_step())
     except:
-        print(
-            'Error, probably due to this version of the portal '
-            'being out of sync with the database. '
-            'Run the database migration script located at '
-            'CBIOPORTAL_SRC/core/src/main/scripts/migrate_db.py '
-            'before continuing.',
-            file=OUTPUT_FILE)
+        print_version_mismatch_help()
         raise
 
-def process_case_lists(jvm_args, case_list_dir):
+def case_list_steps(case_list_dir):
+    steps = []
     for case_list in os.listdir(case_list_dir):
         # skip "temp"/backup files made by some text editors:
         if not (case_list.startswith('.') or case_list.endswith('~')):
-            import_case_list(jvm_args, os.path.join(case_list_dir, case_list))
+            steps.append(import_case_list_step(os.path.join(case_list_dir, case_list)))
+    return steps
 
 def process_command(jvm_args, command, meta_filename, data_filename, study_ids, patient_ids, sample_ids, update_generic_assay_entity = None):
     if command == IMPORT_CANCER_TYPE:
@@ -282,13 +310,16 @@ def get_meta_filenames(data_directory):
         not (meta_filename.startswith('.') or meta_filename.endswith('~'))]
     return meta_filenames
 
-def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None):
+def collect_study_directory_steps(study_directory, update_generic_assay_entity, steps):
     """
-    Import an entire study directory based on meta files found.
+    Add the steps that import an entire study directory based on meta files found.
 
     1. Determine meta files in study directory.
     2. Read all meta files and determine file types.
-    3. Import data files in specific order by file type.
+    3. Add steps to import data files in specific order by file type.
+
+    Steps are added to the given list as they are found, so the caller has the
+    steps found before any error. Returns the study id.
     """
 
     study_id = None
@@ -399,76 +430,88 @@ def process_study_directory(jvm_args, study_directory, update_generic_assay_enti
 
     # First, import cancer types
     for meta_filename, data_filename in cancer_type_filepairs:
-        import_cancer_type(jvm_args, data_filename)
+        steps.append(import_cancer_type_step(data_filename))
 
     # Then define the study
     if study_meta_filename is None:
         raise RuntimeError('No meta_study file found')
     else:
         # First remove study if exists
-        remove_study_meta(jvm_args, study_meta_filename)
-        import_study(jvm_args, study_meta_filename)
+        steps.append(remove_study_meta_step(study_meta_filename))
+        steps.append(import_study_step(study_meta_filename))
 
     # Next, we need to import sample definitions
     if sample_attr_filepair is None:
         raise RuntimeError('No sample attribute file found')
     else:
         meta_filename, data_filename = sample_attr_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Next, we need to import resource definitions for resource data
     if resource_definition_filepair is not None:
         meta_filename, data_filename = resource_definition_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Next, we need to import sample definitions for resource data
     if sample_resource_filepair is not None:
         meta_filename, data_filename = sample_resource_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Next, import everything else except gene panel, structural variant data, GSVA and
     # z-score expression. If in the future more types refer to each other, (like
     # in a tree structure) this could be programmed in a recursive fashion.
     for meta_filename, data_filename in regular_filepairs:
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Import structural variant data
     if structural_variant_filepair is not None:
         meta_filename, data_filename = structural_variant_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Import cna data
     if cna_long_filepair is not None:
         meta_filename, data_filename = cna_long_filepair
-        import_data(jvm_args=jvm_args, meta_filename=meta_filename, data_filename=data_filename,
-                    meta_file_dictionary=study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename=meta_filename, data_filename=data_filename,
+                                      meta_file_dictionary=study_meta_dictionary[meta_filename]))
 
     # Import expression z-score (after expression)
     for meta_filename, data_filename in zscore_filepairs:
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Import GSVA genetic profiles (after expression and z-scores)
     if gsva_score_filepair is not None:
 
         # First import the GSVA score data
         meta_filename, data_filename = gsva_score_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
         # Second import the GSVA p-value data
         meta_filename, data_filename = gsva_pvalue_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     if gene_panel_matrix_filepair is not None:
         meta_filename, data_filename = gene_panel_matrix_filepair
-        import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename])
+        steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, study_meta_dictionary[meta_filename]))
 
     # Import the case lists
     case_list_dirname = os.path.join(study_directory, 'case_lists')
     if os.path.isdir(case_list_dirname):
-        process_case_lists(jvm_args, case_list_dirname)
+        steps.extend(case_list_steps(case_list_dirname))
 
     if study_meta_dictionary[study_meta_filename].get('add_global_case_list', 'false').lower() == 'true':
-        add_global_case_list(jvm_args, study_id)
+        steps.append(add_global_case_list_step(study_id))
+
+    return study_id
+
+def process_study_directory(jvm_args, study_directory, update_generic_assay_entity = None, leading_steps = ()):
+    """
+    Import an entire study directory based on meta files found.
+
+    leading_steps are run before the import steps.
+    """
+    steps = list(leading_steps)
+    study_id = collect_study_directory_steps(study_directory, update_generic_assay_entity, steps)
+    run_directory_import(jvm_args, steps)
 
     # the study stays UNAVAILABLE until the derived tables are rebuilt
     return study_id
@@ -500,10 +543,11 @@ def get_meta_filenames_by_type(data_directory) -> Dict[str, Tuple[str, Dict]]:
         meta_file_type_to_meta_files[meta_file_type].append((meta_filename, meta_dictionary))
     return meta_file_type_to_meta_files
 
-def import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files):
+def incremental_data_steps(data_directory, update_generic_assay_entity, meta_file_type_to_meta_files):
     """
-    Load all data types that are available and support incremental upload
+    Return the steps that load all data types that are available and support incremental upload
     """
+    steps = []
     for meta_file_type in INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES:
         if meta_file_type not in meta_file_type_to_meta_files:
             continue
@@ -511,40 +555,45 @@ def import_incremental_data(jvm_args, data_directory, update_generic_assay_entit
         for meta_pair in meta_pairs:
             meta_filename, meta_dictionary = meta_pair
             data_filename = os.path.join(data_directory, meta_dictionary['data_filename'])
-            try:
-                import_data(jvm_args, meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True)
-            except JavaRunException as jre:
-                if meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
-                    LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
-                    LOGGER.error('  the exit status returned by the java process was %d' % (jre.java_process_status))
-                    LOGGER.error('  the message sent along with this error was %s' % (jre.message))
-                    LOGGER.error('  %s' % ('-' * 70))
-                    LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
-                    LOGGER.error('  samples in \'profile_sample\'. Should something go wrong during this process, an effort is made to restore')
-                    LOGGER.error('  the database to a consistent state. However, you may want to take the extra precaution of deleting the')
-                    LOGGER.error('  entire study, and then reimporting the entire study with all needed updates included.')
-                    LOGGER.error('  %s' % ('-' * 70))
-                raise jre
+            steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True))
+    return steps
 
-def update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files):
+def log_incremental_data_error(jre):
+    if jre.failed_step is not None and jre.failed_step.meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
+        LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
+        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
+        LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+        LOGGER.error('  %s' % ('-' * 70))
+        LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
+        LOGGER.error('  samples in \'profile_sample\'. Should something go wrong during this process, an effort is made to restore')
+        LOGGER.error('  the database to a consistent state. However, you may want to take the extra precaution of deleting the')
+        LOGGER.error('  entire study, and then reimporting the entire study with all needed updates included.')
+        LOGGER.error('  %s' % ('-' * 70))
+
+def case_list_update_steps(data_directory, meta_file_type_to_meta_files):
     """
-    Updates case lists if clinical sample provided.
+    Return the steps that update case lists if clinical sample provided.
     The command takes case_list/ folder as optional argument.
     If folder exists case lists will be updated accordingly.
     """
+    steps = []
     if MetaFileTypes.SAMPLE_ATTRIBUTES in meta_file_type_to_meta_files:
         case_list_dirname = os.path.join(data_directory, 'case_lists')
         sample_attributes_metas = meta_file_type_to_meta_files[MetaFileTypes.SAMPLE_ATTRIBUTES]
         for meta_pair in sample_attributes_metas:
             meta_filename, meta_dictionary = meta_pair
             LOGGER.info('Updating case lists with sample ids', extra={'filename_': meta_filename})
-            update_case_lists(jvm_args, meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None)
+            steps.append(update_case_lists_step(meta_filename, case_lists_file_or_dir=case_list_dirname if os.path.isdir(case_list_dirname) else None))
+    return steps
 
-def process_data_directory(jvm_args, data_directory, update_generic_assay_entity = None):
+def process_data_directory(jvm_args, data_directory, update_generic_assay_entity = None, leading_steps = ()):
     """
     Incremental import of data directory based on meta files found.
+
+    leading_steps are run before the import steps.
     """
 
+    steps = list(leading_steps)
     meta_file_type_to_meta_files = get_meta_filenames_by_type(data_directory)
 
     not_supported_meta_types = meta_file_type_to_meta_files.keys() - INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES
@@ -552,9 +601,15 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
         raise NotImplementedError("These types do not support incremental upload: {}".format(", ".join(not_supported_meta_types)))
     # the study is not removed first, so hide it here until the derived tables are rebuilt
     study_id = next(iter(meta_file_type_to_meta_files.values()))[0][1]['cancer_study_identifier']
-    update_study_status(jvm_args, study_id, "UNAVAILABLE")
-    import_incremental_data(jvm_args, data_directory, update_generic_assay_entity, meta_file_type_to_meta_files)
-    update_case_lists_from_folder(jvm_args, data_directory, meta_file_type_to_meta_files)
+    steps.append(update_study_status_step(study_id, "UNAVAILABLE"))
+    steps.extend(incremental_data_steps(data_directory, update_generic_assay_entity, meta_file_type_to_meta_files))
+    steps.extend(case_list_update_steps(data_directory, meta_file_type_to_meta_files))
+
+    try:
+        run_directory_import(jvm_args, steps)
+    except JavaRunException as jre:
+        log_incremental_data_error(jre)
+        raise
     return study_id
 
 def make_study_available(args, study_id):
@@ -708,16 +763,16 @@ def main(args):
     # process the options
     jvm_args = "-Dspring.profiles.active=dbcp " + args.java_opts
 
-    # check if DB version and application version are in sync
-    check_version(jvm_args)
-
+    # check if DB version and application version are in sync; a directory
+    # import makes the check the first of the steps it runs in one JVM
     if args.data_directory is not None:
         check_dir(args.data_directory)
-        return process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity)
+        return process_data_directory(jvm_args, args.data_directory, args.update_generic_assay_entity, [version_check_step()])
     elif args.study_directory is not None:
         check_dir(args.study_directory)
-        return process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity)
+        return process_study_directory(jvm_args, args.study_directory, args.update_generic_assay_entity, [version_check_step()])
     else:
+        check_version(jvm_args)
         check_args(args.command)
         check_files(args.meta_filename, args.data_filename)
         process_command(

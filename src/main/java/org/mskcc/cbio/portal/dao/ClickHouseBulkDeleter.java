@@ -115,6 +115,20 @@ public class ClickHouseBulkDeleter {
         return countOfDeletedRecords;
     }
 
+    /**
+     * Drops all pending deletes without running them.
+     *
+     * @return  the number of deleters that were discarded
+     */
+    public static int discardAll() {
+        List<ClickHouseBulkDeleter> allDeleters = new ArrayList<>(BULK_DELETERS.values());
+        BULK_DELETERS.clear();
+        for (ClickHouseBulkDeleter d : allDeleters) {
+            d.teardown();
+        }
+        return allDeleters.size();
+    }
+
 // --- Static helper functions
 
     // might be made public in the future for partial flushes (would require testing)
