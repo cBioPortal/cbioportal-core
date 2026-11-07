@@ -2966,6 +2966,19 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         # reset RESOURCE_DEFINITION_DICTIONARY
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
+    def test_resource_url_may_be_a_path_on_the_portal(self):
+        """A URL starting with a single "/" is served relative to the portal's own host, so the
+        data does not have to name one. "//host" and a path without the leading "/" are not."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_relative_url.txt',
+                            validateData.ResourceValidator)
+
+        self.assertEqual(2, len(record_list))
+        self.assertEqual([4, 5], sorted(r.line_number for r in record_list))
+        self.assertTrue(all('not an url' in r.getMessage() for r in record_list))
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
     def test_resource_metadata_must_be_a_json_object(self):
         """METADATA carries the per-item fields the resource table filters on, so the portal
         treats it as a key-value map. Arrays, scalars and malformed JSON are rejected; an empty
