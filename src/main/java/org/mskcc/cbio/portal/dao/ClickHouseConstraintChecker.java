@@ -529,7 +529,10 @@ public class ClickHouseConstraintChecker {
                 + "LEFT JOIN " + fk.parentSource() + " " + parentAlias + "\n"
                 + "  ON " + joinPredicate + "\n"
                 + "WHERE " + childHasAllValues + "\n"
-                + "  AND " + parentMissing;
+                + "  AND " + parentMissing + "\n"
+                // Without join_use_nulls, unmatched non-Nullable parent columns read as
+                // defaults rather than NULL, and no orphan is ever reported.
+                + "SETTINGS join_use_nulls = 1";
     }
 
     /**
