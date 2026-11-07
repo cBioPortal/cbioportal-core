@@ -695,7 +695,8 @@ class Validator(object):
 
     def _checkLineBreaks(self):
         """Checks line breaks, reports to user."""
-        if self.newlines not in("\r\n", "\r", "\n"):
+        # newlines is None for a file without any line break, e.g. a single line
+        if self.newlines is not None and self.newlines not in ("\r\n", "\r", "\n"):
             self.logger.error('No line breaks recognized in file',
                               extra={'cause': repr(self.newlines)[1:-1]})
 
