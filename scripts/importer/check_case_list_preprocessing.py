@@ -5,11 +5,8 @@ Checks:
   unions/intersections and TCGA sample-ID normalization rules.
 - Use sequenced_samples.txt or #sequenced_samples when supplied, so samples
   without mutation records can still count as sequenced.
-- Report a non-empty expected list when neither its stable ID nor an equivalent
-  curated category is already defined. Generic 'other' categories do not count
-  as equivalent; a virtual _all stable ID does count as defined.
-- Accept a curated category only from a defined list belonging to this study
-  with non-empty case_list_ids.
+- Report a non-empty expected list when its stable ID is not already defined.
+  A virtual _all stable ID counts as defined.
 
 Study files are never changed. Existing curated membership is not rebuilt.
 
@@ -160,32 +157,6 @@ class StagingCaseCollector:
             self.members.add(row[self.id_column])
 
 
-def curated_case_list_categories(study_dir, study_id, defined_ids):
-    """Find which sample groups are already covered by this study's case lists.
-
-    Only count lists the validator has recognized, with this study's ID and
-    a non-empty sample list. Ignore hidden and backup files.
-    """
-    categories = set()
-    case_dir = Path(study_dir) / "case_lists"
-    if case_dir.is_dir():
-        for path in case_dir.iterdir():
-            if not path.is_file() or path.name.startswith('.') or path.name.endswith('~'):
-                continue
-            values = {}
-            with path.open() as stream:
-                for line in stream:
-                    if not line.lstrip().startswith('#') and ':' in line:
-                        key, value = line.split(':', 1)
-                        values[key.strip()] = value.strip()
-            if (values.get('stable_id') in defined_ids
-                    and values.get('stable_id', '').startswith(study_id + '_')
-                    and values.get('cancer_study_identifier') == study_id
-                    and values.get('case_list_ids', '').strip()):
-                categories.add(values.get('case_list_category'))
-    return categories
-
-
 def staging_sample_ids(study_dir, filename, scanned_members):
     """Get sample IDs without reading the same data file again when possible.
 
@@ -206,8 +177,7 @@ def staging_sample_ids(study_dir, filename, scanned_members):
 def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=None, scanned_members=None):
     """Find case lists that the generator would create but the study is missing.
 
-    Skip lists already covered by an existing ID or a curated list of the same
-    category. The generic 'other' category cannot stand in for another list.
+    Skip lists already covered by an existing stable ID.
     Combine samples from the configured files: | means any file, & means every
     file. Report each missing list once, and only when it would contain samples.
     Existing curated lists are never rebuilt or changed.
@@ -216,13 +186,9 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
     cache = {}
     scanned_members = scanned_members or {}
     reported = set(defined_ids)
-    categories = curated_case_list_categories(study_dir, study_id, reported)
     for spec in read_config(config_path):
         stable_id = spec['meta_stable_id'].replace("<CANCER_STUDY>", study_id)
         if stable_id in reported:
-            continue
-        category = spec['meta_case_list_category']
-        if category and category != 'other' and category in categories:
             continue
         patterns = spec['staging_filenames']
         union = '|' in patterns

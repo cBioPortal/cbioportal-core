@@ -90,7 +90,7 @@ def oncotree_findings(row, nodes):
     if code.upper() in UNAVAILABLE_VALUES:
         return
     if code not in nodes:
-        yield 'ONCOTREE_CODE', code, 'a code in the selected OncoTree reference; remap retired codes'
+        yield 'ONCOTREE_CODE', code, 'a code in the selected OncoTree reference'
         return
     node = nodes[code]
     for column, field in ONCOTREE_LABELS.items():

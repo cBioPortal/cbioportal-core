@@ -44,8 +44,8 @@ class CaseListPreprocessingTests(unittest.TestCase):
         self.assertEqual([('study_union', 'union.txt', 3), ('study_both', 'both.txt', 1)],
                          self.missing())
 
-    def test_existing_ids_and_curated_categories_are_preserved(self):
-        """An equivalent curated list satisfies the rule without being rewritten."""
+    def test_existing_ids_and_curated_lists_are_preserved(self):
+        """Only the expected stable ID satisfies the rule; curated files are not rewritten."""
         self.write('data_CNA.txt', 'Hugo_Symbol\tS1\nGENE\t1\n')
         self.configure(('cna', 'data_CNA.txt', 'all_cases_with_cna_data'))
         curated = self.write('case_lists/custom.txt', 'cancer_study_identifier: study\n'
@@ -53,7 +53,7 @@ class CaseListPreprocessingTests(unittest.TestCase):
                              'case_list_ids: S1\n')
         original = curated.read_bytes()
         self.assertEqual([], self.missing(['study_cna']))
-        self.assertEqual([], self.missing(['study_custom']))
+        self.assertEqual([('study_cna', 'cna.txt', 1)], self.missing(['study_custom']))
         self.assertEqual(original, curated.read_bytes())
         # A foreign, empty, generic, or unrecognized list does not satisfy the rule.
         self.assertEqual([('study_cna', 'cna.txt', 1)], self.missing())

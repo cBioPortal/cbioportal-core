@@ -5702,6 +5702,12 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             checked_ids.add(study_id + '_sequenced')
         if 'meta_CNA' in validators_by_meta_type:
             checked_ids.add(study_id + '_cna')
+        if 'meta_structural_variants' in validators_by_meta_type:
+            if study_id + '_sv' not in defined_case_list_fns:
+                logger.error("No case list found with stable_id '%s', please add this "
+                             "case list to specify which samples are profiled for structural variants.",
+                             study_id + '_sv')
+            checked_ids.add(study_id + '_sv')
         scanned_members = {
             str(Path(validator.filename).resolve()): validator.generated_case_members
             for validators in validators_by_meta_type.values() for validator in validators
@@ -5711,7 +5717,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
                     study_dir, study_id, checked_ids, scanned_members=scanned_members):
                 if (Path(study_dir) / 'case_lists' / filename).exists():
                     logger.error("Case-list filename '%s' is occupied by an unrelated list. "
-                                 "Resolve the stable-ID/category conflict without overwriting curated data.",
+                                 "Use another filename for the missing stable ID without overwriting curated data.",
                                  filename)
                 logger.error(
                     "Missing generated case list '%s' (%d samples). Run case-list "
