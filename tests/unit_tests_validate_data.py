@@ -3393,6 +3393,51 @@ class CNADiscretePDAAnnotationsValidatorTestCase(PostClinicalDataFileTestCase):
         record_list = self.get_log_records()
         self.assertEqual('Validation complete', record_list[-1].getMessage())
 
+    def _validate_incremental_with_study_on_portal(self, response):
+        """Validate study_es_0_inc (a GRCh38 MAF) as main_validate does online."""
+        portal_instance = validateData.load_portal_info(
+            'test_data/api_json_unit_tests', self.logger, offline=True)
+        portal_instance.species = None
+        portal_instance.reference_genome = None
+        portal_instance.ncbi_build = None
+        with unittest.mock.patch.object(validateData.requests, 'get',
+                                        return_value=response) as get:
+            validateData.validate_data_dir('test_data/study_es_0_inc',
+                                           portal_instance, self.logger,
+                                           False, False,
+                                           server_url='http://portal')
+        get.assert_called_once_with('http://portal/api/studies/study_es_0')
+        record_list = self.get_log_records()
+        build_errors = [r for r in record_list
+                        if r.levelno == logging.ERROR and
+                        'reference genome specified for this study' in r.getMessage()]
+        return portal_instance, record_list, build_errors
+
+    def test_incremental_data_validation_uses_study_genome(self):
+        response = Mock(status_code=200,
+                        **{'json.return_value': {'referenceGenome': 'hg38'}})
+        portal_instance, record_list, build_errors = \
+            self._validate_incremental_with_study_on_portal(response)
+        self.assertEqual('GRCh38', portal_instance.ncbi_build)
+        self.assertEqual([], build_errors)
+        self.assertEqual('Validation complete', record_list[-1].getMessage())
+
+    def test_incremental_data_validation_reports_genome_mismatch(self):
+        response = Mock(status_code=200,
+                        **{'json.return_value': {'referenceGenome': 'hg19'}})
+        _, _, build_errors = self._validate_incremental_with_study_on_portal(response)
+        self.assertTrue(build_errors)
+        for record in build_errors:
+            self.assertIn('(GRCh37)', record.getMessage())
+
+    def test_incremental_data_validation_study_not_on_portal(self):
+        portal_instance, record_list, build_errors = \
+            self._validate_incremental_with_study_on_portal(Mock(status_code=404))
+        self.assertIsNone(portal_instance.ncbi_build)
+        self.assertEqual([], build_errors)
+        self.assertTrue(any('not found on the portal' in r.getMessage()
+                            for r in record_list))
+
 
 if __name__ == '__main__':
     unittest.main(buffer=True)
