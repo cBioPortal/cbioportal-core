@@ -146,7 +146,7 @@ class PostClinicalDataFileTestCase(DataFileTestCase):
         super(PostClinicalDataFileTestCase, self).setUp()
         self.orig_defined_sample_ids = validateData.DEFINED_SAMPLE_IDS
         validateData.DEFINED_SAMPLE_IDS = DEFINED_SAMPLE_IDS
-        self.orig_defined_sample_attributes = validateData.DEFINED_SAMPLE_IDS
+        self.orig_defined_sample_attributes = validateData.DEFINED_SAMPLE_ATTRIBUTES
         validateData.DEFINED_SAMPLE_ATTRIBUTES = DEFINED_SAMPLE_ATTRIBUTES
         self.orig_patients_with_samples = validateData.PATIENTS_WITH_SAMPLES
         validateData.PATIENTS_WITH_SAMPLES = PATIENTS_WITH_SAMPLES
@@ -2256,8 +2256,98 @@ class SegFileValidationTestCase(PostClinicalDataFileTestCase):
         """Pin the exact set of optional ASCN-enrichment columns SegValidator recognizes."""
         self.assertEqual(
             {'TCN', 'LCN', 'CELLULAR_FRACTION', 'PURITY', 'PLOIDY', 'DIP_LOG_R'},
-            set(validateData.SegValidator.INTEGER_CONSTRAINED_COLUMNS) |
-            set(validateData.SegValidator.NULLABLE_FLOAT_COLUMNS))
+            set(validateData.SegValidator.OPTIONAL_HEADERS))
+
+    def test_negative_tcn(self):
+        """TCN must not be negative."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_seg_ascn_negative_tcn.txt',
+                                    validateData.SegValidator,
+                                    extra_meta_fields={'reference_genome_id':
+                                                           'hg19'})
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual(7, record.column_number)
+        self.assertIn('TCN', record.getMessage())
+        self.assertIn('negative', record.getMessage().lower())
+
+    def test_negative_lcn(self):
+        """LCN must not be negative."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_seg_ascn_negative_lcn.txt',
+                                    validateData.SegValidator,
+                                    extra_meta_fields={'reference_genome_id':
+                                                           'hg19'})
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertEqual(8, record.column_number)
+        self.assertIn('LCN', record.getMessage())
+        self.assertIn('negative', record.getMessage().lower())
+
+    def test_lcn_exceeds_tcn(self):
+        """LCN must not exceed TCN when both are present."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_seg_ascn_lcn_exceeds_tcn.txt',
+                                    validateData.SegValidator,
+                                    extra_meta_fields={'reference_genome_id':
+                                                           'hg19'})
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.ERROR, record.levelno)
+        self.assertIn('LCN', record.getMessage())
+        self.assertIn('TCN', record.getMessage())
+        self.assertEqual('TCN=1, LCN=2', record.cause)
+
+    def test_ascn_purity_attribute_missing_warns(self):
+        """Warn when ASCN-enriched data is provided but ASCN_PURITY isn't a
+        defined sample attribute."""
+        self.logger.setLevel(logging.WARNING)
+        orig_defined_sample_attributes = validateData.DEFINED_SAMPLE_ATTRIBUTES
+        validateData.DEFINED_SAMPLE_ATTRIBUTES = {'SOME_OTHER_ATTRIBUTE'}
+        try:
+            record_list = self.validate(
+                'data_seg_ascn_valid.txt',
+                validateData.SegValidator,
+                extra_meta_fields={'reference_genome_id': 'hg19',
+                                   'genetic_alteration_type': 'ALLELE_SPECIFIC_COPY_NUMBER'})
+        finally:
+            validateData.DEFINED_SAMPLE_ATTRIBUTES = orig_defined_sample_attributes
+        self.assertEqual(1, len(record_list))
+        record = record_list.pop()
+        self.assertEqual(logging.WARNING, record.levelno)
+        self.assertIn('ASCN_PURITY', record.getMessage())
+
+    def test_ascn_purity_attribute_present_no_warning(self):
+        """No warning when ASCN_PURITY is already a defined sample attribute."""
+        self.logger.setLevel(logging.WARNING)
+        orig_defined_sample_attributes = validateData.DEFINED_SAMPLE_ATTRIBUTES
+        validateData.DEFINED_SAMPLE_ATTRIBUTES = {'ASCN_PURITY'}
+        try:
+            record_list = self.validate(
+                'data_seg_ascn_valid.txt',
+                validateData.SegValidator,
+                extra_meta_fields={'reference_genome_id': 'hg19',
+                                   'genetic_alteration_type': 'ALLELE_SPECIFIC_COPY_NUMBER'})
+        finally:
+            validateData.DEFINED_SAMPLE_ATTRIBUTES = orig_defined_sample_attributes
+        self.assertEqual(0, len(record_list))
+
+    def test_ascn_purity_check_skipped_for_plain_seg(self):
+        """Plain (non-ASCN) SEG data never triggers the ASCN_PURITY warning,
+        even if the attribute happens to be missing."""
+        self.logger.setLevel(logging.WARNING)
+        orig_defined_sample_attributes = validateData.DEFINED_SAMPLE_ATTRIBUTES
+        validateData.DEFINED_SAMPLE_ATTRIBUTES = {'SOME_OTHER_ATTRIBUTE'}
+        try:
+            record_list = self.validate(
+                'data_seg_ascn_valid.txt',
+                validateData.SegValidator,
+                extra_meta_fields={'reference_genome_id': 'hg19'})
+        finally:
+            validateData.DEFINED_SAMPLE_ATTRIBUTES = orig_defined_sample_attributes
+        self.assertEqual(0, len(record_list))
 
 
 class GisticGenesValidationTestCase(PostClinicalDataFileTestCase):

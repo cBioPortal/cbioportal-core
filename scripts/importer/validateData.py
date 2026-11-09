@@ -3022,6 +3022,13 @@ class SegValidator(Validator):
     importer (ImportCopyNumberSegmentData, which also resolves columns by
     header rather than position) agree on what a given column name means
     regardless of where it sits in the file.
+
+    Beyond the standard numeric/blank checks on TCN and LCN, additional
+    ASCN-specific constraints are enforced: neither TCN nor LCN may be
+    negative, and LCN must not exceed TCN when both are present. Separately, if this is
+    ASCN-enriched data (genetic_alteration_type ALLELE_SPECIFIC_COPY_NUMBER)
+    and the study's sample attribute file has no ASCN_PURITY attribute, a
+    warning is logged (see onComplete).
     """
 
     REQUIRED_HEADERS = [
@@ -3038,6 +3045,16 @@ class SegValidator(Validator):
     # Optional ASCN (allele-specific copy number) enrichment columns.
     INTEGER_CONSTRAINED_COLUMNS = ['TCN', 'LCN']
     NULLABLE_FLOAT_COLUMNS = ['CELLULAR_FRACTION', 'PURITY', 'PLOIDY', 'DIP_LOG_R']
+    # Registered, documented set of all optional columns this validator
+    # recognizes (the union of the two lists above), for discoverability.
+    OPTIONAL_HEADERS = INTEGER_CONSTRAINED_COLUMNS + NULLABLE_FLOAT_COLUMNS
+
+    # Among INTEGER_CONSTRAINED_COLUMNS, those that must also be >= 0.
+    NON_NEGATIVE_INTEGER_COLUMNS = ['TCN', 'LCN']
+
+    # Sample-level clinical attribute expected to be defined (in the sample
+    # attribute file) whenever a study provides ASCN-enriched segment data.
+    ASCN_SAMPLE_ATTRIBUTE = 'ASCN_PURITY'
 
     def __init__(self, *args, **kwargs):
         """Initialize validator to track coverage of the genome."""
@@ -3171,8 +3188,17 @@ class SegValidator(Validator):
                            'cause': '{}-{}'.format(parsed_coords['loc.start'],
                                                    parsed_coords['loc.end'])})
 
-        for column_name in self.INTEGER_CONSTRAINED_COLUMNS:
-            self._checkIntegerConstrainedColumn(data, column_name)
+        integer_constrained_values = {
+            column_name: self._checkIntegerConstrainedColumn(data, column_name)
+            for column_name in self.INTEGER_CONSTRAINED_COLUMNS
+        }
+        tcn_value = integer_constrained_values.get('TCN')
+        lcn_value = integer_constrained_values.get('LCN')
+        if tcn_value is not None and lcn_value is not None and lcn_value > tcn_value:
+            self.logger.error(
+                'LCN must not exceed TCN',
+                extra={'line_number': self.line_number,
+                       'cause': 'TCN=%s, LCN=%s' % (tcn_value, lcn_value)})
 
         for column_name in self.NULLABLE_FLOAT_COLUMNS:
             value = self._getValue(data, column_name)
@@ -3196,26 +3222,61 @@ class SegValidator(Validator):
         neither silently accepted nor rejected outright: the Java importer
         (ImportCopyNumberSegmentData.parseNullableInteger) rounds it to the
         nearest integer and logs a warning, so this validator warns on the
-        same condition rather than erroring.
+        same condition rather than erroring. Columns listed in
+        NON_NEGATIVE_INTEGER_COLUMNS (TCN, LCN) must additionally be >= 0,
+        since a negative allele count is never valid.
+
+        Returns the rounded integer value (for use in further, cross-column
+        validation such as LCN <= TCN), or None if the cell is blank/NA or
+        not parseable as a number.
         """
         value = self._getValue(data, column_name)
         if value is None or value in self.NULL_VALUES:
-            return
+            return None
         if not self.checkFloat(value):
             self.logger.error(
                 'Value is neither a real number nor NA',
                 extra={'line_number': self.line_number,
                        'column_number': self._columnNumber(column_name),
                        'cause': value})
-            return
+            return None
         numeric_value = float(value)
-        if numeric_value != round(numeric_value):
+        rounded_value = int(round(numeric_value))
+        if numeric_value != rounded_value:
             self.logger.warning(
                 '%s is a non-integer value. It will be rounded to the nearest '
                 'integer upon import.' % column_name,
                 extra={'line_number': self.line_number,
                        'column_number': self._columnNumber(column_name),
                        'cause': value})
+        if column_name in self.NON_NEGATIVE_INTEGER_COLUMNS and rounded_value < 0:
+            self.logger.error(
+                '%s must not be negative' % column_name,
+                extra={'line_number': self.line_number,
+                       'column_number': self._columnNumber(column_name),
+                       'cause': value})
+        return rounded_value
+
+    def onComplete(self):
+        """Warn if this is ASCN-enriched data but the study has no
+        ASCN_PURITY sample attribute defined.
+
+        DEFINED_SAMPLE_ATTRIBUTES is populated from the sample attribute file,
+        which is always validated before this one (see validate_study()), so
+        it reflects the full set of sample-level attributes the study
+        defines. It stays None when this validator isn't run as part of a
+        full study validation (e.g. validate_data_dir()), in which case this
+        check is skipped rather than producing a false warning.
+        """
+        if (self.meta_dict.get('genetic_alteration_type') ==
+                'ALLELE_SPECIFIC_COPY_NUMBER' and
+                DEFINED_SAMPLE_ATTRIBUTES is not None and
+                self.ASCN_SAMPLE_ATTRIBUTE not in DEFINED_SAMPLE_ATTRIBUTES):
+            self.logger.warning(
+                '%s sample attribute not found, but this study provides '
+                'ASCN-enriched segment data. Consider adding it to the '
+                'sample clinical attribute file.' % self.ASCN_SAMPLE_ATTRIBUTE)
+        super(SegValidator, self).onComplete()
 
 
 class StructuralVariantValidator(CustomNamespacesValidator):
