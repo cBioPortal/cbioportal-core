@@ -519,6 +519,14 @@ class CancerTypeFileValidationTestCase(DataFileTestCase):
         self.assertEqual('luad', record.cause)
         self.assertIn('will be added', record.getMessage().lower())
 
+    def test_cancer_type_single_line_without_line_break(self):
+        """Test a file with a single line and no line break at the end."""
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_cancertype_lung_no_final_newline.txt',
+                                    validateData.CancerTypeValidator)
+        # a file without any line break is not wrong, so no errors expected
+        self.assertEqual(0, len(record_list))
+
     def test_cancer_type_missing_column(self):
         """Test when a new cancer type file misses a column."""
         self.logger.setLevel(logging.ERROR)
