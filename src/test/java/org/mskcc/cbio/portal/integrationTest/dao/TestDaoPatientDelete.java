@@ -1,19 +1,7 @@
 /*
- * This file is part of cBioPortal.
  * Copyright (C) 2026  Memorial Sloan-Kettering Cancer Center.
  *
- * cBioPortal is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package org.mskcc.cbio.portal.integrationTest.dao;
@@ -24,7 +12,9 @@ import org.junit.runner.RunWith;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.dao.DaoPatient;
+import org.mskcc.cbio.portal.dao.DaoResourceData;
 import org.mskcc.cbio.portal.dao.DaoSample;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.Patient;
 import org.springframework.test.context.ContextConfiguration;
@@ -61,6 +51,23 @@ public class TestDaoPatientDelete extends AbstractDaoDeleteTest {
         patientInternalId = patient.getInternalId();
 
         sampleInternalId = DaoSample.getSampleByCancerStudyAndSampleId(studyId, SAMPLE_STABLE_ID).getInternalId();
+    }
+
+    @Test
+    public void testDeletePatients_resourceRowsAreGone() throws DaoException {
+        // Deleting a patient removes its samples first, so both the patient-level row and the
+        // sample-level row of one of its samples have to go.
+        DaoResourceData.addResourceDatum(studyId, "PATIENT_NOTES", "PATIENT", PATIENT_STABLE_ID,
+                null, "https://example.org/notes.pdf", null, null);
+        DaoResourceData.addResourceDatum(studyId, "PATIENT_NOTES", "SAMPLE", PATIENT_STABLE_ID,
+                SAMPLE_STABLE_ID, "https://example.org/slide.svs", null, null);
+        ClickHouseBulkLoader.flushAll();
+        assertEquals(2L, countRowsWhereEq("resource", "cancer_study_id", studyId));
+
+        DaoPatient.deletePatients(studyId, Set.of(PATIENT_STABLE_ID));
+
+        assertEquals("both the patient's and its sample's resource rows should go",
+                0L, countRowsWhereEq("resource", "cancer_study_id", studyId));
     }
 
     @Test

@@ -1,34 +1,8 @@
 /*
  * Copyright (c) 2015 - 2017 Memorial Sloan-Kettering Cancer Center.
  *
- * This library is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS
- * FOR A PARTICULAR PURPOSE. The software and documentation provided hereunder
- * is on an "as is" basis, and Memorial Sloan-Kettering Cancer Center has no
- * obligations to provide maintenance, support, updates, enhancements or
- * modifications. In no event shall Memorial Sloan-Kettering Cancer Center be
- * liable to any party for direct, indirect, special, incidental or
- * consequential damages, including lost profits, arising out of the use of this
- * software and its documentation, even if Memorial Sloan-Kettering Cancer
- * Center has been advised of the possibility of such damage.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
-/*
- * This file is part of cBioPortal.
- *
- * cBioPortal is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
 
 package org.mskcc.cbio.portal.dao;
 
@@ -541,17 +515,18 @@ public final class DaoCancerStudy {
             ClickHouseBulkDeleter.getBulkDeleter("sample_list_list", "list_id").addIds(sampleListIds);
 
             ClickHouseBulkDeleter.getBulkDeleter("clinical_sample", "internal_id").addIds(sampleIds);
-            ClickHouseBulkDeleter.getBulkDeleter("resource_sample", "internal_id").addIds(sampleIds);
 
             ClickHouseBulkDeleter.getBulkDeleter("sample", "internal_id").addIds(sampleIds);
             ClickHouseBulkDeleter.getBulkDeleter("clinical_patient", "internal_id").addIds(patientIds);
-            ClickHouseBulkDeleter.getBulkDeleter("resource_patient", "internal_id").addIds(patientIds);
 
             ClickHouseBulkDeleter.flushAll();
 
             deleteByStudyId("DELETE FROM clinical_attribute_meta WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM resource_definition WHERE cancer_study_id=?", internalCancerStudyId);
-            deleteByStudyId("DELETE FROM resource_study WHERE internal_id=?", internalCancerStudyId);
+            // One statement for every resource row the study owns, whatever entity it hangs off:
+            // resource carries cancer_study_id, where the three tables it replaced had to be
+            // reached through the sample's and patient's internal ids and the study's own id.
+            deleteByStudyId("DELETE FROM resource WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM cancer_study_tags WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM copy_number_seg WHERE cancer_study_id=?", internalCancerStudyId);
             deleteByStudyId("DELETE FROM copy_number_seg_file WHERE cancer_study_id=?", internalCancerStudyId);

@@ -1,19 +1,7 @@
 /*
- * This file is part of cBioPortal.
  * Copyright (C) 2026  Memorial Sloan-Kettering Cancer Center.
  *
- * cBioPortal is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package org.mskcc.cbio.portal.integrationTest.dao;
@@ -27,6 +15,8 @@ import org.mskcc.cbio.portal.dao.DaoGeneticProfile;
 import org.mskcc.cbio.portal.dao.DaoSample;
 import org.mskcc.cbio.portal.dao.JdbcUtil;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkDeleter;
+import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
+import org.mskcc.cbio.portal.dao.DaoResourceData;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticProfile;
 import org.springframework.test.context.ContextConfiguration;
@@ -111,6 +101,26 @@ public class TestDaoCancerStudyDelete extends AbstractDaoDeleteTest {
             assertEquals(0L, countRowsWhereEq("patient",          "internal_id", patientId));
             assertEquals(0L, countRowsWhereEq("clinical_patient", "internal_id", patientId));
         }
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testDeleteCancerStudy_resourceRowsAreGone() throws Exception {
+        // resource replaced resource_sample/resource_patient/resource_study, which a 7.2.0
+        // database no longer has at all. Deleting a study has to reach the new table: against an
+        // upgraded database the old statements fail outright with UNKNOWN_TABLE, so a study with
+        // resources could not be deleted, and therefore could not be re-imported either.
+        DaoResourceData.addResourceDatum(
+            studyId, "PATIENT_NOTES", "PATIENT", "TCGA-A1-A0SB", null,
+            "https://example.org/notes.pdf", null, null);
+        ClickHouseBulkLoader.flushAll();
+        assertEquals("fixture must have written a resource row",
+            1L, countRowsWhereEq("resource", "cancer_study_id", studyId));
+
+        DaoCancerStudy.deleteCancerStudy(studyId);
+
+        assertEquals("resource rows should go with the study",
+            0L, countRowsWhereEq("resource", "cancer_study_id", studyId));
     }
 
     @Test
