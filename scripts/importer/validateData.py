@@ -1252,8 +1252,7 @@ class CNAValidator(GenewiseFileValidator):
             return super().checkGeneIdentification(gene_symbol, entrez_id)
         if entrez_id is not None:
             normalized = entrez_id.lstrip('0') or '0'
-            if (not re.fullmatch(r'[0-9]+', entrez_id) or len(normalized) > 10
-                    or not 0 < int(normalized) <= 2147483647):
+            if not re.fullmatch(r'[0-9]+', entrez_id) or normalized == '0':
                 self.logger.error('Invalid CNA Entrez gene id; this row would not be loaded. '
                                   'Curate the identifier before import.',
                                   extra={'line_number': self.line_number, 'cause': entrez_id})

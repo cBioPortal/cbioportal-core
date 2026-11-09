@@ -59,9 +59,9 @@ class StrictModeTests(fixtures.PostClinicalDataFileTestCase):
                         self.logger, False, False)
                     validator.checkGeneIdentification(entrez_id=identifier)
                     records = self.get_log_records()
-                    self.assertEqual(strict or identifier == '-1',
+                    self.assertEqual(identifier == '-1',
                         any(record.levelno >= logging.ERROR for record in records))
-                    self.assertEqual(strict, any('Invalid CNA Entrez gene id' in record.getMessage()
+                    self.assertEqual(strict and identifier == '-1', any('Invalid CNA Entrez gene id' in record.getMessage()
                         for record in records))
 
     def test_duplicate_cna_is_warning_by_default_and_error_in_strict_mode(self):
