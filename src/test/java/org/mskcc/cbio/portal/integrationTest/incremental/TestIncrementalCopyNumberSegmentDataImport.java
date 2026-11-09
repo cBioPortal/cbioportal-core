@@ -27,6 +27,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.mskcc.cbio.portal.integrationTest.IntegrationTestBase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests Incremental Import of CNA segmented data.
@@ -89,6 +90,63 @@ public class TestIncrementalCopyNumberSegmentDataImport extends IntegrationTestB
         ClinicalData fractionGenomeAltered = clinicalData.stream()
                 .filter(cd -> "FRACTION_GENOME_ALTERED".equals(cd.getAttrId())).findFirst().get();
         assertEquals("0.0000", fractionGenomeAltered.getAttrVal());
+    }
+
+    /**
+     * Test incremental (--overwrite-existing) import of ASCN-enriched segment
+     * data, which replaces the copy_number_seg rows (coordinates and ASCN
+     * fields alike) for the affected samples.
+     */
+    @Test
+    public void testIncrementalUploadAscnEnrichedData() throws DaoException {
+        String sampleId = "TCGA-A1-A0SE-01";
+        Sample sample = DaoSample.getSampleByCancerStudyAndSampleId(cancerStudy.getInternalId(), sampleId);
+
+        CopyNumberSegmentFile copyNumberSegmentFile = new CopyNumberSegmentFile();
+        copyNumberSegmentFile.cancerStudyId = cancerStudy.getInternalId();
+        copyNumberSegmentFile.referenceGenomeId = CopyNumberSegmentFile.ReferenceGenomeId.hg19;
+        copyNumberSegmentFile.filename = "test_file.seg";
+        copyNumberSegmentFile.description = "test ASCN seg file description";
+        DaoCopyNumberSegmentFile.addCopyNumberSegmentFile(copyNumberSegmentFile);
+
+        ClickHouseBulkLoader.bulkLoadOn();
+        long existingSegId = DaoCopyNumberSegment.getLargestId() + 1;
+        CopyNumberSegment existingSegment = new CopyNumberSegment(
+                cancerStudy.getInternalId(),
+                sample.getInternalId(),
+                "5",
+                1000,
+                2000,
+                0,
+                0.1);
+        existingSegment.setSegId(existingSegId);
+        existingSegment.setTcn(5);
+        existingSegment.setLcn(2);
+        existingSegment.setCellularFraction(0.5);
+        existingSegment.setPurity(0.2);
+        existingSegment.setPloidy(2.0);
+        existingSegment.setDipLogR(-0.05);
+        DaoCopyNumberSegment.addCopyNumberSegment(existingSegment);
+        ClickHouseBulkLoader.flushAll();
+
+        File dataFolder = new File("src/test/resources/incremental/ascn_seg/");
+        File metaFile = new File(dataFolder, "meta_ascn_seg.txt");
+        File dataFile = new File(dataFolder, "data_ascn_seg.txt");
+
+        ImportCopyNumberSegmentData importer = new ImportCopyNumberSegmentData(new String[] {
+                "--loadMode", "bulkLoad",
+                "--meta", metaFile.getAbsolutePath(),
+                "--data", dataFile.getAbsolutePath(),
+                "--overwrite-existing",
+        });
+        importer.run();
+
+        List<CopyNumberSegment> segments = DaoCopyNumberSegment.getSegmentForASample(
+                sample.getInternalId(), cancerStudy.getInternalId());
+        // the pre-existing segment on chr 5 should have been replaced by the 2 new segments from the incremental file
+        assertEquals(2, segments.size());
+        assertTrue(segments.stream().noneMatch(s -> "5".equals(s.getChr()) || s.getSegId() == existingSegId));
+        assertTrue(segments.stream().allMatch(s -> s.getTcn() != null));
     }
 
     public static final String STUDY_ID = "study_tcga_pub";
