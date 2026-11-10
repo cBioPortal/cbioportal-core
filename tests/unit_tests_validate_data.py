@@ -176,6 +176,38 @@ class PostClinicalDataFileTestCase(DataFileTestCase):
 # ----------------------------------------------------------------------------
 # Test cases for the various Validator classes found in validateData script
 
+class PortalApiTokenTestCase(unittest.TestCase):
+
+    """Tests for sending a data access token to the portal API."""
+
+    def _request_gene_panels(self, api_token):
+        """Request gene panels, returning the headers of each mocked call."""
+        responses = [Mock(**{'json.return_value': [{'genePanelId': 'PANEL'}]}),
+                     Mock(**{'json.return_value': {'genePanelId': 'PANEL',
+                                                   'description': 'panel',
+                                                   'genes': []}})]
+        with unittest.mock.patch.object(validateData.requests, 'get',
+                                        side_effect=responses) as get:
+            validateData.request_from_portal_api(
+                'http://portal', 'gene-panels', logging.getLogger(__name__),
+                api_token=api_token)
+        return [c.kwargs['headers'] for c in get.call_args_list]
+
+    def test_token_is_sent_as_bearer_header(self):
+        self.assertEqual(
+            [{'Authorization': 'Bearer secret'}] * 2,
+            self._request_gene_panels('secret'))
+
+    def test_no_header_without_token(self):
+        self.assertEqual([None, None], self._request_gene_panels(None))
+
+    def test_api_token_option_defaults_to_environment(self):
+        with unittest.mock.patch.dict('os.environ',
+                                      {'CBIOPORTAL_API_TOKEN': 'from-env'}):
+            args = validateData.interface(['-s', 'study'])
+        self.assertEqual('from-env', args.api_token)
+
+
 class ColumnOrderTestCase(DataFileTestCase):
 
     """Test if column order requirements are appropriately validated."""

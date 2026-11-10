@@ -5317,8 +5317,12 @@ def validate_data_relations(validators_by_meta_type, logger):
                                'cause': gsva_scores_source_stable_id})
 
 
-def request_from_portal_api(server_url, api_name, logger):
-    """Send a request to the portal API and return the decoded JSON object."""
+def request_from_portal_api(server_url, api_name, logger, api_token=None):
+    """Send a request to the portal API and return the decoded JSON object.
+
+    If `api_token` is given, send it as a bearer token, as portals with
+    authentication enabled require for API requests.
+    """
 
     if api_name in ['info', 'cancer-types', 'genes', 'genesets', 'gene-panels']:
         service_url = server_url + '/api/' + api_name
@@ -5335,7 +5339,8 @@ def request_from_portal_api(server_url, api_name, logger):
     # this may raise a requests.exceptions.RequestException subclass,
     # usually because the URL provided on the command line was invalid or
     # did not include the http:// part
-    response = requests.get(service_url)
+    headers = {'Authorization': 'Bearer ' + api_token} if api_token else None
+    response = requests.get(service_url, headers=headers)
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -5349,7 +5354,7 @@ def request_from_portal_api(server_url, api_name, logger):
             panel = {}
             gene_panel_id = data_item['genePanelId']
             gene_panel_url = service_url+'/'+gene_panel_id
-            response = requests.get(gene_panel_url).json()
+            response = requests.get(gene_panel_url, headers=headers).json()
             panel['description'] = response['description']
             panel['genes'] = response['genes']
             panel['genePanelId'] = response['genePanelId']
@@ -5455,12 +5460,12 @@ def extract_panels(json_data, id_key):
 def load_portal_metadata(json_data):
     return json_data
 
-def load_portal_info(path, logger, offline=False):
+def load_portal_info(path, logger, offline=False, api_token=None):
     """Create a PortalInstance object based on a server API or offline dir.
 
     If `offline` is True, interpret `path` as the path to a directory of JSON
     files. Otherwise expect `path` to be the URL of a cBioPortal server and
-    use its web API.
+    use its web API, authenticating with `api_token` if one is given.
     """
     portal_dict = {}
     for api_name, transform_function in (
@@ -5485,7 +5490,8 @@ def load_portal_info(path, logger, offline=False):
         if offline:
             parsed_json = read_portal_json_file(path, api_name, logger)
         else:
-            parsed_json = request_from_portal_api(path, api_name, logger)
+            parsed_json = request_from_portal_api(path, api_name, logger,
+                                                  api_token=api_token)
         if parsed_json is not None and transform_function is not None:
             parsed_json = transform_function(parsed_json)
         portal_dict[api_name] = parsed_json
@@ -5527,6 +5533,11 @@ def interface(args=None):
                                    action='store_true',
                                    help='Skip tests requiring information '
                                         'from the cBioPortal installation')
+    parser.add_argument('--api_token', type=str,
+                        default=os.environ.get('CBIOPORTAL_API_TOKEN'),
+                        help='Data access token for a cBioPortal server with '
+                             'authentication enabled (default: the '
+                             'CBIOPORTAL_API_TOKEN environment variable)')
     parser.add_argument('-html', '--html_table', type=str, required=False,
                         help='path to html report output file')
     parser.add_argument('-e', '--error_file', type=str, required=False,
@@ -5879,7 +5890,8 @@ def main_validate(args):
         portal_instance = load_portal_info(args.portal_info_dir, logger,
                                            offline=True)
     else:
-        portal_instance = load_portal_info(server_url, logger)
+        portal_instance = load_portal_info(
+            server_url, logger, api_token=getattr(args, 'api_token', None))
 
     # set portal version
     cbio_version = portal_instance.portal_version
