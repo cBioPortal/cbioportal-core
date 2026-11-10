@@ -63,7 +63,34 @@ RESOURCE_DEFINITION_DICTIONARY = {}
 # with no contract is absent from this map and its data file is not checked against one.
 # Populated from the definition file before any resource data file is read.
 RESOURCE_CONTRACT_KEYS = {}
+# resource_id -> URL_TEMPLATE, for resources whose definition has one. A row of one of these
+# resources may leave URL empty: the portal builds its URL from the template. Populated from the
+# definition file before any resource data file is read.
+RESOURCE_URL_TEMPLATES = {}
 RESOURCE_PATIENTS_WITH_SAMPLES = None
+
+# The placeholders a resource URL_TEMPLATE may use, besides ${metadata.<key>}. The portal fills them
+# in when it serves a row, percent-encoding every value except ${base_url}.
+URL_TEMPLATE_PLACEHOLDERS = {'base_url', 'STUDY_ID', 'PATIENT_ID', 'SAMPLE_ID', 'RESOURCE_ID'}
+URL_TEMPLATE_METADATA_PREFIX = 'metadata.'
+
+
+def parse_url_template(template):
+    """Split a resource URL_TEMPLATE into its placeholder names.
+
+    Returns (names, unbalanced): the text between each '${' and the next '}', in order, and
+    whether some '${' has no closing '}' before the next '${' or the end of the template.
+    """
+    names = []
+    pos = template.find('${')
+    while pos >= 0:
+        end = template.find('}', pos + 2)
+        following = template.find('${', pos + 2)
+        if end < 0 or (0 <= following < end):
+            return names, True
+        names.append(template[pos + 2:end])
+        pos = template.find('${', end + 1)
+    return names, False
 
 # globals required for gene set scoring validation
 prior_validated_sample_ids = None
@@ -3686,7 +3713,8 @@ class ResourceDefinitionValidator(Validator):
     # 'RESOURCE_ID', 'RESOURCE_TYPE', 'DISPLAY_NAME' are required
     REQUIRE_COLUMN_ORDER = False
     REQUIRED_HEADERS = ['RESOURCE_ID', 'RESOURCE_TYPE', 'DISPLAY_NAME']
-    OPTIONAL_HEADERS = ['DESCRIPTION', 'OPEN_BY_DEFAULT', 'PRIORITY', 'CUSTOM_METADATA']
+    OPTIONAL_HEADERS = ['DESCRIPTION', 'OPEN_BY_DEFAULT', 'PRIORITY', 'CUSTOM_METADATA',
+                        'URL_TEMPLATE']
     NULL_VALUES = ["[not applicable]", "[not available]", "[pending]", "[discrepancy]", "[completed]", "[null]", "", "na"]
     RESOURCE_TYPES = ["SAMPLE", "PATIENT", "STUDY"]
     ALLOW_BLANKS = True
@@ -3696,6 +3724,7 @@ class ResourceDefinitionValidator(Validator):
         super(ResourceDefinitionValidator, self).__init__(*args, **kwargs)
         self.resource_definition_dictionary = {}
         self.resource_contract_keys = {}
+        self.resource_url_templates = {}
 
     # The complete set of keys the portal reads from a contract field. The format is closed:
     # a key is added here when the portal is taught to read it, so any other key is a mistake
@@ -3789,12 +3818,56 @@ class ResourceDefinitionValidator(Validator):
                     extra=dict(extra, cause='%s: %s' % (field.get('key', 'entry %d' % position),
                                                         ', '.join(unknown))))
 
+    def checkUrlTemplate(self, template, col_index, resource_type, declared_keys):
+        """Check a URL_TEMPLATE the portal will expand for rows that leave URL empty.
+
+        The portal substitutes each ${...} placeholder, so one it does not know would be left in
+        the URL as written, and a metadata key the resource's contract does not declare would
+        likely expand to nothing.
+        """
+        extra = {'line_number': self.line_number, 'column_number': col_index + 1}
+        if not (template.startswith('${base_url}') or
+                re.match(r'https?://', template, re.IGNORECASE)):
+            self.logger.error(
+                'URL_TEMPLATE must start with ${base_url}, http:// or https://',
+                extra=dict(extra, cause=template))
+        names, unbalanced = parse_url_template(template)
+        if unbalanced:
+            self.logger.error(
+                "URL_TEMPLATE has a '${' without a closing '}'",
+                extra=dict(extra, cause=template))
+        for name in names:
+            if name.startswith(URL_TEMPLATE_METADATA_PREFIX):
+                key = name[len(URL_TEMPLATE_METADATA_PREFIX):]
+                if not key:
+                    self.logger.error(
+                        'URL_TEMPLATE placeholder ${metadata.} names no metadata key',
+                        extra=dict(extra, cause=template))
+                elif declared_keys is not None and key not in declared_keys:
+                    self.logger.warning(
+                        'URL_TEMPLATE reads a metadata key that CUSTOM_METADATA does not '
+                        'declare',
+                        extra=dict(extra, cause='${%s}' % name))
+            elif name not in URL_TEMPLATE_PLACEHOLDERS:
+                self.logger.error(
+                    'URL_TEMPLATE placeholder is not one of %s or ${metadata.<key>}'
+                    % ', '.join('${%s}' % p for p in sorted(URL_TEMPLATE_PLACEHOLDERS)),
+                    extra=dict(extra, cause='${%s}' % name))
+            elif (name == 'SAMPLE_ID' and resource_type in ('PATIENT', 'STUDY')) or \
+                    (name == 'PATIENT_ID' and resource_type == 'STUDY'):
+                self.logger.warning(
+                    'URL_TEMPLATE reads a value that rows of a %s resource do not have'
+                    % resource_type,
+                    extra=dict(extra, cause='${%s}' % name))
+
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(ResourceDefinitionValidator, self).checkLine(data)
         resource_id = ''
         resource_type = ''
         declared_keys = None
+        url_template = None
+        url_template_col = None
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3880,6 +3953,15 @@ class ResourceDefinitionValidator(Validator):
                             extra={'line_number': self.line_number,
                                    'column_number': col_index + 1,
                                    'cause': value})
+            if col_name == 'URL_TEMPLATE' and value.lower() not in self.NULL_VALUES:
+                url_template = value
+                url_template_col = col_index
+        # Checked after the loop: the template is checked against the resource's type and
+        # contract, which may be in later columns.
+        if url_template is not None:
+            self.checkUrlTemplate(url_template, url_template_col, resource_type, declared_keys)
+            if resource_id:
+                self.resource_url_templates[resource_id] = url_template
         # Filed after the loop, not inside it: REQUIRE_COLUMN_ORDER is False, so resource_id is
         # only known once every column has been read. Both of these are keyed by it.
         if declared_keys is not None and resource_id:
@@ -3905,6 +3987,8 @@ class ResourceValidator(Validator):
         # once per file: a file where every row carries the same undeclared key would otherwise
         # emit one message per row, and the HTML report buffers every record it is given.
         self.observed_metadata_keys = {}
+        # duplicateKey(row) -> the line it first appeared on
+        self.defined_resources = {}
 
     def recordMetadataKeys(self, resource_id, parsed):
         """Remember which metadata keys a row carried, to check against the contract at the end."""
@@ -3949,6 +4033,65 @@ class ResourceValidator(Validator):
                     extra={'line_number': self.line_number,
                            'cause': ', '.join(unused)})
 
+    def isBlank(self, value):
+        return value.strip().lower() in self.NULL_VALUES
+
+    def columnValue(self, data, col_name):
+        """The stripped value of a column in this line, or '' if the file has no such column."""
+        if col_name in self.cols and self.cols.index(col_name) < len(data):
+            return data[self.cols.index(col_name)].strip()
+        return ''
+
+    def checkTemplateMetadata(self, template):
+        """For a row that relies on its resource's URL_TEMPLATE, check it carries every metadata
+        key the template reads: the portal could not fill that part of the URL in."""
+        names, _ = parse_url_template(template)
+        metadata = self.row_metadata or {}
+        missing = [name[len(URL_TEMPLATE_METADATA_PREFIX):] for name in names
+                   if name.startswith(URL_TEMPLATE_METADATA_PREFIX)
+                   and name[len(URL_TEMPLATE_METADATA_PREFIX):]
+                   and metadata.get(name[len(URL_TEMPLATE_METADATA_PREFIX):]) in (None, '')]
+        if missing:
+            self.logger.error(
+                "URL is empty and the resource's URL_TEMPLATE reads METADATA keys this row "
+                'does not carry',
+                extra={'line_number': self.line_number,
+                       'cause': ', '.join(missing)})
+
+    def duplicateKey(self, data, resource_id, entity_id):
+        """What identifies a row when checking the file for duplicates.
+
+        A row with a URL is identified by (resource, entity, URL). A row that leaves URL empty
+        gets its URL from the resource's URL_TEMPLATE, so it is identified by the values it gives
+        the template instead: two such rows that agree on them resolve to the same URL. The
+        template's other placeholders are the same for every row of the resource.
+        """
+        url = self.columnValue(data, 'URL')
+        template = RESOURCE_URL_TEMPLATES.get(resource_id)
+        if not self.isBlank(url) or template is None:
+            return (resource_id, entity_id, url)
+        metadata = self.row_metadata or {}
+        values = []
+        names, _ = parse_url_template(template)
+        for name in names:
+            if name in ('PATIENT_ID', 'SAMPLE_ID'):
+                values.append(self.columnValue(data, name))
+            elif name.startswith(URL_TEMPLATE_METADATA_PREFIX):
+                value = metadata.get(name[len(URL_TEMPLATE_METADATA_PREFIX):])
+                values.append(value if value is None or isinstance(value, str)
+                              else json.dumps(value))
+        return (resource_id, entity_id, None, tuple(values))
+
+    def checkDuplicate(self, data, resource_id, entity_id):
+        key = self.duplicateKey(data, resource_id, entity_id)
+        if key in self.defined_resources:
+            self.logger.error(
+                'Duplicated resources found',
+                extra={'line_number': self.line_number,
+                       'duplicated_line_number': self.defined_resources[key]})
+        else:
+            self.defined_resources[key] = self.line_number
+
     def url_validator(self, url):
         try:
             result = urlparse(url)
@@ -3959,6 +4102,10 @@ class ResourceValidator(Validator):
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(ResourceValidator, self).checkLine(data)
+        # The row's METADATA as a dict, if it parses to one; read by the URL_TEMPLATE checks.
+        self.row_metadata = None
+        url_template = RESOURCE_URL_TEMPLATES.get(self.columnValue(data, 'RESOURCE_ID'))
+        relies_on_template = False
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -3986,13 +4133,17 @@ class ResourceValidator(Validator):
                 pass
 
             if col_name == 'URL':
-                # value should be a url
+                # value should be a url, or empty when the resource has a URL_TEMPLATE
                 # Characters that affect netloc parsing under NFKC normalization will raise ValueError
-                if self.url_validator(value.strip()):
+                if url_template is not None and self.isBlank(value):
+                    relies_on_template = True
+                elif self.url_validator(value.strip()):
                     pass
                 else:
                     self.logger.error(
-                        'Value of resource is not an url, url should start with http or https',
+                        'Value of resource is not an url, url should start with http or https'
+                        + ('. URL may be empty only for a resource whose definition has a '
+                           'URL_TEMPLATE' if self.isBlank(value) else ''),
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'column_name': col_name,
@@ -4024,7 +4175,9 @@ class ResourceValidator(Validator):
                         data[self.cols.index('RESOURCE_ID')].strip()
                         if 'RESOURCE_ID' in self.cols else None,
                         parsed)
-                    if not isinstance(parsed, dict):
+                    if isinstance(parsed, dict):
+                        self.row_metadata = parsed
+                    else:
                         self.logger.error(
                             'METADATA must be a JSON object (key-value map), not an array or scalar',
                             extra={'line_number': self.line_number,
@@ -4036,6 +4189,8 @@ class ResourceValidator(Validator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': value[:80]})
+        if relies_on_template:
+            self.checkTemplateMetadata(url_template)
 
 class SampleResourceValidator(ResourceValidator):
     """Validator for files defining and setting sample-level attributes."""
@@ -4049,14 +4204,12 @@ class SampleResourceValidator(ResourceValidator):
         self.sample_id_lines = {}
         self.sampleIds = self.sample_id_lines.keys()
         self.patient_ids = set()
-        self.defined_resources = {}
 
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(SampleResourceValidator, self).checkLine(data)
         resource_id = ''
         sample_id = ''
-        resource_url = ''
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4091,16 +4244,7 @@ class SampleResourceValidator(ResourceValidator):
                 sample_id = value
             elif col_name == 'PATIENT_ID':
                 self.patient_ids.add(value)
-            if col_name == 'URL':
-                resource_url = value
-        # check duplicate
-        if (resource_id, sample_id, resource_url) in self.defined_resources:
-            self.logger.error(
-                'Duplicated resources found',
-                extra={'line_number': self.line_number,
-                        'duplicated_line_number': self.defined_resources[(resource_id, sample_id, resource_url)]})
-        else:
-            self.defined_resources[(resource_id, sample_id, resource_url)] = self.line_number
+        self.checkDuplicate(data, resource_id, sample_id)
 
 class PatientResourceValidator(ResourceValidator):
 
@@ -4111,14 +4255,12 @@ class PatientResourceValidator(ResourceValidator):
         """Initialize a PatientResourceValidator with the given parameters."""
         super(PatientResourceValidator, self).__init__(*args, **kwargs)
         self.patient_id_lines = {}
-        self.defined_resources = {}
 
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(PatientResourceValidator, self).checkLine(data)
         resource_id = ''
         patient_id = ''
-        resource_url = ''
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4144,16 +4286,7 @@ class PatientResourceValidator(ResourceValidator):
                 if value not in self.patient_id_lines:
                     self.patient_id_lines[value] = self.line_number
                 patient_id = value
-            if col_name == 'URL':
-                resource_url = value
-        # check duplicate
-        if (resource_id, patient_id, resource_url) in self.defined_resources:
-            self.logger.error(
-                'Duplicated resources found',
-                extra={'line_number': self.line_number,
-                        'duplicated_line_number': self.defined_resources[(resource_id, patient_id, resource_url)]})
-        else:
-            self.defined_resources[(resource_id, patient_id, resource_url)] = self.line_number
+        self.checkDuplicate(data, resource_id, patient_id)
 
 class StudyResourceValidator(ResourceValidator):
 
@@ -4163,13 +4296,11 @@ class StudyResourceValidator(ResourceValidator):
     def __init__(self, *args, **kwargs):
         """Initialize a StudyResourceValidator with the given parameters."""
         super(StudyResourceValidator, self).__init__(*args, **kwargs)
-        self.defined_resources = {}
 
     def checkLine(self, data):
         """Check the values in a line of data."""
         super(StudyResourceValidator, self).checkLine(data)
         resource_id = ''
-        resource_url = ''
         for col_index, col_name in enumerate(self.cols):
             # treat cells beyond the end of the line as blanks,
             # super().checkLine() has already logged an error
@@ -4190,17 +4321,8 @@ class StudyResourceValidator(ResourceValidator):
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'cause': RESOURCE_DEFINITION_DICTIONARY[value]})
-            resource_id = value
-            if col_name == 'URL':
-                resource_url = value
-        # check duplicate
-        if (resource_id, resource_url) in self.defined_resources:
-            self.logger.error(
-                'Duplicated resources found',
-                extra={'line_number': self.line_number,
-                        'duplicated_line_number': self.defined_resources[(resource_id, resource_url)]})
-        else:
-            self.defined_resources[(resource_id, resource_url)] = self.line_number
+                resource_id = value
+        self.checkDuplicate(data, resource_id, None)
 
 class GisticGenesValidator(Validator):
 
@@ -5560,7 +5682,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     global DEFINED_SAMPLE_IDS
     global DEFINED_SAMPLE_ATTRIBUTES
     global PATIENTS_WITH_SAMPLES
-    global RESOURCE_DEFINITION_DICTIONARY, RESOURCE_CONTRACT_KEYS
+    global RESOURCE_DEFINITION_DICTIONARY, RESOURCE_CONTRACT_KEYS, RESOURCE_URL_TEMPLATES
     global RESOURCE_PATIENTS_WITH_SAMPLES
 
     if portal_instance.cancer_type_dict is None:
@@ -5677,6 +5799,7 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
             resources_definition_validator.validate()
         RESOURCE_DEFINITION_DICTIONARY = resources_definition_validator.resource_definition_dictionary
         RESOURCE_CONTRACT_KEYS = resources_definition_validator.resource_contract_keys
+        RESOURCE_URL_TEMPLATES = resources_definition_validator.resource_url_templates
 
     # then validate the resource data if exist
     if cbioportal_common.MetaFileTypes.SAMPLE_RESOURCES in validators_by_meta_type:
