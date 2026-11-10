@@ -3950,9 +3950,17 @@ class ResourceValidator(Validator):
                            'cause': ', '.join(unused)})
 
     def url_validator(self, url):
+        """An absolute URL with a scheme and host, or a path on the portal itself.
+
+        A path must start with a single "/" (e.g. "/wsi/patient/P-1?studyId=s"); the portal
+        serves it relative to its own host, so the data does not name one. A "//host" URL
+        names a host without a scheme and is rejected.
+        """
         try:
             result = urlparse(url)
-            return all([result.scheme, result.netloc])
+            if result.scheme or result.netloc:
+                return all([result.scheme, result.netloc])
+            return url.startswith('/') and not url.startswith('//')
         except:
             return False
 
@@ -3992,7 +4000,7 @@ class ResourceValidator(Validator):
                     pass
                 else:
                     self.logger.error(
-                        'Value of resource is not an url, url should start with http or https',
+                        'Value of resource is not an url, url should start with http or https, or be a path starting with /',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'column_name': col_name,
