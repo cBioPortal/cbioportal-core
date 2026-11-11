@@ -22,7 +22,10 @@ NON_CASE_IDS = {"MIRNA", "LOCUS", "ID", "GENE SYMBOL", "ENTREZ_GENE_ID",
 
 SAMPLE_ID_COLUMN_HEADERS = ("Tumor_Sample_Barcode", "SAMPLE_ID", "Sample_ID", "Sample_Id")
 
-TCGA_SAMPLE_BARCODE_REGEX = re.compile(r"^(TCGA-\w\w-\w\w\w\w-\d\d).*$")
+# Match Java Pattern's default ASCII classes and line terminators.
+TCGA_SAMPLE_BARCODE_REGEX = re.compile(
+    r"^(TCGA-\w\w-\w\w\w\w-\d\d)[^\r\n\x85\u2028\u2029]*"
+    r"(?:\r\n|[\r\n\x85\u2028\u2029])?\Z", re.ASCII)
 
 def get_sample_id(barcode):
     """Convert a TCGA barcode to the sample ID used by the Java importer.
@@ -38,7 +41,8 @@ def get_sample_id(barcode):
         cleaned = barcode.replace("Normal", "11")
     else:
         cleaned = barcode
-    parts = cleaned.split("-")
+    # Java String.split drops trailing empty fields.
+    parts = cleaned.rstrip("-").split("-")
     if len(parts) < 4:
         return barcode + "-01"
     sample_id = "-".join(parts[:4])
