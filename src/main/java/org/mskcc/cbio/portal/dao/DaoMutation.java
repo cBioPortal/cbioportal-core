@@ -64,7 +64,7 @@ public final class DaoMutation {
             Long pos = mutation.getStartPosition();
             String proteinChange = mutation.getProteinChange();
             throw new DaoException(String.format(
-                    "Attempt to add a mutation before the associated mutation event has been added. Chr:%s S.Pos:%d Prot.Change:%s",
+                    "Attempt to add a mutation before the associated mutation event has been added. Chr:%s S.Pos:%s Prot.Change:%s",
                     (chr == null ? "null" : chr),
                     (pos == null ? "null" : Long.toString(pos)),
                     (proteinChange == null ? "null" : proteinChange)));
@@ -119,6 +119,7 @@ public final class DaoMutation {
     }
 
     public static void addMutationEvent(ExtendedMutation.MutationEvent event) throws DaoException {
+        event.setMutationEventId(ClickHouseAutoIncrement.nextId("seq_mutation_event"));
         // use this code if bulk loading
         // write to the temp file maintained by the ClickHouseBulkLoader
         String keyword = MutationKeywordUtils.guessOncotatorMutationKeyword(event.getProteinChange(), event.getMutationType());

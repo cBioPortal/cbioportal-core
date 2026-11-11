@@ -63,7 +63,6 @@ public class TestDaoMutation extends IntegrationTestBase {
 
         ExtendedMutation mutation = new ExtendedMutation();
 
-        mutation.setMutationEventId(1);
         mutation.setKeyword("key");
         mutation.setGeneticProfileId(geneticProfileId);
         mutation.setSampleId(sampleId);
@@ -112,6 +111,7 @@ public class TestDaoMutation extends IntegrationTestBase {
         mutation.setAnnotationJson(makeMockAnnotationJsonString());
 
         DaoMutation.addMutationEvent(mutation.getEvent());
+        assertTrue(mutation.getMutationEventId() > 0);
         DaoMutation.addMutation(mutation);
 
         // if bulkLoading, execute LOAD FILE
