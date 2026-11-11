@@ -7,10 +7,11 @@
 import os
 import sys
 import csv
+import json
 import logging.handlers
 from collections import OrderedDict
 from subprocess import Popen, PIPE, STDOUT
-from typing import Dict, Optional
+from typing import Dict, List, NamedTuple, Optional
 import dsnparse
 
 # ------------------------------------------------------------------------------
@@ -39,6 +40,7 @@ IMPORT_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.ImportSampleList"
 ADD_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.AddCaseList"
 UPDATE_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds"
 VERSION_UTIL_CLASS = "org.mskcc.cbio.portal.util.VersionUtil"
+IMPORT_STEP_RUNNER_CLASS = "org.mskcc.cbio.portal.scripts.ImportStepRunner"
 
 PORTAL_PROPERTY_DATABASE_USER = 'db.user'
 PORTAL_PROPERTY_DATABASE_PW = 'db.password'
@@ -89,6 +91,15 @@ class JavaRunException(Exception):
     def __init__(self, process_return_status, message):
         self.process_return_status = process_return_status
         self.message = message
+        # the JavaStep that failed, when known
+        self.failed_step = None
+
+# one Java class to run with its arguments, without the JVM options
+class JavaStep(NamedTuple):
+    class_name: str
+    args: List[str]
+    # meta file type of the data file the step imports, if any
+    meta_file_type: Optional[str] = None
 
 # fields allowed in each meta file type, maps to True if required
 META_FIELD_MAP = {
@@ -1046,6 +1057,28 @@ def parse_metadata_file(filename,
 
     return meta_dictionary
 
+IMPORT_MANIFEST_VERSION = 1
+
+def write_step_manifest(manifest_filename, steps):
+    """Write the steps for ImportStepRunner to run."""
+    with open(manifest_filename, 'w') as manifest_file:
+        json.dump({'version': IMPORT_MANIFEST_VERSION,
+                   'steps': [{'class': step.class_name, 'args': list(step.args)} for step in steps]},
+                  manifest_file, indent=2)
+
+def read_failed_step(result_filename, steps):
+    """Return the step ImportStepRunner reported as failed, or None if unknown."""
+    try:
+        with open(result_filename) as result_file:
+            failed_step = json.load(result_file).get('failed_step')
+    except (OSError, ValueError):
+        return None
+    if isinstance(failed_step, int) and 0 <= failed_step < len(steps):
+        return steps[failed_step]
+    return None
+
+# Only run_single_step and run_directory_import in cbioportalImporter.py
+# should call this. A direct call starts a JVM and reloads the DAO caches.
 def run_java(*args):
     java_home = os.environ.get('JAVA_HOME', '')
     if java_home:

@@ -85,6 +85,32 @@ public class DaoPatient {
         }
     }
 
+    /** Evict only deleted patients, preserving other rows written by this import. */
+    static void removePatientsFromCache(Collection<Integer> patientIds) {
+        for (int patientId : patientIds) {
+            Patient patient = byInternalId.remove(patientId);
+            if (patient == null) {
+                continue;
+            }
+            int studyId = patient.getCancerStudy().getInternalId();
+            byCancerIdAndStablePatientId.removeMultiKey(studyId, patient.getStableId());
+            Set<Patient> patients = byInternalCancerStudyId.get(studyId);
+            if (patients != null) {
+                patients.remove(patient);
+                if (patients.isEmpty()) {
+                    byInternalCancerStudyId.remove(studyId);
+                }
+            }
+        }
+    }
+
+    static void removeStudyFromCache(int cancerStudyId) {
+        Set<Patient> patients = byInternalCancerStudyId.get(cancerStudyId);
+        if (patients != null) {
+            removePatientsFromCache(patients.stream().map(Patient::getInternalId).collect(Collectors.toList()));
+        }
+    }
+
     private static final String PATIENT_SEQUENCE = "seq_patient";
 
     public static int addPatient(Patient patient) throws DaoException
@@ -245,7 +271,7 @@ public class DaoPatient {
         finally {
             JdbcUtil.closeAll(DaoPatient.class, con, null, null);
         }
-        clearCache();
+        removePatientsFromCache(internalPatientIds);
         log.info("Removing {} patients from study with internal id={} done.", patientStableIds, internalStudyId);
     }
 
