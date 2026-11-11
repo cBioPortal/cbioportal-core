@@ -14,9 +14,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
-import org.mskcc.cbio.portal.model.ClinicalEvent;
 import org.mskcc.cbio.portal.scripts.ImportTimelineData;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import org.mskcc.cbio.portal.model.CancerStudy;
 import org.mskcc.cbio.portal.model.GeneticProfile;
@@ -106,13 +108,17 @@ public class TestImportStateRetention {
         Method importFile = ImportTimelineData.class
             .getDeclaredMethod("importData", String.class, int.class, boolean.class);
         importFile.setAccessible(true);
-        try (MockedStatic<DaoClinicalEvent> events = mockStatic(DaoClinicalEvent.class)) {
+        ClickHouseBulkLoader eventRows = mock(ClickHouseBulkLoader.class);
+        doAnswer(call -> {
+            insertedIds.add(Long.parseLong(call.getArgument(0, String.class)));
+            return null;
+        }).when(eventRows).insertRecord(any(String[].class));
+        try (MockedStatic<ClickHouseBulkLoader> loaders =
+                mockStatic(ClickHouseBulkLoader.class, CALLS_REAL_METHODS)) {
+            loaders.when(() -> ClickHouseBulkLoader.getClickHouseBulkLoader("clinical_event"))
+                .thenReturn(eventRows);
+            loaders.when(ClickHouseBulkLoader::flushAll).thenReturn(0);
             Files.writeString(file, "PATIENT_ID\tSTART_DATE\tEVENT_TYPE\npatient\t1\tSTATUS\n");
-            events.when(() -> DaoClinicalEvent.addClinicalEvent(any()))
-                .thenAnswer(call -> {
-                    insertedIds.add(((ClinicalEvent) call.getArgument(0)).getClinicalEventId());
-                    return null;
-                });
             importFile.invoke(null, file.toString(), 1, false);
             ClickHouseAutoIncrement.persistAllSequences();
             importFile.invoke(null, file.toString(), 1, false);
