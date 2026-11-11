@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 - 2022 The Hyve B.V.
+ * Copyright (c) 2017 - 2026 The Hyve B.V.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,6 +11,8 @@ import java.util.*;
 import org.mskcc.cbio.portal.model.StructuralVariant;
 
 public class DaoStructuralVariant {
+
+    private static final String STRUCTURAL_VARIANT_SEQUENCE = "seq_structural_variant";
 
     private DaoStructuralVariant() {
     }
@@ -68,8 +70,9 @@ public class DaoStructuralVariant {
         bl.setFieldNames(fieldNames);
 
         // write to the temp file maintained by the ClickHouseBulkLoader
+        Long assignedSvInternalIdentifier = ClickHouseAutoIncrement.nextId(STRUCTURAL_VARIANT_SEQUENCE);
         bl.insertRecord(
-            Long.toString(structuralVariant.getInternalId()),
+            Long.toString(assignedSvInternalIdentifier),
             Integer.toString(structuralVariant.getGeneticProfileId()),
             Integer.toString(structuralVariant.getSampleIdInternal()),
             structuralVariant.getSite1EntrezGeneId() == null ? null : Long.toString(structuralVariant.getSite1EntrezGeneId()),
@@ -119,7 +122,7 @@ public class DaoStructuralVariant {
             && !structuralVariant.getDriverTiersFilter().isEmpty()
             && !structuralVariant.getDriverTiersFilter().toLowerCase().equals("na"))) {
             ClickHouseBulkLoader.getClickHouseBulkLoader("alteration_driver_annotation").insertRecord(
-                Long.toString(structuralVariant.getInternalId()),
+                Long.toString(assignedSvInternalIdentifier),
                 Integer.toString(structuralVariant.getGeneticProfileId()),
                 Integer.toString(structuralVariant.getSampleIdInternal()),
                 structuralVariant.getDriverFilter(),
@@ -159,22 +162,6 @@ public class DaoStructuralVariant {
             throw new DaoException(e);
         } finally {
             JdbcUtil.closeAll(DaoGene.class, con, pstmt, rs);
-        }
-    }
-
-    public static long getLargestInternalId() throws DaoException {
-        Connection con = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        try {
-            con = JdbcUtil.getDbConnection(DaoMutation.class);
-            pstmt = con.prepareStatement("SELECT max(`internal_id`) FROM `structural_variant`");
-            rs = pstmt.executeQuery();
-            return rs.next() ? rs.getLong(1) : 0;
-        } catch (SQLException e) {
-            throw new DaoException(e);
-        } finally {
-            JdbcUtil.closeAll(DaoMutation.class, con, pstmt, rs);
         }
     }
 
