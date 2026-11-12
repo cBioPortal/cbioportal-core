@@ -197,11 +197,27 @@ public final class DaoClinicalData {
         }
     }
 
-    public static List<ClinicalData> getDataByPatientId(int cancerStudyId, String patientId) throws DaoException
+    public static Set<Integer> getPatientIdsWithData(int cancerStudyId) throws DaoException
     {
-        List<Integer> internalIds = new ArrayList<Integer>();
-        internalIds.add(DaoPatient.getPatientByCancerStudyAndPatientId(cancerStudyId, patientId).getInternalId());
-        return getDataByInternalIds(cancerStudyId, PATIENT_ATTRIBUTES_TABLE, internalIds);
+        Connection con = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        Set<Integer> internalIds = new HashSet<>();
+        try {
+            con = JdbcUtil.getDbConnection(DaoClinicalData.class);
+            pstmt = con.prepareStatement("SELECT DISTINCT `internal_id` FROM " + PATIENT_ATTRIBUTES_TABLE +
+                " WHERE `internal_id` IN (SELECT `internal_id` FROM patient WHERE `cancer_study_id` = ?)");
+            pstmt.setInt(1, cancerStudyId);
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                internalIds.add(rs.getInt(1));
+            }
+            return internalIds;
+        } catch (SQLException e) {
+            throw new DaoException(e);
+        } finally {
+            JdbcUtil.closeAll(DaoClinicalData.class, con, pstmt, rs);
+        }
     }
 
     private static List<ClinicalData> getDataByInternalIds(int internalCancerStudyId, String table, List<Integer> internalIds) throws DaoException
