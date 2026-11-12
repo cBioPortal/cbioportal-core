@@ -165,19 +165,26 @@ public final class DaoMutation {
             // so OPTIMIZE TABLE FINAL will keep the latest row per key, replacing any stale values.
             // Issuing a DELETE FROM before INSERT causes a lightweight-delete/OPTIMIZE race that silently
             // wipes the newly inserted rows.
+            String profileSamples = "SELECT `sample_id` FROM sample_profile WHERE `genetic_profile_id` = ?";
             selectStmt = con.prepareStatement(
                 "SELECT sample_profile.`sample_id`, count(DISTINCT mutation_event.`chr`, mutation_event.`start_position`, " +
                     "mutation_event.`end_position`, mutation_event.`reference_allele`, mutation_event.`tumor_seq_allele`) AS MUTATION_COUNT " +
                     "FROM `sample_profile` " +
-                    "LEFT JOIN mutation ON mutation.`sample_id` = sample_profile.`sample_id` " +
+                    // ClickHouse loads the whole right-hand table of a join, so restrict it to this profile's samples
+                    "LEFT JOIN (SELECT * FROM mutation WHERE `sample_id` IN (" + profileSamples + ")) AS mutation " +
+                    "ON mutation.`sample_id` = sample_profile.`sample_id` " +
                     "AND ( UPPER(mutation.`mutation_status`) <> 'GERMLINE' OR mutation.`mutation_status` IS NULL ) " +
-                    "LEFT JOIN mutation_event ON mutation.`mutation_event_id` = mutation_event.`mutation_event_id` " +
+                    "LEFT JOIN (SELECT * FROM mutation_event WHERE `mutation_event_id` IN " +
+                    "(SELECT `mutation_event_id` FROM mutation WHERE `sample_id` IN (" + profileSamples + "))) AS mutation_event " +
+                    "ON mutation.`mutation_event_id` = mutation_event.`mutation_event_id` " +
                     "INNER JOIN genetic_profile ON genetic_profile.`genetic_profile_id` = sample_profile.`genetic_profile_id` " +
                     "WHERE genetic_profile.`genetic_alteration_type` = 'MUTATION_EXTENDED' " +
                     "AND genetic_profile.`genetic_profile_id`=? " +
                     "GROUP BY sample_profile.`genetic_profile_id`, sample_profile.`sample_id`"
             );
-            selectStmt.setInt(1, geneticProfile.getGeneticProfileId());
+            for (int i = 1; i <= 3; i++) {
+                selectStmt.setInt(i, geneticProfile.getGeneticProfileId());
+            }
             rs = selectStmt.executeQuery();
             Map<Integer, String> mutationCounts = new HashMap<>();
             while (rs.next()) {
