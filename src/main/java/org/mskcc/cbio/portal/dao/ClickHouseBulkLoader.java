@@ -10,8 +10,8 @@ import org.mskcc.cbio.portal.dao.DaoException;
 import org.mskcc.cbio.portal.util.ProgressMonitor;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,9 +19,12 @@ import java.sql.SQLException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Minimal bulk loader that buffers rows in memory and streams them to ClickHouse via
@@ -72,9 +75,8 @@ public class ClickHouseBulkLoader {
             List<String> columns = resolveColumnNames(con);
             validateRecordWidths(columns.size());
 
-            byte[] payload = buildTsvPayload(columns);
             stmt = con.prepareStatement(buildInsertStatement(columns));
-            stmt.setBinaryStream(1, new ByteArrayInputStream(payload));
+            stmt.setBinaryStream(1, tsvPayload(columns));
 
             int rowsInserted = stmt.executeUpdate();
             if (rowsInserted <= 0) {
@@ -89,7 +91,7 @@ public class ClickHouseBulkLoader {
 
             pendingRecords.clear();
             return rowsInserted;
-        } catch (SQLException | IOException exception) {
+        } catch (SQLException exception) {
             throw new DaoException(exception);
         } finally {
             JdbcUtil.closeAll(ClickHouseBulkLoader.class, con, stmt, null);
@@ -128,36 +130,30 @@ public class ClickHouseBulkLoader {
         }
     }
 
-    private byte[] buildTsvPayload(List<String> columnNames) throws DaoException, IOException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        writeRow(buffer, columnNames);
-        for (String[] record : pendingRecords) {
-            writeRow(buffer, record);
-        }
-        return buffer.toByteArray();
-    }
-
-    private void writeRow(ByteArrayOutputStream buffer, List<String> values) throws IOException {
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) {
-                buffer.write('\t');
+    // Rows are encoded as the driver reads the stream, so the payload is never held in memory.
+    private InputStream tsvPayload(List<String> columnNames) {
+        Iterator<InputStream> lines = Stream.concat(Stream.<String[]>of(columnNames.toArray(new String[0])), pendingRecords.stream())
+            .map(values -> (InputStream) new ByteArrayInputStream(tsvLine(values)))
+            .iterator();
+        return new SequenceInputStream(new Enumeration<InputStream>() {
+            public boolean hasMoreElements() {
+                return lines.hasNext();
             }
-            buffer.write(escapeTsvValue(values.get(i)).getBytes(StandardCharsets.UTF_8));
-        }
-        buffer.write('\n');
+            public InputStream nextElement() {
+                return lines.next();
+            }
+        });
     }
 
-    private void writeRow(ByteArrayOutputStream buffer, String[] values) throws DaoException, IOException {
-        if (values == null) {
-            throw new DaoException("DB Error: encountered null record while preparing bulk insert for `" + tableName + "`.");
-        }
+    private byte[] tsvLine(String[] values) {
+        StringBuilder line = new StringBuilder();
         for (int i = 0; i < values.length; i++) {
             if (i > 0) {
-                buffer.write('\t');
+                line.append('\t');
             }
-            buffer.write(escapeTsvValue(values[i]).getBytes(StandardCharsets.UTF_8));
+            line.append(escapeTsvValue(values[i]));
         }
-        buffer.write('\n');
+        return line.append('\n').toString().getBytes(StandardCharsets.UTF_8);
     }
 
     public void insertRecord(String... fieldValues) {
