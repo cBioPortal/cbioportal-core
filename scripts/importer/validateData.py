@@ -4723,8 +4723,9 @@ class GenericAssayContinuousValidator(GenericAssayWiseFileValidator):
         stripped_value = value.strip()
         # if the value is prefixed with '>' or '<' remove this prefix
         # prior to evaluation of the numeric value
-        hasTruncSymbol = re.match("^[><]", stripped_value)
-        stripped_value = re.sub(r"^[><]\s*","", stripped_value)
+        hasTruncSymbol = stripped_value[:1] in ('>', '<')
+        if hasTruncSymbol:
+            stripped_value = stripped_value[1:].lstrip()
 
         # do not check null values
         # 'NA' is an allowed value. No further validations apply.
