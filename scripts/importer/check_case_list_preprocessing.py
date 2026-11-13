@@ -2,7 +2,7 @@
 
 Checks:
 - Determine which configured lists have samples, using the staging-file
-  unions/intersections and TCGA sample-ID normalization rules.
+  unions/intersections. Require already normalized TCGA sample IDs.
 - Use sequenced_samples.txt or #sequenced_samples when supplied, so samples
   without mutation records can still count as sequenced.
 - Report a non-empty expected list when its stable ID is not already defined.
@@ -22,32 +22,25 @@ NON_CASE_IDS = {"MIRNA", "LOCUS", "ID", "GENE SYMBOL", "ENTREZ_GENE_ID",
 
 SAMPLE_ID_COLUMN_HEADERS = ("Tumor_Sample_Barcode", "SAMPLE_ID", "Sample_ID", "Sample_Id")
 
-# Match Java Pattern's default ASCII classes and line terminators.
-TCGA_SAMPLE_BARCODE_REGEX = re.compile(
-    r"^(TCGA-\w\w-\w\w\w\w-\d\d)[^\r\n\x85\u2028\u2029]*"
-    r"(?:\r\n|[\r\n\x85\u2028\u2029])?\Z", re.ASCII)
+# Preprocessing must supply sample-level IDs; validation never repairs them.
+TCGA_SAMPLE_ID_REGEX = re.compile(r"TCGA-[A-Za-z0-9]{2}-[A-Za-z0-9]{4}-[0-9]{2}")
 
-def get_sample_id(barcode):
-    """Convert a TCGA barcode to the sample ID used by the Java importer.
 
-    Change Tumor/Normal to 01/11, add -01 to patient-only barcodes, and shorten
-    longer barcodes to the sample portion. Leave other IDs unchanged.
-    """
-    if not barcode.startswith("TCGA"):
-        return barcode
-    if "Tumor" in barcode:
-        cleaned = barcode.replace("Tumor", "01")
-    elif "Normal" in barcode:
-        cleaned = barcode.replace("Normal", "11")
-    else:
-        cleaned = barcode
-    # Java String.split drops trailing empty fields.
-    parts = cleaned.rstrip("-").split("-")
-    if len(parts) < 4:
-        return barcode + "-01"
-    sample_id = "-".join(parts[:4])
-    m = TCGA_SAMPLE_BARCODE_REGEX.match(sample_id)
-    return m.group(1) if m else sample_id
+def validate_sample_ids(members, filename):
+    """Reject noncanonical TCGA IDs without merging or changing sample identities."""
+    members = set(members)
+    invalid = sorted(sample_id for sample_id in members
+                     if sample_id.startswith("TCGA") and
+                     not TCGA_SAMPLE_ID_REGEX.fullmatch(sample_id))
+    if invalid:
+        examples = ', '.join(repr(sample_id) for sample_id in invalid[:5])
+        raise ValueError(
+            f"{filename}: {len(invalid)} unnormalized or malformed TCGA sample ID(s): "
+            f"{examples}. Expected TCGA-XX-XXXX-01 format (two-digit sample type). "
+            "Normalize IDs consistently across study files before validation; "
+            "patient-only IDs need an explicit sample type.")
+    return members
+
 
 def read_config(path):
     """Read the filenames, stable IDs and categories from the case-list config."""
@@ -165,7 +158,7 @@ def staging_sample_ids(study_dir, filename, scanned_members):
     """Get sample IDs without reading the same data file again when possible.
 
     Reuse IDs collected by the validator, unless sequenced_samples.txt supplies
-    the mutation sample list. Convert TCGA barcodes before comparing IDs.
+    the mutation sample list. Require normalized TCGA IDs before comparing them.
     """
     path = resolve_staging_path(study_dir, filename)
     key = str(Path(path).resolve()) if path else None
@@ -175,7 +168,7 @@ def staging_sample_ids(study_dir, filename, scanned_members):
         members = scanned_members[key]
     else:
         members = case_list_from_staging_file(study_dir, filename)
-    return set(map(get_sample_id, members))
+    return validate_sample_ids(members, 'sequenced_samples.txt' if sidecar else filename)
 
 
 def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=None, scanned_members=None):
@@ -190,7 +183,14 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
     cache = {}
     scanned_members = scanned_members or {}
     reported = set(defined_ids)
-    for spec in read_config(config_path):
+    specs = read_config(config_path)
+    # Validate sources even when their lists already exist or an intersection's
+    # other input is absent. Each source is still read at most once.
+    for spec in specs:
+        for filename in re.split(r"[|&]", spec['staging_filenames']):
+            if filename not in cache:
+                cache[filename] = staging_sample_ids(study_dir, filename, scanned_members)
+    for spec in specs:
         stable_id = spec['meta_stable_id'].replace("<CANCER_STUDY>", study_id)
         if stable_id in reported:
             continue
@@ -202,8 +202,6 @@ def missing_generated_case_lists(study_dir, study_id, defined_ids, config_path=N
             continue
         members = None if intersection else set()
         for filename in filenames:
-            if filename not in cache:
-                cache[filename] = staging_sample_ids(study_dir, filename, scanned_members)
             found = cache[filename]
             if intersection:
                 members = found.copy() if members is None else members & found

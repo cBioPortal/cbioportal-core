@@ -12,7 +12,6 @@ clinical data is never changed.
 """
 import hashlib
 import json
-from pathlib import Path
 import requests
 
 UNAVAILABLE_VALUES = {'', 'NA', 'N/A', 'NOT AVAILABLE', '[NOT AVAILABLE]', '[NOT APPLICABLE]'}
@@ -43,20 +42,17 @@ def parse_oncotree_nodes(raw):
 
 class OncotreeReference:
     """Load the reference when first needed and reuse the result for later rows."""
-    def __init__(self, filename=None, version='oncotree_latest_stable'):
-        self.filename = filename
+    def __init__(self, version='oncotree_latest_stable'):
         self.version = version
         self.nodes = None
         self.error = None
         self.reported_error = False
 
     def read(self):
-        """Read the saved portal-info file, or download the requested OncoTree version.
+        """Download the requested OncoTree version.
 
         Return the JSON together with a description of where it came from.
         """
-        if self.filename:
-            return Path(self.filename).read_bytes(), str(self.filename)
         source = 'OncoTree version ' + self.version
         response = requests.get('https://oncotree.mskcc.org/api/tumorTypes',
                                 params={'version': self.version}, timeout=(10, 30))
@@ -113,7 +109,7 @@ def check_oncotree_row(columns, values, reference, logger, line_number):
     if nodes is None:
         if not reference.reported_error:
             logger.error('Cannot validate OncoTree preprocessing: %s. Check access to OncoTree, or '
-                         'add a valid oncotree.json to the portal info directory; '
+                         'retry when the service is available; '
                          'this check was not completed.', reference.error,
                          extra={'line_number': line_number})
             reference.reported_error = True

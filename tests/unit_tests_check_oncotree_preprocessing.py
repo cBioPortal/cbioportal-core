@@ -1,7 +1,5 @@
-"""Check OncoTree validation using saved data and mocked downloads."""
+"""Check OncoTree validation using mocked downloads."""
 import json
-from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -54,37 +52,37 @@ class OncotreePreprocessingTests(unittest.TestCase):
              'CANCER_TYPE_DETAILED': 'Lung Adenocarcinoma'}, nodes)))
 
     @patch.object(checks.requests, 'get')
-    def test_saved_reference_is_read_without_downloading(self, get):
-        """A portal-info oncotree.json is used as-is, without downloading."""
-        with tempfile.TemporaryDirectory() as directory:
-            saved = Path(directory) / 'oncotree.json'
-            raw = json.dumps(TUMOR_TYPES).encode()
-            saved.write_bytes(raw)
-            reference = checks.OncotreeReference(saved)
-            self.assertIn('LUAD', reference.load(Mock()))
-            self.assertEqual(raw, saved.read_bytes())
-        get.assert_not_called()
-
-    @patch.object(checks.requests, 'get')
     def test_download_is_reused_for_later_rows(self, get):
         """Download the requested version once, then reuse the result."""
+        # GIVEN the selected online reference returns valid tumor types.
         raw = json.dumps(TUMOR_TYPES).encode()
         get.return_value = Mock(content=raw)
         reference = checks.OncotreeReference(version='pinned')
+
+        # WHEN multiple rows need the same reference.
         nodes = reference.load(Mock())
-        self.assertIs(nodes, reference.load(Mock()))
+        reused_nodes = reference.load(Mock())
+
+        # THEN the reference is downloaded once and reused.
+        self.assertIs(nodes, reused_nodes)
         get.assert_called_once_with('https://oncotree.mskcc.org/api/tumorTypes',
                                     params={'version': 'pinned'}, timeout=(10, 30))
         get.return_value.raise_for_status.assert_called_once()
 
     @patch.object(checks.requests, 'get', side_effect=requests.RequestException('unavailable'))
     def test_reference_failure_is_reported_once(self, get):
+        # GIVEN OncoTree is unavailable.
         reference, logger = checks.OncotreeReference(), Mock()
+
+        # WHEN multiple clinical rows require validation.
         for line in (5, 6):
             checks.check_oncotree_row(['ONCOTREE_CODE'], ['LUAD'], reference, logger, line)
+
+        # THEN one error reports the failed check without suggesting offline fallback.
         get.assert_called_once()
         logger.error.assert_called_once()
         self.assertIn('unavailable', logger.error.call_args.args)
+        self.assertNotIn('oncotree.json', logger.error.call_args.args[0])
 
     def test_row_errors_include_location_and_malformed_rows_are_skipped(self):
         """Report where the bad label is; leave unrelated row errors to the validator."""

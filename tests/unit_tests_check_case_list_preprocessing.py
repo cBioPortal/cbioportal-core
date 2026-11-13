@@ -96,15 +96,103 @@ class CaseListPreprocessingTests(unittest.TestCase):
         with self.assertRaises(IndexError):
             checks.case_list_from_staging_file(self.root, 'broken.txt')
 
-    def test_tcga_normalization_and_filename_casing(self):
-        """Different spellings of the same TCGA sample count once without editing input."""
-        path = self.write('data_cna.txt', 'Hugo_Symbol\tTCGA-AA-1234\tTCGA-AA-1234-01A\n')
+    def test_normalized_tcga_ids_and_filename_casing(self):
+        # GIVEN normalized tumor/normal IDs and an ordinary non-TCGA ID.
+        path = self.write(
+            'data_cna.txt',
+            'Hugo_Symbol\tTCGA-AA-1234-01\tTCGA-AA-1234-11\tS1\n',
+        )
         original = path.read_bytes()
         self.configure(('cna', 'data_CNA.txt', 'all_cases_with_cna_data'))
-        self.assertEqual([('study_cna', 'cna.txt', 1)], self.missing())
+
+        # WHEN the configured filename differs only in capitalization.
+        missing_lists = self.missing()
+
+        # THEN all three samples count separately and the source stays unchanged.
+        self.assertEqual([('study_cna', 'cna.txt', 3)], missing_lists)
         self.assertEqual(original, path.read_bytes())
-        for original_id, expected in [('TCGA-AA-1234-Tumor', 'TCGA-AA-1234-01'),
-                                      ('TCGA-AA-1234-Normal', 'TCGA-AA-1234-11'),
-                                      ('TCGA-AA-1234-03A-01D', 'TCGA-AA-1234-03'), ('S1', 'S1')]:
-            with self.subTest(barcode=original_id):
-                self.assertEqual(expected, checks.get_sample_id(original_id))
+
+    def test_unnormalized_ids_are_rejected_even_if_case_list_exists(self):
+        # GIVEN IDs that previously were silently shortened or assigned a type.
+        self.configure(('cna', 'data_CNA.txt', 'all_cases_with_cna_data'))
+        unnormalized_ids = (
+            'TCGA-AA-1234',
+            'TCGA-AA-1234-Tumor',
+            'TCGA-AA-1234-Normal',
+            'TCGA-AA-1234-01A',
+            'TCGA-AA-1234-03A-01D',
+            'TCGA---',
+        )
+
+        for sample_id in unnormalized_ids:
+            for defined in ((), ('study_cna',)):
+                with self.subTest(sample_id=sample_id, defined=defined):
+                    path = self.write('data_CNA.txt', 'Hugo_Symbol\t' + sample_id + '\n')
+                    original = path.read_bytes()
+
+                    # WHEN / THEN checking reports the bad ID instead of repairing it.
+                    with self.assertRaisesRegex(ValueError, 'unnormalized or malformed TCGA'):
+                        self.missing(defined)
+
+                    self.assertEqual(original, path.read_bytes())
+
+    def test_cached_scan_does_not_bypass_barcode_validation(self):
+        # GIVEN the existing scan has collected an unnormalized mutation ID.
+        path = self.write('data_mutations.txt', 'Tumor_Sample_Barcode\nTCGA-AA-1234-Tumor\n')
+        scanned = {str(path.resolve()): {'TCGA-AA-1234-Tumor'}}
+        self.configure(('sequenced', 'data_mutations.txt', 'all_cases_with_mutation_data'))
+
+        # WHEN / THEN reusing the scan still reports the offending source file.
+        with self.assertRaisesRegex(ValueError, 'data_mutations.txt.*unnormalized'):
+            self.missing(scanned_members=scanned)
+
+    def test_sequenced_comment_requires_normalized_ids(self):
+        # GIVEN the mutation sample list comes from a comment.
+        self.write('data_mutations.txt', '#sequenced_samples: TCGA-AA-1234-01A\n')
+        self.configure(('sequenced', 'data_mutations.txt', 'all_cases_with_mutation_data'))
+
+        # WHEN / THEN the comment's unnormalized ID is rejected.
+        with self.assertRaisesRegex(ValueError, 'unnormalized'):
+            self.missing()
+
+    def test_sequenced_sidecar_requires_normalized_ids(self):
+        # GIVEN a sidecar overrides an otherwise valid mutation-file scan.
+        path = self.write('data_mutations.txt', 'Tumor_Sample_Barcode\nS1\n')
+        self.write('sequenced_samples.txt', 'TCGA-AA-1234-Normal\n')
+        scanned = {str(path.resolve()): {'S1'}}
+        self.configure(('sequenced', 'data_mutations.txt', 'all_cases_with_mutation_data'))
+
+        # WHEN / THEN the error identifies the sidecar, not the mutation file.
+        with self.assertRaisesRegex(ValueError, 'sequenced_samples.txt.*unnormalized'):
+            self.missing(scanned_members=scanned)
+
+    def test_intersection_rejects_ids_that_normalization_would_merge(self):
+        # GIVEN distinct raw IDs that the old normalization mapped to one sample.
+        self.write('data_CNA.txt', 'Hugo_Symbol\tTCGA-AA-1234-01\n')
+        self.write('data_mutations.txt', 'Tumor_Sample_Barcode\nTCGA-AA-1234-01A\n')
+        self.configure(('both', 'data_CNA.txt&data_mutations.txt', 'other'))
+
+        # WHEN / THEN comparison fails instead of reporting a fabricated match.
+        with self.assertRaisesRegex(ValueError, 'unnormalized'):
+            self.missing()
+
+    def test_normalized_tumor_and_normal_ids_do_not_intersect(self):
+        # GIVEN two valid IDs with different sample types.
+        self.write('data_CNA.txt', 'Hugo_Symbol\tTCGA-AA-1234-01\n')
+        self.write('data_mutations.txt', 'Tumor_Sample_Barcode\nTCGA-AA-1234-11\n')
+        self.configure(('both', 'data_CNA.txt&data_mutations.txt', 'other'))
+
+        # WHEN finding lists for samples shared by both files.
+        missing_lists = self.missing()
+
+        # THEN the intersection is empty, so no list is required.
+        self.assertEqual([], missing_lists)
+
+    def test_missing_intersection_input_does_not_hide_bad_ids(self):
+        # GIVEN one input is absent and the other has a patient-only barcode.
+        self.write('data_mutations.txt', 'Tumor_Sample_Barcode\nTCGA-AA-1234\n')
+        self.configure(('both', 'data_mutations.txt&missing.txt', 'other'))
+
+        # WHEN / THEN the absent file does not bypass validation of the present one.
+        with self.assertRaisesRegex(ValueError, 'unnormalized'):
+            self.missing()

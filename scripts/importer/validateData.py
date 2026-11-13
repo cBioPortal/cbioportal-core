@@ -5412,8 +5412,6 @@ def load_portal_info(path, logger, offline=False):
                           gene_panel_list=portal_dict['gene-panels'],
                           geneset_version = portal_dict['genesets_version'],
                           offline=offline)
-    if offline:
-        portal.oncotree = OncotreeReference(Path(path) / 'oncotree.json')
     return portal
 
 
@@ -5460,12 +5458,16 @@ def interface(args=None):
     parser.add_argument('--strict', '--strict-mode', action='store_true', default=False,
                         help='Enable additional preprocessing requirements: OncoTree codes/labels, '
                              'CNA identifiers and duplicates, referenced staging files, and case lists. '
+                             'Requires online OncoTree access; incompatible with -p/--portal_info_dir. '
                              'Independent of --strict_maf_checks; disabled by default.')
     parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
                         help='OncoTree version used with --strict to check ONCOTREE_CODE values '
                              '(default: oncotree_latest_stable)')
-    parser = parser.parse_args(args)
-    return parser
+    parsed_args = parser.parse_args(args)
+    if parsed_args.strict and parsed_args.portal_info_dir is not None:
+        parser.error('--strict requires online OncoTree access and cannot be used with '
+                     '-p/--portal_info_dir (offline mode). Remove -p or --strict.')
+    return parsed_args
 
 
 def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_checks):
@@ -5847,9 +5849,7 @@ def main_validate(args):
 
     portal_instance.strict_mode = getattr(args, 'strict', False)
     if portal_instance.strict_mode:
-        portal_instance.oncotree = OncotreeReference(
-            str(Path(args.portal_info_dir) / 'oncotree.json') if args.portal_info_dir else None,
-            args.oncotree_version)
+        portal_instance.oncotree = OncotreeReference(version=args.oncotree_version)
 
     # set portal version
     cbio_version = portal_instance.portal_version
