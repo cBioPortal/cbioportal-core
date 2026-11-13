@@ -62,6 +62,14 @@ def interface():
                                    type=str, help='path to study directory.')
     data_source_group.add_argument('-d', '--data_directory',
                                    type=str, help='path to data directory for incremental upload.')
+    parser.add_argument('--strict', '--strict-mode', action='store_true', default=False,
+                        help='Enable additional preprocessing requirements: OncoTree codes/labels, '
+                             'CNA identifiers and duplicates, referenced staging files, and case lists. '
+                             'Requires online OncoTree access; incompatible with -p/--portal_info_dir. '
+                             'Independent of --strict_maf_checks; disabled by default.')
+    parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
+                        help='OncoTree version used with --strict to check ONCOTREE_CODE values '
+                             '(default: oncotree_latest_stable)')
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
                                    type=str,
@@ -110,8 +118,11 @@ def interface():
                         help='Skip derived table construction after import.')
     derive_tables_group.add_argument('--derived-table-sql', type=str, metavar='PATH',
                         help='Path to SQL file used for derived table construction.')
-    parser = parser.parse_args()
-    return parser
+    parsed_args = parser.parse_args()
+    if parsed_args.strict and parsed_args.portal_info_dir is not None:
+        parser.error('--strict requires online OncoTree access and cannot be used with '
+                     '-p/--portal_info_dir (offline mode). Remove -p or --strict.')
+    return parsed_args
 
 
 # ----------------------------------------------------------------------------
