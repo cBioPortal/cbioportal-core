@@ -18,11 +18,12 @@ unset my_properties
 unset clickhouse_source_database_name
 unset clickhouse_destination_database_name
 declare -A my_properties
-missing_user_records_result_filepath="$(pwd)/missing_user_records.txt"
-missing_authority_records_result_filepath="$(pwd)/missing_authority_records.txt"
-insert_user_record_result_filepath="$(pwd)/insert_user_result.txt"
-insert_authority_record_result_filepath="$(pwd)/insert_authority_result.txt"
-clickhouse_is_responsive_filepath="$(pwd)/cdtcd_cmd_clickhouse_is_responsive.txt"
+# cis_ts_pid is a timestamp and processid suffix defined by clickhouse_client_command_line_functions.sh
+missing_user_records_result_filepath="$(pwd)/missing_user_records_${cis_ts_pid}.txt"
+missing_authority_records_result_filepath="$(pwd)/missing_authority_records_${cis_ts_pid}.txt"
+insert_user_record_result_filepath="$(pwd)/insert_user_result_${cis_ts_pid}.txt"
+insert_authority_record_result_filepath="$(pwd)/insert_authority_result_${cis_ts_pid}.txt"
+clickhouse_is_responsive_filepath="$(pwd)/cdtcd_cmd_clickhouse_is_responsive_${cis_ts_pid}.txt"
 SECONDS_BETWEEN_RESPONSIVENESS_RETRY=$((60))
 
 function usage() {
