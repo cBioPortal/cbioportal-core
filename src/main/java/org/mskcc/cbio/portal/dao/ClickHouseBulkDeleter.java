@@ -432,7 +432,7 @@ public class ClickHouseBulkDeleter {
     private boolean allReplicasReportExpectedStagingTableRecordCount() throws SQLException, DaoException {
         String queryPart1 = "SELECT host, sum(record_count) AS total_rows FROM ((";
         String queryPart2 = "SELECT hostname() AS host, rows AS record_count FROM clusterAllReplicas('default', 'system', 'parts')";
-        String queryPart3 = "WHERE database = current_database() AND table = ";
+        String queryPart3 = "WHERE database = current_database() AND active = 1 AND table = ";
         String queryPart4 = ") union all (";
         // This union insures that at least one part with one record is included in the query result before aggregation. In this way, every host will be present in the results
         String queryPart5 = "SELECT hostname() AS host, 0 AS record_count FROM clusterAllReplicas('default', 'system', 'one')";
