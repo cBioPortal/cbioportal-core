@@ -2966,6 +2966,32 @@ class ResourceWiseTestCase(PostClinicalDataFileTestCase):
         # reset RESOURCE_DEFINITION_DICTIONARY
         validateData.RESOURCE_DEFINITION_DICTIONARY = {}
 
+    def test_resource_url_may_be_a_path_on_the_portal(self):
+        """A URL is an absolute http(s) URL or a path starting with a single "/", which is served
+        relative to the portal's own host. "//host", a path without the leading "/", other
+        schemes, and backslashes (which browsers read as "/", so "/\\host" names a host) are
+        rejected."""
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {'PATHOLOGY_SLIDE': ['SAMPLE']}
+        self.logger.setLevel(logging.ERROR)
+        record_list = self.validate('data_resource_relative_url.txt',
+                            validateData.ResourceValidator)
+
+        # rows 2, 3, 6 (/wsi/patient/P-1?studyId=x) and 7 (HTTPS://...) are accepted
+        self.assertEqual([4, 5, 8, 9, 10, 11, 12], sorted(r.line_number for r in record_list))
+        self.assertTrue(all('not an url' in r.getMessage() for r in record_list))
+        validateData.RESOURCE_DEFINITION_DICTIONARY = {}
+
+    def test_resource_url_rejects_what_browsers_would_send_elsewhere(self):
+        """Browsers drop control characters and read "\\" as "/", so these would name a host."""
+        url_validator = lambda url: validateData.ResourceValidator.url_validator(None, url)
+        for url in ['/\\evil.com/x', '\\\\evil.com', '/\t/evil.com', '/\r/evil.com',
+                    '//evil.com', 'https:///evil.com', 'javascript:alert(1)',
+                    'JavaScript:alert(1)', 'data:text/html,x', 'ftp://x', 'http:/evil.com']:
+            self.assertFalse(url_validator(url), url)
+        for url in ['/wsi/patient/P-1?studyId=x', '/', 'http://ok.example.org',
+                    'HTTPS://ok.example.org/x?a=b#c']:
+            self.assertTrue(url_validator(url), url)
+
     def test_resource_metadata_must_be_a_json_object(self):
         """METADATA carries the per-item fields the resource table filters on, so the portal
         treats it as a key-value map. Arrays, scalars and malformed JSON are rejected; an empty
