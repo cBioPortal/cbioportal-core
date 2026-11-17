@@ -3950,19 +3950,23 @@ class ResourceValidator(Validator):
                            'cause': ', '.join(unused)})
 
     def url_validator(self, url):
-        """An absolute URL with a scheme and host, or a path on the portal itself.
+        """An absolute http(s) URL with a host, or a path on the portal itself.
 
         A path must start with a single "/" (e.g. "/wsi/patient/P-1?studyId=s"); the portal
-        serves it relative to its own host, so the data does not name one. A "//host" URL
-        names a host without a scheme and is rejected.
+        serves it relative to its own host, so the data does not name one. Browsers treat "\\"
+        like "/" and drop control characters, so "/\\host", "\\\\host" or "/<tab>/host" would
+        name another host; backslashes and control characters are rejected anywhere, as are
+        "//host" and schemes other than http and https.
         """
+        if '\\' in url or any(ord(c) < 0x20 or ord(c) == 0x7f for c in url):
+            return False
         try:
             result = urlparse(url)
-            if result.scheme or result.netloc:
-                return all([result.scheme, result.netloc])
-            return url.startswith('/') and not url.startswith('//')
-        except:
+        except ValueError:
             return False
+        if result.scheme or result.netloc:
+            return result.scheme.lower() in ('http', 'https') and bool(result.netloc)
+        return url.startswith('/') and not url.startswith('//')
 
     def checkLine(self, data):
         """Check the values in a line of data."""
@@ -4000,7 +4004,7 @@ class ResourceValidator(Validator):
                     pass
                 else:
                     self.logger.error(
-                        'Value of resource is not an url, url should start with http or https, or be a path starting with /',
+                        'Value of resource is not an url, url should start with http:// or https://, or be a path starting with a single /',
                         extra={'line_number': self.line_number,
                                'column_number': col_index + 1,
                                'column_name': col_name,
