@@ -41,7 +41,7 @@ public abstract class IntegrationTestBase {
     private static final String DB_USER = "cbio_user";
     private static final String DB_PASSWORD = "somepassword";
     private static final int CLICKHOUSE_HTTP_PORT = 8123;
-    private static final String CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:24.3";
+    private static final String CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:24.10";
     private static final String SKIP_ENV = "CBIOPORTAL_TEST_DB_SKIP";
     private static final String TARGET_DIR = "target/test-db";
     private static final String VERSION_FILE = "cbioportal.version";
