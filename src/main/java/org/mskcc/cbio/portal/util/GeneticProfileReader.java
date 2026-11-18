@@ -144,11 +144,6 @@ public class GeneticProfileReader {
         }
         GeneticProfile referredGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(referredGeneticProfileStableId);
         if (referredGeneticProfile == null) {
-            // Fallback: the referred profile may not be in the cache yet
-            DaoGeneticProfile.reCache();
-            referredGeneticProfile = DaoGeneticProfile.getGeneticProfileByStableId(referredGeneticProfileStableId);
-        }
-        if (referredGeneticProfile == null) {
             throw new RuntimeException("Referred genetic profile not found: "
                     + referredGeneticProfileStableId
                     + " (required by source_stable_id in meta file for "

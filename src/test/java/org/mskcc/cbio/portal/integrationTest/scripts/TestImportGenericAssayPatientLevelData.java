@@ -11,6 +11,9 @@ import java.util.*;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mskcc.cbio.portal.scripts.GenericAssayMetaUtils;
+import static org.mockito.Mockito.mockStatic;
 import org.mskcc.cbio.portal.dao.ClickHouseBulkLoader;
 import org.mskcc.cbio.portal.dao.DaoCancerStudy;
 import org.mskcc.cbio.portal.dao.DaoException;
@@ -116,7 +119,15 @@ public class TestImportGenericAssayPatientLevelData extends IntegrationTestBase 
         File file = new File("src/test/resources/tabDelimitedData/data_patient_generic_assay.txt");
         ImportGenericAssayPatientLevelData parser = new ImportGenericAssayPatientLevelData(file, null, geneticProfileId, null, "name,description");
 
-        parser.importData();
+        try (MockedStatic<GenericAssayMetaUtils> reads =
+                mockStatic(GenericAssayMetaUtils.class)) {
+            // A replica may still return no entities after the inserts in setUp().
+            reads.when(GenericAssayMetaUtils::buildGenericAssayStableIdToEntityIdMap)
+                .thenReturn(Collections.emptyMap());
+            parser.importData(Map.of(geneticEntity1.getStableId(), geneticEntity1.getId(),
+                geneticEntity2.getStableId(), geneticEntity2.getId()));
+            reads.verifyNoInteractions();
+        }
 
         HashMap<Integer,HashMap<Integer, String>> geneticAlterationMap = daoGeneticAlteration.getGeneticAlterationMapForEntityIds(geneticProfileId, Arrays.asList(geneticEntity1.getId(), geneticEntity2.getId()));
 
