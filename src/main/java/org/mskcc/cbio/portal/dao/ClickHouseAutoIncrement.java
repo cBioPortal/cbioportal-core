@@ -195,7 +195,7 @@ public final class ClickHouseAutoIncrement {
         }
     }
 
-    /** Persist high-water marks while retaining counters for subsequent import steps. */
+    /** Persist sequence values while retaining counters for subsequent import steps. */
     public static void persistAllSequences() {
         if (COUNTERS.isEmpty()) {
             return;

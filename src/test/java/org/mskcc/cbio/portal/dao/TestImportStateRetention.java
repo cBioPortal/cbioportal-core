@@ -162,6 +162,23 @@ public class TestImportStateRetention {
     }
 
     @Test
+    public void lastPatientEvictionOnlyRemovesPatientCacheEntry() {
+        Patient deleted = patient(1, 10);
+        Patient survivor = patient(2, 20);
+        queries.clear();
+        DaoPatient.removePatientsFromCache(List.of(10));
+        assertNull(DaoPatient.getPatientsByCancerStudyId(1));
+        assertSame(survivor, DaoPatient.getPatientById(20));
+        assertTrue("Cache eviction must not issue a database deletion", queries.isEmpty());
+        DaoPatient.removeStudyFromCache(1);
+        assertNull(DaoPatient.getPatientsByCancerStudyId(1));
+        assertTrue(queries.isEmpty());
+        Patient replacement = patient(1, 30);
+        assertSame(replacement, DaoPatient.getPatientById(30));
+        assertEquals(java.util.Set.of(replacement), DaoPatient.getPatientsByCancerStudyId(1));
+    }
+
+    @Test
     public void studyEvictionPreservesOtherStudyAndAllowsReinsertion() throws Exception {
         Patient first = patient(1, 10);
         Patient second = patient(2, 20);

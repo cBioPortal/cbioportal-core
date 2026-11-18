@@ -126,10 +126,9 @@ public abstract class ConsoleRunnable implements Runnable {
     }
 
     /**
-     * Runs the command with the same console output as {@link #runInConsole()},
-     * but returns the exit code instead of exiting the JVM.
+     * Runs the command with console output (System.out/System.err).
      *
-     * @return  the exit status code the script would have exited with
+     * @return  a status code indicating success (zero) or error (non-zero)
      */
     public int runInProcess() {
         SysExit status;

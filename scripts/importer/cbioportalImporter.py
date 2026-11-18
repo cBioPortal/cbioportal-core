@@ -93,9 +93,9 @@ def run_directory_import(jvm_args, steps):
         try:
             run_java(*jvm_args.split(' '), IMPORT_STEP_RUNNER_CLASS,
                      '--manifest', manifest_filename, '--result', result_filename)
-        except JavaRunException as jre:
-            jre.failed_step = cbioportal_common.read_failed_step(result_filename, steps)
-            if jre.failed_step is not None and jre.failed_step.class_name == VERSION_UTIL_CLASS:
+        except JavaRunException as jrex:
+            jrex.failed_step = cbioportal_common.read_failed_step(result_filename, steps)
+            if jrex.failed_step is not None and jrex.failed_step.class_name == VERSION_UTIL_CLASS:
                 print_version_mismatch_help()
             raise
 
@@ -146,17 +146,17 @@ def remove_samples(jvm_args, study_ids, sample_ids):
     args.append(sample_ids)
     try:
         run_single_step(jvm_args, JavaStep(REMOVE_SAMPLES_CLASS, args))
-    except JavaRunException as jre:
+    except JavaRunException as jrex:
         LOGGER.error('an error occurred during the java process which removes samples from the database.')
-        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
-        LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+        LOGGER.error('  the exit status returned by the java process was %d' % (jrex.process_return_status))
+        LOGGER.error('  the message sent along with this error was %s' % (jrex.message))
         LOGGER.error('  %s' % ('-' * 70))
         LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
         LOGGER.error('  samples in \'profile_sample\'. Should something go wrong during this process, an effort is made to restore')
         LOGGER.error('  the database to a consistent state. However, you may want to take the extra precaution of deleting the')
         LOGGER.error('  entire study, and then reimporting the entire study with all needed updates included.')
         LOGGER.error('  %s' % ('-' * 70))
-        raise jre
+        raise jrex
 
 def remove_patients(jvm_args, study_ids, patient_ids):
     args = []
@@ -256,7 +256,8 @@ def print_version_mismatch_help():
         'Error, probably due to this version of the portal '
         'being out of sync with the database. '
         'Run the database migration script located at '
-        'CBIOPORTAL_SRC/core/src/main/scripts/migrate_db.py '
+        'https://github.com/cBioPortal/cbioportal/blob/master/'
+        'src/main/resources/db-scripts/clickhouse/migrate/migrate_db.py '
         'before continuing.',
         file=OUTPUT_FILE)
 
@@ -472,7 +473,7 @@ def collect_study_directory_steps(study_directory, update_generic_assay_entity, 
     if cna_long_filepair is not None:
         meta_filename, data_filename = cna_long_filepair
         steps.append(import_data_step(meta_filename=meta_filename, data_filename=data_filename,
-                                      meta_file_dictionary=study_meta_dictionary[meta_filename]))
+                meta_file_dictionary=study_meta_dictionary[meta_filename]))
 
     # Import expression z-score (after expression)
     for meta_filename, data_filename in zscore_filepairs:
@@ -558,11 +559,11 @@ def incremental_data_steps(data_directory, update_generic_assay_entity, meta_fil
             steps.append(import_data_step(meta_filename, data_filename, update_generic_assay_entity, meta_dictionary, incremental=True))
     return steps
 
-def log_incremental_data_error(jre):
-    if jre.failed_step is not None and jre.failed_step.meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
+def log_incremental_data_error(jrex):
+    if jrex.failed_step is not None and jrex.failed_step.meta_file_type == MetaFileTypes.CNA_DISCRETE_LONG:
         LOGGER.error('an error occurred during the java process which updates CNA profile data incrementally.')
-        LOGGER.error('  the exit status returned by the java process was %d' % (jre.process_return_status))
-        LOGGER.error('  the message sent along with this error was %s' % (jre.message))
+        LOGGER.error('  the exit status returned by the java process was %d' % (jrex.process_return_status))
+        LOGGER.error('  the message sent along with this error was %s' % (jrex.message))
         LOGGER.error('  %s' % ('-' * 70))
         LOGGER.error('  One step of this process is to adjust the lists of events in table \'genetic_alteration\' and the list of')
         LOGGER.error('  samples in \'profile_sample\'. Should something go wrong during this process, an effort is made to restore')
@@ -607,8 +608,8 @@ def process_data_directory(jvm_args, data_directory, update_generic_assay_entity
 
     try:
         run_directory_import(jvm_args, steps)
-    except JavaRunException as jre:
-        log_incremental_data_error(jre)
+    except JavaRunException as jrex:
+        log_incremental_data_error(jrex)
         raise
     return study_id
 

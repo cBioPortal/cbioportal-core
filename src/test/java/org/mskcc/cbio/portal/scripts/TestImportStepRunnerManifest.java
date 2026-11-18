@@ -88,11 +88,12 @@ public class TestImportStepRunnerManifest {
     }
 
     @Test
-    public void testEveryStepClassCanBeRun() throws ClassNotFoundException {
+    public void testEveryStepClassCanBeRun() throws ReflectiveOperationException {
         for (String className : ImportStepRunner.STEP_CLASSES) {
             Class<?> stepClass = Class.forName(className);
             if (!className.equals(ImportStepRunner.VERSION_UTIL_CLASS)) {
                 assertTrue(className, ConsoleRunnable.class.isAssignableFrom(stepClass));
+                stepClass.getConstructor(String[].class);
             }
         }
     }

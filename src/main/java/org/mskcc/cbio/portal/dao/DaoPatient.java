@@ -98,6 +98,7 @@ public class DaoPatient {
             if (patients != null) {
                 patients.remove(patient);
                 if (patients.isEmpty()) {
+                    // Remove only the empty patient-cache entry, not the cancer study.
                     byInternalCancerStudyId.remove(studyId);
                 }
             }
@@ -109,6 +110,7 @@ public class DaoPatient {
         if (patients != null) {
             removePatientsFromCache(patients.stream().map(Patient::getInternalId).collect(Collectors.toList()));
         }
+        byInternalCancerStudyId.remove(cancerStudyId);
     }
 
     private static final String PATIENT_SEQUENCE = "seq_patient";

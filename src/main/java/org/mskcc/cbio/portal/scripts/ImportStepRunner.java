@@ -26,12 +26,12 @@ import org.mskcc.cbio.portal.util.VersionUtil;
 /**
  * Runs a list of import steps, written by cbioportalImporter.py, in one JVM.
  *
- * Each step is the class name and arguments that would otherwise be passed to
- * its own {@code java} process. Steps run in order, and the runner stops at the
+ * Each step captures the class name and arguments needed to execute the step.
+ * Steps run in order, and the runner stops at the
  * first step that fails and exits with that step's exit status. Between steps
  * step-local bulk buffers and progress state are reset. DAO caches and ID
  * counters stay current in memory throughout the run, avoiding reads from
- * replicas that may not yet have applied this process's writes.
+ * the ClickHouse database, which may not yet expose this process's recent writes.
  *
  * Manifest format:
  * <pre>
@@ -45,6 +45,7 @@ public class ImportStepRunner {
     static final int EX_OK = 0;
     static final int EX_USAGE = 64;
     static final int EX_SOFTWARE = 70;
+    static final int EX_IOERR = 74;
 
     static final int MANIFEST_VERSION = 1;
 
@@ -93,8 +94,9 @@ public class ImportStepRunner {
     /**
      * Runs the steps in the manifest named on the command line.
      *
-     * @return  the exit status: 0, the status of the failed step, or 64 if the
-     *          command line or manifest is invalid
+     * @return  0 for success, the non-zero status of the first failed step, 64 if
+     *          the command line or manifest is invalid, or 74 if successful
+     *          steps could not be reported in the requested result file
      */
     public static int run(String[] argv) {
         OptionParser parser = new OptionParser();
@@ -151,7 +153,7 @@ public class ImportStepRunner {
             System.out.flush();
             int status = EX_SOFTWARE;
             try {
-                status = runStep(step);
+                status = runStep(step, i);
             } finally {
                 resetAfterStep(status);
             }
@@ -160,11 +162,10 @@ public class ImportStepRunner {
                 return status;
             }
         }
-        writeResult(resultFile, EX_OK, null);
-        return EX_OK;
+        return writeResult(resultFile, EX_OK, null) ? EX_OK : EX_IOERR;
     }
 
-    private static int runStep(Step step) {
+    private static int runStep(Step step, int index) {
         if (VERSION_UTIL_CLASS.equals(step.className())) {
             try {
                 return VersionUtil.check();
@@ -180,7 +181,10 @@ public class ImportStepRunner {
                 .getConstructor(String[].class)
                 .newInstance((Object) step.argArray());
         } catch (ReflectiveOperationException | ClassCastException e) {
-            System.err.println("\nABORTED!");
+            System.err.println("Could not construct import step " + (index + 1)
+                + " (" + step.className() + ") with arguments " + step.args()
+                + ": expected a ConsoleRunnable with a public String[] constructor; "
+                + "class lookup, constructor lookup, or constructor execution failed.");
             e.printStackTrace();
             return EX_SOFTWARE;
         }
@@ -202,17 +206,19 @@ public class ImportStepRunner {
         ProgressMonitor.reset();
     }
 
-    private static void writeResult(File resultFile, int status, Integer failedStep) {
+    private static boolean writeResult(File resultFile, int status, Integer failedStep) {
         if (resultFile == null) {
-            return;
+            return true;
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", status);
         result.put("failed_step", failedStep);
         try {
             new ObjectMapper().writeValue(resultFile, result);
+            return true;
         } catch (IOException e) {
             System.err.println("Could not write import step result file " + resultFile + ": " + e.getMessage());
+            return false;
         }
     }
 }
