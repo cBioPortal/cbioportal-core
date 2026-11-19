@@ -3,7 +3,7 @@
 Checks:
 - The reference is a non-empty tumorTypes array with unique, non-empty string
   codes and string/null names and main types (missing labels are allowed).
-- Each populated ONCOTREE_CODE exists in the selected reference.
+- Each populated ONCOTREE_CODE exists in the selected reference (case-insensitive).
 - Each populated CANCER_TYPE matches that code's mainType.
 - Each populated CANCER_TYPE_DETAILED matches that code's name.
 
@@ -33,7 +33,7 @@ def parse_oncotree_nodes(raw):
             raise ValueError('each tumor type requires a code and string/null name and mainType')
         if any(not isinstance(item.get(field), (str, type(None))) for field in ONCOTREE_LABELS.values()):
             raise ValueError('each tumor type requires a code and string/null name and mainType')
-        code = item['code']
+        code = item['code'].upper()
         if code in nodes:
             raise ValueError('duplicate OncoTree code: ' + code)
         nodes[code] = dict(item, name=item.get('name') or '', mainType=item.get('mainType') or '')
@@ -83,12 +83,13 @@ def oncotree_findings(row, nodes):
     and the expected value.
     """
     code = row.get('ONCOTREE_CODE', '').strip()
-    if code.upper() in UNAVAILABLE_VALUES:
+    lookup_code = code.upper()
+    if lookup_code in UNAVAILABLE_VALUES:
         return
-    if code not in nodes:
+    if lookup_code not in nodes:
         yield 'ONCOTREE_CODE', code, 'a code in the selected OncoTree reference'
         return
-    node = nodes[code]
+    node = nodes[lookup_code]
     for column, field in ONCOTREE_LABELS.items():
         expected = node[field] or 'NA'
         actual = row.get(column, '').strip()

@@ -26,43 +26,45 @@ class StrictModeTests(fixtures.PostClinicalDataFileTestCase):
 
     def test_both_clis_keep_maf_checks_independent(self):
         for module in (validateData, metaImport):
-            for flags, strict, maf in (([], False, False), (['--strict'], True, False),
+            for flags, strict, maf in (([], False, False), (['--strict'], False, True),
                                        (['--strict-mode'], True, False),
-                                       (['-m'], False, True), (['--strict', '-m'], True, True)):
+                                       (['-m'], False, True), (['--strict-mode', '-m'], True, True)):
                 with self.subTest(module=module.__name__, flags=flags), patch.object(
                         sys, 'argv', ['validator', '-s', 'test_data'] + flags):
                     args = module.interface()
                     self.assertEqual(strict, args.strict)
                     self.assertEqual(maf, args.strict_maf_checks)
 
-    def test_strict_offline_combination_exits_with_actionable_error(self):
-        # GIVEN either CLI and either spelling of strict mode with offline data.
+    def test_strict_mode_requires_online_portal_checks(self):
+        # GIVEN either CLI with strict mode and a flag that bypasses the portal.
+        cases = (
+            (['-p', 'saved-portal-info'], 'Remove -p or --strict-mode'),
+            (['--portal_info_dir', 'saved-portal-info'], 'Remove -p or --strict-mode'),
+            (['-n'], 'Remove -n/--no_portal_checks or --strict-mode'),
+            (['--no_portal_checks'], 'Remove -n/--no_portal_checks or --strict-mode'),
+        )
         for module in (validateData, metaImport):
-            for strict_flag in ('--strict', '--strict-mode'):
-                for offline_flag in ('-p', '--portal_info_dir'):
-                    arguments = ['validator', '-s', 'study', strict_flag,
-                                 offline_flag, 'saved-portal-info']
-                    with self.subTest(cli=module.__name__, strict=strict_flag,
-                                      offline=offline_flag):
-                        stderr = io.StringIO()
+            for flags, expected_message in cases:
+                with self.subTest(cli=module.__name__, flags=flags):
+                    arguments = ['validator', '-s', 'study', '--strict-mode'] + flags
+                    stderr = io.StringIO()
 
-                        # WHEN the incompatible command is parsed.
-                        with patch.object(sys, 'argv', arguments), redirect_stderr(stderr):
-                            with self.assertRaises(SystemExit) as result:
-                                module.interface()
+                    # WHEN the incompatible command is parsed.
+                    with patch.object(sys, 'argv', arguments), redirect_stderr(stderr):
+                        with self.assertRaises(SystemExit) as result:
+                            module.interface()
 
-                        # THEN it fails before validation with a corrective message.
-                        self.assertEqual(2, result.exception.code)
-                        self.assertIn('requires online OncoTree access', stderr.getvalue())
-                        self.assertIn('Remove -p or --strict', stderr.getvalue())
+                    # THEN it fails before validation with a corrective message.
+                    self.assertEqual(2, result.exception.code)
+                    self.assertIn(expected_message, stderr.getvalue())
 
     def test_offline_validation_and_strict_online_modes_remain_available(self):
         # GIVEN supported offline and online combinations; -m is independent.
         cases = (
             (['-p', 'saved-portal-info'], False),
             (['-p', 'saved-portal-info', '-m'], False),
-            (['--strict', '-u', 'https://portal.example'], True),
-            (['--strict', '-n'], True),
+            (['--strict-mode', '-u', 'https://portal.example'], True),
+            (['--strict', '-n'], False),
         )
         for module in (validateData, metaImport):
             for flags, expected_strict in cases:
@@ -78,7 +80,7 @@ class StrictModeTests(fixtures.PostClinicalDataFileTestCase):
         # GIVEN an online CLI invocation and a stubbed portal response.
         for strict in (False, True):
             args = validateData.interface(['-s', 'test_data', '-u',
-                'https://portal.example'] + (['--strict'] if strict else []))
+                'https://portal.example'] + (['--strict-mode'] if strict else []))
             logger = logging.getLogger(validateData.__name__)
             original_handlers = list(logger.handlers)
             try:

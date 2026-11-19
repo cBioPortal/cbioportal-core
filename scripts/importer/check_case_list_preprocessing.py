@@ -52,8 +52,7 @@ def read_config(path):
 
 def case_list_from_sequenced_samples_file(path):
     with open(path) as stream:
-        return list(dict.fromkeys(line for line in
-                    (raw.rstrip("\r\n") for raw in stream) if line))
+        return list(dict.fromkeys(raw.rstrip("\r\n") for raw in stream if raw.strip()))
 
 def resolve_staging_path(study_dir, staging_filename):
     """Find the data file named in the config, or return None if it is missing.
@@ -140,7 +139,7 @@ class StagingCaseCollector:
                     self.id_column = row.index(column)
                     return
             # Matrix sample IDs are in the header, so no data rows are needed.
-            self.members = {token for token in row if token.upper() not in NON_CASE_IDS}
+            self.members = {token for token in row if token.strip() and token.upper() not in NON_CASE_IDS}
             self.active = False
             return
         if not line.strip():
@@ -150,7 +149,7 @@ class StagingCaseCollector:
         if self.id_column >= len(row):
             self.error = IndexError(f"{self.filename}: data row has no column {self.id_column}: {line[:80]}")
             self.active = False
-        else:
+        elif row[self.id_column].strip():
             self.members.add(row[self.id_column])
 
 

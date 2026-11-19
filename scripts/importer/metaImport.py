@@ -62,13 +62,13 @@ def interface():
                                    type=str, help='path to study directory.')
     data_source_group.add_argument('-d', '--data_directory',
                                    type=str, help='path to data directory for incremental upload.')
-    parser.add_argument('--strict', '--strict-mode', action='store_true', default=False,
+    parser.add_argument('--strict-mode', dest='strict', action='store_true', default=False,
                         help='Enable additional preprocessing requirements: OncoTree codes/labels, '
                              'CNA identifiers and duplicates, referenced staging files, and case lists. '
-                             'Requires online OncoTree access; incompatible with -p/--portal_info_dir. '
+                             'Requires online portal and OncoTree access. Incompatible with -p and -n. '
                              'Independent of --strict_maf_checks; disabled by default.')
     parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
-                        help='OncoTree version used with --strict to check ONCOTREE_CODE values '
+                        help='OncoTree version used with --strict-mode to check ONCOTREE_CODE values '
                              '(default: oncotree_latest_stable)')
     portal_mode_group = parser.add_mutually_exclusive_group()
     portal_mode_group.add_argument('-u', '--url_server',
@@ -103,10 +103,9 @@ def interface():
                         action='store_true', default=False,
                         help='Option to enable relaxed mode for validator when '
                              'validating clinical data without header definitions')
-    parser.add_argument('-m', '--strict_maf_checks', required=False,
+    parser.add_argument('-m', '--strict_maf_checks', '--strict', required=False,
                         action='store_true', default=False,
-                        help='Option to enable strict mode for validator when '
-                             'validating mutation data')
+                        help='Apply strict mutation checks (--strict is a legacy alias).')
     parser.add_argument('-update', '--update_generic_assay_entity', type=str, required=False, default="False",
                         help='Set as True to update the existing generic assay entities, set as False to keep the existing generic assay entities for generic assay')
     parser.add_argument('-oncokb', '--import_oncokb', action='store_true',
@@ -120,8 +119,10 @@ def interface():
                         help='Path to SQL file used for derived table construction.')
     parsed_args = parser.parse_args()
     if parsed_args.strict and parsed_args.portal_info_dir is not None:
-        parser.error('--strict requires online OncoTree access and cannot be used with '
-                     '-p/--portal_info_dir (offline mode). Remove -p or --strict.')
+        parser.error('--strict-mode requires online OncoTree access and cannot be used with '
+                     '-p/--portal_info_dir (offline mode). Remove -p or --strict-mode.')
+    if parsed_args.strict and parsed_args.no_portal_checks:
+        parser.error('--strict-mode requires portal checks. Remove -n/--no_portal_checks or --strict-mode.')
     return parsed_args
 
 

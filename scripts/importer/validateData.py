@@ -1248,9 +1248,7 @@ class CNAValidator(GenewiseFileValidator):
         if gene_symbol is not None:
             if '|' in gene_symbol:
                 gene_symbol, __ = gene_symbol.split('|', maxsplit=1)
-        if not self.portal.strict_mode:
-            return super().checkGeneIdentification(gene_symbol, entrez_id)
-        if entrez_id is not None:
+        if self.portal.strict_mode and entrez_id is not None:
             normalized = entrez_id.lstrip('0') or '0'
             if not re.fullmatch(r'[0-9]+', entrez_id) or normalized == '0':
                 self.logger.error('Invalid CNA Entrez gene id; this row would not be loaded. '
@@ -1259,13 +1257,7 @@ class CNAValidator(GenewiseFileValidator):
                 return None
             # Integer spellings such as 001 and 1 identify the same gene.
             entrez_id = normalized
-        resolved = super().checkGeneIdentification(gene_symbol, entrez_id)
-        if resolved is None:
-            self.logger.warning('CNA gene could not be resolved; this row would not be loaded. '
-                                'Review the identifier; import can continue with this row omitted.',
-                                extra={'line_number': self.line_number,
-                                       'cause': entrez_id or gene_symbol})
-        return resolved
+        return super().checkGeneIdentification(gene_symbol, entrez_id)
 
 
 class CNADiscreteValidator(CNAValidator):
@@ -5451,22 +5443,23 @@ def interface(args=None):
                         action='store_true', default=False,
                         help='Option to enable relaxed mode for validator when '
                         'validating clinical data without header definitions')
-    parser.add_argument('-m', '--strict_maf_checks', required=False,
+    parser.add_argument('-m', '--strict_maf_checks', '--strict', required=False,
                         action='store_true', default=False,
-                        help='Option to enable strict mode for validator when '
-                             'validating mutation data')
-    parser.add_argument('--strict', '--strict-mode', action='store_true', default=False,
+                        help='Apply strict mutation checks (--strict is a legacy alias).')
+    parser.add_argument('--strict-mode', dest='strict', action='store_true', default=False,
                         help='Enable additional preprocessing requirements: OncoTree codes/labels, '
                              'CNA identifiers and duplicates, referenced staging files, and case lists. '
-                             'Requires online OncoTree access; incompatible with -p/--portal_info_dir. '
+                             'Requires online portal and OncoTree access. Incompatible with -p and -n. '
                              'Independent of --strict_maf_checks; disabled by default.')
     parser.add_argument('--oncotree-version', default='oncotree_latest_stable',
-                        help='OncoTree version used with --strict to check ONCOTREE_CODE values '
+                        help='OncoTree version used with --strict-mode to check ONCOTREE_CODE values '
                              '(default: oncotree_latest_stable)')
     parsed_args = parser.parse_args(args)
     if parsed_args.strict and parsed_args.portal_info_dir is not None:
-        parser.error('--strict requires online OncoTree access and cannot be used with '
-                     '-p/--portal_info_dir (offline mode). Remove -p or --strict.')
+        parser.error('--strict-mode requires online OncoTree access and cannot be used with '
+                     '-p/--portal_info_dir (offline mode). Remove -p or --strict-mode.')
+    if parsed_args.strict and parsed_args.no_portal_checks:
+        parser.error('--strict-mode requires portal checks. Remove -n/--no_portal_checks or --strict-mode.')
     return parsed_args
 
 
@@ -5681,19 +5674,17 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
                               cbioportal_common.MetaFileTypes.SAMPLE_RESOURCES,
                               cbioportal_common.MetaFileTypes.GENE_PANEL_MATRIX):
             continue
-        for validator in sorted(
-                validators_by_meta_type[meta_file_type],
-                key=lambda validator: validator and validator.filename):
-            # if there was no validator for this meta file
-            if validator is None:
-                continue
+        validators = (validator for validator in validators_by_meta_type[meta_file_type]
+                      if validator is not None)
+        for validator in sorted(validators, key=lambda validator: validator.filename):
             validator.validate()
 
     if portal_instance.strict_mode:
         # Case lists were read before mutation rows, so compare membership now.
         if mutation_sample_ids is not None:
             called_samples = set().union(*(validator.mutation_samples for validator in
-                validators_by_meta_type.get(cbioportal_common.MetaFileTypes.MUTATION, [])))
+                validators_by_meta_type.get(cbioportal_common.MetaFileTypes.MUTATION, [])
+                if validator is not None))
             missing_mutation_samples = called_samples - mutation_sample_ids
             if missing_mutation_samples:
                 logger.error("Sample IDs from mutation data are missing from the '_sequenced' case list.",
