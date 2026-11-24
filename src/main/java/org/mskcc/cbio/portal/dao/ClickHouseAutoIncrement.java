@@ -195,7 +195,8 @@ public final class ClickHouseAutoIncrement {
         }
     }
 
-    private static void persistAllSequences() {
+    /** Persist sequence values while retaining counters for subsequent import steps. */
+    public static void persistAllSequences() {
         if (COUNTERS.isEmpty()) {
             return;
         }

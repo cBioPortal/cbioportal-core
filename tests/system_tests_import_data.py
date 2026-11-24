@@ -4,12 +4,50 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import io
+import json
+import os
+import shutil
+import tempfile
 import unittest
 from unittest import mock
 from unittest.mock import call
 from importer import cbioportalImporter
+from importer.cbioportal_common import JavaRunException, MetaFileTypes
 
 common_part = ('-Dspring.profiles.active=dbcp', '-cp', 'test.jar')
+STEP_RUNNER_CLASS = 'org.mskcc.cbio.portal.scripts.ImportStepRunner'
+VERSION_UTIL_CLASS = 'org.mskcc.cbio.portal.util.VersionUtil'
+
+
+class StepRunnerRecorder:
+    '''
+    run_java stand-in for directory imports, which run their steps in one JVM
+    through ImportStepRunner. call_args_list holds one call per manifest step,
+    shaped like the java call that would run that step on its own.
+    '''
+
+    def __init__(self, fail_step_class=None, fail_status=1):
+        self.runs = 0
+        self.call_args_list = []
+        self.fail_step_class = fail_step_class
+        self.fail_status = fail_status
+
+    def __call__(self, *args):
+        self.runs += 1
+        runner = args.index(STEP_RUNNER_CLASS)
+        options = args[runner + 1:]
+        with open(options[options.index('--manifest') + 1]) as manifest_file:
+            steps = json.load(manifest_file)['steps']
+        result_filename = options[options.index('--result') + 1]
+        for index, step in enumerate(steps):
+            self.call_args_list.append(call(*args[:runner], step['class'], *step['args']))
+            if step['class'] == self.fail_step_class:
+                with open(result_filename, 'w') as result_file:
+                    json.dump({'status': self.fail_status, 'failed_step': index}, result_file)
+                raise JavaRunException(self.fail_status, 'Aborting due to error while executing step.')
+        with open(result_filename, 'w') as result_file:
+            json.dump({'status': 0, 'failed_step': None}, result_file)
 
 class DataImporterTests(unittest.TestCase):
     '''
@@ -20,7 +58,7 @@ class DataImporterTests(unittest.TestCase):
         self.maxDiff = None
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
-    @mock.patch('importer.cbioportalImporter.run_java')
+    @mock.patch('importer.cbioportalImporter.run_java', new_callable=StepRunnerRecorder)
     def test_full_study_load(self, run_java, locate_jar):
         '''
         Tests java commands full study load produces
@@ -85,11 +123,12 @@ class DataImporterTests(unittest.TestCase):
             for mol_profile_call in mol_profile_calls))
         # The study is left UNAVAILABLE until the derived tables are rebuilt
         self.assertNotIn('AVAILABLE', [c.args[-2] for c in run_java.call_args_list])
+        self.assertEqual(run_java.runs, 1)
         self.assertEqual(study_id, 'study_es_0')
 
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
-    @mock.patch('importer.cbioportalImporter.run_java')
+    @mock.patch('importer.cbioportalImporter.run_java', new_callable=StepRunnerRecorder)
     def test_incremental_load(self, run_java, locate_jar):
         '''
         Tests java commands incremental load produces
@@ -156,7 +195,7 @@ class DataImporterTests(unittest.TestCase):
 
 
     @mock.patch('importer.cbioportalImporter.locate_jar')
-    @mock.patch('importer.cbioportalImporter.run_java')
+    @mock.patch('importer.cbioportalImporter.run_java', new_callable=StepRunnerRecorder)
     def test_incremental_load_cna_discrete_long(self, run_java, locate_jar):
         '''
         Tests java commands incremental load produces
@@ -226,6 +265,53 @@ class DataImporterTests(unittest.TestCase):
                 call(*common_part, 'org.mskcc.cbio.portal.util.VersionUtil',),
                 call(*common_part, 'org.mskcc.cbio.portal.scripts.RemovePatients', '--study_ids', 'STUDY1,STUDY2', '--patient_ids', 'PATIENT1,PATIENT2'),
             ])
+
+    @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
+    def test_version_mismatch_prints_migration_help(self, locate_jar):
+        recorder = StepRunnerRecorder(fail_step_class=VERSION_UTIL_CLASS)
+        output = io.StringIO()
+        with mock.patch('importer.cbioportalImporter.run_java', recorder), \
+                mock.patch('importer.cbioportalImporter.OUTPUT_FILE', output):
+            with self.assertRaises(JavaRunException) as raised:
+                cbioportalImporter.main(cbioportalImporter.interface(['--study_directory', 'test_data/study_es_0']))
+        self.assertEqual(raised.exception.failed_step.class_name, VERSION_UTIL_CLASS)
+        self.assertEqual(raised.exception.process_return_status, 1)
+        self.assertIn('migrate_db.py', output.getvalue())
+
+    @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
+    def test_incremental_cna_long_failure_is_reported(self, locate_jar):
+        recorder = StepRunnerRecorder(fail_step_class='org.mskcc.cbio.portal.scripts.ImportProfileData', fail_status=65)
+        with mock.patch('importer.cbioportalImporter.run_java', recorder):
+            with self.assertLogs('importer.cbioportalImporter', level='ERROR') as logs:
+                with self.assertRaises(JavaRunException) as raised:
+                    cbioportalImporter.main(cbioportalImporter.interface(['--data_directory', 'test_data/study_es_0_inc/cna_long']))
+        self.assertEqual(raised.exception.failed_step.meta_file_type, MetaFileTypes.CNA_DISCRETE_LONG)
+        self.assertIn('the exit status returned by the java process was 65', '\n'.join(logs.output))
+
+    @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
+    def test_missing_sample_file_runs_nothing(self, locate_jar):
+        study_directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, study_directory)
+        for filename in ('meta_study.txt', 'meta_cancer_type.txt', 'data_cancer_type.txt'):
+            shutil.copy(os.path.join('test_data/study_es_0', filename), study_directory)
+        recorder = StepRunnerRecorder()
+        with mock.patch('importer.cbioportalImporter.run_java', recorder):
+            with self.assertRaisesRegex(RuntimeError, 'No sample attribute file found'):
+                cbioportalImporter.main(cbioportalImporter.interface(['--study_directory', study_directory]))
+        self.assertEqual(recorder.runs, 0)
+        self.assertEqual(recorder.call_args_list, [])
+
+    @mock.patch('importer.cbioportalImporter.locate_jar', return_value='test.jar')
+    def test_incremental_preparation_failure_runs_nothing(self, locate_jar):
+        recorder = StepRunnerRecorder()
+        with mock.patch('importer.cbioportalImporter.run_java', recorder), \
+                mock.patch('importer.cbioportalImporter.case_list_update_steps',
+                           side_effect=RuntimeError('Invalid case list')):
+            with self.assertRaisesRegex(RuntimeError, 'Invalid case list'):
+                cbioportalImporter.main(cbioportalImporter.interface(
+                    ['--data_directory', 'test_data/study_es_0_inc/cna_long']))
+        self.assertEqual(recorder.runs, 0)
+        self.assertEqual(recorder.call_args_list, [])
 
 if __name__ == '__main__':
     unittest.main(buffer=True)

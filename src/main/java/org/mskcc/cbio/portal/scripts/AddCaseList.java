@@ -70,7 +70,8 @@ public class AddCaseList extends ConsoleRunnable {
       DaoSampleList daoSampleList = new DaoSampleList();
       SampleList sampleList = daoSampleList.getSampleListByStableId(stableId);
       if (sampleList != null) {
-         ProgressMonitor.logWarning("Case list with this stable Id already exists:  " + stableId + ". Will keep the existing one.");
+         throw new IllegalArgumentException("Case list with this stable Id already exists: " + stableId
+                 + ". Refusing to skip creation; the existing row may be stale after a study reimport.");
       }
       else {
 	      sampleList = new SampleList();

@@ -84,7 +84,7 @@ public class ImportProfileData extends ConsoleRunnable {
                 importer.importData();
             } else if (geneticProfile.getGeneticAlterationType() == GeneticAlterationType.GENERIC_ASSAY) {
                 // add all missing `genetic_entities` for this assay to the database
-                ImportGenericAssayEntity.importData(dataFile, geneticProfile.getGeneticAlterationType(), geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"), updateInfo);
+                Map<String, Integer> genericAssayEntities = ImportGenericAssayEntity.importData(dataFile, geneticProfile.getGeneticAlterationType(), geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"), updateInfo);
                 // use a different importer for patient level data
                 String patientLevel = geneticProfile.getOtherMetaDataField("patient_level");
                 if (patientLevel != null && patientLevel.trim().toLowerCase().equals("true")) {
@@ -92,7 +92,7 @@ public class ImportProfileData extends ConsoleRunnable {
                         throw new UnsupportedOperationException("Incremental upload for generic assay patient_level data is not supported. Please use sample level instead.");
                     }
                     ImportGenericAssayPatientLevelData genericAssayProfileImporter = new ImportGenericAssayPatientLevelData(dataFile, geneticProfile.getTargetLine(), geneticProfile.getGeneticProfileId(), genePanel, geneticProfile.getOtherMetaDataField("generic_entity_meta_properties"));
-                    genericAssayProfileImporter.importData();
+                    genericAssayProfileImporter.importData(genericAssayEntities);
                 } else {
                     // use ImportTabDelimData importer for non-patient level data
                     ImportTabDelimData genericAssayProfileImporter = new ImportTabDelimData(
@@ -104,7 +104,7 @@ public class ImportProfileData extends ConsoleRunnable {
                         overwriteExisting,
                         daoGene
                     );
-                    genericAssayProfileImporter.importData();
+                    genericAssayProfileImporter.importData(genericAssayEntities);
                 }
             } else if(
                 geneticProfile.getGeneticAlterationType() == GeneticAlterationType.COPY_NUMBER_ALTERATION 
