@@ -220,6 +220,21 @@ public class ProgressMonitor {
         progressMonitor.warningCounts.clear();
     }
 
+    /**
+     * Reset all progress, warnings and messages, as in a freshly started JVM.
+     */
+    public static void reset() {
+        progressMonitor.maxValue = 0;
+        progressMonitor.curValue = 0;
+        progressMonitor.currentMessage = null;
+        progressMonitor.log = new StringBuffer();
+        progressMonitor.consoleMode = false;
+        progressMonitor.showProgress = false;
+        progressMonitor.warnings.clear();
+        progressMonitor.warningCounts.clear();
+        progressMonitor.debugMessages.clear();
+    }
+
     public static ArrayList<String> getMessages() {
         ArrayList<String> ret = getWarnings();
         ret.addAll(progressMonitor.debugMessages);
