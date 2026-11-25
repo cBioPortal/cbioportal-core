@@ -4655,6 +4655,10 @@ class GenericAssayWiseFileValidator(FeaturewiseFileValidator):
         # reset REQUIRED_HEADERS for each generic assay meta file, and then add headers defined in generic_entity_meta_properties
         self.REQUIRED_HEADERS = ['ENTITY_STABLE_ID']
         self.REQUIRED_HEADERS.extend([x.strip() for x in self.meta_dict['generic_entity_meta_properties'].split(',')])
+        # cBioPortal looks up generic assay entities case-insensitively, so IDs
+        # that differ only in case collide after import; maps each lowercased
+        # ENTITY_STABLE_ID to its first spelling and line number
+        self.entity_ids_by_lowercase = {}
 
     REQUIRED_HEADERS = ['ENTITY_STABLE_ID']
     OPTIONAL_HEADERS = []
@@ -4672,6 +4676,17 @@ class GenericAssayWiseFileValidator(FeaturewiseFileValidator):
             self.logger.error('Feature id contains one or more illegal characters',
                               extra={'line_number': self.line_number,
                                      'cause': 'id was`' + value + '` and only alpha-numeric, _, . and - are allowed.'})
+
+        first_seen = self.entity_ids_by_lowercase.get(value.lower())
+        if first_seen is None:
+            self.entity_ids_by_lowercase[value.lower()] = (value, self.line_number)
+        elif first_seen[0] != value:
+            self.logger.error(
+                'ENTITY_STABLE_ID differs only in case from `%s` on line %d; '
+                'cBioPortal does not distinguish entity IDs by case',
+                first_seen[0], first_seen[1],
+                extra={'line_number': self.line_number,
+                       'cause': value})
 
         return value
 
