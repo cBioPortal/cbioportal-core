@@ -1,7 +1,10 @@
 
 import os
+import re
 import subprocess
 import sys
+import time
+from pathlib import Path
 
 
 def rebuild_derived_tables(derived_table_sql_filepath=None):
@@ -47,6 +50,40 @@ def rebuild_derived_tables(derived_table_sql_filepath=None):
         print(RED + f"Derived table construction failed: {e}" + END, file=sys.stderr)
         return False
 
+# A retry opens a new client session. Resume only inside the standalone SQL
+# preamble used by populate_derived_tables.sql, before any session-dependent
+# statements. Restore its numeric SETs and leave all completed writes alone.
+def _discovery_retry_sql(sql, result):
+    if result.returncode != 236:
+        return None
+    failure = re.search(
+        r"^Code: 236\.[^\n]*Timeout, interrupting no-future-parts discovery\. \(ABORTED\)[^\n]*\n"
+        r"\(query: (OPTIMIZE TABLE \w+ FINAL;)\)\s*\Z", result.stderr, re.MULTILINE)
+    if not failure:
+        return None
+    statement = failure.group(1)
+    if sql.count(statement) != 1:
+        return None
+    settings = []
+    lines = sql.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        command = line.strip()
+        if command == statement:
+            return ''.join(settings + lines[index:])
+        if not command or command.startswith('--'):
+            continue
+        if re.fullmatch(r"SET \w+ = [0-9]+;", command):
+            settings.append(line)
+            continue
+        if not re.fullmatch(
+            r"(?:TRUNCATE TABLE IF EXISTS \w+ SETTINGS alter_sync = 2"
+            r"|OPTIMIZE TABLE \w+ FINAL"
+            r"|SELECT sleepEachRow\(1\) FROM numbers\(\{optimize_backoff_secs:UInt64\}\) FORMAT Null);",
+            command):
+            return None
+    return None
+
+
 def execute_clickhouse_sql(sql_filepath, ch_props):
     """Execute a SQL file via the clickhouse client using --multiquery."""
     cmd = [
@@ -57,19 +94,27 @@ def execute_clickhouse_sql(sql_filepath, ch_props):
         '--password', ch_props['password'],
         '--database', ch_props['database'],
         '--multiquery',
-        '--queries-file', sql_filepath,
         '--param_optimize_backoff_secs', ch_props['optimize_backoff_secs'],
         '--echo',
         '--send_logs_level=information'
     ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-    except FileNotFoundError:
-        raise RuntimeError(
-            "clickhouse client not found. Install it with:\n"
-            "  curl https://clickhouse.com/install | sh"
-        )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"clickhouse client failed (exit {result.returncode}):\n{result.stderr}"
-        )
+    sql = Path(sql_filepath).read_text(encoding='utf-8')
+    for delay in (30, 60, 120, None):
+        try:
+            result = subprocess.run(cmd, input=sql, capture_output=True, text=True)
+        except FileNotFoundError:
+            raise RuntimeError(
+                "clickhouse client not found. Install it with:\n"
+                "  curl https://clickhouse.com/install | sh"
+            )
+        if result.returncode == 0:
+            return
+        remaining = _discovery_retry_sql(sql, result)
+        if remaining is None or delay is None:
+            raise RuntimeError(
+                f"clickhouse client failed (exit {result.returncode}):\n{result.stderr}"
+            )
+        print(f"ClickHouse OPTIMIZE part discovery timed out; retrying the failed statement "
+              f"in {delay}s.", file=sys.stderr, flush=True)
+        time.sleep(delay)
+        sql = remaining
