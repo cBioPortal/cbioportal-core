@@ -4849,6 +4849,14 @@ class GenericAssayBinaryValidator(GenericAssayWiseFileValidator):
 
 # FIXME: returning simple valid (meta_fn, data_fn) pairs would be cleaner,
 # Validator objects can be instantiated with a portal instance elsewhere
+# species, NCBI build and genome name for each reference genome a study can use
+REFERENCE_GENOME_MAP = {
+    'hg19': ('human', 'GRCh37', 'hg19'),
+    'hg38': ('human', 'GRCh38', 'hg38'),
+    'mm10': ('mouse', 'GRCm38', 'mm10')
+}
+
+
 def process_metadata_files(directory, portal_instance, logger, relaxed_mode, strict_maf_checks):
 
     """Parse the meta files in a directory and create data file validators.
@@ -4888,11 +4896,6 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
     tags_file_path = None
 
     # implemented ref genomes
-    reference_genome_map = {
-        'hg19': ('human', 'GRCh37', 'hg19'),
-        'hg38': ('human', 'GRCh38', 'hg38'),
-        'mm10': ('mouse', 'GRCm38', 'mm10')
-    }
 
     for filename in filenames:
 
@@ -4968,15 +4971,15 @@ def process_metadata_files(directory, portal_instance, logger, relaxed_mode, str
 
             # if reference_genome is specified in the meta file, override the defaults in portal properties
             if 'reference_genome' in meta_dictionary:
-                if meta_dictionary['reference_genome'] not in reference_genome_map:
+                if meta_dictionary['reference_genome'] not in REFERENCE_GENOME_MAP:
                     logger.error('Unknown reference genome defined. Should be one of %s' %
-                                 list(reference_genome_map.keys()),
+                                 list(REFERENCE_GENOME_MAP.keys()),
                                  extra={
                                      'filename_': filename,
                                      'cause': meta_dictionary['reference_genome'].strip()
                                  })
                 else:
-                    genome_info = reference_genome_map[meta_dictionary['reference_genome']]
+                    genome_info = REFERENCE_GENOME_MAP[meta_dictionary['reference_genome']]
                     logger.info('Setting reference genome to %s (%s, %s)' % genome_info,
                                 extra={'filename_': filename})
                     portal_instance.species, portal_instance.ncbi_build, portal_instance.reference_genome = genome_info
@@ -5767,9 +5770,45 @@ def validate_study(study_dir, portal_instance, logger, relaxed_mode, strict_maf_
     logger.info('Validation complete')
 
 
-def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks):
+def request_study_reference_genome(server_url, study_id, logger):
+    """Return the reference genome of a study on the portal, such as 'hg38'.
+
+    Return None if the portal has no study with this id.
+    """
+    service_url = server_url + '/api/studies/' + study_id
+    logger.debug("Requesting reference genome of study '%s' from portal at '%s'",
+                 study_id, server_url)
+    response = requests.get(service_url)
+    if response.status_code == 404:
+        return None
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        raise ConnectionError(
+            'Failed to fetch study from the portal at [{}]'.format(service_url)
+        ) from e
+    return response.json().get('referenceGenome')
+
+
+def validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks,
+                      server_url=None):
+    """Validate the data files of an incremental upload.
+
+    If `server_url` is given, the genome build checks use the reference genome
+    of the study on that portal; otherwise they are skipped.
+    """
     # walk over the meta files in the dir and get properties of the study
-    validators_by_meta_type, *_ = process_metadata_files(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
+    validators_by_meta_type, _, _, study_id, *_ = process_metadata_files(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
+    if server_url is not None and study_id is not None:
+        reference_genome = request_study_reference_genome(server_url, study_id, logger)
+        if reference_genome in REFERENCE_GENOME_MAP:
+            genome_info = REFERENCE_GENOME_MAP[reference_genome]
+            logger.info('Setting reference genome to %s (%s, %s) from study %s on the portal',
+                        *genome_info, study_id)
+            portal_instance.species, portal_instance.ncbi_build, portal_instance.reference_genome = genome_info
+        else:
+            logger.info('Reference genome of study %s not found on the portal -- '
+                        'skipping genome build checks', study_id)
     for meta_file_type, validators in validators_by_meta_type.items():
         # if there was no validator for this meta file
         if not validators:
@@ -5885,12 +5924,16 @@ def main_validate(args):
     cbio_version = portal_instance.portal_version
 
     if partial_data:
-        # Relax the genome build check for partial (aka incremental) upload until https://github.com/cBioPortal/cbioportal-core/issues/98 is implemented
-        # In case of mismatched genome build a warning will be given during the loading step. See https://github.com/cBioPortal/cbioportal-core/issues/99
+        # An incremental upload has no meta_study file, so the genome build
+        # checks use the reference genome of the study on the portal. Without a
+        # portal to ask, they are skipped; a mismatched genome build then gives a
+        # warning during the loading step. See https://github.com/cBioPortal/cbioportal-core/issues/99
         portal_instance.species = None
         portal_instance.reference_genome = None
         portal_instance.ncbi_build = None
-        validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
+        online = not (args.no_portal_checks or args.portal_info_dir)
+        validate_data_dir(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks,
+                          server_url=server_url if online else None)
     else:
         validate_study(data_dir, portal_instance, logger, relaxed_mode, strict_maf_checks)
 
