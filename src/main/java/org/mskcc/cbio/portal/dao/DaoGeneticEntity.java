@@ -30,18 +30,27 @@ public class DaoGeneticEntity {
 
     public static GeneticEntity addNewGeneticEntity(GeneticEntity geneticEntity) throws DaoException {
 
+        long entityId = ClickHouseAutoIncrement.nextId("seq_genetic_entity");
+        geneticEntity.setId((int) entityId);
+
+        if (ClickHouseBulkLoader.isBulkLoad()) {
+            ClickHouseBulkLoader.getClickHouseBulkLoader("genetic_entity").insertRecord(
+                Long.toString(entityId),
+                geneticEntity.getEntityType(),
+                geneticEntity.getStableId());
+            return geneticEntity;
+        }
+
         Connection con = null;
         PreparedStatement pstmt = null;
         try {
             con = JdbcUtil.getDbConnection(DaoGeneticEntity.class);
-            long entityId = ClickHouseAutoIncrement.nextId("seq_genetic_entity");
             pstmt = con.prepareStatement("INSERT INTO genetic_entity (`id`, `entity_type`, `stable_id`) "
                     + "VALUES(?,?,?)");
             pstmt.setLong(1, entityId);
             pstmt.setString(2, geneticEntity.getEntityType());
             pstmt.setString(3, geneticEntity.getStableId());
             pstmt.executeUpdate();
-            geneticEntity.setId((int) entityId);
         } catch (SQLException e) {
             throw new DaoException(e);
         } finally {
